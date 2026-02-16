@@ -201,22 +201,6 @@ export default function MemberDashboard() {
   const [guestCount, setGuestCount] = useState("1");
   const [specialRequests, setSpecialRequests] = useState("");
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="space-y-4 w-full max-w-md px-4">
-          <Skeleton className="h-8 w-48 mx-auto" />
-          <Skeleton className="h-4 w-64 mx-auto" />
-          <Skeleton className="h-48 w-full rounded-md" />
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <LoginGate />;
-  }
-
   const bookingsQuery = useQuery<BookingRequest[]>({
     queryKey: ["/api/booking-requests/me"],
     queryFn: async () => {
@@ -225,6 +209,7 @@ export default function MemberDashboard() {
       if (!res.ok) throw new Error("Failed to load bookings");
       return res.json();
     },
+    enabled: isAuthenticated,
   });
 
   const sharedDatesQuery = useQuery<SharedDateRequest[]>({
@@ -235,25 +220,18 @@ export default function MemberDashboard() {
       if (!res.ok) throw new Error("Failed to load shared dates");
       return res.json();
     },
-    enabled: retreatType === "shared" && bookingStep === "configure",
+    enabled: isAuthenticated && retreatType === "shared" && bookingStep === "configure",
   });
 
   const activePartnersQuery = useQuery<Partner[]>({
     queryKey: ["/api/partners/active"],
-    enabled: view === "services",
+    enabled: isAuthenticated && view === "services",
   });
 
   const allServicesQuery = useQuery<PartnerService[]>({
     queryKey: ["/api/services"],
-    enabled: view === "services",
+    enabled: isAuthenticated && view === "services",
   });
-
-  const computeEndDate = (start: string, days: number) => {
-    if (!start) return "";
-    const d = new Date(start);
-    d.setDate(d.getDate() + days);
-    return d.toISOString().split("T")[0];
-  };
 
   const createBookingMutation = useMutation({
     mutationFn: async (data: {
@@ -290,6 +268,29 @@ export default function MemberDashboard() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="space-y-4 w-full max-w-md px-4">
+          <Skeleton className="h-8 w-48 mx-auto" />
+          <Skeleton className="h-4 w-64 mx-auto" />
+          <Skeleton className="h-48 w-full rounded-md" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginGate />;
+  }
+
+  const computeEndDate = (start: string, days: number) => {
+    if (!start) return "";
+    const d = new Date(start);
+    d.setDate(d.getDate() + days);
+    return d.toISOString().split("T")[0];
+  };
 
   const handleSubmitBooking = () => {
     if (retreatType === "private" && !tierPrivateAvailable(housingTier)) {
