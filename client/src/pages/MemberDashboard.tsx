@@ -273,6 +273,7 @@ export default function MemberDashboard() {
       setPreferredStartDate("");
       setDuration("3");
       setHousingTier("essential");
+      setRetreatType("shared");
       setGuestCount("1");
       setSpecialRequests("");
       queryClient.invalidateQueries({ queryKey: ["/api/booking-requests/me"] });
@@ -289,6 +290,11 @@ export default function MemberDashboard() {
   });
 
   const handleSubmitBooking = () => {
+    if (retreatType === "private" && !tierPrivateAvailable(housingTier)) {
+      toast({ title: "Private Not Available", description: "Private retreats require Premium or Elite housing. Please upgrade your tier.", variant: "destructive" });
+      setShowBookingDialog(false);
+      return;
+    }
     const endDate = computeEndDate(preferredStartDate, parseInt(duration));
     createBookingMutation.mutate({
       retreatType,
