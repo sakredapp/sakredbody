@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 import {
   applications,
   retreats,
@@ -35,6 +35,7 @@ export interface IStorage {
   getBookingRequestsByUser(userId: string): Promise<BookingRequest[]>;
   getAllBookingRequests(): Promise<BookingRequest[]>;
   getBookingRequest(id: number): Promise<BookingRequest | undefined>;
+  getSharedRetreatRequests(): Promise<BookingRequest[]>;
   updateBookingRequestStatus(id: number, status: string, conciergeNotes?: string): Promise<BookingRequest | undefined>;
   getPartners(): Promise<Partner[]>;
   getPartner(id: number): Promise<Partner | undefined>;
@@ -104,6 +105,15 @@ export class DatabaseStorage implements IStorage {
 
   async getAllBookingRequests(): Promise<BookingRequest[]> {
     return db.select().from(bookingRequests);
+  }
+
+  async getSharedRetreatRequests(): Promise<BookingRequest[]> {
+    return db.select().from(bookingRequests).where(
+      and(
+        eq(bookingRequests.retreatType, "shared"),
+        ne(bookingRequests.status, "cancelled")
+      )
+    );
   }
 
   async updateBookingRequestStatus(id: number, status: string, conciergeNotes?: string): Promise<BookingRequest | undefined> {

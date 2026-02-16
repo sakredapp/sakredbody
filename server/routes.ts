@@ -77,8 +77,13 @@ export async function registerRoutes(
   });
 
   const bookingInputSchema = z.object({
-    retreatId: z.number().int().positive(),
-    propertyId: z.number().int().positive(),
+    retreatId: z.number().int().positive().nullable().optional(),
+    propertyId: z.number().int().positive().nullable().optional(),
+    retreatType: z.enum(["private", "shared"]).default("shared"),
+    preferredStartDate: z.string().nullable().optional(),
+    preferredEndDate: z.string().nullable().optional(),
+    duration: z.number().int().min(2).max(14).default(3),
+    housingTier: z.enum(["essential", "premium", "elite"]).default("essential"),
     guestCount: z.number().int().min(1).max(10).default(1),
     specialRequests: z.string().nullable().optional(),
   });
@@ -88,16 +93,15 @@ export async function registerRoutes(
       const userId = req.user.claims.sub;
       const parsed = bookingInputSchema.parse(req.body);
 
-      const retreat = await storage.getRetreat(parsed.retreatId);
-      if (!retreat) return res.status(404).json({ message: "Retreat not found" });
-
-      const property = await storage.getProperty(parsed.propertyId);
-      if (!property) return res.status(404).json({ message: "Property not found" });
-
       const booking = await storage.createBookingRequest({
         userId,
-        retreatId: parsed.retreatId,
-        propertyId: parsed.propertyId,
+        retreatId: parsed.retreatId || null,
+        propertyId: parsed.propertyId || null,
+        retreatType: parsed.retreatType,
+        preferredStartDate: parsed.preferredStartDate || null,
+        preferredEndDate: parsed.preferredEndDate || null,
+        duration: parsed.duration,
+        housingTier: parsed.housingTier,
         guestCount: parsed.guestCount,
         specialRequests: parsed.specialRequests || null,
       });
@@ -110,6 +114,25 @@ export async function registerRoutes(
           field: err.errors[0].path.join('.'),
         });
       }
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.get("/api/shared-retreat-dates", isAuthenticated, async (_req, res) => {
+    try {
+      const sharedRequests = await storage.getSharedRetreatRequests();
+      const dates = sharedRequests
+        .filter(r => r.preferredStartDate && r.preferredEndDate)
+        .map(r => ({
+          startDate: r.preferredStartDate,
+          endDate: r.preferredEndDate,
+          duration: r.duration,
+          guestCount: r.guestCount,
+          status: r.status,
+        }));
+      res.json(dates);
+    } catch (err) {
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });
     }

@@ -66,11 +66,19 @@ export type InsertProperty = z.infer<typeof insertPropertySchema>;
 export const bookingStatusEnum = z.enum(["requested", "confirmed", "completed", "cancelled"]);
 export type BookingStatus = z.infer<typeof bookingStatusEnum>;
 
+export const retreatTypeEnum = z.enum(["private", "shared"]);
+export type RetreatType = z.infer<typeof retreatTypeEnum>;
+
 export const bookingRequests = pgTable("booking_requests", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull(),
-  retreatId: integer("retreat_id").notNull(),
-  propertyId: integer("property_id").notNull(),
+  retreatId: integer("retreat_id"),
+  propertyId: integer("property_id"),
+  retreatType: text("retreat_type").notNull().default("shared"),
+  preferredStartDate: text("preferred_start_date"),
+  preferredEndDate: text("preferred_end_date"),
+  duration: integer("duration").default(3),
+  housingTier: text("housing_tier").default("essential"),
   status: text("status").notNull().default("requested"),
   guestCount: integer("guest_count").notNull().default(1),
   specialRequests: text("special_requests"),
