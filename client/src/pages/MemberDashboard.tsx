@@ -120,30 +120,64 @@ type SharedDateRequest = {
 
 function LoginGate() {
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <header className="border-b border-border/50 bg-background/80 backdrop-blur-md" style={{ zIndex: 9999 }}>
+    <div className="min-h-screen relative flex flex-col">
+      <div
+        className="absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: "url('/images/member-login-bg.jpg')" }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/70" />
+
+      <header className="relative backdrop-blur-sm" style={{ zIndex: 9999 }}>
         <div className="container max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
-          <Link href="/" className="font-display text-xl tracking-tight" data-testid="link-home">Sakred Body</Link>
+          <Link href="/" className="font-display text-xl tracking-tight text-white/90" data-testid="link-home">Sakred Body</Link>
         </div>
       </header>
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className="max-w-md w-full text-center space-y-6">
-          <div className="space-y-2">
-            <h1 className="font-display text-3xl" data-testid="text-login-heading">Member Portal</h1>
-            <p className="text-muted-foreground">
-              Sign in to design your retreat, select your housing, and schedule your concierge call.
+
+      <div className="relative flex-1 flex items-center justify-center p-4">
+        <div className="max-w-lg w-full text-center space-y-8">
+          <div className="space-y-1">
+            <p className="text-white/60 text-sm uppercase tracking-[0.3em] font-medium">Exclusive Access</p>
+            <h1 className="font-display text-5xl md:text-6xl text-white leading-tight" data-testid="text-login-heading">Member Portal</h1>
+            <div className="w-16 h-px bg-gold mx-auto mt-4" />
+          </div>
+
+          <p className="text-white/70 text-lg leading-relaxed max-w-sm mx-auto">
+            Design your private retreat in Puerto Rico. Select your housing, choose your dates, and our concierge handles the rest.
+          </p>
+
+          <div className="space-y-4 pt-2">
+            <a href="/api/login" data-testid="button-login">
+              <Button size="lg" className="w-full max-w-xs mx-auto bg-gold border-gold-border text-white text-base">
+                Enter the Portal
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </a>
+            <p className="text-white/40 text-xs">
+              Members only. If you haven't been accepted yet, <Link href="/" className="underline text-white/50">apply here</Link>.
             </p>
           </div>
-          <a href="/api/login" data-testid="button-login">
-            <Button size="lg" className="w-full bg-gold border-gold-border text-white">
-              Sign In to Continue
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          </a>
-          <p className="text-xs text-muted-foreground">
-            Members only. If you haven't been accepted yet, <Link href="/" className="underline">apply here</Link>.
-          </p>
+
+          <div className="flex items-center justify-center gap-8 pt-6 flex-wrap">
+            <div className="text-center">
+              <p className="text-white/80 font-display text-xl">3-14</p>
+              <p className="text-white/40 text-xs uppercase tracking-wider">Day Retreats</p>
+            </div>
+            <div className="w-px h-8 bg-white/20" />
+            <div className="text-center">
+              <p className="text-white/80 font-display text-xl">Private</p>
+              <p className="text-white/40 text-xs uppercase tracking-wider">or Shared</p>
+            </div>
+            <div className="w-px h-8 bg-white/20" />
+            <div className="text-center">
+              <p className="text-white/80 font-display text-xl">Concierge</p>
+              <p className="text-white/40 text-xs uppercase tracking-wider">White Glove</p>
+            </div>
+          </div>
         </div>
+      </div>
+
+      <div className="relative py-4 text-center">
+        <p className="text-white/30 text-xs tracking-wider uppercase">Puerto Rico</p>
       </div>
     </div>
   );
