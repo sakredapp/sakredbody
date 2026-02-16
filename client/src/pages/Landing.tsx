@@ -79,7 +79,7 @@ export default function Landing() {
             </motion.p>
             
             <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4">
-              <Button onClick={openApplication} size="lg" className="text-base px-8 bg-gold text-background border-gold-subtle" data-testid="button-apply-hero">
+              <Button onClick={openApplication} size="lg" className="text-base px-8 gold-metallic-btn" data-testid="button-apply-hero">
                 Apply for Sakred Body <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
               <Button variant="outline" size="lg" className="text-base px-8 border-white/20 text-white backdrop-blur-sm bg-white/5" onClick={() => document.getElementById('what-we-do')?.scrollIntoView({ behavior: 'smooth'})} data-testid="button-view-program">
@@ -114,8 +114,7 @@ export default function Landing() {
               <span className="text-gold">The Real Kind.</span>
             </h2>
             <div className="space-y-4 text-muted-foreground leading-relaxed">
-              <p>Most masterminds sell you "personal growth" and then hand you business tactics. You leave with a new funnel strategy but the same stress, the same patterns, the same exhaustion.</p>
-              <p>Sakred Body is different. We focus on you as a person — your health, your nervous system, your energy, your internal world. When you get right internally, everything external improves.</p>
+              <p>Most masterminds sell you "personal growth" and then hand you business tactics. Sakred Body is different — we focus on you as a person. Your health, your energy, your nervous system.</p>
               <p className="text-foreground">Better people build better businesses. We start with the person.</p>
             </div>
           </div>
@@ -318,7 +317,7 @@ export default function Landing() {
                   <li key={i} className="flex gap-2 text-sm text-muted-foreground"><Check className="h-4 w-4 text-gold flex-shrink-0 mt-0.5" /> {item}</li>
                 ))}
               </ul>
-              <Button className="w-full bg-gold text-background border-gold-subtle" onClick={openApplication} data-testid="button-apply-annual">Apply for Annual</Button>
+              <Button className="w-full gold-metallic-btn" onClick={openApplication} data-testid="button-apply-annual">Apply for Annual</Button>
             </CardContent>
           </Card>
         </div>
@@ -354,7 +353,7 @@ export default function Landing() {
           <p className="text-muted-foreground text-lg mb-10 leading-relaxed">
             Sakred Body is for people who are done running on empty and ready to build a real foundation — physically, mentally, and personally.
           </p>
-          <Button onClick={openApplication} size="lg" className="text-base px-10 bg-gold text-background border-gold-subtle" data-testid="button-apply-final">
+          <Button onClick={openApplication} size="lg" className="text-base px-10 gold-metallic-btn" data-testid="button-apply-final">
             Apply to Join Sakred Body <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
           <p className="text-xs text-muted-foreground mt-4">Limited spots. Application required.</p>

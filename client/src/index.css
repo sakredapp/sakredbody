@@ -221,6 +221,12 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+  .gold-metallic-btn {
+    background: linear-gradient(135deg, hsl(var(--gold-dark)), hsl(var(--gold)), hsl(var(--gold-light)), hsl(var(--gold)));
+    background-size: 200% 200%;
+    color: hsl(var(--background));
+    border: 1px solid hsl(var(--gold-light) / 0.4);
+  }
 
   input[type="search"]::-webkit-search-cancel-button {
     @apply hidden;
