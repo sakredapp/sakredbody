@@ -37,7 +37,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import type { Retreat, BookingRequest, Partner, PartnerService } from "@shared/schema";
-import sakredLogo from "@assets/Sakred_(512_x_512_px_LOGO__1771266724485.png";
+import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
 const SERVICE_CATEGORIES = [
   { value: "hotel", label: "Hotel", icon: Hotel },

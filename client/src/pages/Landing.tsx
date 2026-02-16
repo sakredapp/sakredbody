@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import sakredLogo from "@assets/Sakred_(512_x_512_px_LOGO__1771266724485.png";
+import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 30 },
