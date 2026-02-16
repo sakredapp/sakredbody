@@ -27,8 +27,39 @@ import {
   Clock,
   Star,
   ChevronRight,
+  Sparkles,
+  DollarSign,
+  Heart,
+  Dumbbell,
+  Hotel,
+  Home,
+  UtensilsCrossed,
+  MoreHorizontal,
+  Building2,
 } from "lucide-react";
-import type { Retreat, Property, BookingRequest } from "@shared/schema";
+import type { Retreat, Property, BookingRequest, Partner, PartnerService } from "@shared/schema";
+
+const SERVICE_CATEGORIES = [
+  { value: "hotel", label: "Hotel", icon: Hotel },
+  { value: "resort", label: "Resort", icon: Sparkles },
+  { value: "vacation_rental", label: "Vacation Rental", icon: Home },
+  { value: "yoga_studio", label: "Yoga Studio", icon: Heart },
+  { value: "pilates_studio", label: "Pilates Studio", icon: Heart },
+  { value: "fitness_gym", label: "Fitness Gym", icon: Dumbbell },
+  { value: "spa", label: "Spa", icon: Sparkles },
+  { value: "restaurant", label: "Restaurant", icon: UtensilsCrossed },
+  { value: "wellness_center", label: "Wellness Center", icon: Heart },
+  { value: "other", label: "Other", icon: MoreHorizontal },
+];
+
+function serviceCategoryLabel(cat: string) {
+  return SERVICE_CATEGORIES.find((c) => c.value === cat)?.label || cat;
+}
+
+function ServiceCategoryIcon({ category }: { category: string }) {
+  const Icon = SERVICE_CATEGORIES.find((c) => c.value === category)?.icon || Building2;
+  return <Icon className="w-4 h-4" />;
+}
 
 function tierLabel(tier: string) {
   switch (tier) {
@@ -206,7 +237,7 @@ export default function MemberDashboard() {
   const [bookingProperty, setBookingProperty] = useState<Property | null>(null);
   const [guestCount, setGuestCount] = useState("1");
   const [specialRequests, setSpecialRequests] = useState("");
-  const [view, setView] = useState<"retreats" | "my-bookings">("retreats");
+  const [view, setView] = useState<"retreats" | "services" | "my-bookings">("retreats");
 
   if (authLoading) {
     return (
@@ -247,6 +278,16 @@ export default function MemberDashboard() {
       if (!res.ok) throw new Error("Failed to load bookings");
       return res.json();
     },
+  });
+
+  const activePartnersQuery = useQuery<Partner[]>({
+    queryKey: ["/api/partners/active"],
+    enabled: view === "services",
+  });
+
+  const allServicesQuery = useQuery<PartnerService[]>({
+    queryKey: ["/api/services"],
+    enabled: view === "services",
   });
 
   const createBookingMutation = useMutation({
@@ -309,6 +350,14 @@ export default function MemberDashboard() {
             data-testid="button-view-retreats"
           >
             Browse Retreats
+          </Button>
+          <Button
+            variant={view === "services" ? "default" : "outline"}
+            onClick={() => setView("services")}
+            data-testid="button-view-services"
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            Services
           </Button>
           <Button
             variant={view === "my-bookings" ? "default" : "outline"}
@@ -391,6 +440,82 @@ export default function MemberDashboard() {
               </div>
             ) : (
               <Card><CardContent className="p-8 text-center text-muted-foreground">No properties listed yet for this retreat.</CardContent></Card>
+            )}
+          </div>
+        )}
+
+        {view === "services" && (
+          <div className="space-y-8">
+            <div>
+              <h2 className="font-display text-2xl mb-1" data-testid="text-services-heading">Concierge Services</h2>
+              <p className="text-muted-foreground">Explore wellness, fitness, dining, and accommodation services curated by our concierge team.</p>
+            </div>
+            {(activePartnersQuery.isLoading || allServicesQuery.isLoading) ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3].map((i) => (
+                  <Card key={i}><CardContent className="p-5 space-y-3"><Skeleton className="h-6 w-3/4" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" /></CardContent></Card>
+                ))}
+              </div>
+            ) : activePartnersQuery.data && activePartnersQuery.data.length > 0 ? (
+              <>
+                {activePartnersQuery.data.map((partner) => {
+                  const partnerServices = (allServicesQuery.data || []).filter(s => s.partnerId === partner.id);
+                  return (
+                    <div key={partner.id} className="space-y-4" data-testid={`section-partner-${partner.id}`}>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <ServiceCategoryIcon category={partner.category} />
+                        <h3 className="font-display text-xl">{partner.name}</h3>
+                        <Badge variant="outline" className="text-xs">{serviceCategoryLabel(partner.category)}</Badge>
+                        <span className="text-sm text-muted-foreground flex items-center gap-1"><MapPin className="w-3 h-3" /> {partner.location}</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground max-w-2xl">{partner.description}</p>
+                      {partnerServices.length > 0 ? (
+                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {partnerServices.map((service) => (
+                            <Card key={service.id} className="overflow-visible hover-elevate" data-testid={`card-member-service-${service.id}`}>
+                              {service.imageUrl && (
+                                <img
+                                  src={service.imageUrl}
+                                  alt={service.name}
+                                  className="w-full h-36 object-cover rounded-t-md"
+                                />
+                              )}
+                              <CardContent className={`p-4 space-y-2 ${!service.imageUrl ? 'pt-4' : ''}`}>
+                                <h4 className="font-medium">{service.name}</h4>
+                                <p className="text-sm text-muted-foreground line-clamp-2">{service.description}</p>
+                                <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
+                                  {service.price && (
+                                    <span className="flex items-center gap-1"><DollarSign className="w-3.5 h-3.5" /> ${service.price} {service.priceUnit}</span>
+                                  )}
+                                  {service.duration && (
+                                    <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {service.duration}</span>
+                                  )}
+                                  {service.maxCapacity && (
+                                    <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> Up to {service.maxCapacity}</span>
+                                  )}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Services coming soon from this partner.</p>
+                      )}
+                      <Separator />
+                    </div>
+                  );
+                })}
+              </>
+            ) : (
+              <Card>
+                <CardContent className="p-12 text-center space-y-3">
+                  <Sparkles className="w-12 h-12 mx-auto text-muted-foreground" />
+                  <div>
+                    <h3 className="font-display text-lg mb-1">Coming Soon</h3>
+                    <p className="text-sm text-muted-foreground">Our concierge team is building a curated network of wellness, fitness, and accommodation partners. Check back soon.</p>
+                  </div>
+                </CardContent>
+              </Card>
             )}
           </div>
         )}

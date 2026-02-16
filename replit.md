@@ -17,7 +17,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Frontend
 - **Framework**: React 18 with TypeScript, bundled by Vite
-- **Routing**: Wouter — `/` (Landing), `/member` (Member Dashboard), 404 page
+- **Routing**: Wouter — `/` (Landing), `/member` (Member Dashboard), `/admin` (Admin Dashboard), 404 page
 - **UI Components**: shadcn/ui (new-york style) built on Radix UI primitives with Tailwind CSS
 - **Styling**: Tailwind CSS with CSS custom properties for theming. Custom "Sakred" brand palette with gold accents (--gold HSL variables), warm earth tones
 - **State/Data**: TanStack React Query for server state; react-hook-form + Zod for form handling and validation
@@ -57,20 +57,31 @@ Preferred communication style: Simple, everyday language.
 
 ### Database Schema
 Tables:
-- **users**: Replit Auth user storage (id varchar PK, email, firstName, lastName, profileImageUrl, timestamps)
+- **users**: Replit Auth user storage (id varchar PK, email, firstName, lastName, profileImageUrl, isAdmin varchar default "false", timestamps)
 - **sessions**: Replit Auth session storage (sid varchar PK, sess jsonb, expire timestamp)
 - **applications**: Program applications (id serial PK, name, email, goals, stressLevel, willingness, constraints, whyNow, createdAt)
 - **retreats**: Retreat events (id serial PK, name, location, description, startDate, endDate, capacity, imageUrl, active)
 - **properties**: Housing options per retreat (id serial PK, retreatId FK, name, tier [standard/premium/elite], description, bedrooms, bathrooms, maxGuests, pricePerNight, imageUrl, amenities text[], available)
 - **booking_requests**: Member booking requests (id serial PK, userId FK, retreatId FK, propertyId FK, status [requested/confirmed/completed/cancelled], guestCount, specialRequests, conciergeNotes, timestamps)
+- **partners**: Concierge partner businesses (id serial PK, name, category [hotel/resort/vacation_rental/yoga_studio/pilates_studio/fitness_gym/spa/restaurant/wellness_center/other], description, location, contactName, contactEmail, contactPhone, website, imageUrl, notes, active, createdAt)
+- **partner_services**: Offerings from partners (id serial PK, partnerId FK, name, description, category, price, priceUnit, duration, imageUrl, amenities text[], maxCapacity, available, createdAt)
+
+### Admin System
+- Admin access controlled by `isAdmin` field on users table (set to "true" for admin users)
+- Admin middleware (`isAdmin`) checks authentication + admin flag before allowing access
+- Admin dashboard at `/admin` — manage partners, services, and review booking requests
+- To make a user an admin: `UPDATE users SET is_admin = 'true' WHERE id = '<user_id>';` (run via SQL on the Supabase DB)
+- Admin API routes prefixed with `/api/admin/` — all require auth + admin role
 
 ### Key Design Decisions
 1. **Concierge model**: Members browse and request bookings; the Sakred Body team reviews and confirms. Bookings flow: requested → confirmed → completed
 2. **Housing tiers**: Three levels — Essential (standard), Premium, Elite — with increasing amenities and pricing
-3. **Replit Auth**: OpenID Connect authentication supporting Google, GitHub, email/password
-4. **Shared route contracts**: API paths and Zod schemas shared between client and server
-5. **Storage abstraction**: `server/storage.ts` uses an `IStorage` interface with `DatabaseStorage` implementation
-6. **Stock images**: Property and retreat images stored in `client/public/images/`
+3. **Partner network**: Admin-managed catalog of hotels, resorts, studios, gyms, spas, restaurants — all white-labeled under Sakred Body brand
+4. **Replit Auth**: OpenID Connect authentication supporting Google, GitHub, email/password
+5. **Role-based access**: isAdmin flag on users table gates admin features; members see curated partner services without seeing backend partner details
+6. **Shared route contracts**: API paths and Zod schemas shared between client and server
+7. **Storage abstraction**: `server/storage.ts` uses an `IStorage` interface with `DatabaseStorage` implementation
+8. **Stock images**: Property and retreat images stored in `client/public/images/`
 
 ## External Dependencies
 

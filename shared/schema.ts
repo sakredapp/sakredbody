@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, boolean, integer, varchar, date } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, boolean, integer, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -88,3 +88,63 @@ export const insertBookingRequestSchema = createInsertSchema(bookingRequests).om
 });
 export type BookingRequest = typeof bookingRequests.$inferSelect;
 export type InsertBookingRequest = z.infer<typeof insertBookingRequestSchema>;
+
+export const partnerCategoryEnum = z.enum([
+  "hotel",
+  "resort",
+  "vacation_rental",
+  "yoga_studio",
+  "pilates_studio",
+  "fitness_gym",
+  "spa",
+  "restaurant",
+  "wellness_center",
+  "other",
+]);
+export type PartnerCategory = z.infer<typeof partnerCategoryEnum>;
+
+export const partners = pgTable("partners", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  category: text("category").notNull(),
+  description: text("description").notNull(),
+  location: text("location").notNull(),
+  contactName: text("contact_name"),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  website: text("website"),
+  imageUrl: text("image_url"),
+  notes: text("notes"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPartnerSchema = createInsertSchema(partners).omit({
+  id: true,
+  createdAt: true,
+});
+export type Partner = typeof partners.$inferSelect;
+export type InsertPartner = z.infer<typeof insertPartnerSchema>;
+
+export const partnerServices = pgTable("partner_services", {
+  id: serial("id").primaryKey(),
+  partnerId: integer("partner_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  category: text("category").notNull(),
+  price: integer("price"),
+  priceUnit: text("price_unit").default("per session"),
+  duration: text("duration"),
+  imageUrl: text("image_url"),
+  amenities: text("amenities").array(),
+  maxCapacity: integer("max_capacity"),
+  available: boolean("available").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPartnerServiceSchema = createInsertSchema(partnerServices).omit({
+  id: true,
+  createdAt: true,
+});
+export type PartnerService = typeof partnerServices.$inferSelect;
+export type InsertPartnerService = z.infer<typeof insertPartnerServiceSchema>;
