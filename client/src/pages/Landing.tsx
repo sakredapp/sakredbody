@@ -90,10 +90,13 @@ export default function Landing() {
         </div>
       </section>
 
-      <Section dark className="border-y border-border/40 py-8">
-        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-xs font-sans font-normal uppercase tracking-wider text-muted-foreground">
+      <Section dark className="border-y border-border/40 py-10">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto">
           {["Puerto Rico", "Small Groups", "Concierge Service", "Quarterly Retreats"].map((label, i) => (
-            <span key={i} data-testid={`trust-marker-${i}`}>{label}</span>
+            <div key={i} className="flex flex-col items-center gap-2" data-testid={`trust-marker-${i}`}>
+              <div className="h-8 w-8 rounded-full border border-gold/30 bg-gold/5" style={{ boxShadow: '0 0 12px hsl(39 48% 56% / 0.2)' }} />
+              <span className="text-xs font-sans font-normal uppercase tracking-wider text-muted-foreground text-center">{label}</span>
+            </div>
           ))}
         </div>
       </Section>
