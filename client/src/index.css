@@ -11,50 +11,50 @@
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
 
-  /* Sakred Health Light Mode */
-  --background: 50 11% 97%;
-  --foreground: 222 47% 11%;
+  /* Sakred Health Light Mode — gold / black / cream */
+  --background: 45 20% 96%;
+  --foreground: 30 10% 12%;
 
-  --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
-  --card-border: 222 47% 92%;
+  --card: 40 15% 99%;
+  --card-foreground: 30 10% 12%;
+  --card-border: 35 10% 90%;
 
-  --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
-  --popover-border: 222 47% 92%;
+  --popover: 40 15% 99%;
+  --popover-foreground: 30 10% 12%;
+  --popover-border: 35 10% 90%;
 
-  --primary: 222 47% 11%;
+  --primary: 30 10% 12%;
   --primary-foreground: 42 70% 76%;
 
-  --secondary: 50 8% 93%;
-  --secondary-foreground: 222 47% 11%;
+  --secondary: 42 12% 93%;
+  --secondary-foreground: 30 10% 12%;
 
-  --muted: 50 8% 93%;
-  --muted-foreground: 222 47% 45%;
+  --muted: 42 12% 93%;
+  --muted-foreground: 30 8% 42%;
 
   --accent: 39 48% 56%;
-  --accent-foreground: 222 47% 11%;
+  --accent-foreground: 30 10% 12%;
 
   --destructive: 0 45% 42%;
   --destructive-foreground: 0 0% 100%;
 
-  --border: 222 10% 90%;
-  --input: 222 10% 85%;
+  --border: 35 10% 88%;
+  --input: 35 10% 83%;
   --ring: 39 48% 56%;
 
   --chart-1: 39 48% 56%;
   --chart-2: 138 25% 39%;
-  --chart-3: 222 47% 11%;
+  --chart-3: 30 10% 12%;
   --chart-4: 42 70% 76%;
   --chart-5: 0 45% 42%;
 
-  --sidebar: 50 11% 97%;
-  --sidebar-foreground: 222 47% 11%;
-  --sidebar-border: 222 10% 90%;
+  --sidebar: 45 20% 96%;
+  --sidebar-foreground: 30 10% 12%;
+  --sidebar-border: 35 10% 88%;
   --sidebar-primary: 39 48% 56%;
-  --sidebar-primary-foreground: 222 47% 11%;
+  --sidebar-primary-foreground: 30 10% 12%;
   --sidebar-accent: 39 48% 56%;
-  --sidebar-accent-foreground: 222 47% 11%;
+  --sidebar-accent-foreground: 30 10% 12%;
   --sidebar-ring: 39 48% 56%;
 
   --font-sans: 'DM Sans', sans-serif;
@@ -102,52 +102,52 @@
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-  /* Sakred Health Dark Mode */
-  --background: 222 47% 11%;
-  --foreground: 50 11% 97%;
+  /* Sakred Health Dark Mode — warm blacks / gold / cream */
+  --background: 30 10% 10%;
+  --foreground: 45 20% 96%;
 
-  --card: 217 33% 17%;
-  --card-foreground: 50 11% 97%;
-  --card-border: 217 20% 25%;
+  --card: 30 8% 15%;
+  --card-foreground: 45 20% 96%;
+  --card-border: 30 8% 22%;
 
-  --popover: 217 33% 17%;
-  --popover-foreground: 50 11% 97%;
-  --popover-border: 217 20% 25%;
+  --popover: 30 8% 15%;
+  --popover-foreground: 45 20% 96%;
+  --popover-border: 30 8% 22%;
 
   --primary: 42 70% 76%;
-  --primary-foreground: 222 47% 11%;
+  --primary-foreground: 30 10% 10%;
 
-  --secondary: 217 33% 22%;
-  --secondary-foreground: 50 11% 90%;
+  --secondary: 30 8% 20%;
+  --secondary-foreground: 45 15% 90%;
 
-  --muted: 217 33% 22%;
-  --muted-foreground: 50 11% 60%;
+  --muted: 30 8% 20%;
+  --muted-foreground: 40 10% 58%;
 
   --accent: 42 70% 76%;
-  --accent-foreground: 222 47% 11%;
+  --accent-foreground: 30 10% 10%;
 
   --destructive: 0 69% 67%;
-  --destructive-foreground: 222 47% 11%;
+  --destructive-foreground: 30 10% 10%;
 
-  --input: 217 20% 30%;
+  --input: 30 8% 26%;
   --ring: 42 70% 76%;
 
   --chart-1: 42 70% 76%;
   --chart-2: 133 28% 60%;
-  --chart-3: 50 11% 97%;
+  --chart-3: 45 20% 96%;
   --chart-4: 39 48% 56%;
   --chart-5: 0 69% 67%;
 
-  --sidebar: 222 47% 11%;
-  --sidebar-foreground: 50 11% 97%;
-  --sidebar-border: 217 20% 25%;
+  --sidebar: 30 10% 10%;
+  --sidebar-foreground: 45 20% 96%;
+  --sidebar-border: 30 8% 22%;
   --sidebar-primary: 42 70% 76%;
-  --sidebar-primary-foreground: 222 47% 11%;
+  --sidebar-primary-foreground: 30 10% 10%;
   --sidebar-accent: 42 70% 76%;
-  --sidebar-accent-foreground: 222 47% 11%;
+  --sidebar-accent-foreground: 30 10% 10%;
   --sidebar-ring: 42 70% 76%;
 
-  --border: 217 20% 25%;
+  --border: 30 8% 22%;
 
   --shadow-2xs: 0px 2px 0px 0px rgba(0, 0, 0, 0.00);
   --shadow-xs: 0px 2px 0px 0px rgba(0, 0, 0, 0.00);
