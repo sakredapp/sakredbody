@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { ArrowRight, Check } from "lucide-react";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import sakredLogo from "@assets/Sakred_(512_x_512_px_LOGO__1771266724485.png";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 30 },
@@ -26,20 +27,37 @@ const staggerContainer = {
 
 export default function Landing() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
   const openApplication = () => setIsModalOpen(true);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 100);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
       
-      <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50" style={{ zIndex: 9999 }}>
+      <header
+        className={`fixed top-0 left-0 right-0 transition-all duration-300 ${
+          scrolled
+            ? "bg-background/95 backdrop-blur-md border-b border-border/50"
+            : "bg-gradient-to-b from-black/50 to-transparent"
+        }`}
+        style={{ zIndex: 9999 }}
+      >
         <div className="container max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
-          <div className="font-display text-xl tracking-tight">Sakred Body</div>
+          <div className="flex items-center gap-2">
+            <img src={sakredLogo} alt="Sakred Body" className="h-9 w-9 object-contain" />
+            <span className={`font-display text-lg tracking-tight transition-colors duration-300 ${scrolled ? "text-foreground" : "text-white/90"}`}>Sakred Body</span>
+          </div>
           <div className="flex items-center gap-3 flex-wrap">
             <Link href="/member" data-testid="link-member-portal">
-              <Button variant="outline" size="sm">Member Portal</Button>
+              <Button variant="outline" size="sm" className={`transition-colors duration-300 ${scrolled ? "" : "border-white/25 text-white bg-white/5"}`}>Member Portal</Button>
             </Link>
-            <Button onClick={openApplication} size="sm" data-testid="button-apply-header">
+            <Button onClick={openApplication} size="sm" className="bg-gold border-gold-border text-white" data-testid="button-apply-header">
               Apply Now
             </Button>
           </div>

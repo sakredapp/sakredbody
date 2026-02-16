@@ -357,9 +357,12 @@ export default function MemberDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 border-b border-border/50 bg-background/80 backdrop-blur-md" style={{ zIndex: 9999 }}>
+      <header className="sticky top-0 border-b border-border/50 bg-background/90 backdrop-blur-md" style={{ zIndex: 9999 }}>
         <div className="container max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
-          <Link href="/" className="font-display text-xl tracking-tight" data-testid="link-home-dashboard">Sakred Body</Link>
+          <Link href="/" className="flex items-center gap-2" data-testid="link-home-dashboard">
+            <img src={sakredLogo} alt="Sakred Body" className="h-8 w-8 object-contain" />
+            <span className="font-display text-lg tracking-tight">Sakred Body</span>
+          </Link>
           <div className="flex items-center gap-3 flex-wrap">
             <Avatar className="w-8 h-8">
               {user?.profileImageUrl && <AvatarImage src={user.profileImageUrl} alt={user.firstName || "Member"} />}
