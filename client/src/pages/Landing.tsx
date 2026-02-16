@@ -248,58 +248,6 @@ export default function Landing() {
 
       <Section>
         <div className="text-center mb-10">
-          <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">Who This Is For</p>
-          <h2 className="text-3xl md:text-4xl font-display font-normal mb-4" data-testid="text-who-headline">Built for People Who Build Things</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">Entrepreneurs, founders, and high-performing professionals who are ready to invest in themselves — not just their business.</p>
-        </div>
-        <div className="max-w-3xl mx-auto">
-          <Accordion type="single" collapsible className="w-full">
-            {[
-              { q: "You're successful but running on fumes", a: "You've built something real, but your sleep is off, your energy dips, and you know your body is paying for your output." },
-              { q: "You want growth that actually sticks", a: "You've done conferences and courses. You want something deeper — real changes in how you feel, think, and show up daily." },
-              { q: "You're tired of surface-level wellness", a: "You're not looking for crystals and mantras. You want practical, grounded work on your health, mindset, and nervous system." },
-              { q: "You want community without the fluff", a: "You want to be around other serious people working on themselves. Real conversations, not networking pitches." },
-              { q: "You value experiences over information", a: "You don't need more content. You need an environment that pulls the best version of you forward." }
-            ].map((item, i) => (
-              <AccordionItem key={i} value={`who-${i}`} data-testid={`who-item-${i}`}>
-                <AccordionTrigger className="text-left font-display text-base font-normal">{item.q}</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground leading-relaxed text-sm">
-                  {item.a}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </div>
-      </Section>
-
-      <Section dark>
-        <div className="text-center mb-10">
-          <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">What You Get</p>
-          <h2 className="text-3xl md:text-4xl font-display font-normal mb-4" data-testid="text-deliverables-headline">Your Membership Includes</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">Everything is designed to support you between retreats — so the growth doesn't stop when you go home.</p>
-        </div>
-        <div className="max-w-3xl mx-auto">
-          <Accordion type="single" collapsible className="w-full">
-            {[
-              { q: "Customizable Retreats", a: "Design your own retreat — private or shared, 3 days to 2 weeks. Pick your dates, housing tier, and let our concierge handle the rest." },
-              { q: "Concierge Booking", a: "Choose private or shared, pick your dates and housing in your member portal. Submit a request — our team schedules a call to finalize everything." },
-              { q: "Health Protocols", a: "Practical daily routines for hydration, digestion, sleep, and stress management. Built for busy, mobile lives." },
-              { q: "Community + Coaching", a: "Live calls, a private member community, accountability without pressure, and optional 1:1 sessions." },
-              { q: "The Method: Stabilize, Clear, Build", a: "Our approach works in three phases. First, stabilize your foundation — hydration, sleep, gut health. Then clear what's dragging you down. Then build real capacity — nutrition, movement, breath, mental clarity. Systems that keep you strong long-term." }
-            ].map((item, i) => (
-              <AccordionItem key={i} value={`get-${i}`} data-testid={`deliverable-item-${i}`}>
-                <AccordionTrigger className="text-left font-display text-base font-normal">{item.q}</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground leading-relaxed text-sm">
-                  {item.a}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </div>
-      </Section>
-
-      <Section>
-        <div className="text-center mb-10">
           <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">Investment</p>
           <h2 className="text-3xl md:text-4xl font-display font-normal mb-4" data-testid="text-pricing-headline">Two Ways to Join</h2>
           <p className="text-muted-foreground">Application required. Limited spots per cohort.</p>
@@ -337,6 +285,58 @@ export default function Landing() {
               <Button className="w-full gold-metallic-btn" onClick={openApplication} data-testid="button-apply-annual">Apply for Annual</Button>
             </CardContent>
           </Card>
+        </div>
+      </Section>
+
+      <Section dark>
+        <div className="text-center mb-10">
+          <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">Who This Is For</p>
+          <h2 className="text-3xl md:text-4xl font-display font-normal mb-4" data-testid="text-who-headline">Built for People Who Build Things</h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto">Entrepreneurs, founders, and high-performing professionals who are ready to invest in themselves — not just their business.</p>
+        </div>
+        <div className="max-w-3xl mx-auto">
+          <Accordion type="single" collapsible className="w-full">
+            {[
+              { q: "You're successful but running on fumes", a: "You've built something real, but your sleep is off, your energy dips, and you know your body is paying for your output." },
+              { q: "You want growth that actually sticks", a: "You've done conferences and courses. You want something deeper — real changes in how you feel, think, and show up daily." },
+              { q: "You're tired of surface-level wellness", a: "You're not looking for crystals and mantras. You want practical, grounded work on your health, mindset, and nervous system." },
+              { q: "You want community without the fluff", a: "You want to be around other serious people working on themselves. Real conversations, not networking pitches." },
+              { q: "You value experiences over information", a: "You don't need more content. You need an environment that pulls the best version of you forward." }
+            ].map((item, i) => (
+              <AccordionItem key={i} value={`who-${i}`} data-testid={`who-item-${i}`}>
+                <AccordionTrigger className="text-left font-display text-base font-normal">{item.q}</AccordionTrigger>
+                <AccordionContent className="text-muted-foreground leading-relaxed text-sm">
+                  {item.a}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </div>
+      </Section>
+
+      <Section>
+        <div className="text-center mb-10">
+          <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">What You Get</p>
+          <h2 className="text-3xl md:text-4xl font-display font-normal mb-4" data-testid="text-deliverables-headline">Your Membership Includes</h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto">Everything is designed to support you between retreats — so the growth doesn't stop when you go home.</p>
+        </div>
+        <div className="max-w-3xl mx-auto">
+          <Accordion type="single" collapsible className="w-full">
+            {[
+              { q: "Customizable Retreats", a: "Design your own retreat — private or shared, 3 days to 2 weeks. Pick your dates, housing tier, and let our concierge handle the rest." },
+              { q: "Concierge Booking", a: "Choose private or shared, pick your dates and housing in your member portal. Submit a request — our team schedules a call to finalize everything." },
+              { q: "Health Protocols", a: "Practical daily routines for hydration, digestion, sleep, and stress management. Built for busy, mobile lives." },
+              { q: "Community + Coaching", a: "Live calls, a private member community, accountability without pressure, and optional 1:1 sessions." },
+              { q: "The Method: Stabilize, Clear, Build", a: "Our approach works in three phases. First, stabilize your foundation — hydration, sleep, gut health. Then clear what's dragging you down. Then build real capacity — nutrition, movement, breath, mental clarity. Systems that keep you strong long-term." }
+            ].map((item, i) => (
+              <AccordionItem key={i} value={`get-${i}`} data-testid={`deliverable-item-${i}`}>
+                <AccordionTrigger className="text-left font-display text-base font-normal">{item.q}</AccordionTrigger>
+                <AccordionContent className="text-muted-foreground leading-relaxed text-sm">
+                  {item.a}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
         </div>
       </Section>
 
