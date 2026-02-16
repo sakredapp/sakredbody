@@ -64,17 +64,17 @@ export default function Landing() {
             className="max-w-3xl"
           >
             <motion.div variants={fadeInUp}>
-              <Badge variant="outline" className="mb-6 border-gold-subtle text-gold-light tracking-widest uppercase bg-gold-subtle px-4 py-1" data-testid="badge-tagline">
+              <Badge variant="outline" className="mb-6 border-gold-subtle text-gold-light tracking-widest uppercase bg-gold-subtle px-4 py-1 font-normal" data-testid="badge-tagline">
                 Concierge Retreats + Mastermind
               </Badge>
             </motion.div>
             
-            <motion.h1 variants={fadeInUp} className="text-5xl md:text-7xl font-display leading-[1.1] mb-6 tracking-tight text-white">
+            <motion.h1 variants={fadeInUp} className="text-5xl md:text-7xl font-display font-normal leading-[1.1] mb-6 tracking-tight text-white">
               Grow as a Person.<br />
               <span className="gold-gradient-text">Become a Better Leader.</span>
             </motion.h1>
             
-            <motion.p variants={fadeInUp} className="text-lg md:text-xl text-white/70 mb-8 max-w-2xl leading-relaxed">
+            <motion.p variants={fadeInUp} className="text-base md:text-lg text-white/60 mb-8 max-w-2xl leading-relaxed font-sans font-normal">
               A concierge-style mastermind and retreat experience in Puerto Rico for entrepreneurs who want real personal growth — not another business workshop dressed up as self-improvement.
             </motion.p>
             
@@ -102,7 +102,7 @@ export default function Landing() {
           ].map((item, i) => (
             <div key={i} className="flex items-center justify-center gap-2 text-gold" data-testid={`trust-marker-${i}`}>
               {item.icon}
-              <span className="text-xs font-sans font-medium uppercase tracking-wider text-muted-foreground">{item.label}</span>
+              <span className="text-xs font-sans font-normal uppercase tracking-wider text-muted-foreground">{item.label}</span>
             </div>
           ))}
         </div>
@@ -111,15 +111,15 @@ export default function Landing() {
       <Section id="what-we-do">
         <div className="grid md:grid-cols-2 gap-12 md:gap-24 items-center">
           <div>
-            <p className="text-xs font-sans font-medium uppercase tracking-widest text-gold mb-4">What This Actually Is</p>
-            <h2 className="text-3xl md:text-4xl font-display mb-6" data-testid="text-what-headline">
+            <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">What This Actually Is</p>
+            <h2 className="text-3xl md:text-4xl font-display font-normal mb-6" data-testid="text-what-headline">
               Personal Development.<br/>
               <span className="text-gold">The Real Kind.</span>
             </h2>
             <div className="space-y-4 text-muted-foreground leading-relaxed">
               <p>Most masterminds sell you "personal growth" and then hand you business tactics. You leave with a new funnel strategy but the same stress, the same patterns, the same exhaustion.</p>
               <p>Sakred Body is different. We focus on you as a person — your health, your nervous system, your energy, your internal world. When you get right internally, everything external improves. Your business, your relationships, your decisions.</p>
-              <p className="font-sans font-semibold text-foreground">Better people build better businesses. We start with the person.</p>
+              <p className="text-foreground">Better people build better businesses. We start with the person.</p>
             </div>
           </div>
           <div className="relative">
@@ -143,8 +143,8 @@ export default function Landing() {
             />
           </div>
           <div className="order-1 md:order-2">
-            <p className="text-xs font-sans font-medium uppercase tracking-widest text-gold mb-4">The Concierge Experience</p>
-            <h2 className="text-3xl md:text-4xl font-display mb-6" data-testid="text-concierge-headline">
+            <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">The Concierge Experience</p>
+            <h2 className="text-3xl md:text-4xl font-display font-normal mb-6" data-testid="text-concierge-headline">
               Everything Is <span className="text-gold">Handled for You</span>
             </h2>
             <div className="space-y-4 text-muted-foreground leading-relaxed">
@@ -170,8 +170,8 @@ export default function Landing() {
 
       <Section>
         <div className="text-center mb-16">
-          <p className="text-xs font-sans font-medium uppercase tracking-widest text-gold mb-4">Who This Is For</p>
-          <h2 className="text-3xl md:text-4xl font-display mb-4" data-testid="text-who-headline">Built for People Who Build Things</h2>
+          <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">Who This Is For</p>
+          <h2 className="text-3xl md:text-4xl font-display font-normal mb-4" data-testid="text-who-headline">Built for People Who Build Things</h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">Entrepreneurs, founders, sales leaders, and high-performing professionals who are ready to invest in themselves — not just their business.</p>
         </div>
 
@@ -204,7 +204,7 @@ export default function Landing() {
           ].map((item, i) => (
             <Card key={i} className="hover-elevate" data-testid={`card-who-${i}`}>
               <CardContent className="p-6">
-                <h3 className="text-base font-display mb-2">{item.title}</h3>
+                <h3 className="text-sm font-sans font-medium tracking-wide text-foreground mb-2">{item.title}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
               </CardContent>
             </Card>
@@ -215,15 +215,15 @@ export default function Landing() {
       <Section dark>
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div>
-            <p className="text-xs font-sans font-medium uppercase tracking-widest text-gold mb-4">The Retreats</p>
-            <h2 className="text-3xl md:text-4xl font-display mb-6" data-testid="text-retreat-headline">Puerto Rico. Small Group. <span className="text-gold">Big Shifts.</span></h2>
+            <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">The Retreats</p>
+            <h2 className="text-3xl md:text-4xl font-display font-normal mb-6" data-testid="text-retreat-headline">Puerto Rico. Small Group. <span className="text-gold">Big Shifts.</span></h2>
             <div className="space-y-4 text-muted-foreground leading-relaxed">
               <p>Each retreat is 3-4 days in Puerto Rico with a small group of members. Morning movement on the beach. Breathwork sessions. Real conversations over clean food. Ocean time. Nature. Space to actually think.</p>
               <p>This isn't a vacation and it isn't a bootcamp. It's a structured reset — designed to pull you out of your routine long enough to see what needs to change and give you the tools to change it.</p>
             </div>
             <div className="flex flex-wrap gap-2 mt-6">
               {["Breathwork", "Ocean + Nature", "Movement", "Clean Food", "Mastermind Sessions", "Recovery Protocols"].map((tag, i) => (
-                <Badge key={i} variant="outline" className="border-gold-subtle text-gold text-xs">{tag}</Badge>
+                <Badge key={i} variant="outline" className="border-gold-subtle text-gold text-xs font-normal">{tag}</Badge>
               ))}
             </div>
           </div>
@@ -239,8 +239,8 @@ export default function Landing() {
 
       <Section id="housing">
         <div className="text-center mb-16">
-          <p className="text-xs font-sans font-medium uppercase tracking-widest text-gold mb-4">Housing Options</p>
-          <h2 className="text-3xl md:text-4xl font-display mb-4" data-testid="text-housing-headline">Pick Your Space. We Handle the Rest.</h2>
+          <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">Housing Options</p>
+          <h2 className="text-3xl md:text-4xl font-display font-normal mb-4" data-testid="text-housing-headline">Pick Your Space. We Handle the Rest.</h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">Every retreat offers three housing tiers. Browse options in your member portal and submit a booking request — our concierge team takes it from there.</p>
         </div>
 
@@ -268,7 +268,7 @@ export default function Landing() {
             <Card key={i} className="overflow-visible hover-elevate" data-testid={`card-housing-${i}`}>
               <img src={item.img} alt={item.tier} className="w-full h-48 object-cover rounded-t-md" />
               <CardContent className="p-6 space-y-3">
-                <h3 className="text-lg font-display text-gold">{item.tier}</h3>
+                <h3 className="text-base font-sans font-medium text-gold tracking-wide">{item.tier}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
                 <ul className="space-y-2">
                   {item.features.map((f, j) => (
@@ -285,8 +285,8 @@ export default function Landing() {
 
       <Section dark id="method">
         <div className="text-center mb-16">
-          <p className="text-xs font-sans font-medium uppercase tracking-widest text-gold mb-4">The Method</p>
-          <h2 className="text-3xl md:text-4xl font-display mb-4" data-testid="text-method-headline">Three Phases. One System.</h2>
+          <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">The Method</p>
+          <h2 className="text-3xl md:text-4xl font-display font-normal mb-4" data-testid="text-method-headline">Three Phases. One System.</h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">Our approach works in a simple sequence — stabilize your foundation, clear what's getting in the way, then build real capacity.</p>
         </div>
 
@@ -314,7 +314,7 @@ export default function Landing() {
               <Card>
                 <CardContent className="p-8">
                   <div className="text-5xl font-display text-gold/20 mb-4">{item.step}</div>
-                  <h3 className="text-xl font-display mb-4 text-gold">{item.phase}</h3>
+                  <h3 className="text-lg font-sans font-medium mb-4 text-gold tracking-wide">{item.phase}</h3>
                   <p className="text-muted-foreground text-sm leading-relaxed">{item.desc}</p>
                 </CardContent>
               </Card>
@@ -325,8 +325,8 @@ export default function Landing() {
 
       <Section>
         <div className="text-center mb-16">
-          <p className="text-xs font-sans font-medium uppercase tracking-widest text-gold mb-4">What You Get</p>
-          <h2 className="text-3xl md:text-4xl font-display mb-4" data-testid="text-deliverables-headline">Your Membership Includes</h2>
+          <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">What You Get</p>
+          <h2 className="text-3xl md:text-4xl font-display font-normal mb-4" data-testid="text-deliverables-headline">Your Membership Includes</h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">Everything is designed to support you between retreats — so the growth doesn't stop when you go home.</p>
         </div>
 
@@ -356,7 +356,7 @@ export default function Landing() {
             <Card key={i} className="hover-elevate" data-testid={`card-deliverable-${i}`}>
               <CardContent className="p-6">
                 {item.icon}
-                <h3 className="text-lg font-display mb-2">{item.title}</h3>
+                <h3 className="text-base font-sans font-medium mb-2">{item.title}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
               </CardContent>
             </Card>
@@ -367,8 +367,8 @@ export default function Landing() {
       <Section dark className="py-16">
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div>
-            <p className="text-xs font-sans font-medium uppercase tracking-widest text-gold mb-4">The Member Portal</p>
-            <h2 className="text-3xl md:text-4xl font-display mb-6" data-testid="text-portal-headline">Your Own <span className="text-gold">Private Dashboard</span></h2>
+            <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">The Member Portal</p>
+            <h2 className="text-3xl md:text-4xl font-display font-normal mb-6" data-testid="text-portal-headline">Your Own <span className="text-gold">Private Dashboard</span></h2>
             <div className="space-y-4 text-muted-foreground leading-relaxed">
               <p>When you become a member, you get access to a private portal where you can see all upcoming retreats, browse available properties, and submit booking requests with a few clicks.</p>
               <p>Your concierge team reviews each request and confirms everything. You'll also find our curated network of wellness partners — yoga studios, fitness centers, spas, restaurants — all coordinated under the Sakred Body brand so you don't have to research or plan anything yourself.</p>
@@ -400,8 +400,8 @@ export default function Landing() {
 
       <Section>
         <div className="text-center mb-16">
-          <p className="text-xs font-sans font-medium uppercase tracking-widest text-gold mb-4">Investment</p>
-          <h2 className="text-3xl md:text-4xl font-display mb-4" data-testid="text-pricing-headline">Two Ways to Join</h2>
+          <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">Investment</p>
+          <h2 className="text-3xl md:text-4xl font-display font-normal mb-4" data-testid="text-pricing-headline">Two Ways to Join</h2>
           <p className="text-muted-foreground">Application required. Limited spots per cohort.</p>
         </div>
 
@@ -409,8 +409,8 @@ export default function Landing() {
           <Card className="hover-elevate">
             <CardContent className="p-8 flex flex-col h-full">
               <div className="mb-8">
-                <h3 className="text-lg text-muted-foreground mb-2 font-sans">Quarterly Membership</h3>
-                <div className="text-4xl font-display">$2,000<span className="text-base text-muted-foreground font-sans font-normal">/quarter</span></div>
+                <h3 className="text-sm text-muted-foreground mb-2 font-sans font-normal tracking-wide uppercase">Quarterly Membership</h3>
+                <div className="text-3xl font-display font-normal">$2,000<span className="text-base text-muted-foreground font-sans font-normal">/quarter</span></div>
               </div>
               <ul className="space-y-3 mb-8 flex-1">
                 {["Mastermind community + live calls", "Health protocols and daily systems", "Private member portal access", "Retreat booking available separately"].map((item, i) => (
@@ -422,12 +422,12 @@ export default function Landing() {
           </Card>
 
           <Card className="border-gold-subtle shadow-gold-subtle relative hover-elevate">
-            <div className="absolute top-0 right-0 bg-gold text-background text-xs font-sans font-semibold px-3 py-1 rounded-bl-md">BEST VALUE</div>
+            <div className="absolute top-0 right-0 bg-gold text-background text-xs font-sans font-medium tracking-wide px-3 py-1 rounded-bl-md">BEST VALUE</div>
             <CardContent className="p-8 flex flex-col h-full">
               <div className="mb-8">
-                <h3 className="text-lg text-gold mb-2 font-sans font-medium">All-In Annual</h3>
-                <div className="text-4xl font-display">$5,000<span className="text-base text-muted-foreground font-sans font-normal">/year</span></div>
-                <p className="text-xs text-gold mt-2 font-sans font-medium">Retreat included + priority booking</p>
+                <h3 className="text-sm text-gold mb-2 font-sans font-normal tracking-wide uppercase">All-In Annual</h3>
+                <div className="text-3xl font-display font-normal">$5,000<span className="text-base text-muted-foreground font-sans font-normal">/year</span></div>
+                <p className="text-xs text-gold mt-2 font-sans font-normal">Retreat included + priority booking</p>
               </div>
               <ul className="space-y-3 mb-8 flex-1">
                 {["Everything in Quarterly", "One Puerto Rico retreat included", "Priority housing selection", "Direct concierge access"].map((item, i) => (
@@ -442,7 +442,7 @@ export default function Landing() {
 
       <Section dark className="py-16">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-3xl font-display mb-8 text-center" data-testid="text-faq-headline">Common Questions</h2>
+          <h2 className="text-3xl font-display font-normal mb-8 text-center" data-testid="text-faq-headline">Common Questions</h2>
           <Accordion type="single" collapsible className="w-full">
             {[
               { q: "Is this a medical program?", a: "No. Sakred Body is education, coaching, and hands-on experience. We don't diagnose or prescribe anything. We teach you how to take better care of yourself through practical systems." },
@@ -466,7 +466,7 @@ export default function Landing() {
 
       <Section className="text-center py-24">
         <div className="max-w-2xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-display mb-6" data-testid="text-final-cta-headline">You've invested in your business.<br/><span className="text-gold">Now invest in yourself.</span></h2>
+          <h2 className="text-3xl md:text-4xl font-display font-normal mb-6" data-testid="text-final-cta-headline">You've invested in your business.<br/><span className="text-gold">Now invest in yourself.</span></h2>
           <p className="text-muted-foreground text-lg mb-10 leading-relaxed">
             Sakred Body is for people who are done running on empty and ready to build a real foundation — physically, mentally, and personally. Small groups. Concierge-level support. Real results.
           </p>
