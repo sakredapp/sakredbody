@@ -91,7 +91,7 @@ export default function Landing() {
       </section>
 
       <Section dark className="border-y border-border/40 py-10">
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 max-w-xl sm:max-w-none mx-auto">
           {["Puerto Rico", "Small Groups", "Concierge Service", "Quarterly Retreats"].map((label, i) => (
             <div
               key={i}
