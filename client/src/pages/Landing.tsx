@@ -189,7 +189,7 @@ export default function Landing() {
               <CardContent className="p-5 space-y-2">
                 <div className="flex items-baseline justify-between gap-2 flex-wrap">
                   <h3 className="text-base font-sans font-medium text-gold tracking-wide">{item.tier}</h3>
-                  <span className="text-sm font-display font-normal text-foreground">{item.price}<span className="text-xs text-muted-foreground font-sans">{item.priceNote}</span></span>
+                  <span className="text-sm font-display font-normal text-foreground">{item.price} <span className="text-xs text-muted-foreground font-sans">{item.priceNote}</span></span>
                 </div>
                 <p className="text-sm text-muted-foreground">{item.desc}</p>
                 <ul className="space-y-1.5 pt-1">
