@@ -88,6 +88,11 @@ export default {
         mono: ["var(--font-mono)"],
         display: ["var(--font-display)"],
       },
+      letterSpacing: {
+        tightest: "-0.05em",
+        tighter: "-0.03em",
+        tight: "-0.02em",
+      },
       keyframes: {
         "accordion-down": {
           from: { height: "0" },

@@ -1,43 +1,166 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  /* Operator Aesthetic - Dark Mode Default */
-  --background: 220 15% 10%;
-  --foreground: 220 10% 95%;
-  
-  --card: 220 15% 14%;
-  --card-foreground: 220 10% 95%;
-  
-  --popover: 220 15% 14%;
-  --popover-foreground: 220 10% 95%;
-  
-  --primary: 215 90% 55%; /* Electric Blue - Tech/Operator feel */
-  --primary-foreground: 0 0% 100%;
-  
-  --secondary: 220 15% 20%;
-  --secondary-foreground: 220 10% 90%;
-  
-  --muted: 220 15% 20%;
-  --muted-foreground: 220 10% 60%;
-  
-  --accent: 160 85% 40%; /* Signal Green for success/growth */
-  --accent-foreground: 0 0% 100%;
-  
-  --destructive: 0 85% 60%;
+  --button-outline: rgba(0,0,0, .10);
+  --badge-outline: rgba(0,0,0, .05);
+  --opaque-button-border-intensity: -8;
+  --elevate-1: rgba(0,0,0, .03);
+  --elevate-2: rgba(0,0,0, .08);
+
+  /* Sakred Health Light Mode */
+  --background: 50 11% 97%;
+  --foreground: 222 47% 11%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --card-border: 222 47% 92%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --popover-border: 222 47% 92%;
+
+  --primary: 222 47% 11%;
+  --primary-foreground: 42 70% 76%;
+
+  --secondary: 50 8% 93%;
+  --secondary-foreground: 222 47% 11%;
+
+  --muted: 50 8% 93%;
+  --muted-foreground: 222 47% 45%;
+
+  --accent: 39 48% 56%;
+  --accent-foreground: 222 47% 11%;
+
+  --destructive: 0 45% 42%;
   --destructive-foreground: 0 0% 100%;
 
-  --border: 220 15% 25%;
-  --input: 220 15% 25%;
-  --ring: 215 90% 55%;
-  
-  --radius: 0.25rem; /* Sharp corners for technical feel */
+  --border: 222 10% 90%;
+  --input: 222 10% 85%;
+  --ring: 39 48% 56%;
 
-  --font-sans: 'Inter', sans-serif;
-  --font-display: 'Space Grotesk', sans-serif;
+  --chart-1: 39 48% 56%;
+  --chart-2: 138 25% 39%;
+  --chart-3: 222 47% 11%;
+  --chart-4: 42 70% 76%;
+  --chart-5: 0 45% 42%;
+
+  --sidebar: 50 11% 97%;
+  --sidebar-foreground: 222 47% 11%;
+  --sidebar-border: 222 10% 90%;
+  --sidebar-primary: 39 48% 56%;
+  --sidebar-primary-foreground: 222 47% 11%;
+  --sidebar-accent: 39 48% 56%;
+  --sidebar-accent-foreground: 222 47% 11%;
+  --sidebar-ring: 39 48% 56%;
+
+  --font-sans: 'DM Sans', sans-serif;
+  --font-display: 'Playfair Display', serif;
+  --font-serif: 'Playfair Display', serif;
+  --font-mono: Menlo, monospace;
+
+  --radius: 0.5rem;
+
+  --shadow-2xs: 0px 2px 0px 0px rgba(15, 23, 42, 0.00);
+  --shadow-xs: 0px 2px 0px 0px rgba(15, 23, 42, 0.00);
+  --shadow-sm: 0px 2px 0px 0px rgba(15, 23, 42, 0.04), 0px 1px 2px -1px rgba(15, 23, 42, 0.04);
+  --shadow: 0px 2px 0px 0px rgba(15, 23, 42, 0.06), 0px 1px 2px -1px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0px 2px 0px 0px rgba(15, 23, 42, 0.06), 0px 2px 4px -1px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0px 2px 0px 0px rgba(15, 23, 42, 0.06), 0px 4px 6px -1px rgba(15, 23, 42, 0.08);
+  --shadow-xl: 0px 2px 0px 0px rgba(15, 23, 42, 0.06), 0px 8px 10px -1px rgba(15, 23, 42, 0.08);
+  --shadow-2xl: 0px 2px 0px 0px rgba(15, 23, 42, 0.08);
+  --tracking-normal: 0em;
+  --spacing: 0.25rem;
+
+  --sidebar-primary-border: hsl(var(--sidebar-primary));
+  --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --sidebar-accent-border: hsl(var(--sidebar-accent));
+  --sidebar-accent-border: hsl(from hsl(var(--sidebar-accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --primary-border: hsl(var(--primary));
+  --primary-border: hsl(from hsl(var(--primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --secondary-border: hsl(var(--secondary));
+  --secondary-border: hsl(from hsl(var(--secondary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --muted-border: hsl(var(--muted));
+  --muted-border: hsl(from hsl(var(--muted)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --accent-border: hsl(var(--accent));
+  --accent-border: hsl(from hsl(var(--accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --destructive-border: hsl(var(--destructive));
+  --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+
+  --gold: 39 48% 56%;
+  --gold-light: 42 70% 76%;
+  --gold-dark: 42 38% 47%;
+}
+
+.dark {
+  --button-outline: rgba(255,255,255, .10);
+  --badge-outline: rgba(255,255,255, .05);
+  --opaque-button-border-intensity: 9;
+  --elevate-1: rgba(255,255,255, .04);
+  --elevate-2: rgba(255,255,255, .09);
+
+  /* Sakred Health Dark Mode */
+  --background: 222 47% 11%;
+  --foreground: 50 11% 97%;
+
+  --card: 217 33% 17%;
+  --card-foreground: 50 11% 97%;
+  --card-border: 217 20% 25%;
+
+  --popover: 217 33% 17%;
+  --popover-foreground: 50 11% 97%;
+  --popover-border: 217 20% 25%;
+
+  --primary: 42 70% 76%;
+  --primary-foreground: 222 47% 11%;
+
+  --secondary: 217 33% 22%;
+  --secondary-foreground: 50 11% 90%;
+
+  --muted: 217 33% 22%;
+  --muted-foreground: 50 11% 60%;
+
+  --accent: 42 70% 76%;
+  --accent-foreground: 222 47% 11%;
+
+  --destructive: 0 69% 67%;
+  --destructive-foreground: 222 47% 11%;
+
+  --input: 217 20% 30%;
+  --ring: 42 70% 76%;
+
+  --chart-1: 42 70% 76%;
+  --chart-2: 133 28% 60%;
+  --chart-3: 50 11% 97%;
+  --chart-4: 39 48% 56%;
+  --chart-5: 0 69% 67%;
+
+  --sidebar: 222 47% 11%;
+  --sidebar-foreground: 50 11% 97%;
+  --sidebar-border: 217 20% 25%;
+  --sidebar-primary: 42 70% 76%;
+  --sidebar-primary-foreground: 222 47% 11%;
+  --sidebar-accent: 42 70% 76%;
+  --sidebar-accent-foreground: 222 47% 11%;
+  --sidebar-ring: 42 70% 76%;
+
+  --border: 217 20% 25%;
+
+  --shadow-2xs: 0px 2px 0px 0px rgba(0, 0, 0, 0.00);
+  --shadow-xs: 0px 2px 0px 0px rgba(0, 0, 0, 0.00);
+  --shadow-sm: 0px 2px 0px 0px rgba(0, 0, 0, 0.15), 0px 1px 2px -1px rgba(0, 0, 0, 0.15);
+  --shadow: 0px 2px 0px 0px rgba(0, 0, 0, 0.2), 0px 1px 2px -1px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0px 2px 0px 0px rgba(0, 0, 0, 0.2), 0px 2px 4px -1px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0px 2px 0px 0px rgba(0, 0, 0, 0.2), 0px 4px 6px -1px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0px 2px 0px 0px rgba(0, 0, 0, 0.2), 0px 8px 10px -1px rgba(0, 0, 0, 0.3);
+  --shadow-2xl: 0px 2px 0px 0px rgba(0, 0, 0, 0.3);
+
+  --gold: 39 48% 56%;
+  --gold-light: 42 70% 76%;
+  --gold-dark: 42 38% 47%;
 }
 
 @layer base {
@@ -45,10 +168,11 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-sans antialiased selection:bg-primary/30 selection:text-primary-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
   }
   h1, h2, h3, h4, h5, h6 {
-    @apply font-display tracking-tight;
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
   }
 }
 
@@ -56,19 +180,127 @@
   .text-balance {
     text-wrap: balance;
   }
-  
-  /* Custom scrollbar for operator feel */
+
+  .text-gold {
+    color: hsl(var(--gold));
+  }
+  .text-gold-light {
+    color: hsl(var(--gold-light));
+  }
+  .bg-gold {
+    background-color: hsl(var(--gold));
+  }
+  .bg-gold-subtle {
+    background-color: hsl(var(--gold) / 0.1);
+  }
+  .bg-gold-medium {
+    background-color: hsl(var(--gold) / 0.2);
+  }
+  .border-gold {
+    border-color: hsl(var(--gold));
+  }
+  .border-gold-subtle {
+    border-color: hsl(var(--gold) / 0.3);
+  }
+  .shadow-gold-subtle {
+    box-shadow: 0px 2px 8px hsl(var(--gold) / 0.15);
+  }
+  .shadow-gold-medium {
+    box-shadow: 0px 4px 16px hsl(var(--gold) / 0.25);
+  }
+  .shadow-gold-strong {
+    box-shadow: 0px 6px 24px hsl(var(--gold) / 0.35);
+  }
+  .gold-gradient {
+    background: linear-gradient(135deg, hsl(var(--gold)), hsl(var(--gold-light)));
+  }
+  .gold-gradient-text {
+    background: linear-gradient(135deg, hsl(var(--gold)), hsl(var(--gold-light)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  input[type="search"]::-webkit-search-cancel-button {
+    @apply hidden;
+  }
+
+  [contenteditable][data-placeholder]:empty::before {
+    content: attr(data-placeholder);
+    color: hsl(var(--muted-foreground));
+    pointer-events: none;
+  }
+
   ::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
   }
   ::-webkit-scrollbar-track {
     background: hsl(var(--background));
   }
   ::-webkit-scrollbar-thumb {
-    background: hsl(var(--border));
-    border-radius: 4px;
+    background: rgba(197, 160, 89, 0.3);
+    border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--primary));
+    background: var(--gold);
+  }
+
+  .no-default-hover-elevate {}
+  .no-default-active-elevate {}
+
+  .toggle-elevate::before,
+  .toggle-elevate-2::before {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    inset: 0px;
+    border-radius: inherit;
+    z-index: -1;
+  }
+
+  .toggle-elevate.toggle-elevated::before {
+    background-color: var(--elevate-2);
+  }
+
+  .border.toggle-elevate::before {
+    inset: -1px;
+  }
+
+  .hover-elevate:not(.no-default-hover-elevate),
+  .active-elevate:not(.no-default-active-elevate),
+  .hover-elevate-2:not(.no-default-hover-elevate),
+  .active-elevate-2:not(.no-default-active-elevate) {
+    position: relative;
+    z-index: 0;
+  }
+
+  .hover-elevate:not(.no-default-hover-elevate)::after,
+  .active-elevate:not(.no-default-active-elevate)::after,
+  .hover-elevate-2:not(.no-default-hover-elevate)::after,
+  .active-elevate-2:not(.no-default-active-elevate)::after {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    inset: 0px;
+    border-radius: inherit;
+    z-index: 999;
+  }
+
+  .hover-elevate:hover:not(.no-default-hover-elevate)::after,
+  .active-elevate:active:not(.no-default-active-elevate)::after {
+    background-color: var(--elevate-1);
+  }
+
+  .hover-elevate-2:hover:not(.no-default-hover-elevate)::after,
+  .active-elevate-2:active:not(.no-default-active-elevate)::after {
+    background-color: var(--elevate-2);
+  }
+
+  .border.hover-elevate:not(.no-hover-interaction-elevate)::after,
+  .border.active-elevate:not(.no-active-interaction-elevate)::after,
+  .border.hover-elevate-2:not(.no-hover-interaction-elevate)::after,
+  .border.active-elevate-2:not(.no-active-interaction-elevate)::after,
+  .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
+    inset: -1px;
   }
 }
