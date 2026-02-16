@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { ArrowRight, Check, X, Shield, Activity, Zap, Brain, Battery, Calendar, MapPin, Anchor, Droplets, Wind, Sun } from "lucide-react";
 import { ApplicationModal } from "@/components/ApplicationModal";
@@ -34,9 +35,14 @@ export default function Landing() {
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50" style={{ zIndex: 9999 }}>
         <div className="container max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
           <div className="font-display text-xl tracking-tight">Sakred Body</div>
-          <Button onClick={openApplication} size="sm" data-testid="button-apply-header">
-            Apply Now
-          </Button>
+          <div className="flex items-center gap-3 flex-wrap">
+            <Link href="/member" data-testid="link-member-portal">
+              <Button variant="outline" size="sm">Member Portal</Button>
+            </Link>
+            <Button onClick={openApplication} size="sm" data-testid="button-apply-header">
+              Apply Now
+            </Button>
+          </div>
         </div>
       </header>
 

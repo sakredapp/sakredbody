@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertApplicationSchema, applications } from './schema';
+import { insertApplicationSchema, insertBookingRequestSchema } from './schema';
 
 export const errorSchemas = {
   validation: z.object({
@@ -18,10 +18,34 @@ export const api = {
       path: '/api/applications' as const,
       input: insertApplicationSchema,
       responses: {
-        201: z.custom<typeof applications.$inferSelect>(),
+        201: z.any(),
         400: errorSchemas.validation,
         500: errorSchemas.internal,
       },
+    },
+  },
+  retreats: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/retreats' as const,
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/retreats/:id' as const,
+    },
+    properties: {
+      method: 'GET' as const,
+      path: '/api/retreats/:id/properties' as const,
+    },
+  },
+  bookingRequests: {
+    create: {
+      method: 'POST' as const,
+      path: '/api/booking-requests' as const,
+    },
+    mine: {
+      method: 'GET' as const,
+      path: '/api/booking-requests/me' as const,
     },
   },
 };
