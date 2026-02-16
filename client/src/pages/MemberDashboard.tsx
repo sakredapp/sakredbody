@@ -126,7 +126,7 @@ function LoginGate() {
         className="absolute inset-0 bg-cover bg-center"
         style={{ backgroundImage: "url('/images/member-login-bg.jpg')" }}
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/40 to-black/65" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/55 to-black/75" />
 
       <div className="relative flex-1 flex flex-col" style={{ zIndex: 10 }}>
         <div className="pt-6 pb-2 px-6 flex items-center justify-between gap-4">
@@ -146,7 +146,7 @@ function LoginGate() {
               <div className="w-12 h-px bg-gradient-to-r from-transparent via-gold to-transparent mx-auto" />
             </div>
 
-            <p className="text-white/60 text-base leading-relaxed max-w-sm mx-auto">
+            <p className="text-white/90 text-base leading-relaxed max-w-sm mx-auto" style={{ textShadow: "0 1px 8px rgba(0,0,0,0.6)" }}>
               Design your private retreat in Puerto Rico. Select your housing, choose your dates, and our concierge handles the rest.
             </p>
 
@@ -157,25 +157,25 @@ function LoginGate() {
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </a>
-              <p className="text-white/35 text-xs">
-                Members only. If you haven't been accepted yet, <Link href="/" className="underline text-white/45">apply here</Link>.
+              <p className="text-white/50 text-xs" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>
+                Members only. If you haven't been accepted yet, <Link href="/" className="underline text-white/60">apply here</Link>.
               </p>
             </div>
 
             <div className="flex items-center justify-center gap-8 pt-4 flex-wrap">
               <div className="text-center">
-                <p className="text-white/70 font-display text-lg">3 - 14</p>
-                <p className="text-white/35 text-[10px] uppercase tracking-widest">Day Retreats</p>
+                <p className="text-white/90 font-display text-lg" style={{ textShadow: "0 1px 6px rgba(0,0,0,0.5)" }}>3 - 14</p>
+                <p className="text-white/55 text-[10px] uppercase tracking-widest" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>Day Retreats</p>
               </div>
-              <div className="w-px h-6 bg-white/15" />
+              <div className="w-px h-6 bg-white/25" />
               <div className="text-center">
-                <p className="text-white/70 font-display text-lg">Private</p>
-                <p className="text-white/35 text-[10px] uppercase tracking-widest">or Shared</p>
+                <p className="text-white/90 font-display text-lg" style={{ textShadow: "0 1px 6px rgba(0,0,0,0.5)" }}>Private</p>
+                <p className="text-white/55 text-[10px] uppercase tracking-widest" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>or Shared</p>
               </div>
-              <div className="w-px h-6 bg-white/15" />
+              <div className="w-px h-6 bg-white/25" />
               <div className="text-center">
-                <p className="text-white/70 font-display text-lg">Concierge</p>
-                <p className="text-white/35 text-[10px] uppercase tracking-widest">White Glove</p>
+                <p className="text-white/90 font-display text-lg" style={{ textShadow: "0 1px 6px rgba(0,0,0,0.5)" }}>Concierge</p>
+                <p className="text-white/55 text-[10px] uppercase tracking-widest" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>White Glove</p>
               </div>
             </div>
           </div>
