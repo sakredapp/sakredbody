@@ -49,9 +49,8 @@ export default function Landing() {
         style={{ zIndex: 9999 }}
       >
         <div className="container max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <img src={sakredLogo} alt="Sakred Body" className="h-9 w-9 object-contain" />
-            <span className={`font-display text-lg tracking-tight transition-colors duration-300 ${scrolled ? "text-foreground" : "text-white/90"}`}>Sakred Body</span>
+          <div className="flex items-center">
+            <img src={sakredLogo} alt="Sakred Body" className="h-10 w-10 object-contain" />
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             <Link href="/member" data-testid="link-member-portal">

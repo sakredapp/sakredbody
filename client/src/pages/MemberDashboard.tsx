@@ -360,8 +360,7 @@ export default function MemberDashboard() {
       <header className="sticky top-0 border-b border-border/50 bg-background/90 backdrop-blur-md" style={{ zIndex: 9999 }}>
         <div className="container max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-2" data-testid="link-home-dashboard">
-            <img src={sakredLogo} alt="Sakred Body" className="h-8 w-8 object-contain" />
-            <span className="font-display text-lg tracking-tight">Sakred Body</span>
+            <img src={sakredLogo} alt="Sakred Body" className="h-9 w-9 object-contain" />
           </Link>
           <div className="flex items-center gap-3 flex-wrap">
             <Avatar className="w-8 h-8">
