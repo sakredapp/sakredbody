@@ -141,10 +141,10 @@ export default function Landing() {
           <div className="order-1 md:order-2">
             <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">The Concierge Experience</p>
             <h2 className="text-3xl md:text-4xl font-display font-normal mb-6" data-testid="text-concierge-headline">
-              Everything Is <span className="text-gold">Handled for You</span>
+              Your Retreat, <span className="text-gold">Your Way</span>
             </h2>
             <div className="space-y-4 text-muted-foreground leading-relaxed">
-              <p>When you join, you get access to a private member portal with a full concierge team behind it. Browse upcoming retreats, pick your housing tier, submit a booking request. We handle the rest.</p>
+              <p>Choose a private 1-on-1 retreat or a shared group experience. Pick your dates, duration, and housing tier — then our concierge team schedules a call to finalize everything before anything is booked.</p>
               <p>Accommodations, wellness activities, dining, local experiences — all coordinated so you can show up and focus on growth.</p>
             </div>
           </div>
@@ -208,9 +208,9 @@ export default function Landing() {
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div>
             <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">The Retreats</p>
-            <h2 className="text-3xl md:text-4xl font-display font-normal mb-6" data-testid="text-retreat-headline">Puerto Rico. Small Group. <span className="text-gold">Big Shifts.</span></h2>
+            <h2 className="text-3xl md:text-4xl font-display font-normal mb-6" data-testid="text-retreat-headline">Puerto Rico. Your Dates. <span className="text-gold">Your Way.</span></h2>
             <div className="space-y-4 text-muted-foreground leading-relaxed">
-              <p>Each retreat is 3-4 days in Puerto Rico with a small group of members. Morning movement on the beach. Breathwork sessions. Real conversations over clean food. Ocean time. Nature. Space to actually think.</p>
+              <p>Choose a private 1-on-1 retreat or go shared and overlap dates with other members for a small group experience. Pick 3 days to 2 weeks — whatever fits your life. Morning movement on the beach. Breathwork sessions. Real conversations over clean food. Ocean time. Nature.</p>
               <p>This isn't a vacation and it isn't a bootcamp. It's a structured reset — designed to pull you out of your routine long enough to see what needs to change and give you the tools to change it.</p>
             </div>
             <div className="flex flex-wrap gap-2 mt-6">
@@ -264,8 +264,8 @@ export default function Landing() {
         <div className="max-w-3xl mx-auto">
           <Accordion type="single" collapsible className="w-full">
             {[
-              { q: "Quarterly Retreats", a: "3-4 day immersive experiences in Puerto Rico. Breathwork, movement, nature, mastermind sessions, and real recovery time." },
-              { q: "Concierge Booking", a: "Browse retreats and housing in your member portal. Pick your tier, submit a request, and we handle all the details." },
+              { q: "Customizable Retreats", a: "Design your own retreat — private or shared, 3 days to 2 weeks. Pick your dates, housing tier, and let our concierge handle the rest." },
+              { q: "Concierge Booking", a: "Choose private or shared, pick your dates and housing in your member portal. Submit a request — our team schedules a call to finalize everything." },
               { q: "Health Protocols", a: "Practical daily routines for hydration, digestion, sleep, and stress management. Built for busy, mobile lives." },
               { q: "Community + Coaching", a: "Live calls, a private member community, accountability without pressure, and optional 1:1 sessions." },
               { q: "The Method: Stabilize, Clear, Build", a: "Our approach works in three phases. First, stabilize your foundation — hydration, sleep, gut health. Then clear what's dragging you down. Then build real capacity — nutrition, movement, breath, mental clarity. Systems that keep you strong long-term." }
@@ -296,7 +296,7 @@ export default function Landing() {
                 <div className="text-3xl font-display font-normal">$2,000<span className="text-base text-muted-foreground font-sans font-normal">/quarter</span></div>
               </div>
               <ul className="space-y-3 mb-8 flex-1">
-                {["Mastermind community + live calls", "Health protocols and daily systems", "Private member portal access", "Essential housing included with retreat", "Premium + Elite tiers available as upgrades"].map((item, i) => (
+                {["Mastermind community + live calls", "Health protocols and daily systems", "Private member portal access", "Design your own retreat (dates + duration)", "Essential housing included, upgrades available"].map((item, i) => (
                   <li key={i} className="flex gap-2 text-sm text-muted-foreground"><Check className="h-4 w-4 text-gold flex-shrink-0 mt-0.5" /> {item}</li>
                 ))}
               </ul>
@@ -313,7 +313,7 @@ export default function Landing() {
                 <p className="text-xs text-gold mt-2 font-sans font-normal">Retreat included + priority booking</p>
               </div>
               <ul className="space-y-3 mb-8 flex-1">
-                {["Everything in Quarterly", "One Puerto Rico retreat included", "Essential housing included", "Priority upgrade to Premium + Elite", "Direct concierge access"].map((item, i) => (
+                {["Everything in Quarterly", "One Puerto Rico retreat included", "Essential housing included", "Priority upgrade to Premium + Elite", "Direct concierge access + priority scheduling"].map((item, i) => (
                   <li key={i} className="flex gap-2 text-sm text-muted-foreground"><Check className="h-4 w-4 text-gold flex-shrink-0 mt-0.5" /> {item}</li>
                 ))}
               </ul>
@@ -331,10 +331,10 @@ export default function Landing() {
               { q: "Is this a medical program?", a: "No. Sakred Body is education, coaching, and hands-on experience. We don't diagnose or prescribe anything. We teach you how to take better care of yourself through practical systems." },
               { q: "Is this a business mastermind?", a: "No. This is personal development. We focus on you as a person — your health, energy, stress, and internal patterns. The business benefits come as a result of you being a better, more grounded human." },
               { q: "Is this going to be really esoteric and woo-woo?", a: "No. We're practical and grounded. Breathwork, movement, nutrition, sleep — real things that actually work. No crystals, no chanting, no pseudoscience." },
-              { q: "What happens at the retreats?", a: "3-4 days in Puerto Rico with a small group. Morning movement and breathwork on the beach, mastermind sessions, clean food, ocean time, nature, and recovery. It's structured but not rigid." },
+              { q: "What happens at the retreats?", a: "You design your retreat — private or shared, 3 days to 2 weeks. Morning movement and breathwork on the beach, mastermind sessions, clean food, ocean time, nature, and recovery. It's structured but flexible to you." },
               { q: "What if I travel a lot for work?", a: "The protocols are designed for busy, mobile lives. We teach systems that work on the road — hydration, sleep anchors, food strategies, nervous system tools you can use anywhere." },
-              { q: "How does the concierge booking work?", a: "You log into your member portal, browse upcoming retreats, pick a housing tier, and submit a request. Our team confirms your booking and handles all the logistics." },
-              { q: "How much time does this take each week?", a: "The daily protocols take 30-60 minutes. Live calls are optional. The retreats are 3-4 days per quarter. It's designed to fit into a real life, not replace it." }
+              { q: "How does the concierge booking work?", a: "Log into your member portal, choose private or shared, pick your dates and duration, select a housing tier, and submit your request. Our concierge team schedules a call to finalize everything." },
+              { q: "How much time does this take each week?", a: "The daily protocols take 30-60 minutes. Live calls are optional. Retreats are customizable — from 3 days to 2 weeks. Designed to fit into your life." }
             ].map((item, i) => (
               <AccordionItem key={i} value={`item-${i}`} data-testid={`faq-item-${i}`}>
                 <AccordionTrigger className="text-left font-display text-base font-normal">{item.q}</AccordionTrigger>

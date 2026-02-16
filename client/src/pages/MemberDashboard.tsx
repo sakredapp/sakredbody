@@ -12,21 +12,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import {
   Calendar,
   MapPin,
   Users,
-  Bed,
-  Bath,
   ArrowRight,
   LogOut,
-  ArrowLeft,
   Check,
   Clock,
   Star,
-  ChevronRight,
   Sparkles,
   DollarSign,
   Heart,
@@ -36,8 +33,10 @@ import {
   UtensilsCrossed,
   MoreHorizontal,
   Building2,
+  User,
+  UserPlus,
 } from "lucide-react";
-import type { Retreat, Property, BookingRequest, Partner, PartnerService } from "@shared/schema";
+import type { Retreat, BookingRequest, Partner, PartnerService } from "@shared/schema";
 
 const SERVICE_CATEGORIES = [
   { value: "hotel", label: "Hotel", icon: Hotel },
@@ -63,16 +62,34 @@ function ServiceCategoryIcon({ category }: { category: string }) {
 
 function tierLabel(tier: string) {
   switch (tier) {
-    case "standard": return "Essential";
+    case "essential": return "Essential";
     case "premium": return "Premium";
     case "elite": return "Elite";
     default: return tier;
   }
 }
 
+function tierPricing(tier: string) {
+  switch (tier) {
+    case "essential": return "Included";
+    case "premium": return "$450/night";
+    case "elite": return "$1,500/night";
+    default: return "";
+  }
+}
+
+function tierDescription(tier: string) {
+  switch (tier) {
+    case "essential": return "Hotel-style accommodation included with your retreat";
+    case "premium": return "5-star resort with premium amenities and services";
+    case "elite": return "Private luxury home with personal chef and staff";
+    default: return "";
+  }
+}
+
 function tierColor(tier: string) {
   switch (tier) {
-    case "standard": return "bg-muted text-muted-foreground";
+    case "essential": return "bg-muted text-muted-foreground";
     case "premium": return "bg-gold/15 text-gold-foreground";
     case "elite": return "bg-gold text-white";
     default: return "";
@@ -89,6 +106,14 @@ function statusBadge(status: string) {
   }
 }
 
+type SharedDateRequest = {
+  startDate: string;
+  endDate: string;
+  duration: number | null;
+  guestCount: number;
+  status: string;
+};
+
 function LoginGate() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -102,7 +127,7 @@ function LoginGate() {
           <div className="space-y-2">
             <h1 className="font-display text-3xl" data-testid="text-login-heading">Member Portal</h1>
             <p className="text-muted-foreground">
-              Sign in to browse upcoming retreats, select your housing, and request concierge bookings.
+              Sign in to design your retreat, select your housing, and schedule your concierge call.
             </p>
           </div>
           <a href="/api/login" data-testid="button-login">
@@ -120,102 +145,30 @@ function LoginGate() {
   );
 }
 
-function RetreatCard({ retreat, onClick }: { retreat: Retreat; onClick: () => void }) {
-  const start = new Date(retreat.startDate);
-  const end = new Date(retreat.endDate);
-  const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-
-  return (
-    <Card className="overflow-visible hover-elevate cursor-pointer" onClick={onClick} data-testid={`card-retreat-${retreat.id}`}>
-      <div className="relative">
-        <img
-          src={retreat.imageUrl || "/images/hero-ocean.jpg"}
-          alt={retreat.name}
-          className="w-full h-52 object-cover rounded-t-md"
-        />
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
-          <Badge className="bg-gold/90 text-white mb-1">{days}-Day Retreat</Badge>
-        </div>
-      </div>
-      <CardContent className="p-5 space-y-3">
-        <h3 className="font-display text-xl" data-testid={`text-retreat-name-${retreat.id}`}>{retreat.name}</h3>
-        <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
-          <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {retreat.location}</span>
-          <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – {end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
-        </div>
-        <p className="text-sm text-muted-foreground line-clamp-2">{retreat.description}</p>
-        <div className="flex items-center justify-between gap-2 pt-1">
-          <span className="text-xs text-muted-foreground flex items-center gap-1"><Users className="w-3 h-3" /> {retreat.capacity} spots</span>
-          <span className="flex items-center gap-1 text-sm font-medium text-gold-foreground">
-            View Housing <ChevronRight className="w-4 h-4" />
-          </span>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function PropertyCard({ property, onSelect }: { property: Property; onSelect: () => void }) {
-  return (
-    <Card className="overflow-visible hover-elevate" data-testid={`card-property-${property.id}`}>
-      <div className="relative">
-        <img
-          src={property.imageUrl || "/images/studio-standard.jpg"}
-          alt={property.name}
-          className="w-full h-44 object-cover rounded-t-md"
-        />
-        <div className="absolute top-3 right-3">
-          <Badge className={`${tierColor(property.tier)}`}>{tierLabel(property.tier)}</Badge>
-        </div>
-      </div>
-      <CardContent className="p-5 space-y-3">
-        <h4 className="font-display text-lg" data-testid={`text-property-name-${property.id}`}>{property.name}</h4>
-        <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
-          <span className="flex items-center gap-1"><Bed className="w-3.5 h-3.5" /> {property.bedrooms} bed</span>
-          <span className="flex items-center gap-1"><Bath className="w-3.5 h-3.5" /> {property.bathrooms} bath</span>
-          <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> Up to {property.maxGuests}</span>
-        </div>
-        <p className="text-sm text-muted-foreground line-clamp-2">{property.description}</p>
-        {property.amenities && property.amenities.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {property.amenities.slice(0, 4).map((a) => (
-              <Badge key={a} variant="outline" className="text-xs">{a}</Badge>
-            ))}
-            {property.amenities.length > 4 && (
-              <Badge variant="outline" className="text-xs">+{property.amenities.length - 4} more</Badge>
-            )}
-          </div>
-        )}
-        <Separator />
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <span className="text-xl font-semibold">${property.pricePerNight}</span>
-            <span className="text-sm text-muted-foreground"> / night</span>
-          </div>
-          <Button onClick={onSelect} data-testid={`button-select-property-${property.id}`}>
-            Request Booking
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function BookingRequestCard({ booking, retreats }: { booking: BookingRequest; retreats: Retreat[] }) {
-  const retreat = retreats.find((r) => r.id === booking.retreatId);
+function BookingRequestCard({ booking }: { booking: BookingRequest }) {
   return (
     <Card data-testid={`card-booking-${booking.id}`}>
       <CardContent className="p-4 space-y-2">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <h4 className="font-display text-base" data-testid={`text-booking-retreat-${booking.id}`}>{retreat?.name || `Retreat #${booking.retreatId}`}</h4>
+          <h4 className="font-display text-base" data-testid={`text-booking-type-${booking.id}`}>
+            {booking.retreatType === "private" ? "Private Retreat" : "Shared Retreat"}
+          </h4>
           {statusBadge(booking.status)}
         </div>
         <div className="text-sm text-muted-foreground flex items-center gap-3 flex-wrap">
           <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {booking.guestCount} guest{booking.guestCount > 1 ? "s" : ""}</span>
-          {retreat && (
-            <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {new Date(retreat.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} – {new Date(retreat.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+          {booking.duration && (
+            <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {booking.duration} days</span>
+          )}
+          {booking.housingTier && (
+            <Badge className={`${tierColor(booking.housingTier)} text-xs`}>{tierLabel(booking.housingTier)}</Badge>
           )}
         </div>
+        {booking.preferredStartDate && booking.preferredEndDate && (
+          <p className="text-sm text-muted-foreground">
+            {new Date(booking.preferredStartDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} – {new Date(booking.preferredEndDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+          </p>
+        )}
         {booking.specialRequests && (
           <p className="text-sm text-muted-foreground">Your notes: {booking.specialRequests}</p>
         )}
@@ -233,11 +186,15 @@ function BookingRequestCard({ booking, retreats }: { booking: BookingRequest; re
 export default function MemberDashboard() {
   const { user, isLoading: authLoading, isAuthenticated, logout } = useAuth();
   const { toast } = useToast();
-  const [selectedRetreat, setSelectedRetreat] = useState<Retreat | null>(null);
-  const [bookingProperty, setBookingProperty] = useState<Property | null>(null);
+  const [view, setView] = useState<"book" | "services" | "my-bookings">("book");
+  const [showBookingDialog, setShowBookingDialog] = useState(false);
+
+  const [retreatType, setRetreatType] = useState<"private" | "shared">("shared");
+  const [preferredStartDate, setPreferredStartDate] = useState("");
+  const [duration, setDuration] = useState("3");
+  const [housingTier, setHousingTier] = useState("essential");
   const [guestCount, setGuestCount] = useState("1");
   const [specialRequests, setSpecialRequests] = useState("");
-  const [view, setView] = useState<"retreats" | "services" | "my-bookings">("retreats");
 
   if (authLoading) {
     return (
@@ -255,21 +212,6 @@ export default function MemberDashboard() {
     return <LoginGate />;
   }
 
-  const retreatsQuery = useQuery<Retreat[]>({
-    queryKey: ["/api/retreats"],
-  });
-
-  const propertiesQuery = useQuery<Property[]>({
-    queryKey: ["/api/retreats", selectedRetreat?.id, "properties"],
-    queryFn: async () => {
-      if (!selectedRetreat) return [];
-      const res = await fetch(`/api/retreats/${selectedRetreat.id}/properties`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load properties");
-      return res.json();
-    },
-    enabled: !!selectedRetreat,
-  });
-
   const bookingsQuery = useQuery<BookingRequest[]>({
     queryKey: ["/api/booking-requests/me"],
     queryFn: async () => {
@@ -278,6 +220,17 @@ export default function MemberDashboard() {
       if (!res.ok) throw new Error("Failed to load bookings");
       return res.json();
     },
+  });
+
+  const sharedDatesQuery = useQuery<SharedDateRequest[]>({
+    queryKey: ["/api/shared-retreat-dates"],
+    queryFn: async () => {
+      const res = await fetch("/api/shared-retreat-dates", { credentials: "include" });
+      if (res.status === 401) return [];
+      if (!res.ok) throw new Error("Failed to load shared dates");
+      return res.json();
+    },
+    enabled: retreatType === "shared",
   });
 
   const activePartnersQuery = useQuery<Partner[]>({
@@ -290,17 +243,36 @@ export default function MemberDashboard() {
     enabled: view === "services",
   });
 
+  const computeEndDate = (start: string, days: number) => {
+    if (!start) return "";
+    const d = new Date(start);
+    d.setDate(d.getDate() + days);
+    return d.toISOString().split("T")[0];
+  };
+
   const createBookingMutation = useMutation({
-    mutationFn: async (data: { retreatId: number; propertyId: number; guestCount: number; specialRequests: string }) => {
+    mutationFn: async (data: {
+      retreatType: string;
+      preferredStartDate: string | null;
+      preferredEndDate: string | null;
+      duration: number;
+      housingTier: string;
+      guestCount: number;
+      specialRequests: string;
+    }) => {
       const res = await apiRequest("POST", "/api/booking-requests", data);
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Booking Requested", description: "Our concierge team will review and confirm your reservation shortly." });
-      setBookingProperty(null);
-      setSpecialRequests("");
+      toast({ title: "Retreat Request Submitted", description: "Our concierge team will reach out to schedule your confirmation call." });
+      setShowBookingDialog(false);
+      setPreferredStartDate("");
+      setDuration("3");
+      setHousingTier("essential");
       setGuestCount("1");
+      setSpecialRequests("");
       queryClient.invalidateQueries({ queryKey: ["/api/booking-requests/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/shared-retreat-dates"] });
     },
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
@@ -313,16 +285,22 @@ export default function MemberDashboard() {
   });
 
   const handleSubmitBooking = () => {
-    if (!selectedRetreat || !bookingProperty) return;
+    const endDate = computeEndDate(preferredStartDate, parseInt(duration));
     createBookingMutation.mutate({
-      retreatId: selectedRetreat.id,
-      propertyId: bookingProperty.id,
+      retreatType,
+      preferredStartDate: preferredStartDate || null,
+      preferredEndDate: endDate || null,
+      duration: parseInt(duration),
+      housingTier,
       guestCount: parseInt(guestCount),
       specialRequests,
     });
   };
 
   const initials = [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join("") || "M";
+  const minDate = new Date();
+  minDate.setDate(minDate.getDate() + 14);
+  const minDateStr = minDate.toISOString().split("T")[0];
 
   return (
     <div className="min-h-screen bg-background">
@@ -345,11 +323,11 @@ export default function MemberDashboard() {
       <div className="container max-w-6xl mx-auto px-4 py-8">
         <div className="flex items-center gap-4 mb-8 flex-wrap">
           <Button
-            variant={view === "retreats" ? "default" : "outline"}
-            onClick={() => { setView("retreats"); setSelectedRetreat(null); }}
-            data-testid="button-view-retreats"
+            variant={view === "book" ? "default" : "outline"}
+            onClick={() => setView("book")}
+            data-testid="button-view-book"
           >
-            Browse Retreats
+            Design Your Retreat
           </Button>
           <Button
             variant={view === "services" ? "default" : "outline"}
@@ -371,76 +349,174 @@ export default function MemberDashboard() {
           </Button>
         </div>
 
-        {view === "retreats" && !selectedRetreat && (
-          <div className="space-y-6">
+        {view === "book" && (
+          <div className="space-y-8 max-w-3xl">
             <div>
-              <h2 className="font-display text-2xl mb-1" data-testid="text-retreats-heading">Upcoming Retreats</h2>
-              <p className="text-muted-foreground">Select a retreat to browse available housing and request your booking.</p>
+              <h2 className="font-display text-2xl mb-1" data-testid="text-book-heading">Design Your Retreat</h2>
+              <p className="text-muted-foreground">Choose your experience type, dates, duration, and housing. After you submit, our concierge team will schedule a call to finalize the details.</p>
             </div>
-            {retreatsQuery.isLoading ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[1, 2, 3].map((i) => (
-                  <Card key={i}><CardContent className="p-0"><Skeleton className="h-52 w-full rounded-t-md" /><div className="p-5 space-y-3"><Skeleton className="h-6 w-3/4" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" /></div></CardContent></Card>
-                ))}
-              </div>
-            ) : retreatsQuery.data && retreatsQuery.data.length > 0 ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {retreatsQuery.data.map((retreat) => (
-                  <RetreatCard key={retreat.id} retreat={retreat} onClick={() => setSelectedRetreat(retreat)} />
-                ))}
-              </div>
-            ) : (
-              <Card><CardContent className="p-8 text-center text-muted-foreground">No upcoming retreats at this time. Check back soon.</CardContent></Card>
-            )}
-          </div>
-        )}
 
-        {view === "retreats" && selectedRetreat && (
-          <div className="space-y-6">
-            <Button variant="ghost" onClick={() => setSelectedRetreat(null)} className="gap-1" data-testid="button-back-retreats">
-              <ArrowLeft className="w-4 h-4" /> Back to Retreats
-            </Button>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Experience Type</label>
+              <div className="grid grid-cols-2 gap-4">
+                <Card
+                  className={`overflow-visible cursor-pointer hover-elevate ${retreatType === "private" ? "ring-2 ring-gold" : ""}`}
+                  onClick={() => setRetreatType("private")}
+                  data-testid="card-type-private"
+                >
+                  <CardContent className="p-5 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <User className="w-5 h-5 text-gold-foreground" />
+                      <h3 className="font-display text-lg">Private</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground">1-on-1 experience, fully customizable to your schedule and goals</p>
+                  </CardContent>
+                </Card>
+                <Card
+                  className={`overflow-visible cursor-pointer hover-elevate ${retreatType === "shared" ? "ring-2 ring-gold" : ""}`}
+                  onClick={() => setRetreatType("shared")}
+                  data-testid="card-type-shared"
+                >
+                  <CardContent className="p-5 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <UserPlus className="w-5 h-5 text-gold-foreground" />
+                      <h3 className="font-display text-lg">Shared</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground">Join other members during overlapping dates for a group retreat experience</p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
 
-            <div className="relative rounded-md overflow-hidden">
-              <img
-                src={selectedRetreat.imageUrl || "/images/hero-ocean.jpg"}
-                alt={selectedRetreat.name}
-                className="w-full h-64 object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-              <div className="absolute bottom-0 left-0 p-6 text-white">
-                <h2 className="font-display text-3xl mb-1" data-testid="text-selected-retreat-name">{selectedRetreat.name}</h2>
-                <div className="flex items-center gap-4 text-sm opacity-90 flex-wrap">
-                  <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {selectedRetreat.location}</span>
-                  <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {new Date(selectedRetreat.startDate).toLocaleDateString("en-US", { month: "long", day: "numeric" })} – {new Date(selectedRetreat.endDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</span>
+            {retreatType === "shared" && sharedDatesQuery.data && sharedDatesQuery.data.length > 0 && (
+              <div className="space-y-3">
+                <label className="text-sm font-medium">Other Members' Requested Dates</label>
+                <p className="text-xs text-muted-foreground">Consider overlapping your dates with existing requests for a group experience.</p>
+                <div className="space-y-2">
+                  {sharedDatesQuery.data.map((req, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-3 p-3 bg-muted/50 rounded-md text-sm cursor-pointer hover-elevate flex-wrap"
+                      onClick={() => {
+                        if (req.startDate) setPreferredStartDate(req.startDate);
+                        if (req.duration) setDuration(String(req.duration));
+                      }}
+                      data-testid={`shared-date-${i}`}
+                    >
+                      <Calendar className="w-4 h-4 text-muted-foreground" />
+                      <span>
+                        {new Date(req.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} – {new Date(req.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </span>
+                      <Badge variant="outline" className="text-xs">{req.duration} days</Badge>
+                      <Badge variant="outline" className="text-xs">{req.guestCount} guest{req.guestCount > 1 ? "s" : ""}</Badge>
+                    </div>
+                  ))}
                 </div>
               </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Preferred Start Date</label>
+                <Input
+                  type="date"
+                  value={preferredStartDate}
+                  onChange={(e) => setPreferredStartDate(e.target.value)}
+                  min={minDateStr}
+                  data-testid="input-start-date"
+                />
+                <p className="text-xs text-muted-foreground">At least 2 weeks out from today</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Duration</label>
+                <Select value={duration} onValueChange={setDuration}>
+                  <SelectTrigger data-testid="select-duration">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="3">3 Days</SelectItem>
+                    <SelectItem value="5">5 Days</SelectItem>
+                    <SelectItem value="7">7 Days (Full Week)</SelectItem>
+                    <SelectItem value="10">10 Days</SelectItem>
+                    <SelectItem value="14">14 Days (Two Weeks)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            <p className="text-muted-foreground max-w-3xl">{selectedRetreat.description}</p>
+            {preferredStartDate && (
+              <p className="text-sm text-muted-foreground">
+                Your retreat: {new Date(preferredStartDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} – {new Date(computeEndDate(preferredStartDate, parseInt(duration))).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+              </p>
+            )}
 
-            <div>
-              <h3 className="font-display text-xl mb-4" data-testid="text-housing-heading">Select Your Housing</h3>
-              <p className="text-sm text-muted-foreground mb-6">Choose your accommodation level. Our concierge team handles all booking details — you just pick your preference and we take care of the rest.</p>
-            </div>
-
-            {propertiesQuery.isLoading ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[1, 2, 3].map((i) => (
-                  <Card key={i}><CardContent className="p-0"><Skeleton className="h-44 w-full rounded-t-md" /><div className="p-5 space-y-3"><Skeleton className="h-5 w-3/4" /><Skeleton className="h-4 w-full" /><Skeleton className="h-9 w-28 ml-auto" /></div></CardContent></Card>
+            <div className="space-y-3">
+              <label className="text-sm font-medium">Housing Tier</label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {(["essential", "premium", "elite"] as const).map((tier) => (
+                  <Card
+                    key={tier}
+                    className={`overflow-visible cursor-pointer hover-elevate ${housingTier === tier ? "ring-2 ring-gold" : ""}`}
+                    onClick={() => setHousingTier(tier)}
+                    data-testid={`card-tier-${tier}`}
+                  >
+                    <CardContent className="p-4 space-y-2">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <Badge className={`${tierColor(tier)}`}>{tierLabel(tier)}</Badge>
+                        <span className="text-sm font-semibold">{tierPricing(tier)}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{tierDescription(tier)}</p>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
-            ) : propertiesQuery.data && propertiesQuery.data.length > 0 ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {propertiesQuery.data
-                  .sort((a, b) => a.pricePerNight - b.pricePerNight)
-                  .map((property) => (
-                    <PropertyCard key={property.id} property={property} onSelect={() => setBookingProperty(property)} />
-                  ))}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Number of Guests</label>
+                <Select value={guestCount} onValueChange={setGuestCount}>
+                  <SelectTrigger data-testid="select-guest-count">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 10 }, (_, i) => (
+                      <SelectItem key={i + 1} value={String(i + 1)}>{i + 1} Guest{i > 0 ? "s" : ""}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            ) : (
-              <Card><CardContent className="p-8 text-center text-muted-foreground">No properties listed yet for this retreat.</CardContent></Card>
-            )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Special Requests (optional)</label>
+              <Textarea
+                placeholder="Dietary needs, goals for the retreat, preferred activities, airport transfer, etc."
+                value={specialRequests}
+                onChange={(e) => setSpecialRequests(e.target.value)}
+                className="resize-none"
+                data-testid="input-special-requests"
+              />
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Ready to submit?</p>
+                <p className="text-xs text-muted-foreground">Our concierge will schedule a call to go over details before anything is finalized.</p>
+              </div>
+              <Button
+                onClick={() => setShowBookingDialog(true)}
+                className="bg-gold border-gold-border text-white"
+                disabled={!preferredStartDate}
+                data-testid="button-review-booking"
+              >
+                Review & Submit
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
           </div>
         )}
 
@@ -523,8 +599,8 @@ export default function MemberDashboard() {
         {view === "my-bookings" && (
           <div className="space-y-6">
             <div>
-              <h2 className="font-display text-2xl mb-1" data-testid="text-bookings-heading">My Booking Requests</h2>
-              <p className="text-muted-foreground">Track the status of your concierge bookings below.</p>
+              <h2 className="font-display text-2xl mb-1" data-testid="text-bookings-heading">My Retreat Requests</h2>
+              <p className="text-muted-foreground">Track the status of your retreat requests below.</p>
             </div>
             {bookingsQuery.isLoading ? (
               <div className="space-y-4">
@@ -535,70 +611,59 @@ export default function MemberDashboard() {
                 {bookingsQuery.data
                   .sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime())
                   .map((booking) => (
-                    <BookingRequestCard key={booking.id} booking={booking} retreats={retreatsQuery.data || []} />
+                    <BookingRequestCard key={booking.id} booking={booking} />
                   ))}
               </div>
             ) : (
-              <Card><CardContent className="p-8 text-center text-muted-foreground">No booking requests yet. Browse retreats to get started.</CardContent></Card>
+              <Card><CardContent className="p-8 text-center text-muted-foreground">No retreat requests yet. Design your retreat to get started.</CardContent></Card>
             )}
           </div>
         )}
       </div>
 
-      <Dialog open={!!bookingProperty} onOpenChange={(open) => { if (!open) setBookingProperty(null); }}>
+      <Dialog open={showBookingDialog} onOpenChange={setShowBookingDialog}>
         <DialogContent className="max-w-md" data-testid="dialog-booking">
           <DialogHeader>
-            <DialogTitle className="font-display text-xl">Request Concierge Booking</DialogTitle>
+            <DialogTitle className="font-display text-xl">Confirm Your Retreat Request</DialogTitle>
             <DialogDescription>
-              Our team will review your request and confirm availability within 24 hours.
+              Review the details below. After submitting, our concierge team will schedule a call to finalize everything.
             </DialogDescription>
           </DialogHeader>
-          {bookingProperty && selectedRetreat && (
-            <div className="space-y-4">
-              <div className="bg-muted/50 rounded-md p-3 space-y-1">
-                <p className="font-medium text-sm">{selectedRetreat.name}</p>
-                <p className="text-sm text-muted-foreground">{bookingProperty.name} — <span className="capitalize">{tierLabel(bookingProperty.tier)}</span></p>
-                <p className="text-sm font-semibold">${bookingProperty.pricePerNight}/night</p>
+          <div className="space-y-4">
+            <div className="bg-muted/50 rounded-md p-4 space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="text-sm font-medium">{retreatType === "private" ? "Private Retreat" : "Shared Retreat"}</span>
+                <Badge className={`${tierColor(housingTier)}`}>{tierLabel(housingTier)}</Badge>
               </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Number of Guests</label>
-                <Select value={guestCount} onValueChange={setGuestCount}>
-                  <SelectTrigger data-testid="select-guest-count">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: bookingProperty.maxGuests }, (_, i) => (
-                      <SelectItem key={i + 1} value={String(i + 1)}>{i + 1} Guest{i > 0 ? "s" : ""}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Special Requests (optional)</label>
-                <Textarea
-                  placeholder="Dietary needs, arrival time, airport transfer, etc."
-                  value={specialRequests}
-                  onChange={(e) => setSpecialRequests(e.target.value)}
-                  className="resize-none"
-                  data-testid="input-special-requests"
-                />
-              </div>
-
-              <Button
-                onClick={handleSubmitBooking}
-                disabled={createBookingMutation.isPending}
-                className="w-full bg-gold border-gold-border text-white"
-                data-testid="button-submit-booking"
-              >
-                {createBookingMutation.isPending ? "Submitting..." : "Submit Booking Request"}
-              </Button>
-              <p className="text-xs text-center text-muted-foreground">
-                You will not be charged until your booking is confirmed by our concierge team.
-              </p>
+              {preferredStartDate && (
+                <p className="text-sm text-muted-foreground">
+                  {new Date(preferredStartDate).toLocaleDateString("en-US", { month: "long", day: "numeric" })} – {new Date(computeEndDate(preferredStartDate, parseInt(duration))).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                </p>
+              )}
+              <p className="text-sm text-muted-foreground">{duration} days, {guestCount} guest{parseInt(guestCount) > 1 ? "s" : ""}</p>
+              {housingTier !== "essential" && (
+                <p className="text-sm font-semibold">Housing: {tierPricing(housingTier)}</p>
+              )}
             </div>
-          )}
+
+            {specialRequests && (
+              <div className="text-sm">
+                <span className="font-medium">Your notes:</span> {specialRequests}
+              </div>
+            )}
+
+            <Button
+              onClick={handleSubmitBooking}
+              disabled={createBookingMutation.isPending}
+              className="w-full bg-gold border-gold-border text-white"
+              data-testid="button-submit-booking"
+            >
+              {createBookingMutation.isPending ? "Submitting..." : "Submit Retreat Request"}
+            </Button>
+            <p className="text-xs text-center text-muted-foreground">
+              Nothing is finalized until your concierge call. No charges until confirmed.
+            </p>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

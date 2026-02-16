@@ -80,13 +80,17 @@ export async function registerRoutes(
     retreatId: z.number().int().positive().nullable().optional(),
     propertyId: z.number().int().positive().nullable().optional(),
     retreatType: z.enum(["private", "shared"]).default("shared"),
-    preferredStartDate: z.string().nullable().optional(),
-    preferredEndDate: z.string().nullable().optional(),
+    preferredStartDate: z.string().min(1, "Start date is required"),
+    preferredEndDate: z.string().min(1, "End date is required"),
     duration: z.number().int().min(2).max(14).default(3),
     housingTier: z.enum(["essential", "premium", "elite"]).default("essential"),
     guestCount: z.number().int().min(1).max(10).default(1),
     specialRequests: z.string().nullable().optional(),
-  });
+  }).refine((data) => {
+    const start = new Date(data.preferredStartDate);
+    const end = new Date(data.preferredEndDate);
+    return start < end;
+  }, { message: "Start date must be before end date", path: ["preferredStartDate"] });
 
   app.post("/api/booking-requests", isAuthenticated, async (req: any, res) => {
     try {

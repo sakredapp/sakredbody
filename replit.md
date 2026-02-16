@@ -38,8 +38,9 @@ Preferred communication style: Simple, everyday language.
   - `GET /api/retreats` — List active retreats (public)
   - `GET /api/retreats/:id` — Get single retreat (public)
   - `GET /api/retreats/:id/properties` — List properties for a retreat (public)
-  - `POST /api/booking-requests` — Create booking request (auth required)
+  - `POST /api/booking-requests` — Create booking request with retreat type, dates, duration, housing tier (auth required)
   - `GET /api/booking-requests/me` — Get user's booking requests (auth required)
+  - `GET /api/shared-retreat-dates` — Get all shared retreat date requests for overlap display (auth required)
 - **Development**: Vite dev server is integrated as middleware for HMR during development (see `server/vite.ts`)
 - **Production**: Client is built to `dist/public`, server is bundled with esbuild to `dist/index.cjs`
 
@@ -62,7 +63,7 @@ Tables:
 - **applications**: Program applications (id serial PK, name, email, goals, stressLevel, willingness, constraints, whyNow, createdAt)
 - **retreats**: Retreat events (id serial PK, name, location, description, startDate, endDate, capacity, imageUrl, active)
 - **properties**: Housing options per retreat (id serial PK, retreatId FK, name, tier [standard/premium/elite], description, bedrooms, bathrooms, maxGuests, pricePerNight, imageUrl, amenities text[], available)
-- **booking_requests**: Member booking requests (id serial PK, userId FK, retreatId FK, propertyId FK, status [requested/confirmed/completed/cancelled], guestCount, specialRequests, conciergeNotes, timestamps)
+- **booking_requests**: Member booking requests (id serial PK, userId FK, retreatId FK nullable, propertyId FK nullable, retreatType [private/shared], preferredStartDate, preferredEndDate, duration, housingTier [essential/premium/elite], status [requested/confirmed/completed/cancelled], guestCount, specialRequests, conciergeNotes, timestamps)
 - **partners**: Concierge partner businesses (id serial PK, name, category [hotel/resort/vacation_rental/yoga_studio/pilates_studio/fitness_gym/spa/restaurant/wellness_center/other], description, location, contactName, contactEmail, contactPhone, website, imageUrl, notes, active, createdAt)
 - **partner_services**: Offerings from partners (id serial PK, partnerId FK, name, description, category, price, priceUnit, duration, imageUrl, amenities text[], maxCapacity, available, createdAt)
 
@@ -74,8 +75,8 @@ Tables:
 - Admin API routes prefixed with `/api/admin/` — all require auth + admin role
 
 ### Key Design Decisions
-1. **Concierge model**: Members browse and request bookings; the Sakred Body team reviews and confirms. Bookings flow: requested → confirmed → completed
-2. **Housing tiers**: Three levels — Essential (standard), Premium, Elite — with increasing amenities and pricing
+1. **Concierge model**: Members design their retreat (private or shared, custom dates/duration, housing tier) and submit a request. Concierge team schedules a call to finalize before booking. Flow: requested → confirmed → completed
+2. **Housing tiers**: Three levels — Essential (included), Premium ($450/night), Elite ($1,500/night) — with increasing amenities and pricing
 3. **Partner network**: Admin-managed catalog of hotels, resorts, studios, gyms, spas, restaurants — all white-labeled under Sakred Body brand
 4. **Replit Auth**: OpenID Connect authentication supporting Google, GitHub, email/password
 5. **Role-based access**: isAdmin flag on users table gates admin features; members see curated partner services without seeing backend partner details
