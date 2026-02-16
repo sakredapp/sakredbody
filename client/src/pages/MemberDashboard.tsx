@@ -193,6 +193,7 @@ export default function MemberDashboard() {
   const [view, setView] = useState<"book" | "services" | "my-bookings">("book");
   const [showBookingDialog, setShowBookingDialog] = useState(false);
 
+  const [bookingStep, setBookingStep] = useState<"choose-type" | "configure">("choose-type");
   const [retreatType, setRetreatType] = useState<"private" | "shared">("shared");
   const [preferredStartDate, setPreferredStartDate] = useState("");
   const [duration, setDuration] = useState("3");
@@ -234,7 +235,7 @@ export default function MemberDashboard() {
       if (!res.ok) throw new Error("Failed to load shared dates");
       return res.json();
     },
-    enabled: retreatType === "shared",
+    enabled: retreatType === "shared" && bookingStep === "configure",
   });
 
   const activePartnersQuery = useQuery<Partner[]>({
@@ -270,6 +271,7 @@ export default function MemberDashboard() {
     onSuccess: () => {
       toast({ title: "Retreat Request Submitted", description: "Our concierge team will reach out to schedule your confirmation call." });
       setShowBookingDialog(false);
+      setBookingStep("choose-type");
       setPreferredStartDate("");
       setDuration("3");
       setHousingTier("essential");
@@ -363,190 +365,226 @@ export default function MemberDashboard() {
           <div className="space-y-8 max-w-3xl">
             <div>
               <h2 className="font-display text-2xl mb-1" data-testid="text-book-heading">Design Your Retreat</h2>
-              <p className="text-muted-foreground">Choose your experience type, dates, duration, and housing. After you submit, our concierge team will schedule a call to finalize the details.</p>
+              <p className="text-muted-foreground">
+                {bookingStep === "choose-type"
+                  ? "Start by choosing your experience. Everything else follows from here."
+                  : retreatType === "private"
+                    ? "Your private retreat. Choose your housing, dates, and duration below."
+                    : "Your shared retreat. Pick your dates to overlap with other members, choose your housing tier, and customize."}
+              </p>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Experience Type</label>
-              {housingTier === "essential" && (
-                <p className="text-xs text-muted-foreground">Private retreats require Premium or Elite housing. Upgrade your tier to unlock private.</p>
-              )}
-              <div className="grid grid-cols-2 gap-4">
-                <Card
-                  className={`overflow-visible hover-elevate ${retreatType === "private" ? "ring-2 ring-gold" : ""} ${!tierPrivateAvailable(housingTier) ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-                  onClick={() => {
-                    if (tierPrivateAvailable(housingTier)) {
-                      setRetreatType("private");
-                    }
-                  }}
-                  data-testid="card-type-private"
-                >
-                  <CardContent className="p-5 space-y-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <User className="w-5 h-5 text-gold-foreground" />
-                      <h3 className="font-display text-lg">Private</h3>
-                      {!tierPrivateAvailable(housingTier) && (
-                        <Badge variant="outline" className="text-xs">Premium+</Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground">1-on-1 experience, fully customizable. Your schedule, your pace, complete privacy.</p>
-                  </CardContent>
-                </Card>
-                <Card
-                  className={`overflow-visible cursor-pointer hover-elevate ${retreatType === "shared" ? "ring-2 ring-gold" : ""}`}
-                  onClick={() => setRetreatType("shared")}
-                  data-testid="card-type-shared"
-                >
-                  <CardContent className="p-5 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <UserPlus className="w-5 h-5 text-gold-foreground" />
-                      <h3 className="font-display text-lg">Shared</h3>
-                    </div>
-                    <p className="text-sm text-muted-foreground">Join other members during overlapping dates for a group retreat experience</p>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-
-            {retreatType === "shared" && sharedDatesQuery.data && sharedDatesQuery.data.length > 0 && (
+            {bookingStep === "choose-type" && (
               <div className="space-y-3">
-                <label className="text-sm font-medium">Other Members' Requested Dates</label>
-                <p className="text-xs text-muted-foreground">Consider overlapping your dates with existing requests for a group experience.</p>
-                <div className="space-y-2">
-                  {sharedDatesQuery.data.map((req, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center gap-3 p-3 bg-muted/50 rounded-md text-sm cursor-pointer hover-elevate flex-wrap"
-                      onClick={() => {
-                        if (req.startDate) setPreferredStartDate(req.startDate);
-                        if (req.duration) setDuration(String(req.duration));
-                      }}
-                      data-testid={`shared-date-${i}`}
-                    >
-                      <Calendar className="w-4 h-4 text-muted-foreground" />
-                      <span>
-                        {new Date(req.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} – {new Date(req.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                      </span>
-                      <Badge variant="outline" className="text-xs">{req.duration} days</Badge>
-                      <Badge variant="outline" className="text-xs">{req.guestCount} guest{req.guestCount > 1 ? "s" : ""}</Badge>
-                    </div>
-                  ))}
+                <label className="text-sm font-medium">How do you want to experience your retreat?</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Card
+                    className="overflow-visible cursor-pointer hover-elevate"
+                    onClick={() => {
+                      setRetreatType("private");
+                      setHousingTier("premium");
+                      setBookingStep("configure");
+                    }}
+                    data-testid="card-type-private"
+                  >
+                    <CardContent className="p-6 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <User className="w-5 h-5 text-gold-foreground" />
+                        <h3 className="font-display text-xl">Private</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground">Just you. Your schedule, your pace, complete privacy. A fully personalized experience with no distractions.</p>
+                      <div className="pt-2 space-y-1">
+                        <p className="text-xs text-muted-foreground flex items-center gap-1"><Check className="w-3 h-3 text-gold-foreground" /> Premium or Elite housing</p>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1"><Check className="w-3 h-3 text-gold-foreground" /> Custom dates & duration</p>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1"><Check className="w-3 h-3 text-gold-foreground" /> 1-on-1 concierge attention</p>
+                      </div>
+                      <Badge className="bg-gold/15 text-gold-foreground">From $450/night</Badge>
+                    </CardContent>
+                  </Card>
+                  <Card
+                    className="overflow-visible cursor-pointer hover-elevate"
+                    onClick={() => {
+                      setRetreatType("shared");
+                      setHousingTier("essential");
+                      setBookingStep("configure");
+                    }}
+                    data-testid="card-type-shared"
+                  >
+                    <CardContent className="p-6 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <UserPlus className="w-5 h-5 text-gold-foreground" />
+                        <h3 className="font-display text-xl">Shared</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground">Join other members for a group experience. Shared energy, curated programming, community-driven transformation.</p>
+                      <div className="pt-2 space-y-1">
+                        <p className="text-xs text-muted-foreground flex items-center gap-1"><Check className="w-3 h-3 text-gold-foreground" /> All housing tiers available</p>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1"><Check className="w-3 h-3 text-gold-foreground" /> Overlap dates with other members</p>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1"><Check className="w-3 h-3 text-gold-foreground" /> Group workshops & activities</p>
+                      </div>
+                      <Badge variant="outline">Essential tier included</Badge>
+                    </CardContent>
+                  </Card>
                 </div>
               </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Preferred Start Date</label>
-                <Input
-                  type="date"
-                  value={preferredStartDate}
-                  onChange={(e) => setPreferredStartDate(e.target.value)}
-                  min={minDateStr}
-                  data-testid="input-start-date"
-                />
-                <p className="text-xs text-muted-foreground">At least 2 weeks out from today</p>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Duration</label>
-                <Select value={duration} onValueChange={setDuration}>
-                  <SelectTrigger data-testid="select-duration">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="3">3 Days</SelectItem>
-                    <SelectItem value="5">5 Days</SelectItem>
-                    <SelectItem value="7">7 Days (Full Week)</SelectItem>
-                    <SelectItem value="10">10 Days</SelectItem>
-                    <SelectItem value="14">14 Days (Two Weeks)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {preferredStartDate && (
-              <p className="text-sm text-muted-foreground">
-                Your retreat: {new Date(preferredStartDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} – {new Date(computeEndDate(preferredStartDate, parseInt(duration))).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
-              </p>
-            )}
-
-            <div className="space-y-3">
-              <label className="text-sm font-medium">Housing Tier</label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {(["essential", "premium", "elite"] as const).map((tier) => (
-                  <Card
-                    key={tier}
-                    className={`overflow-visible cursor-pointer hover-elevate ${housingTier === tier ? "ring-2 ring-gold" : ""}`}
+            {bookingStep === "configure" && (
+              <div className="space-y-8">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => {
-                      setHousingTier(tier);
-                      if (!tierPrivateAvailable(tier) && retreatType === "private") {
-                        setRetreatType("shared");
-                      }
+                      setBookingStep("choose-type");
+                      setPreferredStartDate("");
+                      setDuration("3");
+                      setHousingTier(retreatType === "private" ? "premium" : "essential");
+                      setGuestCount("1");
+                      setSpecialRequests("");
                     }}
-                    data-testid={`card-tier-${tier}`}
+                    data-testid="button-back-to-type"
                   >
-                    <CardContent className="p-4 space-y-2">
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <Badge className={`${tierColor(tier)}`}>{tierLabel(tier)}</Badge>
-                        <span className="text-sm font-semibold">{tierPricing(tier)}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{tierDescription(tier)}</p>
-                      {tierPrivateAvailable(tier) ? (
-                        <p className="text-xs font-medium text-gold-foreground flex items-center gap-1"><User className="w-3 h-3" /> Private available</p>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">Shared experience only</p>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
+                    <ArrowRight className="w-4 h-4 mr-1 rotate-180" /> Change experience
+                  </Button>
+                  <Badge className={retreatType === "private" ? "bg-gold text-white" : "bg-gold/15 text-gold-foreground"}>
+                    {retreatType === "private" ? "Private Retreat" : "Shared Retreat"}
+                  </Badge>
+                </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Number of Guests</label>
-                <Select value={guestCount} onValueChange={setGuestCount}>
-                  <SelectTrigger data-testid="select-guest-count">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 10 }, (_, i) => (
-                      <SelectItem key={i + 1} value={String(i + 1)}>{i + 1} Guest{i > 0 ? "s" : ""}</SelectItem>
+                {retreatType === "shared" && sharedDatesQuery.data && sharedDatesQuery.data.length > 0 && (
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium">Other Members' Requested Dates</label>
+                    <p className="text-xs text-muted-foreground">Tap a date range below to match your dates with existing members for a group experience.</p>
+                    <div className="space-y-2">
+                      {sharedDatesQuery.data.map((req, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-3 p-3 bg-muted/50 rounded-md text-sm cursor-pointer hover-elevate flex-wrap"
+                          onClick={() => {
+                            if (req.startDate) setPreferredStartDate(req.startDate);
+                            if (req.duration) setDuration(String(req.duration));
+                          }}
+                          data-testid={`shared-date-${i}`}
+                        >
+                          <Calendar className="w-4 h-4 text-muted-foreground" />
+                          <span>
+                            {new Date(req.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} – {new Date(req.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          </span>
+                          <Badge variant="outline" className="text-xs">{req.duration} days</Badge>
+                          <Badge variant="outline" className="text-xs">{req.guestCount} guest{req.guestCount > 1 ? "s" : ""}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  <label className="text-sm font-medium">Housing Tier</label>
+                  <div className={`grid grid-cols-1 gap-4 ${retreatType === "private" ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
+                    {(retreatType === "private"
+                      ? (["premium", "elite"] as const)
+                      : (["essential", "premium", "elite"] as const)
+                    ).map((tier) => (
+                      <Card
+                        key={tier}
+                        className={`overflow-visible cursor-pointer hover-elevate ${housingTier === tier ? "ring-2 ring-gold" : ""}`}
+                        onClick={() => setHousingTier(tier)}
+                        data-testid={`card-tier-${tier}`}
+                      >
+                        <CardContent className="p-4 space-y-2">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <Badge className={`${tierColor(tier)}`}>{tierLabel(tier)}</Badge>
+                            <span className="text-sm font-semibold">{tierPricing(tier)}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">{tierDescription(tier)}</p>
+                        </CardContent>
+                      </Card>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Preferred Start Date</label>
+                    <Input
+                      type="date"
+                      value={preferredStartDate}
+                      onChange={(e) => setPreferredStartDate(e.target.value)}
+                      min={minDateStr}
+                      data-testid="input-start-date"
+                    />
+                    <p className="text-xs text-muted-foreground">At least 2 weeks out from today</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Duration</label>
+                    <Select value={duration} onValueChange={setDuration}>
+                      <SelectTrigger data-testid="select-duration">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="3">3 Days</SelectItem>
+                        <SelectItem value="5">5 Days</SelectItem>
+                        <SelectItem value="7">7 Days (Full Week)</SelectItem>
+                        <SelectItem value="10">10 Days</SelectItem>
+                        <SelectItem value="14">14 Days (Two Weeks)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {preferredStartDate && (
+                  <p className="text-sm text-muted-foreground">
+                    Your retreat: {new Date(preferredStartDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} – {new Date(computeEndDate(preferredStartDate, parseInt(duration))).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+                  </p>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Number of Guests</label>
+                    <Select value={guestCount} onValueChange={setGuestCount}>
+                      <SelectTrigger data-testid="select-guest-count">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 10 }, (_, i) => (
+                          <SelectItem key={i + 1} value={String(i + 1)}>{i + 1} Guest{i > 0 ? "s" : ""}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Special Requests (optional)</label>
+                  <Textarea
+                    placeholder="Dietary needs, goals for the retreat, preferred activities, airport transfer, etc."
+                    value={specialRequests}
+                    onChange={(e) => setSpecialRequests(e.target.value)}
+                    className="resize-none"
+                    data-testid="input-special-requests"
+                  />
+                </div>
+
+                <Separator />
+
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Ready to submit?</p>
+                    <p className="text-xs text-muted-foreground">Our concierge will schedule a call to go over details before anything is finalized.</p>
+                  </div>
+                  <Button
+                    onClick={() => setShowBookingDialog(true)}
+                    className="bg-gold border-gold-border text-white"
+                    disabled={!preferredStartDate}
+                    data-testid="button-review-booking"
+                  >
+                    Review & Submit
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </div>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Special Requests (optional)</label>
-              <Textarea
-                placeholder="Dietary needs, goals for the retreat, preferred activities, airport transfer, etc."
-                value={specialRequests}
-                onChange={(e) => setSpecialRequests(e.target.value)}
-                className="resize-none"
-                data-testid="input-special-requests"
-              />
-            </div>
-
-            <Separator />
-
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div className="space-y-1">
-                <p className="text-sm font-medium">Ready to submit?</p>
-                <p className="text-xs text-muted-foreground">Our concierge will schedule a call to go over details before anything is finalized.</p>
-              </div>
-              <Button
-                onClick={() => setShowBookingDialog(true)}
-                className="bg-gold border-gold-border text-white"
-                disabled={!preferredStartDate}
-                data-testid="button-review-booking"
-              >
-                Review & Submit
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </div>
+            )}
           </div>
         )}
 
