@@ -90,7 +90,12 @@ export async function registerRoutes(
     const start = new Date(data.preferredStartDate);
     const end = new Date(data.preferredEndDate);
     return start < end;
-  }, { message: "Start date must be before end date", path: ["preferredStartDate"] });
+  }, { message: "Start date must be before end date", path: ["preferredStartDate"] }).refine((data) => {
+    if (data.retreatType === "private" && data.housingTier === "essential") {
+      return false;
+    }
+    return true;
+  }, { message: "Private retreats are only available with Premium or Elite housing", path: ["housingTier"] });
 
   app.post("/api/booking-requests", isAuthenticated, async (req: any, res) => {
     try {

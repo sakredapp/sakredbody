@@ -80,11 +80,15 @@ function tierPricing(tier: string) {
 
 function tierDescription(tier: string) {
   switch (tier) {
-    case "essential": return "Hotel-style accommodation included with your retreat";
-    case "premium": return "5-star resort with premium amenities and services";
-    case "elite": return "Private luxury home with personal chef and staff";
+    case "essential": return "Shared resort experience with fellow members. Group energy, curated programming, all-inclusive.";
+    case "premium": return "5-star resort with premium amenities. Private or shared \u2014 your call. Elevated service, your own rhythm.";
+    case "elite": return "Your own luxury home. Private chef, personal staff, complete solitude. The full experience, nobody around.";
     default: return "";
   }
+}
+
+function tierPrivateAvailable(tier: string) {
+  return tier === "premium" || tier === "elite";
 }
 
 function tierColor(tier: string) {
@@ -358,18 +362,28 @@ export default function MemberDashboard() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Experience Type</label>
+              {housingTier === "essential" && (
+                <p className="text-xs text-muted-foreground">Private retreats require Premium or Elite housing. Upgrade your tier to unlock private.</p>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <Card
-                  className={`overflow-visible cursor-pointer hover-elevate ${retreatType === "private" ? "ring-2 ring-gold" : ""}`}
-                  onClick={() => setRetreatType("private")}
+                  className={`overflow-visible hover-elevate ${retreatType === "private" ? "ring-2 ring-gold" : ""} ${!tierPrivateAvailable(housingTier) ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                  onClick={() => {
+                    if (tierPrivateAvailable(housingTier)) {
+                      setRetreatType("private");
+                    }
+                  }}
                   data-testid="card-type-private"
                 >
                   <CardContent className="p-5 space-y-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <User className="w-5 h-5 text-gold-foreground" />
                       <h3 className="font-display text-lg">Private</h3>
+                      {!tierPrivateAvailable(housingTier) && (
+                        <Badge variant="outline" className="text-xs">Premium+</Badge>
+                      )}
                     </div>
-                    <p className="text-sm text-muted-foreground">1-on-1 experience, fully customizable to your schedule and goals</p>
+                    <p className="text-sm text-muted-foreground">1-on-1 experience, fully customizable. Your schedule, your pace, complete privacy.</p>
                   </CardContent>
                 </Card>
                 <Card
@@ -458,7 +472,12 @@ export default function MemberDashboard() {
                   <Card
                     key={tier}
                     className={`overflow-visible cursor-pointer hover-elevate ${housingTier === tier ? "ring-2 ring-gold" : ""}`}
-                    onClick={() => setHousingTier(tier)}
+                    onClick={() => {
+                      setHousingTier(tier);
+                      if (!tierPrivateAvailable(tier) && retreatType === "private") {
+                        setRetreatType("shared");
+                      }
+                    }}
                     data-testid={`card-tier-${tier}`}
                   >
                     <CardContent className="p-4 space-y-2">
@@ -467,6 +486,11 @@ export default function MemberDashboard() {
                         <span className="text-sm font-semibold">{tierPricing(tier)}</span>
                       </div>
                       <p className="text-xs text-muted-foreground">{tierDescription(tier)}</p>
+                      {tierPrivateAvailable(tier) ? (
+                        <p className="text-xs font-medium text-gold-foreground flex items-center gap-1"><User className="w-3 h-3" /> Private available</p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">Shared experience only</p>
+                      )}
                     </CardContent>
                   </Card>
                 ))}
