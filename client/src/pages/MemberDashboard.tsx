@@ -385,14 +385,6 @@ export default function MemberDashboard() {
             Design Your Retreat
           </Button>
           <Button
-            variant={view === "services" ? "default" : "outline"}
-            onClick={() => setView("services")}
-            data-testid="button-view-services"
-          >
-            <Sparkles className="w-4 h-4 mr-2" />
-            Services
-          </Button>
-          <Button
             variant={view === "my-bookings" ? "default" : "outline"}
             onClick={() => setView("my-bookings")}
             data-testid="button-view-bookings"
@@ -531,7 +523,10 @@ export default function MemberDashboard() {
                       <Card
                         key={tier}
                         className={`overflow-visible cursor-pointer hover-elevate ${housingTier === tier ? "ring-2 ring-gold" : ""}`}
-                        onClick={() => setHousingTier(tier)}
+                        onClick={() => {
+                          setHousingTier(tier);
+                          if (tier === "essential" && parseInt(guestCount) > 2) setGuestCount("1");
+                        }}
                         data-testid={`card-tier-${tier}`}
                       >
                         <CardContent className="p-4 space-y-2">
@@ -590,11 +585,21 @@ export default function MemberDashboard() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {Array.from({ length: 10 }, (_, i) => (
-                          <SelectItem key={i + 1} value={String(i + 1)}>{i + 1} Guest{i > 0 ? "s" : ""}</SelectItem>
-                        ))}
+                        {housingTier === "essential" ? (
+                          <>
+                            <SelectItem value="1">Just Me</SelectItem>
+                            <SelectItem value="2">Me + 1 Guest</SelectItem>
+                          </>
+                        ) : (
+                          Array.from({ length: 10 }, (_, i) => (
+                            <SelectItem key={i + 1} value={String(i + 1)}>{i + 1} Guest{i > 0 ? "s" : ""}</SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
+                    {housingTier === "essential" && (
+                      <p className="text-xs text-muted-foreground">Essential includes you and an optional +1</p>
+                    )}
                   </div>
                 </div>
 
