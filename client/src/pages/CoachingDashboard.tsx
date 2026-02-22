@@ -81,7 +81,7 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-import sakredLogo from "/images/sakred-logo.svg";
+import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
 // ─── Date Utilities (client-side, matches shared/utils/dates) ───────────
 

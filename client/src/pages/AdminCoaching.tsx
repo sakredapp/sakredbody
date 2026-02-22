@@ -55,7 +55,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 
-import sakredLogo from "/images/sakred-logo.svg";
+import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
 const CATEGORIES = [
   "Sleep",
