@@ -3,14 +3,14 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import { isAuthenticated } from "./replit_integrations/auth";
+import { isAuthenticated } from "./auth";
 import { insertPartnerSchema, insertPartnerServiceSchema } from "@shared/schema";
 
 function isAdmin(req: Request, res: Response, next: NextFunction) {
-  if (!(req as any).user?.claims?.sub) {
+  const userId = (req.session as any)?.userId;
+  if (!userId) {
     return res.status(401).json({ message: "Not authenticated" });
   }
-  const userId = (req as any).user.claims.sub;
   storage.getUser(userId).then((user) => {
     if (!user || user.isAdmin !== "true") {
       return res.status(403).json({ message: "Admin access required" });
@@ -99,7 +99,7 @@ export async function registerRoutes(
 
   app.post("/api/booking-requests", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.session as any).userId;
       const parsed = bookingInputSchema.parse(req.body);
 
       const booking = await storage.createBookingRequest({
@@ -149,7 +149,7 @@ export async function registerRoutes(
 
   app.get("/api/booking-requests/me", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.session as any).userId;
       const requests = await storage.getBookingRequestsByUser(userId);
       res.json(requests);
     } catch (err) {
@@ -160,7 +160,7 @@ export async function registerRoutes(
 
   app.get("/api/admin/check", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.session as any).userId;
       const user = await storage.getUser(userId);
       res.json({ isAdmin: user?.isAdmin === "true" });
     } catch (err) {
