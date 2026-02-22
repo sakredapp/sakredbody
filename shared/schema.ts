@@ -3,6 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export * from "./models/auth";
+export * from "./models/coaching";
 
 export const applications = pgTable("applications", {
   id: serial("id").primaryKey(),
