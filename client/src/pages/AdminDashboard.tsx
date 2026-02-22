@@ -497,6 +497,11 @@ export default function AdminDashboard() {
             Bookings
             {bookingCount > 0 && <Badge variant="secondary" className="ml-2">{bookingCount}</Badge>}
           </Button>
+          <Link href="/admin/coaching">
+            <Button variant="outline" className="border-[hsl(var(--gold))]/30 text-[hsl(var(--gold))]">
+              <Sparkles className="w-4 h-4 mr-1" /> Coaching
+            </Button>
+          </Link>
         </div>
 
         {view === "partners" && !selectedPartner && (

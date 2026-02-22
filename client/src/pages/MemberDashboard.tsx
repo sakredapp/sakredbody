@@ -35,6 +35,7 @@ import {
   Building2,
   User,
   UserPlus,
+  ChevronRight,
 } from "lucide-react";
 import type { Retreat, BookingRequest, Partner, PartnerService } from "@shared/schema";
 import {
@@ -307,6 +308,12 @@ export default function MemberDashboard() {
               <Badge variant="secondary" className="ml-2">{bookingsQuery.data.length}</Badge>
             )}
           </Button>
+          <Link href="/coaching">
+            <Button variant="outline" className="border-[hsl(var(--gold))]/30 text-[hsl(var(--gold))]">
+              Coaching
+              <ChevronRight className="w-4 h-4 ml-1" />
+            </Button>
+          </Link>
         </div>
 
         {view === "book" && (
