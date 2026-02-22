@@ -48,7 +48,10 @@ export interface IStorage {
   createPartnerService(service: InsertPartnerService): Promise<PartnerService>;
   updatePartnerService(id: number, service: Partial<InsertPartnerService>): Promise<PartnerService | undefined>;
   deletePartnerService(id: number): Promise<void>;
+  // User methods (unified — used by both auth and business logic)
   getUser(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  upsertUser(user: { email: string; password?: string; firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null }): Promise<User>;
   setUserAdmin(id: string, isAdmin: boolean): Promise<User | undefined>;
 }
 
@@ -176,6 +179,23 @@ export class DatabaseStorage implements IStorage {
 
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  async upsertUser(userData: { email: string; password?: string; firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null }): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: users.id,
+        set: { ...userData, updatedAt: new Date() },
+      })
+      .returning();
     return user;
   }
 

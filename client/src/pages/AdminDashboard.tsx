@@ -43,26 +43,22 @@ import {
   Users,
 } from "lucide-react";
 import type { Partner, PartnerService, BookingRequest } from "@shared/schema";
+import {
+  SERVICE_CATEGORIES,
+  getCategoryLabel,
+  type ServiceCategoryValue,
+} from "@shared/constants";
 
-const CATEGORIES = [
-  { value: "hotel", label: "Hotel", icon: Hotel },
-  { value: "resort", label: "Resort", icon: Sparkles },
-  { value: "vacation_rental", label: "Vacation Rental", icon: Home },
-  { value: "yoga_studio", label: "Yoga Studio", icon: Heart },
-  { value: "pilates_studio", label: "Pilates Studio", icon: Heart },
-  { value: "fitness_gym", label: "Fitness Gym", icon: Dumbbell },
-  { value: "spa", label: "Spa", icon: Sparkles },
-  { value: "restaurant", label: "Restaurant", icon: UtensilsCrossed },
-  { value: "wellness_center", label: "Wellness Center", icon: Heart },
-  { value: "other", label: "Other", icon: MoreHorizontal },
-];
-
-function categoryLabel(cat: string) {
-  return CATEGORIES.find((c) => c.value === cat)?.label || cat;
-}
+// Icon mapping (UI-only, can't live in shared/)
+const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  hotel: Hotel, resort: Sparkles, vacation_rental: Home,
+  yoga_studio: Heart, pilates_studio: Heart, fitness_gym: Dumbbell,
+  spa: Sparkles, restaurant: UtensilsCrossed, wellness_center: Heart,
+  other: MoreHorizontal,
+};
 
 function CategoryIcon({ category }: { category: string }) {
-  const Icon = CATEGORIES.find((c) => c.value === category)?.icon || Building2;
+  const Icon = CATEGORY_ICONS[category] || Building2;
   return <Icon className="w-4 h-4" />;
 }
 
@@ -83,12 +79,12 @@ function LoginGate() {
               Sign in with an admin account to manage partners, services, and bookings.
             </p>
           </div>
-          <a href="/api/login" data-testid="button-admin-login">
+          <Link href="/login" data-testid="button-admin-login">
             <Button size="lg" className="w-full bg-gold border-gold-border text-white">
               Sign In
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
-          </a>
+          </Link>
         </div>
       </div>
     </div>
@@ -197,6 +193,27 @@ export default function AdminDashboard() {
     enabled: isAuthenticated,
   });
 
+  const partnersQuery = useQuery<Partner[]>({
+    queryKey: ["/api/admin/partners"],
+    enabled: isAuthenticated && adminCheckQuery.data?.isAdmin === true,
+  });
+
+  const servicesQuery = useQuery<PartnerService[]>({
+    queryKey: ["/api/admin/partners", selectedPartner?.id, "services"],
+    queryFn: async () => {
+      if (!selectedPartner) return [];
+      const res = await fetch(`/api/admin/partners/${selectedPartner.id}/services`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load services");
+      return res.json();
+    },
+    enabled: isAuthenticated && !!selectedPartner && adminCheckQuery.data?.isAdmin === true,
+  });
+
+  const bookingsQuery = useQuery<BookingRequest[]>({
+    queryKey: ["/api/admin/bookings"],
+    enabled: isAuthenticated && adminCheckQuery.data?.isAdmin === true,
+  });
+
   if (authLoading || (isAuthenticated && adminCheckQuery.isLoading)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -211,25 +228,6 @@ export default function AdminDashboard() {
 
   if (!isAuthenticated) return <LoginGate />;
   if (!adminCheckQuery.data?.isAdmin) return <AccessDenied />;
-
-  const partnersQuery = useQuery<Partner[]>({
-    queryKey: ["/api/admin/partners"],
-  });
-
-  const servicesQuery = useQuery<PartnerService[]>({
-    queryKey: ["/api/admin/partners", selectedPartner?.id, "services"],
-    queryFn: async () => {
-      if (!selectedPartner) return [];
-      const res = await fetch(`/api/admin/partners/${selectedPartner.id}/services`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load services");
-      return res.json();
-    },
-    enabled: !!selectedPartner,
-  });
-
-  const bookingsQuery = useQuery<BookingRequest[]>({
-    queryKey: ["/api/admin/bookings"],
-  });
 
   const createPartnerMutation = useMutation({
     mutationFn: async (data: PartnerFormData) => {
@@ -545,7 +543,7 @@ export default function AdminDashboard() {
                       </div>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <CategoryIcon category={partner.category} />
-                        <span>{categoryLabel(partner.category)}</span>
+                        <span>{getCategoryLabel(partner.category)}</span>
                       </div>
                       <div className="flex items-center gap-1 text-sm text-muted-foreground">
                         <MapPin className="w-3.5 h-3.5" />
@@ -593,7 +591,7 @@ export default function AdminDashboard() {
                   </Badge>
                 </div>
                 <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
-                  <span className="flex items-center gap-1"><CategoryIcon category={selectedPartner.category} /> {categoryLabel(selectedPartner.category)}</span>
+                  <span className="flex items-center gap-1"><CategoryIcon category={selectedPartner.category} /> {getCategoryLabel(selectedPartner.category)}</span>
                   <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {selectedPartner.location}</span>
                   {selectedPartner.website && (
                     <a href={selectedPartner.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 underline">
@@ -777,7 +775,7 @@ export default function AdminDashboard() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map((c) => (
+                  {SERVICE_CATEGORIES.map((c) => (
                     <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
                   ))}
                 </SelectContent>
@@ -901,7 +899,7 @@ export default function AdminDashboard() {
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map((c) => (
+                  {SERVICE_CATEGORIES.map((c) => (
                     <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
                   ))}
                 </SelectContent>

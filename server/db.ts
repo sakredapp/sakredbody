@@ -8,7 +8,7 @@ const connectionString = process.env.SAKREDBODY_DATABASE_URL || process.env.DATA
 
 if (!connectionString) {
   throw new Error(
-    "SAKREDBODY_DATABASE_URL must be set. Did you forget to add the Supabase connection string?",
+    "Database URL not configured. Set SAKREDBODY_DATABASE_URL or DATABASE_URL environment variable.",
   );
 }
 

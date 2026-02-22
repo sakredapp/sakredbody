@@ -37,59 +37,36 @@ import {
   UserPlus,
 } from "lucide-react";
 import type { Retreat, BookingRequest, Partner, PartnerService } from "@shared/schema";
+import {
+  SERVICE_CATEGORIES,
+  getCategoryLabel,
+  HOUSING_TIERS,
+  getTierLabel,
+  getTierPricing,
+  type HousingTierKey,
+  type ServiceCategoryValue,
+} from "@shared/constants";
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
-const SERVICE_CATEGORIES = [
-  { value: "hotel", label: "Hotel", icon: Hotel },
-  { value: "resort", label: "Resort", icon: Sparkles },
-  { value: "vacation_rental", label: "Vacation Rental", icon: Home },
-  { value: "yoga_studio", label: "Yoga Studio", icon: Heart },
-  { value: "pilates_studio", label: "Pilates Studio", icon: Heart },
-  { value: "fitness_gym", label: "Fitness Gym", icon: Dumbbell },
-  { value: "spa", label: "Spa", icon: Sparkles },
-  { value: "restaurant", label: "Restaurant", icon: UtensilsCrossed },
-  { value: "wellness_center", label: "Wellness Center", icon: Heart },
-  { value: "other", label: "Other", icon: MoreHorizontal },
-];
-
-function serviceCategoryLabel(cat: string) {
-  return SERVICE_CATEGORIES.find((c) => c.value === cat)?.label || cat;
-}
+// Icon mapping (UI-only, can't live in shared/)
+const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  hotel: Hotel, resort: Sparkles, vacation_rental: Home,
+  yoga_studio: Heart, pilates_studio: Heart, fitness_gym: Dumbbell,
+  spa: Sparkles, restaurant: UtensilsCrossed, wellness_center: Heart,
+  other: MoreHorizontal,
+};
 
 function ServiceCategoryIcon({ category }: { category: string }) {
-  const Icon = SERVICE_CATEGORIES.find((c) => c.value === category)?.icon || Building2;
+  const Icon = CATEGORY_ICONS[category] || Building2;
   return <Icon className="w-4 h-4" />;
 }
 
-function tierLabel(tier: string) {
-  switch (tier) {
-    case "essential": return "Essential";
-    case "premium": return "Premium";
-    case "elite": return "Elite";
-    default: return tier;
-  }
-}
-
-function tierPricing(tier: string) {
-  switch (tier) {
-    case "essential": return "Included";
-    case "premium": return "$450/night";
-    case "elite": return "$1,500/night";
-    default: return "";
-  }
-}
-
 function tierDescription(tier: string) {
-  switch (tier) {
-    case "essential": return "Shared resort experience with fellow members. Group energy, curated programming, all-inclusive.";
-    case "premium": return "5-star resort with premium amenities. Private or shared \u2014 your call. Elevated service, your own rhythm.";
-    case "elite": return "Your own luxury home. Private chef, personal staff, complete solitude. The full experience, nobody around.";
-    default: return "";
-  }
+  return HOUSING_TIERS[tier as HousingTierKey]?.dashboardDescription || "";
 }
 
 function tierPrivateAvailable(tier: string) {
-  return tier === "premium" || tier === "elite";
+  return HOUSING_TIERS[tier as HousingTierKey]?.privateAvailable || false;
 }
 
 function tierColor(tier: string) {
@@ -120,73 +97,9 @@ type SharedDateRequest = {
 };
 
 function LoginGate() {
-  return (
-    <div className="min-h-screen relative flex flex-col">
-      <div
-        className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: "url('/images/member-login-bg.jpg')" }}
-      />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/55 to-black/75" />
-
-      <div className="relative flex-1 flex flex-col" style={{ zIndex: 10 }}>
-        <div className="pt-6 pb-2 px-6 flex items-center justify-between gap-4">
-          <Link href="/" data-testid="link-home">
-            <img src={sakredLogo} alt="Sakred Body" className="h-12 w-12 object-contain drop-shadow-lg" />
-          </Link>
-          <Link href="/" className="text-white/50 text-xs uppercase tracking-widest hover:text-white/70 transition-colors">
-            Back to Site
-          </Link>
-        </div>
-
-        <div className="flex-1 flex items-center justify-center p-4">
-          <div className="max-w-lg w-full text-center space-y-8">
-            <div className="space-y-4">
-              <img src={sakredLogo} alt="Sakred Body" className="h-20 w-20 mx-auto object-contain drop-shadow-xl" />
-              <h1 className="font-display text-4xl md:text-5xl text-white leading-tight" data-testid="text-login-heading">Member Portal</h1>
-              <div className="w-12 h-px bg-gradient-to-r from-transparent via-gold to-transparent mx-auto" />
-            </div>
-
-            <p className="text-white/90 text-base leading-relaxed max-w-sm mx-auto" style={{ textShadow: "0 1px 8px rgba(0,0,0,0.6)" }}>
-              Design your private retreat in Puerto Rico. Select your housing, choose your dates, and our concierge handles the rest.
-            </p>
-
-            <div className="space-y-5 pt-2">
-              <a href="/api/login" data-testid="button-login">
-                <Button size="lg" className="w-full max-w-xs mx-auto bg-gold border-gold-border text-white text-base">
-                  Enter the Portal
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </a>
-              <p className="text-white/50 text-xs" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>
-                Members only. If you haven't been accepted yet, <Link href="/" className="underline text-white/60">apply here</Link>.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-center gap-8 pt-4 flex-wrap">
-              <div className="text-center">
-                <p className="text-white/90 font-display text-lg" style={{ textShadow: "0 1px 6px rgba(0,0,0,0.5)" }}>3 - 14</p>
-                <p className="text-white/55 text-[10px] uppercase tracking-widest" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>Day Retreats</p>
-              </div>
-              <div className="w-px h-6 bg-white/25" />
-              <div className="text-center">
-                <p className="text-white/90 font-display text-lg" style={{ textShadow: "0 1px 6px rgba(0,0,0,0.5)" }}>Private</p>
-                <p className="text-white/55 text-[10px] uppercase tracking-widest" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>or Shared</p>
-              </div>
-              <div className="w-px h-6 bg-white/25" />
-              <div className="text-center">
-                <p className="text-white/90 font-display text-lg" style={{ textShadow: "0 1px 6px rgba(0,0,0,0.5)" }}>Concierge</p>
-                <p className="text-white/55 text-[10px] uppercase tracking-widest" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>White Glove</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="pb-6 text-center">
-          <p className="text-white/25 text-[10px] tracking-[0.25em] uppercase">Puerto Rico</p>
-        </div>
-      </div>
-    </div>
-  );
+  // Redirect to the login page
+  window.location.href = "/login";
+  return null;
 }
 
 function BookingRequestCard({ booking }: { booking: BookingRequest }) {
@@ -205,7 +118,7 @@ function BookingRequestCard({ booking }: { booking: BookingRequest }) {
             <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {booking.duration} days</span>
           )}
           {booking.housingTier && (
-            <Badge className={`${tierColor(booking.housingTier)} text-xs`}>{tierLabel(booking.housingTier)}</Badge>
+            <Badge className={`${tierColor(booking.housingTier)} text-xs`}>{getTierLabel(booking.housingTier)}</Badge>
           )}
         </div>
         {booking.preferredStartDate && booking.preferredEndDate && (
@@ -531,8 +444,8 @@ export default function MemberDashboard() {
                       >
                         <CardContent className="p-4 space-y-2">
                           <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <Badge className={`${tierColor(tier)}`}>{tierLabel(tier)}</Badge>
-                            <span className="text-sm font-semibold">{tierPricing(tier)}</span>
+                            <Badge className={`${tierColor(tier)}`}>{getTierLabel(tier)}</Badge>
+                            <span className="text-sm font-semibold">{getTierPricing(tier)}</span>
                           </div>
                           <p className="text-xs text-muted-foreground">{tierDescription(tier)}</p>
                         </CardContent>
@@ -657,7 +570,7 @@ export default function MemberDashboard() {
                       <div className="flex items-center gap-3 flex-wrap">
                         <ServiceCategoryIcon category={partner.category} />
                         <h3 className="font-display text-xl">{partner.name}</h3>
-                        <Badge variant="outline" className="text-xs">{serviceCategoryLabel(partner.category)}</Badge>
+                        <Badge variant="outline" className="text-xs">{getCategoryLabel(partner.category)}</Badge>
                         <span className="text-sm text-muted-foreground flex items-center gap-1"><MapPin className="w-3 h-3" /> {partner.location}</span>
                       </div>
                       <p className="text-sm text-muted-foreground max-w-2xl">{partner.description}</p>
@@ -749,7 +662,7 @@ export default function MemberDashboard() {
             <div className="bg-muted/50 rounded-md p-4 space-y-2">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <span className="text-sm font-medium">{retreatType === "private" ? "Private Retreat" : "Shared Retreat"}</span>
-                <Badge className={`${tierColor(housingTier)}`}>{tierLabel(housingTier)}</Badge>
+                <Badge className={`${tierColor(housingTier)}`}>{getTierLabel(housingTier)}</Badge>
               </div>
               {preferredStartDate && (
                 <p className="text-sm text-muted-foreground">
@@ -758,7 +671,7 @@ export default function MemberDashboard() {
               )}
               <p className="text-sm text-muted-foreground">{duration} days, {guestCount} guest{parseInt(guestCount) > 1 ? "s" : ""}</p>
               {housingTier !== "essential" && (
-                <p className="text-sm font-semibold">Housing: {tierPricing(housingTier)}</p>
+                <p className="text-sm font-semibold">Housing: {getTierPricing(housingTier)}</p>
               )}
             </div>
 

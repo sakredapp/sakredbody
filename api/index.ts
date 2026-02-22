@@ -1,4 +1,5 @@
-import express, { type Request, Response, NextFunction } from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
+import type { IncomingMessage, ServerResponse } from "http";
 import { registerRoutes } from "../server/routes";
 import { setupAuth, registerAuthRoutes } from "../server/auth";
 import { createServer } from "http";
@@ -6,15 +7,9 @@ import { createServer } from "http";
 const app = express();
 const httpServer = createServer(app);
 
-declare module "http" {
-  interface IncomingMessage {
-    rawBody: unknown;
-  }
-}
-
 app.use(
   express.json({
-    verify: (req, _res, buf) => {
+    verify: (req: IncomingMessage & { rawBody?: unknown }, _res: ServerResponse, buf: Buffer) => {
       req.rawBody = buf;
     },
   })
@@ -34,7 +29,7 @@ const initPromise = (async () => {
 })();
 
 // Error handler
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+app.use((err: Error & { status?: number; statusCode?: number }, _req: Request, res: Response, _next: NextFunction) => {
   const status = err.status || err.statusCode || 500;
   const message = err.message || "Internal Server Error";
   console.error("API Error:", err);
@@ -44,7 +39,7 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 // Vercel serverless handler
-export default async function handler(req: any, res: any) {
+export default async function handler(req: IncomingMessage, res: ServerResponse) {
   if (!initialized) {
     await initPromise;
   }
