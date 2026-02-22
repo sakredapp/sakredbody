@@ -6,6 +6,7 @@ import { z } from "zod";
 import { isAuthenticated } from "./auth";
 import "./auth/sessionAuth"; // session type augmentation
 import { insertPartnerSchema, insertPartnerServiceSchema } from "@shared/schema";
+import { registerCoachingRoutes } from "./coaching";
 
 function isAdmin(req: Request, res: Response, next: NextFunction) {
   const userId = req.session?.userId;
@@ -334,6 +335,9 @@ export async function registerRoutes(
       res.status(500).json({ message: "Internal Server Error" });
     }
   });
+
+  // ── Coaching Engine ──────────────────────────────────────────────────
+  registerCoachingRoutes(app);
 
   return httpServer;
 }
