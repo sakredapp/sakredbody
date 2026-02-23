@@ -1,4 +1,4 @@
-import { db } from "./db";
+import { db } from "./db.js";
 import { retreats, properties } from "@shared/schema";
 
 async function seed() {

@@ -21,7 +21,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-import { users } from "./auth";
+import { users } from "./auth.js";
 
 // ─── 1. WELLNESS ROUTINES (Admin-managed program templates) ────────────────
 

@@ -1,4 +1,4 @@
-import { db } from "./db";
+import { db } from "./db.js";
 import { eq, and, ne } from "drizzle-orm";
 import {
   applications,

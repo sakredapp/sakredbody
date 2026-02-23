@@ -1,12 +1,12 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import type { Server } from "http";
-import { storage } from "./storage";
+import { storage } from "./storage.js";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import { isAuthenticated } from "./auth";
-import "./auth/sessionAuth"; // session type augmentation
+import { isAuthenticated } from "./auth/index.js";
+import "./auth/sessionAuth.js"; // session type augmentation
 import { insertPartnerSchema, insertPartnerServiceSchema } from "@shared/schema";
-import { registerCoachingRoutes } from "./coaching";
+import { registerCoachingRoutes } from "./coaching/index.js";
 
 function isAdmin(req: Request, res: Response, next: NextFunction) {
   const userId = req.session?.userId;

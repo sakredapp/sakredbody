@@ -36,11 +36,11 @@
  */
 
 import type { Express, Request, Response, NextFunction } from "express";
-import { db } from "../db";
+import { db } from "../db.js";
 import { eq, and, desc, count, sql, gte, lte } from "drizzle-orm";
 import { z } from "zod";
-import { isAuthenticated } from "../auth";
-import { storage } from "../storage";
+import { isAuthenticated } from "../auth/index.js";
+import { storage } from "../storage.js";
 import {
   wellnessRoutines,
   routineHabits,
@@ -59,12 +59,12 @@ import {
   reconcileHabits,
   pauseRoutine,
   abandonRoutine,
-} from "./enrollment";
+} from "./enrollment.js";
 import {
   formatLocalDateString,
   parseLocalDate,
   addDays,
-} from "../../shared/utils/dates";
+} from "../../shared/utils/dates.js";
 
 // ─── Middleware ────────────────────────────────────────────────────────────
 

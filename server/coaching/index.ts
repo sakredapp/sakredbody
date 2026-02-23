@@ -2,17 +2,17 @@
  * Coaching Module — barrel export
  */
 
-export { registerCoachingRoutes } from "./routes";
+export { registerCoachingRoutes } from "./routes.js";
 export {
   enrollInRoutine,
   reconcileHabits,
   pauseRoutine,
   abandonRoutine,
-} from "./enrollment";
+} from "./enrollment.js";
 export {
   formatLocalDateString,
   parseLocalDate,
   addDays,
   subtractDays,
   daysBetween,
-} from "../../shared/utils/dates";
+} from "../../shared/utils/dates.js";

@@ -13,7 +13,7 @@
  */
 
 import crypto from "crypto";
-import { db } from "../db";
+import { db } from "../db.js";
 import { eq, and, sql, count } from "drizzle-orm";
 import {
   users,
@@ -33,7 +33,7 @@ import {
   parseLocalDate,
   addDays,
   daysBetween,
-} from "../../shared/utils/dates";
+} from "../../shared/utils/dates.js";
 
 function generateIdempotencyKey(
   userId: string,

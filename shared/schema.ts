@@ -2,8 +2,8 @@ import { pgTable, text, serial, timestamp, boolean, integer, varchar } from "dri
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export * from "./models/auth";
-export * from "./models/coaching";
+export * from "./models/auth.js";
+export * from "./models/coaching.js";
 
 export const applications = pgTable("applications", {
   id: serial("id").primaryKey(),

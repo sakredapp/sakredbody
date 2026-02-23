@@ -1,2 +1,2 @@
-export { setupAuth, isAuthenticated } from "./sessionAuth";
-export { registerAuthRoutes } from "./routes";
+export { setupAuth, isAuthenticated } from "./sessionAuth.js";
+export { registerAuthRoutes } from "./routes.js";

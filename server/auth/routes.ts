@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from "express";
-import { storage } from "../storage";
-import { isAuthenticated } from "./sessionAuth";
+import { storage } from "../storage.js";
+import { isAuthenticated } from "./sessionAuth.js";
 import { z } from "zod";
 import crypto from "crypto";
 
