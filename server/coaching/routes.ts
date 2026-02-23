@@ -935,16 +935,22 @@ export function registerCoachingRoutes(app: Express): void {
       const userMap: Record<string, { firstName?: string | null; lastName?: string | null; email?: string | null }> = {};
       usersData.forEach((u) => { if (u) userMap[u.id] = u; });
 
-      const threads = userIds.map((uid) => ({
-        userId: uid,
-        userName: [userMap[uid]?.firstName, userMap[uid]?.lastName].filter(Boolean).join(" ") || userMap[uid]?.email || uid,
-        userEmail: userMap[uid]?.email || null,
-        messages: messages.filter((m) => m.userId === uid).sort((a, b) =>
+      const threads = userIds.map((uid) => {
+        const userMessages = messages.filter((m) => m.userId === uid);
+        const sorted = userMessages.sort((a, b) =>
           new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime()
-        ),
-        lastMessage: messages.find((m) => m.userId === uid),
-        unreadCount: messages.filter((m) => m.userId === uid && m.senderRole === "member" && !m.readAt).length,
-      }));
+        );
+        const last = sorted[sorted.length - 1];
+        return {
+          userId: uid,
+          userName: [userMap[uid]?.firstName, userMap[uid]?.lastName].filter(Boolean).join(" ") || userMap[uid]?.email || uid,
+          userEmail: userMap[uid]?.email || null,
+          lastMessage: last?.content || "",
+          lastMessageAt: last?.createdAt?.toISOString?.() ?? last?.createdAt ?? null,
+          totalMessages: userMessages.length,
+          unreadCount: userMessages.filter((m) => m.senderRole === "member" && !m.readAt).length,
+        };
+      });
 
       res.json(threads);
     } catch (err) {

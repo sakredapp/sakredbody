@@ -1228,6 +1228,7 @@ interface CoachingMessageData {
 }
 
 export function CoachChat() {
+  const { toast } = useToast();
   const [messageText, setMessageText] = useState("");
   const [messageType, setMessageType] = useState<"text" | "progress_update">("text");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1252,6 +1253,9 @@ export function CoachChat() {
       queryClient.invalidateQueries({ queryKey: ["/api/coaching/messages"] });
       setMessageText("");
       setMessageType("text");
+    },
+    onError: () => {
+      toast({ title: "Failed to send", description: "Please try again.", variant: "destructive" });
     },
   });
 

@@ -35,6 +35,7 @@ ALTER TABLE IF EXISTS retreats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS properties ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS partners ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS partner_services ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS coaching_messages ENABLE ROW LEVEL SECURITY;
 
 -- ─── 2. DROP EXISTING POLICIES (idempotent re-run) ────────────────────────
 
@@ -244,6 +245,23 @@ CREATE POLICY sakred_applications_insert ON applications
 
 CREATE POLICY sakred_applications_select ON applications
   FOR SELECT USING (public.is_sakred_admin());
+
+-- coaching_messages: users can read/write their own messages
+CREATE POLICY sakred_coaching_msgs_select ON coaching_messages
+  FOR SELECT USING (auth.uid()::text = user_id);
+
+CREATE POLICY sakred_coaching_msgs_insert ON coaching_messages
+  FOR INSERT WITH CHECK (auth.uid()::text = user_id);
+
+-- Admin can read all messages and update (mark read, etc.)
+CREATE POLICY sakred_coaching_msgs_admin_select ON coaching_messages
+  FOR SELECT USING (public.is_sakred_admin());
+
+CREATE POLICY sakred_coaching_msgs_admin_insert ON coaching_messages
+  FOR INSERT WITH CHECK (public.is_sakred_admin());
+
+CREATE POLICY sakred_coaching_msgs_admin_update ON coaching_messages
+  FOR UPDATE USING (public.is_sakred_admin());
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- INDEX VERIFICATION
