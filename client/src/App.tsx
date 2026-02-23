@@ -6,8 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Landing from "@/pages/Landing";
 import LoginPage from "@/pages/LoginPage";
 import MemberDashboard from "@/pages/MemberDashboard";
-import AdminDashboard from "@/pages/AdminDashboard";
-import AdminCoaching from "@/pages/AdminCoaching";
+import AdminPortal from "@/pages/AdminPortal";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -17,8 +16,9 @@ function Router() {
       <Route path="/login" component={LoginPage} />
       <Route path="/member" component={MemberDashboard} />
       <Route path="/coaching" component={MemberDashboard} />
-      <Route path="/admin" component={AdminDashboard} />
-      <Route path="/admin/coaching" component={AdminCoaching} />
+      <Route path="/admin" component={AdminPortal} />
+      <Route path="/admin/coaching" component={AdminPortal} />
+      <Route path="/admin/masterclass" component={AdminPortal} />
       <Route component={NotFound} />
     </Switch>
   );

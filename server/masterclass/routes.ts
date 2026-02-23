@@ -220,6 +220,34 @@ export function registerMasterclassRoutes(app: Express) {
 
   // ─── ADMIN ───────────────────────────────────────────────────────────
 
+  // List ALL categories (including inactive) — admin only
+  app.get("/api/admin/masterclass/categories", isAuthenticated, isAdmin, async (_req, res) => {
+    try {
+      const cats = await db
+        .select()
+        .from(masterclassCategories)
+        .orderBy(masterclassCategories.sortOrder);
+      res.json(cats);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // List ALL videos (including inactive) — admin only
+  app.get("/api/admin/masterclass/videos", isAuthenticated, isAdmin, async (_req, res) => {
+    try {
+      const videos = await db
+        .select()
+        .from(masterclassVideos)
+        .orderBy(desc(masterclassVideos.createdAt));
+      res.json(videos);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
   // Create category
   app.post("/api/masterclass/categories", isAdmin, async (req, res) => {
     try {
