@@ -41,8 +41,6 @@ import {
   Map,
   Compass,
   BarChart3,
-  Mountain,
-  Zap,
 } from "lucide-react";
 import type { Retreat, BookingRequest, Partner, PartnerService } from "@shared/schema";
 import {
@@ -301,26 +299,24 @@ export default function MemberDashboard() {
           {/* Main section toggle */}
           <div className="flex items-center bg-muted/60 rounded-full p-1 gap-0.5">
             <button
-              onClick={() => setSection("retreat")}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-300 ${
-                section === "retreat"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Mountain className="w-4 h-4" />
-              <span className="hidden sm:inline">My Retreat</span>
-            </button>
-            <button
               onClick={() => setSection("coaching")}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-300 ${
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-300 ${
                 section === "coaching"
                   ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Zap className="w-4 h-4" />
-              <span className="hidden sm:inline">Coaching</span>
+              Coaching
+            </button>
+            <button
+              onClick={() => setSection("retreat")}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-300 ${
+                section === "retreat"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              My Retreat
             </button>
           </div>
 
