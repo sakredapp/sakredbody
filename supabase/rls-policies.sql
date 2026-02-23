@@ -36,6 +36,9 @@ ALTER TABLE IF EXISTS properties ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS partners ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS partner_services ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS coaching_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS masterclass_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS masterclass_videos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS user_category_subs ENABLE ROW LEVEL SECURITY;
 
 -- ─── 2. DROP EXISTING POLICIES (idempotent re-run) ────────────────────────
 
@@ -135,6 +138,12 @@ CREATE POLICY sakred_partners_select ON partners
   FOR SELECT USING (auth.role() = 'authenticated');
 
 CREATE POLICY sakred_partner_services_select ON partner_services
+  FOR SELECT USING (auth.role() = 'authenticated');
+
+CREATE POLICY sakred_masterclass_categories_select ON masterclass_categories
+  FOR SELECT USING (auth.role() = 'authenticated');
+
+CREATE POLICY sakred_masterclass_videos_select ON masterclass_videos
   FOR SELECT USING (auth.role() = 'authenticated');
 
 -- ─── 5. ADMIN WRITE POLICIES ─────────────────────────────────────────────
@@ -262,6 +271,36 @@ CREATE POLICY sakred_coaching_msgs_admin_insert ON coaching_messages
 
 CREATE POLICY sakred_coaching_msgs_admin_update ON coaching_messages
   FOR UPDATE USING (public.is_sakred_admin());
+
+-- masterclass_categories: admin full CRUD
+CREATE POLICY sakred_mc_categories_admin_insert ON masterclass_categories
+  FOR INSERT WITH CHECK (public.is_sakred_admin());
+
+CREATE POLICY sakred_mc_categories_admin_update ON masterclass_categories
+  FOR UPDATE USING (public.is_sakred_admin());
+
+CREATE POLICY sakred_mc_categories_admin_delete ON masterclass_categories
+  FOR DELETE USING (public.is_sakred_admin());
+
+-- masterclass_videos: admin full CRUD
+CREATE POLICY sakred_mc_videos_admin_insert ON masterclass_videos
+  FOR INSERT WITH CHECK (public.is_sakred_admin());
+
+CREATE POLICY sakred_mc_videos_admin_update ON masterclass_videos
+  FOR UPDATE USING (public.is_sakred_admin());
+
+CREATE POLICY sakred_mc_videos_admin_delete ON masterclass_videos
+  FOR DELETE USING (public.is_sakred_admin());
+
+-- user_category_subs: users can manage their own subscriptions
+CREATE POLICY sakred_user_cat_subs_select ON user_category_subs
+  FOR SELECT USING (auth.uid()::text = user_id);
+
+CREATE POLICY sakred_user_cat_subs_insert ON user_category_subs
+  FOR INSERT WITH CHECK (auth.uid()::text = user_id);
+
+CREATE POLICY sakred_user_cat_subs_delete ON user_category_subs
+  FOR DELETE USING (auth.uid()::text = user_id);
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- INDEX VERIFICATION
