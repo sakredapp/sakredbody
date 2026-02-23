@@ -34,8 +34,8 @@ let initError: Error | null = null;
 
 const initPromise = (async () => {
   try {
-    const { setupAuth, registerAuthRoutes } = await import("../server/auth");
-    const { registerRoutes } = await import("../server/routes");
+    const { setupAuth, registerAuthRoutes } = await import("../server/auth/index.js");
+    const { registerRoutes } = await import("../server/routes.js");
     
     setupAuth(app);
     registerAuthRoutes(app);
