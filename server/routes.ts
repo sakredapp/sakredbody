@@ -1,11 +1,11 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import type { Server } from "http";
 import { storage } from "./storage.js";
-import { api } from "@shared/routes";
+import { api } from "../shared/routes.js";
 import { z } from "zod";
 import { isAuthenticated } from "./auth/index.js";
 import "./auth/sessionAuth.js"; // session type augmentation
-import { insertPartnerSchema, insertPartnerServiceSchema } from "@shared/schema";
+import { insertPartnerSchema, insertPartnerServiceSchema } from "../shared/schema.js";
 import { registerCoachingRoutes } from "./coaching/index.js";
 
 function isAdmin(req: Request, res: Response, next: NextFunction) {

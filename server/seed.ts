@@ -1,5 +1,5 @@
 import { db } from "./db.js";
-import { retreats, properties } from "@shared/schema";
+import { retreats, properties } from "../shared/schema.js";
 
 async function seed() {
   console.log("Seeding retreats...");

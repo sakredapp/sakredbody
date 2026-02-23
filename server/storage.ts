@@ -21,7 +21,7 @@ import {
   type InsertPartnerService,
   type PartnerService,
   type User,
-} from "@shared/schema";
+} from "../shared/schema.js";
 
 export interface IStorage {
   createApplication(application: InsertApplication): Promise<Application>;

@@ -26,7 +26,7 @@ import {
   type RoutineHabit,
   type UserRoutine,
   type Habit,
-} from "@shared/schema";
+} from "../../shared/schema.js";
 
 import {
   formatLocalDateString,

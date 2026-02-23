@@ -53,7 +53,7 @@ import {
   insertWellnessRoutineSchema,
   insertRoutineHabitSchema,
   COINS_PER_HABIT_COMPLETION,
-} from "@shared/schema";
+} from "../../shared/schema.js";
 import {
   enrollInRoutine,
   reconcileHabits,
