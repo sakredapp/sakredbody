@@ -468,29 +468,40 @@ function HabitFormDialog({
 // BOOKING ADMIN CARD
 // ═══════════════════════════════════════════════════════════════════════════
 
-function BookingAdminCard({ booking, onUpdateStatus }: { booking: BookingRequest; onUpdateStatus: (s: string, n?: string) => void }) {
+interface EnrichedBooking extends BookingRequest {
+  userName?: string | null;
+  userEmail?: string | null;
+}
+
+function BookingAdminCard({ booking, onUpdateStatus }: { booking: EnrichedBooking; onUpdateStatus: (s: string, n?: string) => void }) {
   const [notes, setNotes] = useState(booking.conciergeNotes || "");
   const [showNotes, setShowNotes] = useState(false);
+  const statusColor: Record<string, string> = {
+    requested: "bg-yellow-100 text-yellow-800",
+    confirmed: "bg-green-100 text-green-800",
+    completed: "bg-blue-100 text-blue-800",
+    cancelled: "bg-red-100 text-red-800",
+  };
   const statusOptions = [
     { value: "requested", label: "Pending" },
     { value: "confirmed", label: "Confirmed" },
     { value: "completed", label: "Completed" },
     { value: "cancelled", label: "Cancelled" },
   ];
+  const displayName = booking.userName || booking.userEmail || booking.userId;
+  const retreatLabel = booking.retreatType === "shared" ? "Shared Retreat" : booking.retreatType === "private" ? "Private Retreat" : booking.retreatType || "Retreat";
   return (
     <Card>
-      <CardContent className="p-4 space-y-3">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="space-y-1">
+      <CardContent className="p-5 space-y-4">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="space-y-1.5">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-medium">Booking #{booking.id}</span>
-              <Badge variant="outline" className="text-xs">Retreat #{booking.retreatId}</Badge>
+              <h4 className="font-medium">{displayName}</h4>
+              <Badge className={`text-[10px] ${statusColor[booking.status] || ""}`}>{booking.status}</Badge>
             </div>
-            <div className="text-sm text-muted-foreground flex items-center gap-3 flex-wrap">
-              <span>User: {booking.userId}</span>
-              <span>{booking.guestCount} guest{booking.guestCount > 1 ? "s" : ""}</span>
-              <span>{new Date(booking.createdAt!).toLocaleDateString()}</span>
-            </div>
+            {booking.userEmail && booking.userName && (
+              <p className="text-xs text-muted-foreground">{booking.userEmail}</p>
+            )}
           </div>
           <Select value={booking.status} onValueChange={(v) => onUpdateStatus(v, notes || undefined)}>
             <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
@@ -499,18 +510,35 @@ function BookingAdminCard({ booking, onUpdateStatus }: { booking: BookingRequest
             </SelectContent>
           </Select>
         </div>
-        {booking.specialRequests && <p className="text-sm text-muted-foreground">Member notes: {booking.specialRequests}</p>}
-        <div className="space-y-2">
-          <Button variant="ghost" size="sm" onClick={() => setShowNotes(!showNotes)}>
-            {showNotes ? "Hide" : "Add"} Concierge Notes
-          </Button>
-          {showNotes && (
-            <div className="flex gap-2">
-              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Internal notes..." className="resize-none flex-1" />
-              <Button variant="outline" onClick={() => onUpdateStatus(booking.status, notes)}>Save</Button>
-            </div>
-          )}
+        <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
+          <span>{retreatLabel}</span>
+          <span>{booking.guestCount} guest{booking.guestCount > 1 ? "s" : ""}</span>
+          {booking.housingTier && <span className="capitalize">{booking.housingTier} tier</span>}
+          {booking.duration && <span>{booking.duration}-day</span>}
         </div>
+        {(booking.preferredStartDate || booking.preferredEndDate) && (
+          <div className="text-sm text-muted-foreground">
+            Dates: {booking.preferredStartDate || "TBD"} → {booking.preferredEndDate || "TBD"}
+          </div>
+        )}
+        {booking.specialRequests && (
+          <div className="bg-muted/50 rounded-md p-3">
+            <p className="text-xs font-medium text-muted-foreground mb-1">Member Notes</p>
+            <p className="text-sm">{booking.specialRequests}</p>
+          </div>
+        )}
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>Submitted {new Date(booking.createdAt!).toLocaleDateString()}</span>
+          <Button variant="ghost" size="sm" className="text-xs" onClick={() => setShowNotes(!showNotes)}>
+            {showNotes ? "Hide" : booking.conciergeNotes ? "Edit" : "Add"} Concierge Notes
+          </Button>
+        </div>
+        {showNotes && (
+          <div className="flex gap-2">
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Internal notes..." className="resize-none flex-1" rows={2} />
+            <Button variant="outline" onClick={() => onUpdateStatus(booking.status, notes)}>Save</Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -581,7 +609,7 @@ export default function AdminPortal() {
     enabled: isAdmin && !!selectedPartner,
   });
 
-  const bookingsQuery = useQuery<BookingRequest[]>({
+  const bookingsQuery = useQuery<EnrichedBooking[]>({
     queryKey: ["/api/admin/bookings"],
     enabled: isAdmin,
   });
@@ -949,10 +977,10 @@ export default function AdminPortal() {
       <div className="container max-w-6xl mx-auto px-4 pt-6 pb-2">
         <div className="flex items-center gap-2 overflow-x-auto pb-1">
           {([
-            { key: "partners" as AdminTab, label: "Partners", icon: Building2, badge: partnerCount > 0 ? partnerCount : null },
-            { key: "bookings" as AdminTab, label: "Bookings", icon: ClipboardList, badge: bookingCount > 0 ? bookingCount : null },
-            { key: "coaching" as AdminTab, label: "Coaching", icon: Sparkles, badge: null },
-            { key: "masterclass" as AdminTab, label: "Masterclass", icon: Film, badge: null },
+            { key: "partners" as AdminTab, label: "Partners", badge: partnerCount > 0 ? partnerCount : null },
+            { key: "bookings" as AdminTab, label: "Bookings", badge: bookingCount > 0 ? bookingCount : null },
+            { key: "coaching" as AdminTab, label: "Coaching", badge: null },
+            { key: "masterclass" as AdminTab, label: "Masterclass", badge: null },
           ]).map((t) => (
             <Button
               key={t.key}
@@ -960,7 +988,6 @@ export default function AdminPortal() {
               onClick={() => { setTab(t.key); setSelectedPartner(null); }}
               className="shrink-0"
             >
-              <t.icon className="w-4 h-4 mr-1.5" />
               {t.label}
               {t.badge !== null && <Badge variant="secondary" className="ml-2 text-xs">{t.badge}</Badge>}
             </Button>
@@ -1107,10 +1134,10 @@ export default function AdminPortal() {
           <div className="space-y-6">
             <div className="flex items-center gap-3 mb-4">
               <Button variant={coachingView === "routines" ? "default" : "outline"} onClick={() => { setCoachingView("routines"); setSelectedRoutineId(null); }}>
-                <Sparkles className="w-4 h-4 mr-1" /> Routines
+                Routines
               </Button>
               <Button variant={coachingView === "habits" ? "default" : "outline"} onClick={() => setCoachingView("habits")}>
-                <ListChecks className="w-4 h-4 mr-1" /> Habit Templates
+                Habit Templates
               </Button>
             </div>
 
@@ -1257,10 +1284,10 @@ export default function AdminPortal() {
           <div className="space-y-6">
             <div className="flex items-center gap-3 mb-4">
               <Button variant={mcView === "categories" ? "default" : "outline"} onClick={() => setMcView("categories")}>
-                <FolderPlus className="w-4 h-4 mr-1" /> Categories
+                Categories
               </Button>
               <Button variant={mcView === "videos" ? "default" : "outline"} onClick={() => setMcView("videos")}>
-                <Play className="w-4 h-4 mr-1" /> Videos
+                Videos
               </Button>
             </div>
 

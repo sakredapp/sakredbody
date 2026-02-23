@@ -1,11 +1,13 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import type { Server } from "http";
 import { storage } from "./storage.js";
+import { db } from "./db.js";
+import { eq } from "drizzle-orm";
 import { api } from "../shared/routes.js";
 import { z } from "zod";
 import { isAuthenticated } from "./auth/index.js";
 import "./auth/sessionAuth.js"; // session type augmentation
-import { insertPartnerSchema, insertPartnerServiceSchema } from "../shared/schema.js";
+import { insertPartnerSchema, insertPartnerServiceSchema, users } from "../shared/schema.js";
 import { registerCoachingRoutes } from "./coaching/index.js";
 import { registerMasterclassRoutes } from "./masterclass/index.js";
 
@@ -278,7 +280,22 @@ export async function registerRoutes(
   app.get("/api/admin/bookings", isAuthenticated, isAdmin, async (_req, res) => {
     try {
       const allBookings = await storage.getAllBookingRequests();
-      res.json(allBookings);
+      // Enrich with user name/email
+      const userIds = Array.from(new Set(allBookings.map((b) => b.userId)));
+      const usersData = await Promise.all(
+        userIds.map((uid) =>
+          db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName, email: users.email })
+            .from(users).where(eq(users.id, uid)).then((rows) => rows[0])
+        )
+      );
+      const userMap: Record<string, { firstName?: string | null; lastName?: string | null; email?: string | null }> = {};
+      usersData.forEach((u) => { if (u) userMap[u.id] = u; });
+      const enriched = allBookings.map((b) => ({
+        ...b,
+        userName: [userMap[b.userId]?.firstName, userMap[b.userId]?.lastName].filter(Boolean).join(" ") || null,
+        userEmail: userMap[b.userId]?.email || null,
+      }));
+      res.json(enriched);
     } catch (err) {
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });
