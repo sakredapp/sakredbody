@@ -7,6 +7,7 @@ import { isAuthenticated } from "./auth/index.js";
 import "./auth/sessionAuth.js"; // session type augmentation
 import { insertPartnerSchema, insertPartnerServiceSchema } from "../shared/schema.js";
 import { registerCoachingRoutes } from "./coaching/index.js";
+import { registerMasterclassRoutes } from "./masterclass/index.js";
 
 function isAdmin(req: Request, res: Response, next: NextFunction) {
   const userId = req.session?.userId;
@@ -338,6 +339,9 @@ export async function registerRoutes(
 
   // ── Coaching Engine ──────────────────────────────────────────────────
   registerCoachingRoutes(app);
+
+  // ── Masterclass Video Library ────────────────────────────────────────
+  registerMasterclassRoutes(app);
 
   return httpServer;
 }

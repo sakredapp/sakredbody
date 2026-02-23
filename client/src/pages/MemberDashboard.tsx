@@ -59,6 +59,7 @@ import {
   CatalogSection,
   AnalyticsTab,
 } from "./CoachingDashboard";
+import { MasterclassTab } from "@/components/MasterclassTab";
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
 // Icon mapping (UI-only, can't live in shared/)
@@ -160,7 +161,7 @@ export default function MemberDashboard() {
 
   // Default to coaching tab if coming from /coaching URL
   const defaultSection = location === "/coaching" ? "coaching" : "retreat";
-  const [section, setSection] = useState<"retreat" | "coaching">(defaultSection);
+  const [section, setSection] = useState<"retreat" | "coaching" | "masterclass">(defaultSection);
   const [retreatView, setRetreatView] = useState<"book" | "services" | "my-bookings">("book");
   const [coachingTab, setCoachingTab] = useState<"today" | "journey" | "routines" | "catalog" | "analytics">("today");
   const [showBookingDialog, setShowBookingDialog] = useState(false);
@@ -318,6 +319,16 @@ export default function MemberDashboard() {
             >
               My Retreat
             </button>
+            <button
+              onClick={() => setSection("masterclass")}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-300 ${
+                section === "masterclass"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Masterclass
+            </button>
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
@@ -411,6 +422,19 @@ export default function MemberDashboard() {
             {coachingTab === "routines" && <RoutinesTab />}
             {coachingTab === "catalog" && <CatalogSection />}
             {coachingTab === "analytics" && <AnalyticsTab />}
+          </motion.div>
+        )}
+
+        {section === "masterclass" && (
+          <motion.div
+            key="masterclass"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="container max-w-6xl mx-auto px-4 py-6"
+          >
+            <MasterclassTab />
           </motion.div>
         )}
 
