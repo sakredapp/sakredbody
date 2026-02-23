@@ -83,6 +83,11 @@ import {
   Play,
   MessageCircle,
   Send,
+  Flame,
+  CheckCircle,
+  Activity,
+  TrendingUp,
+  ChevronDown,
 } from "lucide-react";
 
 import type { Partner, PartnerService, BookingRequest } from "@shared/schema";
@@ -542,6 +547,155 @@ function BookingAdminCard({ booking, onUpdateStatus }: { booking: EnrichedBookin
           </div>
         )}
       </CardContent>
+    </Card>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MEMBER SNAPSHOT PANEL (admin coaching view)
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface SnapshotData {
+  user: { id: string; firstName: string; lastName: string; email: string };
+  activeRoutine: {
+    routineName: string;
+    intensity: string;
+    startedAt: string;
+    currentDay: number;
+    totalDays: number;
+  } | null;
+  today: {
+    date: string;
+    totalHabits: number;
+    completed: number;
+    habits: { title: string; completed: boolean; cadence: string }[];
+  };
+  stats: {
+    currentStreak: number;
+    longestStreak: number;
+    totalCompleted: number;
+    totalScheduled: number;
+    completionRate: number;
+  };
+}
+
+function MemberSnapshotPanel({ userId }: { userId: string }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const snapshotQuery = useQuery<SnapshotData>({
+    queryKey: ["/api/admin/coaching/member", userId, "snapshot"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/admin/coaching/member/${userId}/snapshot`);
+      return res.json();
+    },
+    enabled: !!userId,
+    staleTime: 30_000,
+  });
+
+  if (snapshotQuery.isLoading) {
+    return <Skeleton className="h-16 rounded-lg" />;
+  }
+
+  const snap = snapshotQuery.data;
+  if (!snap) return null;
+
+  const pct = snap.stats.completionRate;
+  const routineProgress = snap.activeRoutine
+    ? Math.round((snap.activeRoutine.currentDay / snap.activeRoutine.totalDays) * 100)
+    : 0;
+
+  return (
+    <Card className="border-border/40 bg-muted/30">
+      <button
+        type="button"
+        className="w-full px-4 py-3 flex items-center justify-between text-left"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <Activity className="w-4 h-4 text-[hsl(var(--gold))] shrink-0" />
+          <span className="text-sm font-medium truncate">
+            {snap.activeRoutine?.routineName || "No active routine"}
+          </span>
+          {snap.activeRoutine && (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5 shrink-0">
+              Day {snap.activeRoutine.currentDay}/{snap.activeRoutine.totalDays}
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <CheckCircle className="w-3.5 h-3.5" />
+            {snap.today.completed}/{snap.today.totalHabits} today
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Flame className="w-3.5 h-3.5" />
+            {snap.stats.currentStreak}d streak
+          </div>
+          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`} />
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 space-y-4 border-t border-border/30 pt-3">
+          {/* Routine progress */}
+          {snap.activeRoutine && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground font-medium">Routine Progress</span>
+                <span className="text-muted-foreground">{routineProgress}%</span>
+              </div>
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-[hsl(var(--gold))] rounded-full transition-all"
+                  style={{ width: `${routineProgress}%` }}
+                />
+              </div>
+              <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
+                <span>Intensity: {snap.activeRoutine.intensity}</span>
+                <span>Started: {new Date(snap.activeRoutine.startedAt).toLocaleDateString()}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Today's habits */}
+          {snap.today.habits.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground">Today's Habits</p>
+              <div className="grid gap-1">
+                {snap.today.habits.map((h, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs">
+                    <CheckCircle className={`w-3.5 h-3.5 shrink-0 ${
+                      h.completed ? "text-emerald-500" : "text-muted-foreground/40"
+                    }`} />
+                    <span className={h.completed ? "line-through text-muted-foreground" : ""}>{h.title}</span>
+                    <Badge variant="outline" className="ml-auto text-[9px] px-1 py-0 h-4">{h.cadence}</Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Stats row */}
+          <div className="grid grid-cols-4 gap-3">
+            <div className="text-center">
+              <p className="text-lg font-semibold">{snap.stats.currentStreak}</p>
+              <p className="text-[10px] text-muted-foreground">Current Streak</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-semibold">{snap.stats.longestStreak}</p>
+              <p className="text-[10px] text-muted-foreground">Best Streak</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-semibold">{snap.stats.totalCompleted}</p>
+              <p className="text-[10px] text-muted-foreground">Completed</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-semibold">{pct}%</p>
+              <p className="text-[10px] text-muted-foreground">Completion</p>
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
@@ -1430,6 +1584,9 @@ export default function AdminPortal() {
                   </span>
                 </div>
 
+                {/* Member snapshot */}
+                <MemberSnapshotPanel userId={selectedConversationUserId} />
+
                 <Card className="overflow-hidden">
                   {/* Messages */}
                   <div className="max-h-[500px] overflow-y-auto p-4 space-y-3 scrollbar-thin">
@@ -1441,6 +1598,8 @@ export default function AdminPortal() {
                       const time = new Date(msg.createdAt).toLocaleString("en-US", {
                         month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
                       });
+                      const meta = msg.metadata ? (() => { try { return JSON.parse(msg.metadata!); } catch { return null; } })() : null;
+                      const isImage = msg.messageType === "photo" || meta?.mimeType?.startsWith("image/");
                       return (
                         <div key={msg.id} className={`flex ${isMember ? "justify-start" : "justify-end"}`}>
                           <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
@@ -1457,6 +1616,18 @@ export default function AdminPortal() {
                               )}
                             </div>
                             <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
+                            {msg.imageUrl && (
+                              isImage ? (
+                                <a href={msg.imageUrl} target="_blank" rel="noopener noreferrer" className="block mt-2">
+                                  <img src={msg.imageUrl} alt={meta?.fileName || "Attachment"} className="max-w-full max-h-48 rounded-lg object-cover border border-border/30" />
+                                </a>
+                              ) : (
+                                <a href={msg.imageUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-background/50 border border-border/30 hover:bg-muted/50 transition-colors">
+                                  <ClipboardList className="w-4 h-4 text-muted-foreground shrink-0" />
+                                  <span className="text-xs truncate flex-1">{meta?.fileName || "File"}</span>
+                                </a>
+                              )
+                            )}
                             <div className={`flex ${isMember ? "justify-start" : "justify-end"} mt-1`}>
                               <span className="text-[9px] text-muted-foreground">{time}</span>
                             </div>

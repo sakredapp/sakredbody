@@ -36,11 +36,13 @@
  */
 
 import type { Express, Request, Response, NextFunction } from "express";
+import multer from "multer";
 import { db } from "../db.js";
 import { eq, and, desc, count, sql, gte, lte } from "drizzle-orm";
 import { z } from "zod";
 import { isAuthenticated } from "../auth/index.js";
 import { storage } from "../storage.js";
+import { uploadFile, isStorageConfigured } from "../supabaseStorage.js";
 import {
   wellnessRoutines,
   routineHabits,
@@ -1013,6 +1015,152 @@ export function registerCoachingRoutes(app: Express): void {
           sql`${coachingMessages.readAt} IS NULL`
         ));
       res.json({ success: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // FILE UPLOAD (Supabase Storage)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+    fileFilter: (_req, file, cb) => {
+      const allowed = [
+        "image/jpeg", "image/png", "image/gif", "image/webp",
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "text/plain",
+      ];
+      if (allowed.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error("File type not allowed. Accepted: images, PDF, Word, text."));
+      }
+    },
+  });
+
+  // ── Upload a file and get its public URL ─────────────────────────────
+  app.post("/api/coaching/upload", isAuthenticated, upload.single("file"), async (req: Request, res: Response) => {
+    try {
+      if (!isStorageConfigured()) {
+        return res.status(503).json({ message: "File storage not configured" });
+      }
+      const file = (req as any).file;
+      if (!file) {
+        return res.status(400).json({ message: "No file provided" });
+      }
+
+      const userId = req.session!.userId!;
+      const url = await uploadFile(userId, file.buffer, file.originalname, file.mimetype);
+
+      if (!url) {
+        return res.status(500).json({ message: "Upload failed" });
+      }
+
+      res.json({ url, fileName: file.originalname, mimeType: file.mimetype, size: file.size });
+    } catch (err: any) {
+      if (err.message?.includes("File type not allowed")) {
+        return res.status(400).json({ message: err.message });
+      }
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ADMIN: MEMBER COACHING SNAPSHOT
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // ── Get a member's current coaching status (for admin to view) ───────
+  app.get("/api/admin/coaching/member/:userId/snapshot", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
+    try {
+      const userId = param(req, "userId");
+
+      // User info
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      // Active enrollment
+      const [activeEnrollment] = await db
+        .select()
+        .from(userRoutines)
+        .where(and(eq(userRoutines.userId, userId), eq(userRoutines.status, "active")));
+
+      // Routine name if enrolled
+      let routineName: string | null = null;
+      if (activeEnrollment) {
+        const [routine] = await db
+          .select({ name: wellnessRoutines.name })
+          .from(wellnessRoutines)
+          .where(eq(wellnessRoutines.id, activeEnrollment.routineId));
+        routineName = routine?.name || null;
+      }
+
+      // Today's habits
+      const today = formatLocalDateString();
+      const todayHabits = await db
+        .select()
+        .from(habits)
+        .where(and(eq(habits.userId, userId), eq(habits.scheduledDate, today)));
+      const completedToday = todayHabits.filter((h) => h.completed).length;
+
+      // Overall stats
+      const [completedStats] = await db
+        .select({ total: count() })
+        .from(habits)
+        .where(and(eq(habits.userId, userId), eq(habits.completed, true)));
+
+      const [scheduledStats] = await db
+        .select({ total: count() })
+        .from(habits)
+        .where(eq(habits.userId, userId));
+
+      res.json({
+        user: {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+        },
+        activeRoutine: activeEnrollment ? (() => {
+          const start = new Date(activeEnrollment.startDate);
+          const end = new Date(activeEnrollment.endDate);
+          const now = new Date();
+          const totalDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000));
+          const currentDay = Math.min(totalDays, Math.max(1, Math.round((now.getTime() - start.getTime()) / 86400000) + 1));
+          return {
+            routineName,
+            intensity: activeEnrollment.intensity,
+            startedAt: activeEnrollment.startDate,
+            currentDay,
+            totalDays,
+          };
+        })() : null,
+        today: {
+          date: today,
+          totalHabits: todayHabits.length,
+          completed: completedToday,
+          habits: todayHabits.map((h) => ({
+            title: h.title,
+            completed: h.completed,
+            cadence: h.cadence,
+          })),
+        },
+        stats: {
+          currentStreak: user.currentStreak ?? 0,
+          longestStreak: user.longestStreak ?? 0,
+          totalCompleted: Number(completedStats.total),
+          totalScheduled: Number(scheduledStats.total),
+          completionRate: Number(scheduledStats.total) > 0
+            ? Math.round((Number(completedStats.total) / Number(scheduledStats.total)) * 100)
+            : 0,
+        },
+      });
     } catch (err) {
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });

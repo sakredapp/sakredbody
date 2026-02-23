@@ -78,6 +78,10 @@ import {
   Info,
   Send,
   MessageCircle,
+  Paperclip,
+  FileText,
+  Image as ImageIcon,
+  Download,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -1231,8 +1235,11 @@ export function CoachChat() {
   const { toast } = useToast();
   const [messageText, setMessageText] = useState("");
   const [messageType, setMessageType] = useState<"text" | "progress_update">("text");
+  const [pendingFile, setPendingFile] = useState<{ file: File; preview?: string } | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const messagesQuery = useQuery<CoachingMessageData[]>({
     queryKey: ["/api/coaching/messages"],
@@ -1241,11 +1248,11 @@ export function CoachChat() {
       if (!res.ok) throw new Error("Failed to load messages");
       return res.json();
     },
-    refetchInterval: 15000, // poll every 15s for new coach replies
+    refetchInterval: 15000,
   });
 
   const sendMutation = useMutation({
-    mutationFn: async (data: { content: string; messageType: string }) => {
+    mutationFn: async (data: { content: string; messageType: string; imageUrl?: string; metadata?: string }) => {
       const res = await apiRequest("POST", "/api/coaching/messages", data);
       return res.json();
     },
@@ -1253,6 +1260,7 @@ export function CoachChat() {
       queryClient.invalidateQueries({ queryKey: ["/api/coaching/messages"] });
       setMessageText("");
       setMessageType("text");
+      setPendingFile(null);
     },
     onError: () => {
       toast({ title: "Failed to send", description: "Please try again.", variant: "destructive" });
@@ -1266,11 +1274,68 @@ export function CoachChat() {
     }
   }, [messagesQuery.data]);
 
-  const handleSend = () => {
-    const text = messageText.trim();
-    if (!text || sendMutation.isPending) return;
-    sendMutation.mutate({ content: text, messageType });
+  // Clean up preview URL
+  useEffect(() => {
+    return () => {
+      if (pendingFile?.preview) URL.revokeObjectURL(pendingFile.preview);
+    };
+  }, [pendingFile]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Maximum 10 MB allowed.", variant: "destructive" });
+      return;
+    }
+    const preview = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
+    setPendingFile({ file, preview });
+    e.target.value = "";
   };
+
+  const uploadAndSend = async () => {
+    const text = messageText.trim();
+    if (!text && !pendingFile) return;
+    if (sendMutation.isPending || isUploading) return;
+
+    let imageUrl: string | undefined;
+    let metadata: string | undefined;
+
+    if (pendingFile) {
+      setIsUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", pendingFile.file);
+        const res = await fetch("/api/coaching/upload", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ message: "Upload failed" }));
+          throw new Error(err.message);
+        }
+        const data = await res.json();
+        imageUrl = data.url;
+        metadata = JSON.stringify({ fileName: data.fileName, mimeType: data.mimeType, size: data.size });
+      } catch (err: any) {
+        toast({ title: "Upload failed", description: err.message || "Please try again.", variant: "destructive" });
+        setIsUploading(false);
+        return;
+      }
+      setIsUploading(false);
+    }
+
+    const msgType = pendingFile?.file.type.startsWith("image/") ? "photo" : (pendingFile ? "text" : messageType);
+    sendMutation.mutate({
+      content: text || `📎 ${pendingFile?.file.name || "File"}`,
+      messageType: msgType,
+      imageUrl,
+      metadata,
+    });
+  };
+
+  const handleSend = () => uploadAndSend();
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -1389,6 +1454,32 @@ export function CoachChat() {
                             {msg.content}
                           </p>
 
+                          {/* Attachment */}
+                          {msg.imageUrl && (() => {
+                            const meta = msg.metadata ? JSON.parse(msg.metadata) : null;
+                            const isImage = msg.messageType === "photo" || meta?.mimeType?.startsWith("image/");
+                            return isImage ? (
+                              <a href={msg.imageUrl} target="_blank" rel="noopener noreferrer" className="block mt-2">
+                                <img
+                                  src={msg.imageUrl}
+                                  alt={meta?.fileName || "Attachment"}
+                                  className="max-w-full max-h-60 rounded-lg object-cover border border-border/30"
+                                />
+                              </a>
+                            ) : (
+                              <a
+                                href={msg.imageUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-background/50 border border-border/30 hover:bg-muted/50 transition-colors"
+                              >
+                                <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                                <span className="text-xs truncate flex-1">{meta?.fileName || "File"}</span>
+                                <Download className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                              </a>
+                            );
+                          })()}
+
                           {/* Timestamp */}
                           <div className={`flex ${isMember ? "justify-end" : "justify-start"} mt-1`}>
                             <span className="text-[9px] text-muted-foreground">{time}</span>
@@ -1405,6 +1496,33 @@ export function CoachChat() {
 
         {/* Input area */}
         <div className="border-t border-border/50 p-3 bg-background/50">
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,.pdf,.doc,.docx,.txt"
+            className="hidden"
+            onChange={handleFileSelect}
+          />
+
+          {/* Pending file preview */}
+          {pendingFile && (
+            <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-muted/50 border border-border/30">
+              {pendingFile.preview ? (
+                <img src={pendingFile.preview} alt="" className="w-10 h-10 rounded object-cover" />
+              ) : (
+                <FileText className="w-5 h-5 text-muted-foreground" />
+              )}
+              <span className="text-xs truncate flex-1">{pendingFile.file.name}</span>
+              <span className="text-[10px] text-muted-foreground">
+                {(pendingFile.file.size / 1024).toFixed(0)} KB
+              </span>
+              <button onClick={() => setPendingFile(null)} className="text-muted-foreground hover:text-foreground">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           {/* Message type toggle */}
           <div className="flex items-center gap-1.5 mb-2">
             <button
@@ -1430,6 +1548,17 @@ export function CoachChat() {
           </div>
 
           <div className="flex items-end gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="h-[44px] w-[44px] shrink-0 text-muted-foreground hover:text-foreground"
+              title="Attach file"
+            >
+              <Paperclip className="w-4 h-4" />
+            </Button>
             <Textarea
               ref={textareaRef}
               value={messageText}
@@ -1446,10 +1575,14 @@ export function CoachChat() {
             <Button
               size="icon"
               onClick={handleSend}
-              disabled={!messageText.trim() || sendMutation.isPending}
+              disabled={(!messageText.trim() && !pendingFile) || sendMutation.isPending || isUploading}
               className="h-[44px] w-[44px] shrink-0 bg-[hsl(var(--gold))] hover:bg-[hsl(var(--gold))]/80 text-background"
             >
-              <Send className="w-4 h-4" />
+              {isUploading ? (
+                <div className="w-4 h-4 border-2 border-background/30 border-t-background rounded-full animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
             </Button>
           </div>
         </div>

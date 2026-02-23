@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes.js";
 import { setupAuth, registerAuthRoutes } from "./auth/index.js";
 import { serveStatic } from "./static.js";
 import { createServer } from "http";
+import { ensureStorageBucket } from "./supabaseStorage.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -64,6 +65,9 @@ app.use((req, res, next) => {
   setupAuth(app);
   registerAuthRoutes(app);
   await registerRoutes(httpServer, app);
+
+  // Ensure Supabase Storage bucket exists (idempotent)
+  ensureStorageBucket().catch((err) => console.warn("Storage bucket init:", err.message));
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
