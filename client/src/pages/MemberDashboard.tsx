@@ -350,12 +350,12 @@ export default function MemberDashboard() {
           <div className="container max-w-6xl mx-auto px-4">
             <div className="flex gap-1 overflow-x-auto py-1.5 scrollbar-thin">
               {([
-                { id: "today" as const, label: "Today", icon: ListChecks },
-                { id: "journey" as const, label: "Journey", icon: Map },
-                { id: "routines" as const, label: "Routines", icon: Compass },
-                { id: "catalog" as const, label: "Habits", icon: Sparkles },
-                { id: "analytics" as const, label: "Stats", icon: BarChart3 },
-              ]).map(({ id, label, icon: Icon }) => (
+                { id: "today" as const, label: "Today" },
+                { id: "journey" as const, label: "Journey" },
+                { id: "routines" as const, label: "Routines" },
+                { id: "catalog" as const, label: "Habits" },
+                { id: "analytics" as const, label: "Stats" },
+              ]).map(({ id, label }) => (
                 <button
                   key={id}
                   onClick={() => setCoachingTab(id)}
@@ -365,7 +365,6 @@ export default function MemberDashboard() {
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
                   {label}
                 </button>
               ))}
