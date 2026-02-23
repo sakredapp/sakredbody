@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -36,6 +37,12 @@ import {
   User,
   UserPlus,
   ChevronRight,
+  ListChecks,
+  Map,
+  Compass,
+  BarChart3,
+  Mountain,
+  Zap,
 } from "lucide-react";
 import type { Retreat, BookingRequest, Partner, PartnerService } from "@shared/schema";
 import {
@@ -47,6 +54,13 @@ import {
   type HousingTierKey,
   type ServiceCategoryValue,
 } from "@shared/constants";
+import {
+  TodayTab,
+  JourneyMap,
+  RoutinesTab,
+  CatalogSection,
+  AnalyticsTab,
+} from "./CoachingDashboard";
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
 // Icon mapping (UI-only, can't live in shared/)
@@ -144,7 +158,13 @@ function BookingRequestCard({ booking }: { booking: BookingRequest }) {
 export default function MemberDashboard() {
   const { user, isLoading: authLoading, isAuthenticated, logout } = useAuth();
   const { toast } = useToast();
-  const [view, setView] = useState<"book" | "services" | "my-bookings">("book");
+  const [location] = useLocation();
+
+  // Default to coaching tab if coming from /coaching URL
+  const defaultSection = location === "/coaching" ? "coaching" : "retreat";
+  const [section, setSection] = useState<"retreat" | "coaching">(defaultSection);
+  const [retreatView, setRetreatView] = useState<"book" | "services" | "my-bookings">("book");
+  const [coachingTab, setCoachingTab] = useState<"today" | "journey" | "routines" | "catalog" | "analytics">("today");
   const [showBookingDialog, setShowBookingDialog] = useState(false);
 
   const [bookingStep, setBookingStep] = useState<"choose-type" | "configure">("choose-type");
@@ -179,12 +199,12 @@ export default function MemberDashboard() {
 
   const activePartnersQuery = useQuery<Partner[]>({
     queryKey: ["/api/partners/active"],
-    enabled: isAuthenticated && view === "services",
+    enabled: isAuthenticated && retreatView === "services",
   });
 
   const allServicesQuery = useQuery<PartnerService[]>({
     queryKey: ["/api/services"],
-    enabled: isAuthenticated && view === "services",
+    enabled: isAuthenticated && retreatView === "services",
   });
 
   const createBookingMutation = useMutation({
@@ -271,11 +291,39 @@ export default function MemberDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* ─── Header ─── */}
       <header className="sticky top-0 border-b border-border/50 bg-background/90 backdrop-blur-md" style={{ zIndex: 9999 }}>
         <div className="container max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-2" data-testid="link-home-dashboard">
             <img src={sakredLogo} alt="Sakred Body" className="h-9 w-9 object-contain" />
           </Link>
+
+          {/* Main section toggle */}
+          <div className="flex items-center bg-muted/60 rounded-full p-1 gap-0.5">
+            <button
+              onClick={() => setSection("retreat")}
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-300 ${
+                section === "retreat"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Mountain className="w-4 h-4" />
+              <span className="hidden sm:inline">My Retreat</span>
+            </button>
+            <button
+              onClick={() => setSection("coaching")}
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-300 ${
+                section === "coaching"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Zap className="w-4 h-4" />
+              <span className="hidden sm:inline">Coaching</span>
+            </button>
+          </div>
+
           <div className="flex items-center gap-3 flex-wrap">
             <Avatar className="w-8 h-8">
               {user?.profileImageUrl && <AvatarImage src={user.profileImageUrl} alt={user.firstName || "Member"} />}
@@ -289,34 +337,98 @@ export default function MemberDashboard() {
         </div>
       </header>
 
-      <div className="container max-w-6xl mx-auto px-4 py-8">
-        <div className="flex items-center gap-4 mb-8 flex-wrap">
-          <Button
-            variant={view === "book" ? "default" : "outline"}
-            onClick={() => setView("book")}
-            data-testid="button-view-book"
-          >
-            Design Your Retreat
-          </Button>
-          <Button
-            variant={view === "my-bookings" ? "default" : "outline"}
-            onClick={() => setView("my-bookings")}
-            data-testid="button-view-bookings"
-          >
-            My Requests
-            {bookingsQuery.data && bookingsQuery.data.length > 0 && (
-              <Badge variant="secondary" className="ml-2">{bookingsQuery.data.length}</Badge>
-            )}
-          </Button>
-          <Link href="/coaching">
-            <Button variant="outline" className="border-[hsl(var(--gold))]/30 text-[hsl(var(--gold))]">
-              Coaching
-              <ChevronRight className="w-4 h-4 ml-1" />
-            </Button>
-          </Link>
+      {/* ─── Sub-navigation ─── */}
+      {section === "coaching" && (
+        <div className="border-b border-border/50 bg-background/50 backdrop-blur-sm sticky top-16" style={{ zIndex: 9998 }}>
+          <div className="container max-w-6xl mx-auto px-4">
+            <div className="flex gap-1 overflow-x-auto py-1.5 scrollbar-thin">
+              {([
+                { id: "today" as const, label: "Today", icon: ListChecks },
+                { id: "journey" as const, label: "Journey", icon: Map },
+                { id: "routines" as const, label: "Routines", icon: Compass },
+                { id: "catalog" as const, label: "Habits", icon: Sparkles },
+                { id: "analytics" as const, label: "Stats", icon: BarChart3 },
+              ]).map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  onClick={() => setCoachingTab(id)}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-md whitespace-nowrap transition-colors ${
+                    coachingTab === id
+                      ? "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))] font-medium"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
+      )}
 
-        {view === "book" && (
+      {section === "retreat" && (
+        <div className="border-b border-border/50 bg-background/50 backdrop-blur-sm sticky top-16" style={{ zIndex: 9998 }}>
+          <div className="container max-w-6xl mx-auto px-4">
+            <div className="flex gap-1 overflow-x-auto py-1.5 scrollbar-thin">
+              <button
+                onClick={() => setRetreatView("book")}
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-md whitespace-nowrap transition-colors ${
+                  retreatView === "book"
+                    ? "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))] font-medium"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                }`}
+              >
+                Design Your Retreat
+              </button>
+              <button
+                onClick={() => setRetreatView("my-bookings")}
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-md whitespace-nowrap transition-colors ${
+                  retreatView === "my-bookings"
+                    ? "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))] font-medium"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                }`}
+              >
+                My Requests
+                {bookingsQuery.data && bookingsQuery.data.length > 0 && (
+                  <Badge variant="secondary" className="ml-2 text-[10px]">{bookingsQuery.data.length}</Badge>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Content Area ─── */}
+      <AnimatePresence mode="wait">
+        {section === "coaching" && (
+          <motion.div
+            key="coaching"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="container max-w-3xl mx-auto px-4 py-6"
+          >
+            {coachingTab === "today" && <TodayTab />}
+            {coachingTab === "journey" && <JourneyMap />}
+            {coachingTab === "routines" && <RoutinesTab />}
+            {coachingTab === "catalog" && <CatalogSection />}
+            {coachingTab === "analytics" && <AnalyticsTab />}
+          </motion.div>
+        )}
+
+        {section === "retreat" && (
+          <motion.div
+            key="retreat"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="container max-w-6xl mx-auto px-4 py-8"
+          >
+
+        {retreatView === "book" && (
           <div className="space-y-8 max-w-3xl">
             <div>
               <h2 className="font-display text-2xl mb-1" data-testid="text-book-heading">Design Your Retreat</h2>
@@ -556,7 +668,7 @@ export default function MemberDashboard() {
           </div>
         )}
 
-        {view === "services" && (
+        {retreatView === "services" && (
           <div className="space-y-8">
             <div>
               <h2 className="font-display text-2xl mb-1" data-testid="text-services-heading">Concierge Services</h2>
@@ -632,7 +744,7 @@ export default function MemberDashboard() {
           </div>
         )}
 
-        {view === "my-bookings" && (
+        {retreatView === "my-bookings" && (
           <div className="space-y-6">
             <div>
               <h2 className="font-display text-2xl mb-1" data-testid="text-bookings-heading">My Retreat Requests</h2>
@@ -655,7 +767,10 @@ export default function MemberDashboard() {
             )}
           </div>
         )}
-      </div>
+
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <Dialog open={showBookingDialog} onOpenChange={setShowBookingDialog}>
         <DialogContent className="max-w-md" data-testid="dialog-booking">

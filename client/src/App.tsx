@@ -7,7 +7,6 @@ import Landing from "@/pages/Landing";
 import LoginPage from "@/pages/LoginPage";
 import MemberDashboard from "@/pages/MemberDashboard";
 import AdminDashboard from "@/pages/AdminDashboard";
-import CoachingDashboard from "@/pages/CoachingDashboard";
 import AdminCoaching from "@/pages/AdminCoaching";
 import NotFound from "@/pages/not-found";
 
@@ -17,7 +16,7 @@ function Router() {
       <Route path="/" component={Landing} />
       <Route path="/login" component={LoginPage} />
       <Route path="/member" component={MemberDashboard} />
-      <Route path="/coaching" component={CoachingDashboard} />
+      <Route path="/coaching" component={MemberDashboard} />
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/coaching" component={AdminCoaching} />
       <Route component={NotFound} />

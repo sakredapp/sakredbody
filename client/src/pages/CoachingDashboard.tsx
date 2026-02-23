@@ -8,7 +8,6 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import {
-  useCoachingStats,
   useTodayHabits,
   useToggleHabit,
   useReconcileHabits,
@@ -56,9 +55,6 @@ import {
 import {
   Check,
   Circle,
-  Flame,
-  Coins,
-  Target,
   TrendingUp,
   Calendar,
   ChevronRight,
@@ -121,43 +117,7 @@ function LoginGate() {
   return null;
 }
 
-// ─── Stats Bar ────────────────────────────────────────────────────────────
 
-function StatsBar() {
-  const { data: stats, isLoading } = useCoachingStats();
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center gap-6 flex-wrap">
-        <Skeleton className="h-8 w-24" />
-        <Skeleton className="h-8 w-24" />
-        <Skeleton className="h-8 w-24" />
-      </div>
-    );
-  }
-
-  if (!stats) return null;
-
-  return (
-    <div className="flex items-center gap-4 sm:gap-6 flex-wrap">
-      <div className="flex items-center gap-1.5">
-        <Coins className="w-4 h-4 text-[hsl(var(--gold))]" />
-        <span className="text-sm font-semibold">{stats.sakredCoins}</span>
-        <span className="text-xs text-muted-foreground hidden sm:inline">coins</span>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <Flame className="w-4 h-4 text-orange-400" />
-        <span className="text-sm font-semibold">{stats.currentStreak}</span>
-        <span className="text-xs text-muted-foreground hidden sm:inline">day streak</span>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <Target className="w-4 h-4 text-emerald-400" />
-        <span className="text-sm font-semibold">{stats.completionRate}%</span>
-        <span className="text-xs text-muted-foreground hidden sm:inline">complete</span>
-      </div>
-    </div>
-  );
-}
 
 // ─── Habit Card (Part 3) ─────────────────────────────────────────────────
 
@@ -283,13 +243,7 @@ function HabitCard({
             )}
           </div>
 
-          {/* Coin reward indicator */}
-          {habit.completed && (
-            <div className="flex items-center gap-0.5 text-[10px] text-[hsl(var(--gold))]">
-              <Coins className="w-3 h-3" />
-              +10
-            </div>
-          )}
+
         </div>
       </CardContent>
     </Card>
@@ -298,7 +252,7 @@ function HabitCard({
 
 // ─── Today Tab (Part 3) ──────────────────────────────────────────────────
 
-function TodayTab() {
+export function TodayTab() {
   const { data: todayData, isLoading } = useTodayHabits();
   const toggleMutation = useToggleHabit();
   const reconcileMutation = useReconcileHabits();
@@ -389,7 +343,7 @@ function TodayTab() {
 
 // ─── Journey Map (Part 5) ────────────────────────────────────────────────
 
-function JourneyMap() {
+export function JourneyMap() {
   const today = formatLocalDate();
   const start = formatLocalDate(addDays(new Date(), -13));
   const { data: rangeData, isLoading } = useHabitRange(start, today);
@@ -579,7 +533,7 @@ function JourneyMap() {
 
 // ─── Routine Browser (Part 7) ────────────────────────────────────────────
 
-function RoutinesTab() {
+export function RoutinesTab() {
   const { data: routines, isLoading } = useRoutines();
   const { data: activeEnrollment } = useActiveEnrollment();
   const enrollMutation = useEnrollInRoutine();
@@ -897,7 +851,7 @@ function RoutinesTab() {
 
 // ─── Catalog Tab (Part 4: Standalone Habits) ─────────────────────────────
 
-function CatalogSection() {
+export function CatalogSection() {
   const { data: catalog, isLoading: catalogLoading } = useCatalogHabits();
   const { data: assigned } = useAssignedHabits();
   const assignMutation = useAssignHabit();
@@ -1124,9 +1078,8 @@ function CatalogSection() {
 
 // ─── Analytics Tab (Part 8) ──────────────────────────────────────────────
 
-function AnalyticsTab() {
+export function AnalyticsTab() {
   const [range, setRange] = useState<7 | 30 | 90>(7);
-  const { data: stats } = useCoachingStats();
   const start = formatLocalDate(addDays(new Date(), -(range - 1)));
   const end = formatLocalDate();
   const { data: rangeData, isLoading } = useHabitRange(start, end);
@@ -1198,20 +1151,6 @@ function AnalyticsTab() {
           </CardContent>
         </Card>
       </div>
-
-      {/* All-time stats */}
-      {stats && (
-        <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
-          <span className="flex items-center gap-1">
-            <Flame className="w-3.5 h-3.5 text-orange-400" />
-            Best streak: {stats.longestStreak} days
-          </span>
-          <span className="flex items-center gap-1">
-            <Coins className="w-3.5 h-3.5 text-[hsl(var(--gold))]" />
-            Total coins: {stats.sakredCoins}
-          </span>
-        </div>
-      )}
 
       {/* Bar chart */}
       {rangeData && rangeData.length > 0 ? (
@@ -1319,8 +1258,6 @@ export default function CoachingDashboard() {
             </Link>
             <span className="text-sm font-display hidden sm:inline">Coaching</span>
           </div>
-
-          <StatsBar />
 
           <div className="flex items-center gap-3">
             <Link href="/member">
