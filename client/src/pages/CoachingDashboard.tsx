@@ -6,7 +6,9 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Link } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   useTodayHabits,
   useToggleHabit,
@@ -74,6 +76,8 @@ import {
   Pause,
   Trash2,
   Info,
+  Send,
+  MessageCircle,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -1205,6 +1209,247 @@ export function AnalyticsTab() {
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
+
+// ─── Coach Chat / Share Progress ─────────────────────────────────────────
+
+interface CoachingMessageData {
+  id: string;
+  userId: string;
+  senderRole: string;
+  messageType: string;
+  content: string;
+  imageUrl: string | null;
+  metadata: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export function CoachChat() {
+  const [messageText, setMessageText] = useState("");
+  const [messageType, setMessageType] = useState<"text" | "progress_update">("text");
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const messagesQuery = useQuery<CoachingMessageData[]>({
+    queryKey: ["/api/coaching/messages"],
+    queryFn: async () => {
+      const res = await fetch("/api/coaching/messages", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load messages");
+      return res.json();
+    },
+    refetchInterval: 15000, // poll every 15s for new coach replies
+  });
+
+  const sendMutation = useMutation({
+    mutationFn: async (data: { content: string; messageType: string }) => {
+      const res = await apiRequest("POST", "/api/coaching/messages", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/coaching/messages"] });
+      setMessageText("");
+      setMessageType("text");
+    },
+  });
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messagesQuery.data]);
+
+  const handleSend = () => {
+    const text = messageText.trim();
+    if (!text || sendMutation.isPending) return;
+    sendMutation.mutate({ content: text, messageType });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const messages = messagesQuery.data || [];
+
+  // Group messages by date
+  const groupedMessages = useMemo(() => {
+    const groups: { date: string; messages: CoachingMessageData[] }[] = [];
+    let currentDate = "";
+    for (const msg of messages) {
+      const d = new Date(msg.createdAt).toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      });
+      if (d !== currentDate) {
+        currentDate = d;
+        groups.push({ date: d, messages: [msg] });
+      } else {
+        groups[groups.length - 1].messages.push(msg);
+      }
+    }
+    return groups;
+  }, [messages]);
+
+  if (messagesQuery.isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-6 w-32" />
+        <Skeleton className="h-64 w-full rounded-md" />
+        <Skeleton className="h-16 w-full rounded-md" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-180px)] max-h-[700px]">
+      {/* Header */}
+      <div className="mb-4">
+        <h2 className="text-lg font-display font-semibold tracking-tight">Coach</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Share updates, progress, and connect with your coach
+        </p>
+      </div>
+
+      {/* Messages area */}
+      <Card className="flex-1 overflow-hidden flex flex-col">
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin"
+        >
+          {messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center py-12 px-4">
+              <div className="w-14 h-14 rounded-full bg-[hsl(var(--gold))]/10 flex items-center justify-center mb-4">
+                <MessageCircle className="w-7 h-7 text-[hsl(var(--gold))]" />
+              </div>
+              <h3 className="text-sm font-medium mb-1">Start the Conversation</h3>
+              <p className="text-xs text-muted-foreground max-w-xs">
+                Share your progress, ask questions, or send updates to your coach.
+                They'll respond here.
+              </p>
+            </div>
+          ) : (
+            groupedMessages.map((group) => (
+              <div key={group.date}>
+                {/* Date divider */}
+                <div className="flex items-center gap-3 my-3">
+                  <Separator className="flex-1" />
+                  <span className="text-[10px] text-muted-foreground font-medium whitespace-nowrap">
+                    {group.date}
+                  </span>
+                  <Separator className="flex-1" />
+                </div>
+
+                {/* Messages */}
+                <div className="space-y-3">
+                  {group.messages.map((msg) => {
+                    const isMember = msg.senderRole === "member";
+                    const isProgressUpdate = msg.messageType === "progress_update";
+                    const time = new Date(msg.createdAt).toLocaleTimeString("en-US", {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    });
+
+                    return (
+                      <div
+                        key={msg.id}
+                        className={`flex ${isMember ? "justify-end" : "justify-start"}`}
+                      >
+                        <div
+                          className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
+                            isMember
+                              ? "bg-[hsl(var(--gold))]/15 text-foreground rounded-br-md"
+                              : "bg-muted text-foreground rounded-bl-md"
+                          }`}
+                        >
+                          {/* Sender label */}
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] font-medium opacity-70">
+                              {isMember ? "You" : "Coach"}
+                            </span>
+                            {isProgressUpdate && (
+                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4">
+                                Progress Update
+                              </Badge>
+                            )}
+                          </div>
+
+                          {/* Message content */}
+                          <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
+                            {msg.content}
+                          </p>
+
+                          {/* Timestamp */}
+                          <div className={`flex ${isMember ? "justify-end" : "justify-start"} mt-1`}>
+                            <span className="text-[9px] text-muted-foreground">{time}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Input area */}
+        <div className="border-t border-border/50 p-3 bg-background/50">
+          {/* Message type toggle */}
+          <div className="flex items-center gap-1.5 mb-2">
+            <button
+              onClick={() => setMessageType("text")}
+              className={`text-[10px] px-2.5 py-1 rounded-full transition-colors ${
+                messageType === "text"
+                  ? "bg-foreground text-background font-medium"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Message
+            </button>
+            <button
+              onClick={() => setMessageType("progress_update")}
+              className={`text-[10px] px-2.5 py-1 rounded-full transition-colors ${
+                messageType === "progress_update"
+                  ? "bg-[hsl(var(--gold))]/20 text-[hsl(var(--gold))] font-medium"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Progress Update
+            </button>
+          </div>
+
+          <div className="flex items-end gap-2">
+            <Textarea
+              ref={textareaRef}
+              value={messageText}
+              onChange={e => setMessageText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                messageType === "progress_update"
+                  ? "Share what you accomplished today..."
+                  : "Type a message to your coach..."
+              }
+              className="flex-1 min-h-[44px] max-h-32 resize-none text-sm"
+              rows={1}
+            />
+            <Button
+              size="icon"
+              onClick={handleSend}
+              disabled={!messageText.trim() || sendMutation.isPending}
+              className="h-[44px] w-[44px] shrink-0 bg-[hsl(var(--gold))] hover:bg-[hsl(var(--gold))]/80 text-background"
+            >
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      </Card>
     </div>
   );
 }

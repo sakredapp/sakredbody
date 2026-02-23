@@ -257,3 +257,33 @@ export const ROUTINE_CATEGORIES = [
 export type RoutineCategory = (typeof ROUTINE_CATEGORIES)[number];
 
 export const COINS_PER_HABIT_COMPLETION = 10;
+
+// ─── COACHING MESSAGES (member ↔ coach thread) ─────────────────────────────
+
+export const coachingMessages = pgTable(
+  "coaching_messages",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: text("user_id").notNull().references(() => users.id),
+    senderRole: text("sender_role").notNull().default("member"), // 'member' | 'coach'
+    messageType: text("message_type").notNull().default("text"), // 'text' | 'progress_update' | 'photo'
+    content: text("content").notNull(),
+    imageUrl: text("image_url"),
+    metadata: text("metadata"), // JSON string for progress data (routine name, stats, etc.)
+    readAt: timestamp("read_at"),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => [
+    index("idx_coaching_msgs_user").on(t.userId),
+    index("idx_coaching_msgs_user_created").on(t.userId, t.createdAt),
+  ]
+);
+
+export const insertCoachingMessageSchema = createInsertSchema(coachingMessages).omit({
+  id: true,
+  readAt: true,
+  createdAt: true,
+});
+
+export type CoachingMessage = typeof coachingMessages.$inferSelect;
+export type InsertCoachingMessage = z.infer<typeof insertCoachingMessageSchema>;

@@ -50,6 +50,7 @@ import {
   rewards,
   userAssignedHabits,
   users,
+  coachingMessages,
   insertWellnessRoutineSchema,
   insertRoutineHabitSchema,
   COINS_PER_HABIT_COMPLETION,
@@ -858,6 +859,153 @@ export function registerCoachingRoutes(app: Express): void {
       const habitId = param(req, "id");
       await db.delete(habitRoutineAssignments).where(eq(habitRoutineAssignments.habitId, habitId));
       await db.delete(routineHabits).where(eq(routineHabits.id, habitId));
+      res.json({ success: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // COACHING MESSAGES (member ↔ coach)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // ── Get my messages ──────────────────────────────────────────────────
+  app.get("/api/coaching/messages", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId!;
+      const messages = await db
+        .select()
+        .from(coachingMessages)
+        .where(eq(coachingMessages.userId, userId))
+        .orderBy(coachingMessages.createdAt);
+      res.json(messages);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // ── Send a message ───────────────────────────────────────────────────
+  app.post("/api/coaching/messages", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId!;
+      const { content, messageType, imageUrl, metadata } = z.object({
+        content: z.string().min(1).max(5000),
+        messageType: z.enum(["text", "progress_update", "photo"]).default("text"),
+        imageUrl: z.string().optional(),
+        metadata: z.string().optional(),
+      }).parse(req.body);
+
+      const [msg] = await db.insert(coachingMessages).values({
+        userId,
+        senderRole: "member",
+        messageType,
+        content,
+        imageUrl: imageUrl || null,
+        metadata: metadata || null,
+      }).returning();
+
+      res.status(201).json(msg);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // ── Admin: get all conversations (grouped by user) ───────────────────
+  app.get("/api/admin/coaching/messages", isAuthenticated, isAdmin, async (_req: Request, res: Response) => {
+    try {
+      const messages = await db
+        .select()
+        .from(coachingMessages)
+        .orderBy(desc(coachingMessages.createdAt));
+
+      // Group by userId + include user info
+      const userIds = Array.from(new Set(messages.map((m) => m.userId)));
+      const usersData = await Promise.all(
+        userIds.map((uid) =>
+          db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName, email: users.email })
+            .from(users).where(eq(users.id, uid)).then((rows) => rows[0])
+        )
+      );
+      const userMap: Record<string, { firstName?: string | null; lastName?: string | null; email?: string | null }> = {};
+      usersData.forEach((u) => { if (u) userMap[u.id] = u; });
+
+      const threads = userIds.map((uid) => ({
+        userId: uid,
+        userName: [userMap[uid]?.firstName, userMap[uid]?.lastName].filter(Boolean).join(" ") || userMap[uid]?.email || uid,
+        userEmail: userMap[uid]?.email || null,
+        messages: messages.filter((m) => m.userId === uid).sort((a, b) =>
+          new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime()
+        ),
+        lastMessage: messages.find((m) => m.userId === uid),
+        unreadCount: messages.filter((m) => m.userId === uid && m.senderRole === "member" && !m.readAt).length,
+      }));
+
+      res.json(threads);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // ── Admin: get messages for a specific user ──────────────────────────
+  app.get("/api/admin/coaching/messages/:userId", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
+    try {
+      const userId = param(req, "userId");
+      const messages = await db
+        .select()
+        .from(coachingMessages)
+        .where(eq(coachingMessages.userId, userId))
+        .orderBy(coachingMessages.createdAt);
+      res.json(messages);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // ── Admin: reply to a user ───────────────────────────────────────────
+  app.post("/api/admin/coaching/messages/:userId", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
+    try {
+      const userId = param(req, "userId");
+      const { content } = z.object({
+        content: z.string().min(1).max(5000),
+      }).parse(req.body);
+
+      const [msg] = await db.insert(coachingMessages).values({
+        userId,
+        senderRole: "coach",
+        messageType: "text",
+        content,
+      }).returning();
+
+      res.status(201).json(msg);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // ── Admin: mark messages as read ─────────────────────────────────────
+  app.patch("/api/admin/coaching/messages/:userId/read", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
+    try {
+      const userId = param(req, "userId");
+      await db
+        .update(coachingMessages)
+        .set({ readAt: new Date() })
+        .where(and(
+          eq(coachingMessages.userId, userId),
+          eq(coachingMessages.senderRole, "member"),
+          sql`${coachingMessages.readAt} IS NULL`
+        ));
       res.json({ success: true });
     } catch (err) {
       console.error(err);

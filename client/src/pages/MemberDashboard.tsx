@@ -58,6 +58,7 @@ import {
   RoutinesTab,
   CatalogSection,
   AnalyticsTab,
+  CoachChat,
 } from "./CoachingDashboard";
 import { MasterclassTab } from "@/components/MasterclassTab";
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
@@ -163,7 +164,7 @@ export default function MemberDashboard() {
   const defaultSection = location === "/coaching" ? "coaching" : "retreat";
   const [section, setSection] = useState<"retreat" | "coaching" | "masterclass">(defaultSection);
   const [retreatView, setRetreatView] = useState<"book" | "services" | "my-bookings">("book");
-  const [coachingTab, setCoachingTab] = useState<"today" | "journey" | "routines" | "catalog" | "analytics">("today");
+  const [coachingTab, setCoachingTab] = useState<"today" | "journey" | "routines" | "catalog" | "analytics" | "coach">("today");
   const [showBookingDialog, setShowBookingDialog] = useState(false);
 
   const [bookingStep, setBookingStep] = useState<"choose-type" | "configure">("choose-type");
@@ -355,6 +356,7 @@ export default function MemberDashboard() {
                 { id: "routines" as const, label: "Routines" },
                 { id: "catalog" as const, label: "Habits" },
                 { id: "analytics" as const, label: "Stats" },
+                { id: "coach" as const, label: "Coach" },
               ]).map(({ id, label }) => (
                 <button
                   key={id}
@@ -421,6 +423,7 @@ export default function MemberDashboard() {
             {coachingTab === "routines" && <RoutinesTab />}
             {coachingTab === "catalog" && <CatalogSection />}
             {coachingTab === "analytics" && <AnalyticsTab />}
+            {coachingTab === "coach" && <CoachChat />}
           </motion.div>
         )}
 

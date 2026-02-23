@@ -81,6 +81,8 @@ import {
   Film,
   FolderPlus,
   Play,
+  MessageCircle,
+  Send,
 } from "lucide-react";
 
 import type { Partner, PartnerService, BookingRequest } from "@shared/schema";
@@ -565,12 +567,14 @@ export default function AdminPortal() {
   const [serviceForm, setServiceForm] = useState<ServiceFormData>(emptyServiceForm);
 
   // ─── Coaching state ────────────────────────────────────────────────
-  const [coachingView, setCoachingView] = useState<"routines" | "habits">("routines");
+  const [coachingView, setCoachingView] = useState<"routines" | "habits" | "messages">("routines");
   const [selectedRoutineId, setSelectedRoutineId] = useState<string | null>(null);
   const [routineDialogOpen, setRoutineDialogOpen] = useState(false);
   const [editingRoutine, setEditingRoutine] = useState<WellnessRoutine | null>(null);
   const [habitDialogOpen, setHabitDialogOpen] = useState(false);
   const [editingHabit, setEditingHabit] = useState<RoutineHabitTemplate | null>(null);
+  const [selectedConversationUserId, setSelectedConversationUserId] = useState<string | null>(null);
+  const [adminReplyText, setAdminReplyText] = useState("");
 
   // ─── Masterclass state ─────────────────────────────────────────────
   const [mcView, setMcView] = useState<"categories" | "videos">("categories");
@@ -726,6 +730,72 @@ export default function AdminPortal() {
   const createHabitMut = useCreateHabitTemplate();
   const updateHabitMut = useUpdateHabitTemplate();
   const deleteHabitMut = useDeleteHabitTemplate();
+
+  // Coaching Messages
+  interface ConversationSummary {
+    userId: string;
+    userName: string;
+    userEmail: string;
+    lastMessage: string;
+    lastMessageAt: string;
+    unreadCount: number;
+    totalMessages: number;
+  }
+
+  interface AdminCoachingMessage {
+    id: string;
+    userId: string;
+    senderRole: string;
+    messageType: string;
+    content: string;
+    imageUrl: string | null;
+    metadata: string | null;
+    readAt: string | null;
+    createdAt: string;
+  }
+
+  const conversationsQuery = useQuery<ConversationSummary[]>({
+    queryKey: ["/api/admin/coaching/messages"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/coaching/messages", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load conversations");
+      return res.json();
+    },
+    enabled: isAdmin && coachingView === "messages",
+    refetchInterval: 20000,
+  });
+
+  const conversationMessagesQuery = useQuery<AdminCoachingMessage[]>({
+    queryKey: ["/api/admin/coaching/messages", selectedConversationUserId],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/coaching/messages/${selectedConversationUserId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load messages");
+      return res.json();
+    },
+    enabled: isAdmin && !!selectedConversationUserId,
+    refetchInterval: 10000,
+  });
+
+  const adminReplyMut = useMutation({
+    mutationFn: async ({ userId, content }: { userId: string; content: string }) => {
+      const res = await apiRequest("POST", `/api/admin/coaching/messages/${userId}`, { content, messageType: "text" });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/coaching/messages"] });
+      setAdminReplyText("");
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const markReadMut = useMutation({
+    mutationFn: async (userId: string) => {
+      await apiRequest("PATCH", `/api/admin/coaching/messages/${userId}/read`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/coaching/messages"] });
+    },
+  });
 
   // Masterclass
   const mcCategoriesQuery = useQuery<MasterclassCategory[]>({
@@ -1139,6 +1209,9 @@ export default function AdminPortal() {
               <Button variant={coachingView === "habits" ? "default" : "outline"} onClick={() => setCoachingView("habits")}>
                 Habit Templates
               </Button>
+              <Button variant={coachingView === "messages" ? "default" : "outline"} onClick={() => setCoachingView("messages")}>
+                Messages
+              </Button>
             </div>
 
             {coachingView === "routines" && (
@@ -1274,6 +1347,156 @@ export default function AdminPortal() {
                   title={editingHabit ? "Edit Habit Template" : "Create Habit Template"}
                   routines={routines || []}
                 />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ═══════════════ COACHING MESSAGES VIEW ═══════════════ */}
+        {tab === "coaching" && coachingView === "messages" && (
+          <div className="space-y-6">
+            {!selectedConversationUserId ? (
+              /* ── Conversation List ── */
+              <div className="space-y-4">
+                <div>
+                  <h2 className="font-display text-2xl">Member Messages</h2>
+                  <p className="text-sm text-muted-foreground">View and reply to member messages.</p>
+                </div>
+                {conversationsQuery.isLoading ? (
+                  <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-20 rounded-md" />)}</div>
+                ) : !conversationsQuery.data || conversationsQuery.data.length === 0 ? (
+                  <Card>
+                    <CardContent className="p-12 text-center text-muted-foreground">
+                      <MessageCircle className="w-8 h-8 mx-auto mb-3 opacity-50" />
+                      No member messages yet.
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-2">
+                    {conversationsQuery.data.map((conv) => (
+                      <Card
+                        key={conv.userId}
+                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => {
+                          setSelectedConversationUserId(conv.userId);
+                          if (conv.unreadCount > 0) markReadMut.mutate(conv.userId);
+                        }}
+                      >
+                        <CardContent className="p-4 flex items-center gap-4">
+                          <Avatar className="w-10 h-10">
+                            <AvatarFallback className="text-sm">
+                              {(conv.userName || conv.userEmail || "?").slice(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-sm truncate">
+                                {conv.userName || conv.userEmail}
+                              </span>
+                              {conv.unreadCount > 0 && (
+                                <Badge className="bg-[hsl(var(--gold))] text-background text-[10px] px-1.5 h-5">
+                                  {conv.unreadCount} new
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate mt-0.5">
+                              {conv.lastMessage}
+                            </p>
+                            <span className="text-[10px] text-muted-foreground">
+                              {new Date(conv.lastMessageAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                              {" · "}
+                              {conv.totalMessages} message{conv.totalMessages !== 1 ? "s" : ""}
+                            </span>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* ── Single Conversation Thread ── */
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedConversationUserId(null)}>
+                    <ArrowLeft className="w-4 h-4 mr-1" /> Back
+                  </Button>
+                  <Separator orientation="vertical" className="h-5" />
+                  <span className="text-sm font-medium">
+                    {conversationsQuery.data?.find(c => c.userId === selectedConversationUserId)?.userName ||
+                     conversationsQuery.data?.find(c => c.userId === selectedConversationUserId)?.userEmail ||
+                     "Member"}
+                  </span>
+                </div>
+
+                <Card className="overflow-hidden">
+                  {/* Messages */}
+                  <div className="max-h-[500px] overflow-y-auto p-4 space-y-3 scrollbar-thin">
+                    {conversationMessagesQuery.isLoading ? (
+                      <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-12 rounded-md" />)}</div>
+                    ) : (conversationMessagesQuery.data || []).map((msg) => {
+                      const isMember = msg.senderRole === "member";
+                      const isProgress = msg.messageType === "progress_update";
+                      const time = new Date(msg.createdAt).toLocaleString("en-US", {
+                        month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+                      });
+                      return (
+                        <div key={msg.id} className={`flex ${isMember ? "justify-start" : "justify-end"}`}>
+                          <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
+                            isMember
+                              ? "bg-muted text-foreground rounded-bl-md"
+                              : "bg-[hsl(var(--gold))]/15 text-foreground rounded-br-md"
+                          }`}>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-[10px] font-medium opacity-70">
+                                {isMember ? "Member" : "You (Coach)"}
+                              </span>
+                              {isProgress && (
+                                <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4">Progress Update</Badge>
+                              )}
+                            </div>
+                            <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
+                            <div className={`flex ${isMember ? "justify-start" : "justify-end"} mt-1`}>
+                              <span className="text-[9px] text-muted-foreground">{time}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Reply input */}
+                  <div className="border-t border-border/50 p-3 flex items-end gap-2">
+                    <Textarea
+                      value={adminReplyText}
+                      onChange={e => setAdminReplyText(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          if (adminReplyText.trim() && selectedConversationUserId) {
+                            adminReplyMut.mutate({ userId: selectedConversationUserId, content: adminReplyText.trim() });
+                          }
+                        }
+                      }}
+                      placeholder="Reply as coach..."
+                      className="flex-1 min-h-[44px] max-h-32 resize-none text-sm"
+                      rows={1}
+                    />
+                    <Button
+                      size="icon"
+                      onClick={() => {
+                        if (adminReplyText.trim() && selectedConversationUserId) {
+                          adminReplyMut.mutate({ userId: selectedConversationUserId, content: adminReplyText.trim() });
+                        }
+                      }}
+                      disabled={!adminReplyText.trim() || adminReplyMut.isPending}
+                      className="h-[44px] w-[44px] shrink-0 bg-[hsl(var(--gold))] hover:bg-[hsl(var(--gold))]/80 text-background"
+                    >
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </Card>
               </div>
             )}
           </div>
