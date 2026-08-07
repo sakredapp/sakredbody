@@ -1,14 +1,14 @@
-import { useState, useEffect } from "react";
-import { Link } from "wouter";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Check } from "lucide-react";
 import { ApplicationModal } from "@/components/ApplicationModal";
 import { Section } from "@/components/Section";
+import { SiteHeader } from "@/components/SiteHeader";
+import { SiteFooter } from "@/components/SiteFooter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 30 },
@@ -25,43 +25,25 @@ const staggerContainer = {
   }
 };
 
-export default function Landing() {
+export default function Mastermind() {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
 
   const openApplication = () => setIsModalOpen(true);
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 100);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
-      
-      <header
-        className={`fixed top-0 left-0 right-0 transition-all duration-300 ${
-          scrolled
-            ? "bg-background/95 backdrop-blur-md border-b border-border/50"
-            : "bg-gradient-to-b from-black/50 to-transparent"
-        }`}
-        style={{ zIndex: 9999 }}
-      >
-        <div className="container max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center">
-            <img src={sakredLogo} alt="Sakred Body" className="h-10 w-10 object-contain" />
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <Link href="/member" data-testid="link-member-portal">
-              <Button variant="outline" size="sm" className={`transition-colors duration-300 ${scrolled ? "" : "border-white/25 text-white bg-white/5"}`}>Member Portal</Button>
-            </Link>
-            <Button onClick={openApplication} size="sm" className="bg-gold border-gold-border text-white" data-testid="button-apply-header">
-              Apply Now
-            </Button>
-          </div>
-        </div>
-      </header>
+      <SiteHeader
+        cta={
+          <Button
+            onClick={openApplication}
+            size="sm"
+            className="bg-gold border-gold-border text-white"
+            data-testid="button-apply-header"
+          >
+            Apply Now
+          </Button>
+        }
+      />
 
       <section className="relative min-h-[90vh] flex items-center pt-20 overflow-hidden">
         <div className="absolute inset-0 z-0">
@@ -377,26 +359,9 @@ export default function Landing() {
         </div>
       </Section>
 
-      <footer className="border-t border-border/30 bg-background py-12 text-center">
-        <div className="container mx-auto px-4">
-          <div className="font-display text-2xl tracking-tight mb-6">Sakred Body</div>
-          <p className="text-muted-foreground text-sm mb-8 max-w-md mx-auto">
-            A concierge retreat and mastermind experience for entrepreneurs who take personal growth seriously.
-            <br/>Copyright {new Date().getFullYear()} Sakred Body. All rights reserved.
-          </p>
-          <p className="text-xs text-muted-foreground max-w-lg mx-auto mb-6">
-            Disclaimer: Sakred Body is not a medical program. We do not diagnose, treat, or prescribe. 
-            Consult your healthcare provider before making changes to your health regimen.
-          </p>
-          <div className="flex justify-center flex-wrap gap-6 text-sm text-muted-foreground">
-            <a href="#" className="hover:text-gold transition-colors" data-testid="link-privacy">Privacy Policy</a>
-            <a href="#" className="hover:text-gold transition-colors" data-testid="link-terms">Terms of Service</a>
-            <a href="mailto:contact@sakredbody.com" className="hover:text-gold transition-colors" data-testid="link-contact">Contact</a>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
 
-      <ApplicationModal 
+      <ApplicationModal
         open={isModalOpen} 
         onOpenChange={setIsModalOpen} 
       />

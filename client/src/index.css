@@ -93,6 +93,19 @@
   --gold: 39 48% 56%;
   --gold-light: 42 70% 76%;
   --gold-dark: 42 38% 47%;
+
+  /* Warm-black "ink" surfaces — used for the dark bands on the homepage.
+     Fixed values so they read the same regardless of light/dark mode. */
+  --ink: 30 10% 10%;
+  --ink-soft: 30 8% 15%;
+  --ink-foreground: 45 20% 96%;
+
+  /* Five-element accents (TCM) — kept desaturated so gold stays dominant. */
+  --element-wood: 138 25% 42%;
+  --element-fire: 6 45% 52%;
+  --element-earth: 39 48% 56%;
+  --element-metal: 40 8% 62%;
+  --element-water: 210 22% 38%;
 }
 
 .dark {
@@ -221,6 +234,34 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+  .bg-ink {
+    background-color: hsl(var(--ink));
+  }
+  .bg-ink-soft {
+    background-color: hsl(var(--ink-soft));
+  }
+  .text-ink-foreground {
+    color: hsl(var(--ink-foreground));
+  }
+  .border-ink-line {
+    border-color: hsl(var(--ink-foreground) / 0.12);
+  }
+
+  /* Thin gold rule used to open sections. */
+  .rule-gold::before {
+    content: "";
+    display: block;
+    width: 2.5rem;
+    height: 1px;
+    background: linear-gradient(90deg, hsl(var(--gold)), transparent);
+    margin-bottom: 1.25rem;
+  }
+  .rule-gold-center::before {
+    margin-left: auto;
+    margin-right: auto;
+    background: linear-gradient(90deg, transparent, hsl(var(--gold)), transparent);
+  }
+
   .gold-metallic-btn {
     background: linear-gradient(135deg, hsl(var(--gold-dark)), hsl(var(--gold)), hsl(var(--gold-light)), hsl(var(--gold)));
     background-size: 200% 200%;
