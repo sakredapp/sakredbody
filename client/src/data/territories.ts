@@ -1,0 +1,117 @@
+/**
+ * The four territories are the spine of the whole site. Every pillar page,
+ * nav entry, and homepage section hangs off this order — it's a sequence,
+ * not a menu: you can't load a body that can't yet drain.
+ */
+
+export interface Territory {
+  key: string;
+  name: string;
+  href: string;
+  /** One-word imperative used in the four-beat summary. */
+  verb: string;
+  force: string;
+  color: string;
+  promise: string;
+  body: string;
+  domains: string[];
+}
+
+export const TERRITORIES: Territory[] = [
+  {
+    key: "restore",
+    name: "Restore",
+    href: "/restore",
+    verb: "Clear the terrain.",
+    force: "Yin — the receding force",
+    color: "var(--element-wood)",
+    promise: "Reduce what obstructs the organism, and rebuild the conditions under which it works well.",
+    body: "Healing is not endlessly adding things. Most people are carrying a load they've never put down — poor drainage, a gut that can't extract, a nervous system that never downshifts. Restoration begins by removing what's in the way.",
+    domains: [
+      "Digestion and gut function",
+      "Liver and bile flow",
+      "Drainage, lymph, fascia",
+      "Hydration and minerals",
+      "Sleep and circadian rhythm",
+      "Nervous-system regulation",
+      "Food quality",
+      "Cleansing and resets",
+    ],
+  },
+  {
+    key: "build",
+    name: "Build",
+    href: "/build",
+    verb: "Build its capacity.",
+    force: "Yang — the advancing force",
+    color: "var(--element-water)",
+    promise: "Once the terrain can receive demand, give it demand worth adapting to.",
+    body: "Health should eventually become capacity. Not a body that merely avoids illness — a body that can carry weight, produce force, move through space, withstand adversity, recover quickly, and serve the life inside it.",
+    domains: [
+      "Strength and muscle",
+      "Cardiovascular capacity",
+      "Mobility and athleticism",
+      "Work capacity and posture",
+      "Breathing mechanics",
+      "Heat, cold, hormetic stress",
+      "Energy production",
+      "Nutrition for performance",
+    ],
+  },
+  {
+    key: "embody",
+    name: "Embody",
+    href: "/embody",
+    verb: "Live inside it consciously.",
+    force: "Where the two forces meet",
+    color: "var(--element-earth)",
+    promise: "Information is not enough. Health has to become perception, practice, and relationship.",
+    body: "The body you inhabit becomes the life you are capable of living. This is the part almost nobody teaches: attention, standards, rhythm, and the judgment to know when to push and when to yield.",
+    domains: [
+      "Habits and discipline",
+      "Body awareness and literacy",
+      "Personal standards",
+      "Morning and evening rhythms",
+      "Attention and digital hygiene",
+      "Environment design",
+      "Stress capacity",
+      "Seasonal rhythms",
+    ],
+  },
+  {
+    key: "gather",
+    name: "Gather",
+    href: "/retreats",
+    verb: "Put it in an environment that holds.",
+    force: "The social terrain",
+    color: "var(--element-fire)",
+    promise: "The terrain isn't only biological. Who you're around is an input like any other.",
+    body: "You are affected by the conversations that surround you, the standards your people hold, whether your life contains real challenge, and whether you ever spend uninterrupted days in nature. Retreats and the mastermind are the social expression of the same philosophy.",
+    domains: [
+      "Small-group masterminds",
+      "Retreats in Puerto Rico",
+      "Uninterrupted time in nature",
+      "Shared standards",
+      "Real challenge",
+      "Time away from stimulation",
+      "People actually building something",
+      "Accountability without pressure",
+    ],
+  },
+];
+
+/** Health → Resilience → Capacity → Expression. */
+export const CAPACITY_MODEL = [
+  { stage: "Health", body: "A functioning base. Systems doing their job without constant intervention." },
+  { stage: "Resilience", body: "The ability to absorb disruption — a bad night, a hard week, a missed meal — and return." },
+  { stage: "Capacity", body: "Room to handle greater demand than your life currently asks of you." },
+  { stage: "Expression", body: "What you actually do with it. Work, build, create, lead, compete, parent, travel, train." },
+];
+
+/** The operating loop that applies to health, training, and work alike. */
+export const OPERATING_LOOP = [
+  { step: "Clear", body: "Remove burden. Restore elimination. Create space for anything else to work." },
+  { step: "Nourish", body: "Minerals, water, food, light, sleep, breath. The raw inputs, in adequate amounts." },
+  { step: "Challenge", body: "Lift, run, work, think, create, compete. Demand is the signal to adapt." },
+  { step: "Recover", body: "Rest, restore, integrate. Adaptation happens here, not during the challenge." },
+];

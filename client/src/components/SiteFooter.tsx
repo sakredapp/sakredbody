@@ -8,18 +8,27 @@ import {
   SAKRED_HEALTH_URL,
 } from "@/lib/links";
 
-/** Internal routes on sakredbody.com. */
-const EXPLORE_LINKS = [
-  { label: "Home", href: "/" },
-  { label: "The App", href: "/app" },
-  { label: "Food Chart", href: "/food-chart" },
-  { label: "Mastermind + Retreats", href: "/mastermind" },
+/** The four territories, in sequence. */
+const PATH_LINKS = [
+  { label: "Restore", href: "/restore" },
+  { label: "Build", href: "/build" },
+  { label: "Embody", href: "/embody" },
+  { label: "Gather — Retreats", href: "/retreats" },
 ];
 
-/** Also sakredbody.com — the member area lives on this site, not Sakred Health. */
-const MEMBER_LINKS = [
+/** Worldview pages. */
+const PHILOSOPHY_LINKS = [
+  { label: "What Is a Sakred Body?", href: "/philosophy" },
+  { label: "The Terrain", href: "/the-terrain" },
+  { label: "Body Literacy", href: "/body-literacy" },
+];
+
+/** Product + tools. */
+const EXPLORE_LINKS = [
+  { label: "The App", href: "/app" },
+  { label: "Food Chart", href: "/food-chart" },
+  { label: "Mastermind", href: "/mastermind" },
   { label: "Member Portal", href: "/member" },
-  { label: "Coaching", href: "/coaching" },
   { label: "Sign In", href: "/login" },
 ];
 
@@ -35,7 +44,7 @@ export function SiteFooter() {
   return (
     <footer className="bg-ink text-ink-foreground border-t border-ink-line pt-16 pb-10">
       <div className="container max-w-6xl mx-auto px-4">
-        <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-5 mb-14">
+        <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-6 mb-14">
           {/* Brand */}
           <div className="lg:col-span-2">
             <Link href="/" className="flex items-center gap-3 mb-4 w-fit">
@@ -69,8 +78,8 @@ export function SiteFooter() {
             </div>
           </div>
 
-          <FooterColumn title="Explore">
-            {EXPLORE_LINKS.map((l) => (
+          <FooterColumn title="The Path">
+            {PATH_LINKS.map((l) => (
               <li key={l.href}>
                 <Link href={l.href} className="hover:text-gold transition-colors">
                   {l.label}
@@ -79,8 +88,18 @@ export function SiteFooter() {
             ))}
           </FooterColumn>
 
-          <FooterColumn title="Members">
-            {MEMBER_LINKS.map((l) => (
+          <FooterColumn title="Philosophy">
+            {PHILOSOPHY_LINKS.map((l) => (
+              <li key={l.href}>
+                <Link href={l.href} className="hover:text-gold transition-colors">
+                  {l.label}
+                </Link>
+              </li>
+            ))}
+          </FooterColumn>
+
+          <FooterColumn title="Explore">
+            {EXPLORE_LINKS.map((l) => (
               <li key={l.href}>
                 <Link href={l.href} className="hover:text-gold transition-colors">
                   {l.label}

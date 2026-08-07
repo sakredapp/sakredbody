@@ -5,12 +5,36 @@ export const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com
 export const FOOD_CHART_URL = "https://www.sakredhealth.com/food-chart";
 export const SAKRED_HEALTH_URL = "https://www.sakredhealth.com";
 
-/** Primary site navigation — real pages, shared by the header and footer. */
-export const SITE_NAV = [
+export interface NavEntry {
+  label: string;
+  href?: string;
+  /** When present the entry becomes a dropdown and `href` is ignored. */
+  children?: { label: string; href: string; note?: string }[];
+}
+
+/** Primary site navigation — shared by the header on every page. */
+export const SITE_NAV: NavEntry[] = [
+  {
+    label: "Philosophy",
+    children: [
+      { label: "What Is a Sakred Body?", href: "/philosophy", note: "The manifesto" },
+      { label: "The Terrain", href: "/the-terrain", note: "The body as an environment" },
+      { label: "Body Literacy", href: "/body-literacy", note: "Learn to read the signals" },
+    ],
+  },
+  {
+    label: "The Path",
+    children: [
+      { label: "Restore", href: "/restore", note: "Clear the terrain" },
+      { label: "Build", href: "/build", note: "Build its capacity" },
+      { label: "Embody", href: "/embody", note: "Live inside it consciously" },
+      { label: "Gather", href: "/retreats", note: "Environment that holds" },
+    ],
+  },
   { label: "The App", href: "/app" },
   { label: "Food Chart", href: "/food-chart" },
   { label: "Mastermind", href: "/mastermind" },
-] as const;
+];
 
 /** Legal pages are shared across the brands and live on the Sakred Health domain. */
 export const LEGAL_LINKS = [

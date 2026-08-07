@@ -6,11 +6,13 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { YinYang } from "@/components/YinYang";
 import { LessonSlideshow, type Lesson } from "@/components/LessonSlideshow";
+import { SectionHeader } from "@/components/PageHero";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/links";
 import { TOTAL_FOODS } from "@/data/foodChart";
+import { TERRITORIES } from "@/data/territories";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
 const fadeInUp = {
@@ -24,24 +26,6 @@ const staggerContainer = {
 };
 
 const viewportOnce = { once: true, amount: 0.2 } as const;
-
-const YIN_PRACTICES = [
-  "Sleep and circadian anchoring",
-  "Fasting and digestive rest",
-  "Cleansing and drainage",
-  "Cooling, watery, in-season foods",
-  "Breathwork and nasal breathing",
-  "Stillness, sun, silence",
-];
-
-const YANG_PRACTICES = [
-  "Resistance training and load",
-  "Protein and mineral repletion",
-  "Heat, sauna, cold exposure",
-  "Sprinting and hard conditioning",
-  "Discipline and structure",
-  "Work that demands something",
-];
 
 const LESSONS: Lesson[] = [
   {
@@ -138,8 +122,8 @@ const FOOD_SAMPLES = [
 
 export default function Home() {
   usePageMeta(
-    "Sakred Body — Live in Harmony. Build Real Strength.",
-    "Holistic health rooted in Eastern traditional medicine and the duality of rest and strength. Guided protocols, the Sakred app, and mastermind retreats.",
+    "Sakred Body — Restore the Body. Build the Body. Embody the Life.",
+    "Human capacity, not wellness. Restore the terrain, build real strength, embody the practice, and gather with people who hold the same standard.",
   );
 
   return (
@@ -182,21 +166,23 @@ export default function Home() {
 
             <motion.h1
               variants={fadeInUp}
-              className="text-5xl md:text-7xl font-display font-normal leading-[1.08] mb-7 tracking-tight text-white"
+              className="text-4xl md:text-6xl font-display font-normal leading-[1.1] mb-7 tracking-tight text-white"
               data-testid="text-hero-headline"
             >
-              Live in Harmony.
+              Restore the Body.
               <br />
-              <span className="gold-gradient-text">Build Real Strength.</span>
+              Build the Body.
+              <br />
+              <span className="gold-gradient-text">Embody the Life.</span>
             </motion.h1>
 
             <motion.p
               variants={fadeInUp}
               className="text-base md:text-lg text-white/60 mb-9 max-w-2xl mx-auto leading-relaxed font-normal"
             >
-              We follow the old principles — eat with the season, move with the sun, rest when the light
-              goes. And then we train hard. Health isn't monk mode and it isn't a supplement stack. It
-              lives in the tension between the two.
+              Not wellness. Not fitness. Not detox. Human capacity — because the body is the terrain you
+              have to live your whole life through. Clear it, restore it, build it, and then actually use
+              it for something.
             </motion.p>
 
             <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -212,7 +198,7 @@ export default function Home() {
                 variant="outline"
                 size="lg"
                 className="text-base px-8 border-white/20 text-white backdrop-blur-sm bg-white/5"
-                onClick={() => document.getElementById("duality")?.scrollIntoView({ behavior: "smooth" })}
+                onClick={() => document.getElementById("territories")?.scrollIntoView({ behavior: "smooth" })}
                 data-testid="button-philosophy"
               >
                 What We Believe
@@ -222,83 +208,61 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── The Duality ──────────────────────────────────────── */}
-      <Section id="duality" tone="ink" className="overflow-hidden">
+      {/* ── The Four Territories ─────────────────────────── */}
+      <Section id="territories" tone="ink">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
-          <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-14">
-            <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
-              The Duality
-            </p>
-            <h2 className="text-3xl md:text-5xl font-display font-normal mb-6" data-testid="text-duality-headline">
-              Two Forces. <span className="text-gold">One Body.</span>
-            </h2>
-            <p className="text-ink-foreground/60 leading-relaxed">
-              Every tradition worth following lands in the same place: the body runs on opposites held in
-              balance. Emptying and filling. Cooling and heating. Rest and exertion. Push one side too far
-              and you break — just in a different way each time.
-            </p>
+          <motion.div variants={fadeInUp}>
+            <SectionHeader
+              eyebrow="The Architecture"
+              title={<>Four Territories. <span className="text-gold">One Sequence.</span></>}
+              intro="These aren't categories to browse — they're an order of operations. A body that can't drain shouldn't be loaded. A body with capacity it never expresses is a waste. Each territory earns the next."
+              onInk
+              testId="text-territories-headline"
+            />
           </motion.div>
 
-          <motion.div
-            variants={fadeInUp}
-            className="relative grid md:grid-cols-2 gap-px bg-ink-line rounded-lg overflow-hidden border border-ink-line"
-          >
-            {[
-              {
-                eyebrow: "Yin — the receding force",
-                title: "Restore",
-                titleClass: "text-ink-foreground",
-                eyebrowClass: "text-ink-foreground/40",
-                bg: "bg-[hsl(30_10%_8%)]",
-                body: "The work of clearing what's in the way. Cooling, quieting, draining, emptying. This is where most people are deficient, and it's the half that traditional medicine understood long before anyone had a word for inflammation.",
-                practices: YIN_PRACTICES,
-              },
-              {
-                eyebrow: "Yang — the advancing force",
-                title: "Build",
-                titleClass: "text-gold",
-                eyebrowClass: "text-gold/60",
-                bg: "bg-[hsl(30_9%_13%)]",
-                body: "The work of adding capacity the body can actually hold. Heat, load, effort, structure. This is the half the wellness world quietly dropped — and the reason so much of it produces calm, fragile people.",
-                practices: YANG_PRACTICES,
-              },
-            ].map((side) => (
-              <div key={side.title} className={`${side.bg} p-8 md:p-12 text-center`}>
-                <p className={`text-xs uppercase tracking-widest mb-3 ${side.eyebrowClass}`}>{side.eyebrow}</p>
-                <h3 className={`text-2xl md:text-3xl font-display mb-5 ${side.titleClass}`}>{side.title}</h3>
-                <p className="text-sm text-ink-foreground/55 leading-relaxed mb-8 max-w-sm mx-auto">
-                  {side.body}
-                </p>
-                <ul className="space-y-3 max-w-xs mx-auto">
-                  {side.practices.map((p) => (
-                    <li
-                      key={p}
-                      className="text-sm text-ink-foreground/70 pb-3 border-b border-ink-line last:border-0 last:pb-0"
-                    >
-                      {p}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {TERRITORIES.map((t, i) => (
+              <motion.div variants={fadeInUp} key={t.key}>
+                <Link href={t.href}>
+                  <div
+                    className="h-full bg-ink-soft border border-ink-line rounded-lg p-7 text-center flex flex-col hover-elevate transition-colors"
+                    data-testid={`card-territory-${t.key}`}
+                  >
+                    <span className="font-mono text-xs text-gold/60 mb-4">{String(i + 1).padStart(2, "0")}</span>
+                    <span
+                      className="h-10 w-10 rounded-full mx-auto mb-5 border border-white/10"
+                      style={{ backgroundColor: `hsl(${t.color})` }}
+                    />
+                    <h3 className="font-display text-2xl mb-2">{t.name}</h3>
+                    <p className="text-[10px] uppercase tracking-wider text-ink-foreground/40 mb-5">{t.force}</p>
+                    <p className="text-sm text-ink-foreground/60 leading-relaxed flex-1">{t.promise}</p>
+                    <span className="mt-6 text-xs text-gold inline-flex items-center justify-center gap-1.5">
+                      {t.verb} <ArrowRight className="h-3.5 w-3.5" />
+                    </span>
+                  </div>
+                </Link>
+              </motion.div>
             ))}
-
-            {/* Mark at the seam */}
-            <div className="hidden md:flex absolute inset-0 items-center justify-center pointer-events-none">
-              <div className="h-16 w-16 rounded-full bg-ink border border-gold/30 flex items-center justify-center shadow-gold-subtle">
-                <YinYang className="h-9 w-9 text-gold" voidColor="hsl(var(--ink))" />
-              </div>
-            </div>
-          </motion.div>
+          </div>
 
           <motion.p
             variants={fadeInUp}
-            className="text-center font-display text-xl md:text-2xl mt-12 max-w-2xl mx-auto leading-relaxed"
+            className="text-center font-display text-xl md:text-2xl mt-14 max-w-2xl mx-auto leading-relaxed"
             data-testid="text-duality-thesis"
           >
             Yin without Yang is decay. Yang without Yin is burnout.
             <br />
             <span className="text-gold">We refuse to pick a side.</span>
           </motion.p>
+
+          <motion.div variants={fadeInUp} className="text-center mt-9">
+            <Link href="/philosophy">
+              <Button variant="outline" className="border-gold-subtle text-gold" data-testid="button-philosophy-page">
+                Read the Full Philosophy <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </motion.div>
         </motion.div>
       </Section>
 

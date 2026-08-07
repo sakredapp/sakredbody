@@ -1,29 +1,28 @@
-import { ReactNode, useEffect, useState } from "react";
-import { Link } from "wouter";
-import { Menu, X } from "lucide-react";
+import { ReactNode, useEffect, useRef, useState } from "react";
+import { Link, useLocation } from "wouter";
+import { Menu, X, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { SITE_NAV } from "@/lib/links";
+import { SITE_NAV, type NavEntry } from "@/lib/links";
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
-export interface NavItem {
-  label: string;
-  /** "#section-id" scrolls on the current page; anything else routes. */
-  href: string;
-}
+export type { NavEntry as NavItem };
 
 interface SiteHeaderProps {
   /** Defaults to the shared site navigation so every page matches. */
-  navItems?: NavItem[];
+  navItems?: NavEntry[];
   /** Right-hand action rendered after the Member Portal button. */
   cta?: ReactNode;
   /** Start transparent over a dark hero, then solidify on scroll. */
   overHero?: boolean;
 }
 
-export function SiteHeader({ navItems = [...SITE_NAV], cta, overHero = true }: SiteHeaderProps) {
+export function SiteHeader({ navItems = SITE_NAV, cta, overHero = true }: SiteHeaderProps) {
   const [scrolled, setScrolled] = useState(!overHero);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const [location] = useLocation();
+  const navRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (!overHero) return;
@@ -33,14 +32,31 @@ export function SiteHeader({ navItems = [...SITE_NAV], cta, overHero = true }: S
     return () => window.removeEventListener("scroll", onScroll);
   }, [overHero]);
 
-  const solid = scrolled || menuOpen;
-
-  const handleNavClick = (href: string) => {
+  // Close everything on navigation.
+  useEffect(() => {
     setMenuOpen(false);
-    if (href.startsWith("#")) {
-      document.getElementById(href.slice(1))?.scrollIntoView({ behavior: "smooth" });
-    }
-  };
+    setOpenGroup(null);
+  }, [location]);
+
+  // Close the dropdown on outside click or Escape.
+  useEffect(() => {
+    if (!openGroup) return;
+    const onDown = (e: MouseEvent) => {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) setOpenGroup(null);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpenGroup(null);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [openGroup]);
+
+  const solid = scrolled || menuOpen || openGroup !== null;
+  const isActive = (href: string) => location === href;
+  const linkTone = (active: boolean) =>
+    active ? "text-gold" : solid ? "text-muted-foreground" : "text-white/75";
 
   return (
     <header
@@ -57,28 +73,57 @@ export function SiteHeader({ navItems = [...SITE_NAV], cta, overHero = true }: S
           <img src={sakredLogo} alt="Sakred Body" className="h-10 w-10 object-contain" />
         </Link>
 
-        <nav className="hidden md:flex items-center gap-7">
+        <nav ref={navRef} className="hidden lg:flex items-center gap-6">
           {navItems.map((item) =>
-            item.href.startsWith("#") ? (
-              <button
-                key={item.href}
-                onClick={() => handleNavClick(item.href)}
-                className={cn(
-                  "text-sm font-sans transition-colors hover:text-gold",
-                  solid ? "text-muted-foreground" : "text-white/75",
+            item.children ? (
+              <div key={item.label} className="relative">
+                <button
+                  onClick={() => setOpenGroup((g) => (g === item.label ? null : item.label))}
+                  aria-expanded={openGroup === item.label}
+                  aria-haspopup="true"
+                  className={cn(
+                    "text-sm font-sans transition-colors hover:text-gold inline-flex items-center gap-1",
+                    linkTone(item.children.some((c) => isActive(c.href))),
+                  )}
+                  data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                >
+                  {item.label}
+                  <ChevronDown
+                    className={cn(
+                      "h-3.5 w-3.5 transition-transform",
+                      openGroup === item.label && "rotate-180",
+                    )}
+                  />
+                </button>
+
+                {openGroup === item.label && (
+                  <div className="absolute left-1/2 -translate-x-1/2 top-full mt-3 w-72 rounded-lg border border-border bg-popover shadow-lg overflow-hidden">
+                    {item.children.map((c) => (
+                      <Link
+                        key={c.href}
+                        href={c.href}
+                        className={cn(
+                          "block px-5 py-3.5 hover-elevate transition-colors border-b border-border/40 last:border-0",
+                          isActive(c.href) && "bg-gold/5",
+                        )}
+                        data-testid={`nav-${c.href.replace(/\//g, "")}`}
+                      >
+                        <span className={cn("block text-sm", isActive(c.href) ? "text-gold" : "text-foreground")}>
+                          {c.label}
+                        </span>
+                        {c.note && (
+                          <span className="block text-xs text-muted-foreground mt-0.5">{c.note}</span>
+                        )}
+                      </Link>
+                    ))}
+                  </div>
                 )}
-                data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
-              >
-                {item.label}
-              </button>
+              </div>
             ) : (
               <Link
                 key={item.href}
-                href={item.href}
-                className={cn(
-                  "text-sm font-sans transition-colors hover:text-gold",
-                  solid ? "text-muted-foreground" : "text-white/75",
-                )}
+                href={item.href!}
+                className={cn("text-sm font-sans transition-colors hover:text-gold", linkTone(isActive(item.href!)))}
                 data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
               >
                 {item.label}
@@ -98,38 +143,46 @@ export function SiteHeader({ navItems = [...SITE_NAV], cta, overHero = true }: S
             </Button>
           </Link>
           {cta}
-          {navItems.length > 0 && (
-            <button
-              onClick={() => setMenuOpen((v) => !v)}
-              className={cn("md:hidden p-2 -mr-2", solid ? "text-foreground" : "text-white")}
-              aria-label={menuOpen ? "Close menu" : "Open menu"}
-              aria-expanded={menuOpen}
-              data-testid="button-mobile-menu"
-            >
-              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
-          )}
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            className={cn("lg:hidden p-2 -mr-2", solid ? "text-foreground" : "text-white")}
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={menuOpen}
+            data-testid="button-mobile-menu"
+          >
+            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
         </div>
       </div>
 
-      {menuOpen && navItems.length > 0 && (
-        <nav className="md:hidden border-t border-border/50 bg-background/95 backdrop-blur-md">
+      {menuOpen && (
+        <nav className="lg:hidden border-t border-border/50 bg-background/95 backdrop-blur-md max-h-[75vh] overflow-y-auto">
           <div className="container max-w-6xl mx-auto px-4 py-3 flex flex-col">
             {navItems.map((item) =>
-              item.href.startsWith("#") ? (
-                <button
-                  key={item.href}
-                  onClick={() => handleNavClick(item.href)}
-                  className="py-3 text-left text-sm text-muted-foreground border-b border-border/30 last:border-0"
-                >
-                  {item.label}
-                </button>
+              item.children ? (
+                <div key={item.label} className="py-3 border-b border-border/30 last:border-0">
+                  <p className="text-xs uppercase tracking-widest text-gold mb-2">{item.label}</p>
+                  {item.children.map((c) => (
+                    <Link
+                      key={c.href}
+                      href={c.href}
+                      className={cn(
+                        "block py-2 text-sm",
+                        isActive(c.href) ? "text-gold" : "text-muted-foreground",
+                      )}
+                    >
+                      {c.label}
+                    </Link>
+                  ))}
+                </div>
               ) : (
                 <Link
                   key={item.href}
-                  href={item.href}
-                  onClick={() => setMenuOpen(false)}
-                  className="py-3 text-sm text-muted-foreground border-b border-border/30 last:border-0"
+                  href={item.href!}
+                  className={cn(
+                    "py-3 text-sm border-b border-border/30 last:border-0",
+                    isActive(item.href!) ? "text-gold" : "text-muted-foreground",
+                  )}
                 >
                   {item.label}
                 </Link>
