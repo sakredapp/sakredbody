@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { SITE_NAV } from "@/lib/links";
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
 export interface NavItem {
@@ -12,6 +13,7 @@ export interface NavItem {
 }
 
 interface SiteHeaderProps {
+  /** Defaults to the shared site navigation so every page matches. */
   navItems?: NavItem[];
   /** Right-hand action rendered after the Member Portal button. */
   cta?: ReactNode;
@@ -19,7 +21,7 @@ interface SiteHeaderProps {
   overHero?: boolean;
 }
 
-export function SiteHeader({ navItems = [], cta, overHero = true }: SiteHeaderProps) {
+export function SiteHeader({ navItems = [...SITE_NAV], cta, overHero = true }: SiteHeaderProps) {
   const [scrolled, setScrolled] = useState(!overHero);
   const [menuOpen, setMenuOpen] = useState(false);
 

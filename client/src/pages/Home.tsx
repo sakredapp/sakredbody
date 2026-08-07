@@ -1,14 +1,17 @@
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { ArrowRight, Download, Smartphone } from "lucide-react";
-import { SiteHeader, type NavItem } from "@/components/SiteHeader";
+import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { YinYang } from "@/components/YinYang";
+import { LessonSlideshow, type Lesson } from "@/components/LessonSlideshow";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { APP_STORE_URL, PLAY_STORE_URL, FOOD_CHART_URL } from "@/lib/links";
+import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/links";
+import { TOTAL_FOODS } from "@/data/foodChart";
+import { usePageMeta } from "@/hooks/use-page-meta";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 30 },
@@ -21,14 +24,6 @@ const staggerContainer = {
 };
 
 const viewportOnce = { once: true, amount: 0.2 } as const;
-
-const NAV_ITEMS: NavItem[] = [
-  { label: "The Duality", href: "#duality" },
-  { label: "Principles", href: "#principles" },
-  { label: "Five Elements", href: "#elements" },
-  { label: "The App", href: "#app" },
-  { label: "Mastermind", href: "/mastermind" },
-];
 
 const YIN_PRACTICES = [
   "Sleep and circadian anchoring",
@@ -48,7 +43,7 @@ const YANG_PRACTICES = [
   "Work that demands something",
 ];
 
-const PRINCIPLES = [
+const LESSONS: Lesson[] = [
   {
     title: "Eat with the season",
     body: "Cooling foods in the heat, warming foods in the cold. Local, in season, and close to the ground. Your body is reading the environment whether you cooperate with it or not.",
@@ -81,7 +76,7 @@ const ELEMENTS = [
     organs: "Liver + Gallbladder",
     season: "Spring",
     color: "var(--element-wood)",
-    reads: "Detoxification pathways, bile flow, and the tension that settles into the sinews.",
+    reads: "Detox pathways, bile flow, and the tension that settles into the sinews.",
     protocol: "Liver & Detox Support",
     days: "21 days",
   },
@@ -90,8 +85,8 @@ const ELEMENTS = [
     organs: "Heart + Small Intestine",
     season: "Summer",
     color: "var(--element-fire)",
-    reads: "Circulation, sleep, and whether the mind actually settles when the light goes.",
-    protocol: "Sleep & Nervous System Regulation",
+    reads: "Circulation, sleep, and whether the mind settles when the light goes.",
+    protocol: "Sleep & Nervous System",
     days: "14 days",
   },
   {
@@ -100,7 +95,7 @@ const ELEMENTS = [
     season: "Late Summer",
     color: "var(--element-earth)",
     reads: "Digestion, enzyme output, the gut lining, and the worry that sits in the stomach.",
-    protocol: "Digestive Stability, then Full Gut Reset",
+    protocol: "Digestive Stability, then Gut Reset",
     days: "21 + 28 days",
   },
   {
@@ -117,19 +112,10 @@ const ELEMENTS = [
     organs: "Kidney + Bladder",
     season: "Winter",
     color: "var(--element-water)",
-    reads: "Deep reserves, bone, and the will you draw on under real load. This is the strength layer.",
+    reads: "Deep reserves, bone, and the will you draw on under real load. The strength layer.",
     protocol: "Training, minerals, and capacity",
     days: "Ongoing",
   },
-];
-
-const FOOD_SAMPLES = [
-  { name: "Leafy greens, cruciferous veg", rating: "Strongly anti-inflammatory", color: "var(--element-wood)" },
-  { name: "Berries, citrus", rating: "Strongly anti-inflammatory", color: "var(--element-wood)" },
-  { name: "Turmeric, ginger, garlic", rating: "Strongly anti-inflammatory", color: "var(--element-wood)" },
-  { name: "Extra virgin olive oil", rating: "Anti-inflammatory", color: "138 22% 52%" },
-  { name: "White bread, refined grains", rating: "Inflammatory", color: "25 55% 55%" },
-  { name: "Seed oils, added sugar", rating: "Highly inflammatory", color: "var(--element-fire)" },
 ];
 
 const APP_FEATURES = [
@@ -141,28 +127,49 @@ const APP_FEATURES = [
   { title: "A real coach", body: "Message a coach directly from inside the app. Ask the question you'd otherwise search badly." },
 ];
 
+const FOOD_SAMPLES = [
+  { name: "Leafy greens, cruciferous veg", rating: "Strongly anti-inflammatory", color: "var(--element-wood)" },
+  { name: "Berries, citrus", rating: "Strongly anti-inflammatory", color: "var(--element-wood)" },
+  { name: "Turmeric, ginger, garlic", rating: "Strongly anti-inflammatory", color: "var(--element-wood)" },
+  { name: "Extra virgin olive oil", rating: "Anti-inflammatory", color: "138 22% 52%" },
+  { name: "White bread, refined grains", rating: "Inflammatory", color: "25 55% 55%" },
+  { name: "Seed oils, added sugar", rating: "Highly inflammatory", color: "var(--element-fire)" },
+];
+
 export default function Home() {
+  usePageMeta(
+    "Sakred Body — Live in Harmony. Build Real Strength.",
+    "Holistic health rooted in Eastern traditional medicine and the duality of rest and strength. Guided protocols, the Sakred app, and mastermind retreats.",
+  );
+
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
-      <SiteHeader navItems={NAV_ITEMS} />
+      <SiteHeader />
 
       {/* ── Hero ─────────────────────────────────────────────── */}
       <section className="relative min-h-[92vh] flex items-center pt-20 overflow-hidden bg-ink">
         <div className="absolute inset-0 z-0">
-          <img
-            src="/images/retreat-jungle.jpg"
-            alt=""
-            className="w-full h-full object-cover opacity-55"
+          <img src="/images/retreat-jungle.jpg" alt="" className="w-full h-full object-cover opacity-55" />
+          {/* Symmetric vignette so centered copy stays legible while the
+              foliage still reads as texture at the edges. */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(ellipse 70% 60% at 50% 50%, hsl(30 10% 8% / 0.82), hsl(30 10% 7% / 0.96))",
+            }}
           />
-          {/* Heavy on the left so the copy stays legible, lighter on the right
-              so the foliage still reads as texture. */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[hsl(30_10%_7%)] via-[hsl(30_10%_8%/0.88)] to-[hsl(30_10%_8%/0.45)]" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[hsl(30_10%_9%)] via-transparent to-[hsl(30_10%_8%/0.6)]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[hsl(30_10%_8%/0.7)] via-transparent to-[hsl(30_10%_9%)]" />
         </div>
 
         <div className="container max-w-6xl mx-auto px-4 relative z-20">
-          <motion.div initial="hidden" animate="visible" variants={staggerContainer} className="max-w-3xl">
-            <motion.div variants={fadeInUp} className="flex items-center gap-4 mb-8">
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={staggerContainer}
+            className="max-w-3xl mx-auto text-center"
+          >
+            <motion.div variants={fadeInUp} className="flex items-center justify-center gap-4 mb-8">
               <YinYang className="h-9 w-9 text-gold" voidColor="hsl(30 10% 9%)" />
               <Badge
                 variant="outline"
@@ -185,14 +192,14 @@ export default function Home() {
 
             <motion.p
               variants={fadeInUp}
-              className="text-base md:text-lg text-white/60 mb-9 max-w-2xl leading-relaxed font-normal"
+              className="text-base md:text-lg text-white/60 mb-9 max-w-2xl mx-auto leading-relaxed font-normal"
             >
               We follow the old principles — eat with the season, move with the sun, rest when the light
               goes. And then we train hard. Health isn't monk mode and it isn't a supplement stack. It
               lives in the tension between the two.
             </motion.p>
 
-            <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4">
+            <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button
                 size="lg"
                 className="text-base px-8 gold-metallic-btn w-full sm:w-auto"
@@ -215,30 +222,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Trust strip ──────────────────────────────────────── */}
-      <Section tone="ink-soft" className="border-y border-ink-line py-10">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 max-w-xl sm:max-w-none mx-auto">
-          {["Traditional Principles", "Five Guided Protocols", "Strength First", "iOS + Android"].map((label, i) => (
-            <div
-              key={i}
-              className="px-5 py-2 rounded-full border border-gold/30 bg-gold/5 text-xs font-normal uppercase tracking-wider text-ink-foreground/60 text-center"
-              style={{ boxShadow: "0 0 14px hsl(39 48% 56% / 0.15)" }}
-              data-testid={`trust-marker-${i}`}
-            >
-              {label}
-            </div>
-          ))}
-        </div>
-      </Section>
-
       {/* ── The Duality ──────────────────────────────────────── */}
       <Section id="duality" tone="ink" className="overflow-hidden">
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={viewportOnce}
-          variants={staggerContainer}
-        >
+        <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-14">
             <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
               The Duality
@@ -253,44 +239,48 @@ export default function Home() {
             </p>
           </motion.div>
 
-          <motion.div variants={fadeInUp} className="relative grid md:grid-cols-2 gap-px bg-ink-line rounded-lg overflow-hidden border border-ink-line">
-            {/* Yin */}
-            <div className="bg-[hsl(30_10%_8%)] p-8 md:p-12">
-              <p className="text-xs uppercase tracking-widest text-ink-foreground/40 mb-3">Yin — the receding force</p>
-              <h3 className="text-2xl md:text-3xl font-display mb-5 text-ink-foreground">Restore</h3>
-              <p className="text-sm text-ink-foreground/55 leading-relaxed mb-7">
-                The work of clearing what's in the way. Cooling, quieting, draining, emptying. This is where
-                most people are deficient, and it's the half that traditional medicine understood long before
-                anyone had a word for inflammation.
-              </p>
-              <ul className="space-y-2.5">
-                {YIN_PRACTICES.map((p) => (
-                  <li key={p} className="text-sm text-ink-foreground/70 flex gap-3">
-                    <span className="text-ink-foreground/25 mt-px">—</span>
-                    {p}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Yang */}
-            <div className="bg-[hsl(30_9%_13%)] p-8 md:p-12">
-              <p className="text-xs uppercase tracking-widest text-gold/60 mb-3">Yang — the advancing force</p>
-              <h3 className="text-2xl md:text-3xl font-display mb-5 text-gold">Build</h3>
-              <p className="text-sm text-ink-foreground/55 leading-relaxed mb-7">
-                The work of adding capacity the body can actually hold. Heat, load, effort, structure. This is
-                the half the wellness world quietly dropped — and the reason so much of it produces calm,
-                fragile people.
-              </p>
-              <ul className="space-y-2.5">
-                {YANG_PRACTICES.map((p) => (
-                  <li key={p} className="text-sm text-ink-foreground/70 flex gap-3">
-                    <span className="text-gold/40 mt-px">—</span>
-                    {p}
-                  </li>
-                ))}
-              </ul>
-            </div>
+          <motion.div
+            variants={fadeInUp}
+            className="relative grid md:grid-cols-2 gap-px bg-ink-line rounded-lg overflow-hidden border border-ink-line"
+          >
+            {[
+              {
+                eyebrow: "Yin — the receding force",
+                title: "Restore",
+                titleClass: "text-ink-foreground",
+                eyebrowClass: "text-ink-foreground/40",
+                bg: "bg-[hsl(30_10%_8%)]",
+                body: "The work of clearing what's in the way. Cooling, quieting, draining, emptying. This is where most people are deficient, and it's the half that traditional medicine understood long before anyone had a word for inflammation.",
+                practices: YIN_PRACTICES,
+              },
+              {
+                eyebrow: "Yang — the advancing force",
+                title: "Build",
+                titleClass: "text-gold",
+                eyebrowClass: "text-gold/60",
+                bg: "bg-[hsl(30_9%_13%)]",
+                body: "The work of adding capacity the body can actually hold. Heat, load, effort, structure. This is the half the wellness world quietly dropped — and the reason so much of it produces calm, fragile people.",
+                practices: YANG_PRACTICES,
+              },
+            ].map((side) => (
+              <div key={side.title} className={`${side.bg} p-8 md:p-12 text-center`}>
+                <p className={`text-xs uppercase tracking-widest mb-3 ${side.eyebrowClass}`}>{side.eyebrow}</p>
+                <h3 className={`text-2xl md:text-3xl font-display mb-5 ${side.titleClass}`}>{side.title}</h3>
+                <p className="text-sm text-ink-foreground/55 leading-relaxed mb-8 max-w-sm mx-auto">
+                  {side.body}
+                </p>
+                <ul className="space-y-3 max-w-xs mx-auto">
+                  {side.practices.map((p) => (
+                    <li
+                      key={p}
+                      className="text-sm text-ink-foreground/70 pb-3 border-b border-ink-line last:border-0 last:pb-0"
+                    >
+                      {p}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
 
             {/* Mark at the seam */}
             <div className="hidden md:flex absolute inset-0 items-center justify-center pointer-events-none">
@@ -319,9 +309,9 @@ export default function Home() {
           whileInView="visible"
           viewport={viewportOnce}
           variants={staggerContainer}
-          className="max-w-3xl mx-auto"
+          className="max-w-3xl mx-auto text-center"
         >
-          <motion.p variants={fadeInUp} className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold">
+          <motion.p variants={fadeInUp} className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
             Where We Part Ways
           </motion.p>
           <motion.h2
@@ -354,89 +344,74 @@ export default function Home() {
         </motion.div>
       </Section>
 
-      {/* ── Principles ───────────────────────────────────────── */}
-      <Section id="principles" tone="muted">
+      {/* ── Core lessons ─────────────────────────────────────── */}
+      <Section id="lessons" tone="muted">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
-          <motion.p variants={fadeInUp} className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold">
-            The Principles
-          </motion.p>
-          <motion.h2
-            variants={fadeInUp}
-            className="text-3xl md:text-4xl font-display font-normal mb-4"
-            data-testid="text-principles-headline"
-          >
-            Live With Your Environment, <span className="text-gold">Not Against It</span>
-          </motion.h2>
-          <motion.p variants={fadeInUp} className="text-muted-foreground mb-12 max-w-2xl leading-relaxed">
-            None of this is new. It's what nearly every traditional system arrived at independently, long
-            before it could be measured. We just stopped doing it.
-          </motion.p>
+          <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-14">
+            <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
+              The Core Lessons
+            </p>
+            <h2 className="text-3xl md:text-4xl font-display font-normal mb-5" data-testid="text-lessons-headline">
+              Live With Your Environment, <span className="text-gold">Not Against It</span>
+            </h2>
+            <p className="text-muted-foreground leading-relaxed">
+              None of this is new. It's what nearly every traditional system arrived at independently, long
+              before it could be measured. We just stopped doing it.
+            </p>
+          </motion.div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {PRINCIPLES.map((p, i) => (
-              <motion.div variants={fadeInUp} key={p.title}>
-                <Card className="h-full hover-elevate" data-testid={`card-principle-${i}`}>
-                  <CardContent className="p-6">
-                    <div className="text-xs font-mono text-gold/70 mb-3">{String(i + 1).padStart(2, "0")}</div>
-                    <h3 className="font-display text-xl mb-3">{p.title}</h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{p.body}</p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
+          <motion.div variants={fadeInUp} className="max-w-3xl mx-auto">
+            <LessonSlideshow lessons={LESSONS} />
+          </motion.div>
         </motion.div>
       </Section>
 
       {/* ── Five Elements ────────────────────────────────────── */}
       <Section id="elements" tone="ink">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
-          <motion.div variants={fadeInUp} className="max-w-2xl mb-14">
-            <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold">Eastern Traditional Medicine</p>
+          <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-14">
+            <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
+              Eastern Traditional Medicine
+            </p>
             <h2 className="text-3xl md:text-4xl font-display font-normal mb-5" data-testid="text-elements-headline">
               The Body, <span className="text-gold">The Way Tradition Reads It</span>
             </h2>
             <p className="text-ink-foreground/60 leading-relaxed">
               Traditional Chinese Medicine organizes the body into five elements — each with its own organs,
-              its own season, and its own way of going wrong. It's a map that's been refined for two thousand
-              years, and it keeps lining up with what modern research rediscovers a piece at a time. We built
-              our protocols on it.
+              its own season, and its own way of going wrong. It's a map refined over two thousand years, and
+              it keeps lining up with what modern research rediscovers a piece at a time. We built our
+              protocols on it.
             </p>
           </motion.div>
 
-          <div className="space-y-px bg-ink-line border border-ink-line rounded-lg overflow-hidden">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
             {ELEMENTS.map((el, i) => (
-              <motion.div
-                variants={fadeInUp}
-                key={el.element}
-                className="bg-ink-soft p-6 md:p-8 grid md:grid-cols-12 gap-5 md:gap-8 md:items-center"
-                data-testid={`row-element-${i}`}
-              >
-                <div className="md:col-span-3 flex items-center gap-4">
+              <motion.div variants={fadeInUp} key={el.element}>
+                <div
+                  className="h-full bg-ink-soft border border-ink-line rounded-lg p-6 text-center flex flex-col"
+                  data-testid={`card-element-${i}`}
+                >
                   <span
-                    className="h-9 w-9 rounded-full shrink-0 border border-white/10"
+                    className="h-10 w-10 rounded-full mx-auto mb-4 border border-white/10"
                     style={{ backgroundColor: `hsl(${el.color})` }}
                   />
-                  <div>
-                    <h3 className="font-display text-2xl leading-none mb-1.5">{el.element}</h3>
-                    <p className="text-xs uppercase tracking-wider text-ink-foreground/40">{el.season}</p>
+                  <h3 className="font-display text-2xl leading-none mb-2">{el.element}</h3>
+                  <p className="text-[10px] uppercase tracking-wider text-ink-foreground/40 mb-4">{el.season}</p>
+                  <p className="text-sm text-gold/80 mb-3">{el.organs}</p>
+                  <p className="text-sm text-ink-foreground/55 leading-relaxed flex-1">{el.reads}</p>
+                  <div className="mt-5 pt-4 border-t border-ink-line">
+                    <p className="text-sm text-ink-foreground/85">{el.protocol}</p>
+                    <p className="text-xs text-ink-foreground/40 mt-1">{el.days}</p>
                   </div>
-                </div>
-
-                <div className="md:col-span-5">
-                  <p className="text-sm text-gold/80 mb-1.5 font-medium">{el.organs}</p>
-                  <p className="text-sm text-ink-foreground/55 leading-relaxed">{el.reads}</p>
-                </div>
-
-                <div className="md:col-span-4 md:text-right">
-                  <p className="text-sm text-ink-foreground/85">{el.protocol}</p>
-                  <p className="text-xs text-ink-foreground/40 mt-1">{el.days}</p>
                 </div>
               </motion.div>
             ))}
           </div>
 
-          <motion.p variants={fadeInUp} className="text-xs text-ink-foreground/35 mt-6 max-w-2xl leading-relaxed">
+          <motion.p
+            variants={fadeInUp}
+            className="text-xs text-ink-foreground/35 mt-8 max-w-2xl mx-auto text-center leading-relaxed"
+          >
             We present the five-element framework as philosophy and structure — a way of organizing practice.
             It is not a diagnostic system, and nothing here replaces care from a qualified provider.
           </motion.p>
@@ -446,8 +421,8 @@ export default function Home() {
       {/* ── The App ──────────────────────────────────────────── */}
       <Section id="app" tone="light">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
-          <motion.div variants={fadeInUp} className="max-w-2xl mb-12">
-            <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold">The App</p>
+          <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-12">
+            <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">The App</p>
             <h2 className="text-3xl md:text-4xl font-display font-normal mb-5" data-testid="text-app-headline">
               Practice Needs a <span className="text-gold">Place to Live</span>
             </h2>
@@ -462,7 +437,7 @@ export default function Home() {
             {APP_FEATURES.map((f, i) => (
               <motion.div variants={fadeInUp} key={f.title}>
                 <Card className="h-full hover-elevate border-gold-subtle" data-testid={`card-app-feature-${i}`}>
-                  <CardContent className="p-6">
+                  <CardContent className="p-6 text-center">
                     <h3 className="font-display text-lg mb-2.5 text-gold">{f.title}</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">{f.body}</p>
                   </CardContent>
@@ -471,7 +446,7 @@ export default function Home() {
             ))}
           </div>
 
-          <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4">
+          <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4 justify-center">
             <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="sm:w-auto">
               <Button size="lg" className="gold-metallic-btn w-full sm:w-auto px-8" data-testid="button-app-store">
                 <Download className="mr-2 h-5 w-5" /> Download on iOS
@@ -488,38 +463,24 @@ export default function Home() {
 
       {/* ── Food ─────────────────────────────────────────────── */}
       <Section tone="muted">
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={viewportOnce}
-          variants={staggerContainer}
-          className="grid md:grid-cols-2 gap-12 md:gap-20 items-center"
-        >
-          <motion.div variants={fadeInUp}>
-            <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold">Food</p>
-            <h2 className="text-3xl md:text-4xl font-display font-normal mb-6" data-testid="text-food-headline">
+        <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
+          <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-10">
+            <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">Food</p>
+            <h2 className="text-3xl md:text-4xl font-display font-normal mb-5" data-testid="text-food-headline">
               Eat Like It <span className="text-gold">Matters</span>
             </h2>
-            <div className="space-y-4 text-muted-foreground leading-relaxed">
-              <p>
-                Chronic inflammation sits underneath most of what goes wrong, and food is the variable you
-                touch three times a day. So we rated 197 of them — from strongly anti-inflammatory to highly
-                inflammatory — across fruit, vegetables, grains, meat, oils, spices, drinks, and the habits
-                around them.
-              </p>
-              <p className="text-foreground">
-                It isn't a diet and there's no plan to buy. It's a map. Awareness beats restriction, because
-                awareness is the thing that survives a holiday.
-              </p>
-            </div>
-            <a href={FOOD_CHART_URL} className="inline-block mt-7">
-              <Button variant="outline" className="border-gold-subtle text-gold" data-testid="button-food-chart">
-                See the Food Chart <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </a>
+            <p className="text-muted-foreground leading-relaxed mb-4">
+              Chronic inflammation sits underneath most of what goes wrong, and food is the variable you touch
+              three times a day. So we rated 197 of them — across fruit, vegetables, grains, meat, oils,
+              spices, drinks, and the habits around them.
+            </p>
+            <p className="text-foreground leading-relaxed">
+              It isn't a diet and there's no plan to buy. It's a map. Awareness beats restriction, because
+              awareness is the thing that survives a holiday.
+            </p>
           </motion.div>
 
-          <motion.div variants={fadeInUp} className="relative">
+          <motion.div variants={fadeInUp} className="relative max-w-xl mx-auto">
             <div className="absolute -inset-4 bg-gold/10 blur-3xl rounded-full opacity-30" />
             <div className="relative rounded-lg border border-gold-subtle bg-card p-7 md:p-8 shadow-gold-subtle">
               <div className="flex justify-between text-[10px] uppercase tracking-wider text-muted-foreground mb-3">
@@ -536,20 +497,24 @@ export default function Home() {
               <ul className="space-y-3.5">
                 {FOOD_SAMPLES.map((f) => (
                   <li key={f.name} className="flex items-center gap-3 text-sm">
-                    <span
-                      className="h-2.5 w-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: `hsl(${f.color})` }}
-                    />
-                    <span className="text-foreground flex-1">{f.name}</span>
+                    <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: `hsl(${f.color})` }} />
+                    <span className="text-foreground flex-1 text-left">{f.name}</span>
                     <span className="text-xs text-muted-foreground text-right">{f.rating}</span>
                   </li>
                 ))}
               </ul>
-              <p className="text-xs text-muted-foreground mt-7 pt-5 border-t border-border/50">
-                197 foods across 8 categories — fruit, vegetables, grains, meat, oils, spices, drinks, and
-                the habits around them.
+              <p className="text-xs text-muted-foreground mt-7 pt-5 border-t border-border/50 text-center">
+                197 foods across 8 categories.
               </p>
             </div>
+          </motion.div>
+
+          <motion.div variants={fadeInUp} className="text-center mt-9">
+            <Link href="/food-chart">
+              <Button variant="outline" className="border-gold-subtle text-gold" data-testid="button-food-chart">
+                See All {TOTAL_FOODS} Foods <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
           </motion.div>
         </motion.div>
       </Section>
@@ -558,7 +523,13 @@ export default function Home() {
       <Section tone="ink" className="overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img src="/images/tropical-beach.png" alt="" className="w-full h-full object-cover opacity-20" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[hsl(30_10%_10%)] via-[hsl(30_10%_10%/0.9)] to-transparent" />
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(ellipse 70% 70% at 50% 50%, hsl(30 10% 10% / 0.86), hsl(30 10% 10% / 0.97))",
+            }}
+          />
         </div>
 
         <motion.div
@@ -566,9 +537,9 @@ export default function Home() {
           whileInView="visible"
           viewport={viewportOnce}
           variants={staggerContainer}
-          className="max-w-2xl relative z-10"
+          className="max-w-2xl mx-auto text-center relative z-10"
         >
-          <motion.p variants={fadeInUp} className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold">
+          <motion.p variants={fadeInUp} className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
             Go Deeper
           </motion.p>
           <motion.h2
@@ -580,7 +551,7 @@ export default function Home() {
           </motion.h2>
           <motion.p variants={fadeInUp} className="text-ink-foreground/60 leading-relaxed mb-4">
             Some of this only lands in person. Our concierge mastermind and retreat experience in Puerto Rico
-            takes the same principles and puts them in a place with no distractions — small groups, custom
+            takes the same principles and puts them somewhere with no distractions — small groups, custom
             dates, morning movement on the beach, breathwork, clean food, and real conversation.
           </motion.p>
           <motion.p variants={fadeInUp} className="text-ink-foreground/60 leading-relaxed mb-9">

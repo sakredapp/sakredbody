@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { usePageMeta } from "@/hooks/use-page-meta";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 30 },
@@ -26,6 +27,10 @@ const staggerContainer = {
 };
 
 export default function Mastermind() {
+  usePageMeta(
+    "Mastermind + Retreats in Puerto Rico | Sakred Body",
+    "A concierge mastermind and retreat experience in Puerto Rico. Private or shared, three days to two weeks, with essential housing included.",
+  );
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const openApplication = () => setIsModalOpen(true);
