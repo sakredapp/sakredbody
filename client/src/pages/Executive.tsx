@@ -87,7 +87,15 @@ export default function Executive() {
       </PageHero>
 
       {/* ── The application ──────────────────────────────────── */}
-      <Section tone="light" id="apply" className="scroll-mt-28">
+      {/* The form is max-w-2xl. Left in the standard max-w-6xl panel it
+          sat in a field of white with a quarter of the panel empty on
+          either side. The panel fits the form instead. */}
+      <Section
+        tone="light"
+        id="apply"
+        className="scroll-mt-28 py-12 md:py-14"
+        containerClassName="max-w-3xl"
+      >
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
