@@ -73,6 +73,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_removed_habits_title
   ON user_removed_habits (user_id, user_routine_id, title)
   WHERE routine_habit_id IS NULL;
 
+-- Tombstones are member data and this table is reachable through PostgREST,
+-- so it needs the same lock as every other per-user table here.
+ALTER TABLE user_removed_habits ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS user_removed_habits_own ON user_removed_habits;
+CREATE POLICY user_removed_habits_own ON user_removed_habits
+  FOR ALL USING (user_id = auth.uid()::text OR public.is_sakred_admin())
+  WITH CHECK (user_id = auth.uid()::text OR public.is_sakred_admin());
+
 -- ─── 4. Coins can only be awarded once per habit ───────────────────────────
 -- The macro app guarded this with an in-memory Set, so toggling a habit off,
 -- restarting the app, and toggling it back on paid out again. A partial unique

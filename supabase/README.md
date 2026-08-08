@@ -8,13 +8,15 @@ Every file here is idempotent. Paste into the SQL editor and run, in this order
 
 | # | File | Creates | Run? |
 |---|---|---|---|
-| 1 | `rls-policies.sql` | `is_sakred_admin()` and base policies | pre-existing |
-| 2 | `executive-applications.sql` | `executive_applications` | **pending** |
-| 3 | `habit-integrity.sql` | habit dedupe, FK, tombstones, coin dedupe | **pending** |
-| 4 | `apothecary.sql` | `products`, `product_links`, `habit_products`, `routine_products`, `user_shop_checkoffs` | **pending** |
-| 5 | `library.sql` | `ebooks`, `ebook_sections`, `ebook_entitlements`, `ebook_progress` | **pending** |
-| 6 | `energy.sql` | `energy_centres` (+ nine seeded), `centre_habits`, `centre_routines`, `user_centre_readings`, `user_cosmology` | **pending** |
-| 7 | `cohorts.sql` | `cohorts`, `cohort_members`, `cohort_sessions`, `cohort_attendance` | **pending** |
+| 1 | `rls-policies.sql` | `is_sakred_admin()` and base policies | already there |
+| 2 | `executive-applications.sql` | `executive_applications` | **run 2026-08-08** |
+| 3 | `habit-integrity.sql` | habit dedupe, FK, tombstones, coin dedupe | **run 2026-08-08** |
+| 4 | `apothecary.sql` | `products`, `product_links`, `habit_products`, `routine_products`, `user_shop_checkoffs` | **run 2026-08-08** |
+| 5 | `library.sql` | `ebooks`, `ebook_sections`, `ebook_entitlements`, `ebook_progress` | **run 2026-08-08** |
+| 6 | `energy.sql` | `energy_centres` (+ nine seeded), `centre_habits`, `centre_routines`, `user_centre_readings`, `user_cosmology` | **run 2026-08-08** |
+| 7 | `cohorts.sql` | `cohorts`, `cohort_members`, `cohort_sessions`, `cohort_attendance` | **run 2026-08-08** |
+
+All seven are applied to `zcvanbozvtojmnyuzsjh`, verified by table, policy and index.
 
 **Order matters** for 3–7: `habit-integrity.sql` de-duplicates `habits` before
 adding the unique index, and `apothecary.sql` / `energy.sql` both take foreign

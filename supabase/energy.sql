@@ -156,8 +156,11 @@ CREATE POLICY cosmology_own ON user_cosmology
 -- Written to the guardrail — what a member notices, never a named condition.
 -- Edit freely in the admin; this is a starting point, not doctrine.
 
+-- No color_hex: the map draws state as gold at varying strength, so a
+-- per-centre colour would fight the palette rather than add to it. The column
+-- stays on the table for admin use.
 INSERT INTO energy_centres
-  (id, name, aspect, body_region, element, color_hex, axis_position, sort_order,
+  (id, name, aspect, body_region, element, axis_position, sort_order,
    description, when_blocked, when_flowing)
 VALUES
   ('crown',      'Crown',      'Clarity',   'top of the head',   'ether',  4,  1,
