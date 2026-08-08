@@ -4,9 +4,13 @@ import { setupAuth, registerAuthRoutes } from "./auth/index.js";
 import { serveStatic } from "./static.js";
 import { createServer } from "http";
 import { ensureStorageBucket } from "./supabaseStorage.js";
+import { securityHeaders } from "./security/headers.js";
 
 const app = express();
 const httpServer = createServer(app);
+
+// First middleware, so it applies to static assets and error responses too.
+app.use(securityHeaders);
 
 declare module "http" {
   interface IncomingMessage {

@@ -5,6 +5,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ScrollToTop } from "@/components/ScrollToTop";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Home from "@/pages/Home";
 const Philosophy = lazy(() => import("@/pages/Philosophy"));
 const Restore = lazy(() => import("@/pages/Restore"));
@@ -75,8 +76,15 @@ function App() {
       <TooltipProvider>
         <Toaster />
         <ScrollToTop />
+        {/*
+          Inside Suspense rather than outside it, so a route that fails to
+          load is caught too — and inside the providers, so the error screen
+          can use the same buttons and toasts as everything else.
+        */}
         <Suspense fallback={<RouteFallback />}>
-          <Router />
+          <ErrorBoundary>
+            <Router />
+          </ErrorBoundary>
         </Suspense>
       </TooltipProvider>
     </QueryClientProvider>

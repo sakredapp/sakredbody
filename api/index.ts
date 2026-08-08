@@ -1,9 +1,20 @@
 import express, { type Request, type Response, type NextFunction } from "express";
 import type { IncomingMessage, ServerResponse } from "http";
 import { createServer } from "http";
+import { securityHeaders } from "../server/security/headers.js";
 
 const app = express();
 const httpServer = createServer(app);
+
+// Before everything, including the health check and the error paths — a
+// header that only gets set on the happy path is not a security header.
+//
+// Statically imported, unlike the route modules below. Those are deferred so
+// that a failure to reach the database still leaves /api/health answering;
+// this module imports nothing but express types, so there is nothing for it
+// to fail at, and deferring it would mean the health check and any init-error
+// response went out bare.
+app.use(securityHeaders);
 
 app.use(
   express.json({
