@@ -81,7 +81,7 @@ export function LessonSlideshow({ lessons, intervalMs = 7000, className }: Lesso
               transition={{ duration: 0.45, ease: "easeOut" }}
               className="text-center max-w-xl mx-auto"
             >
-              <div className="font-mono text-xs text-gold/70 mb-5" data-testid="text-lesson-number">
+              <div className="font-mono text-[11px] text-muted-foreground mb-5" data-testid="text-lesson-number">
                 {String(index + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
               </div>
               <h3 className="font-display text-3xl md:text-4xl mb-5" data-testid="text-lesson-title">

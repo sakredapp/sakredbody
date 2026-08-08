@@ -266,11 +266,11 @@ export default function AppPage() {
             </h2>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-14">
             {FEATURES.map((f, i) => (
               <motion.div variants={fadeInUp} key={f.title}>
                 <div
-                  className="h-full bg-card border border-border rounded-lg p-6 text-center"
+                  className="h-full pt-8 border-t border-border text-center"
                   data-testid={`card-feature-${i}`}
                 >
                   <h3 className="font-display text-lg mb-3 text-gold">{f.title}</h3>

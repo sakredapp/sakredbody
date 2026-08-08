@@ -19,13 +19,29 @@ interface PageHeroProps {
   note?: ReactNode;
   children?: ReactNode;
   testId?: string;
+  /** Optional backdrop photo. A scrim keeps the copy well past AA contrast. */
+  image?: string;
+  imageAlt?: string;
 }
 
 /** Dark centered hero shared by every pillar page. */
-export function PageHero({ eyebrow, title, intro, note, children, testId }: PageHeroProps) {
+export function PageHero({ eyebrow, title, intro, note, children, testId, image, imageAlt }: PageHeroProps) {
   return (
-    <section className="tone-ink bg-background pt-36 pb-24">
-      <div className="container max-w-6xl mx-auto px-4 text-center">
+    <section className="tone-ink bg-background pt-36 pb-24 relative overflow-hidden">
+      {image && (
+        <div className="absolute inset-0 z-0">
+          <img src={image} alt={imageAlt ?? ""} className="w-full h-full object-cover opacity-45" />
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(ellipse 75% 65% at 50% 50%, hsl(30 10% 8% / 0.84), hsl(30 10% 7% / 0.96))",
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-[hsl(30_10%_8%/0.6)] via-transparent to-[hsl(30_10%_10%)]" />
+        </div>
+      )}
+      <div className="container max-w-6xl mx-auto px-4 text-center relative z-10">
         <motion.div initial="hidden" animate="visible" variants={stagger}>
           <motion.p
             variants={fadeInUp}

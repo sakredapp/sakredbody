@@ -207,6 +207,32 @@
     color: hsl(var(--foreground));
   }
 
+  /**
+   * Resets the theme tokens back to the light palette. Needed because light
+   * panels now nest inside an ink-toned gutter, and would otherwise inherit
+   * the dark values from .tone-ink above.
+   */
+  .tone-light {
+    --background: 45 20% 96%;
+    --foreground: 30 10% 12%;
+    --muted-foreground: 30 8% 42%;
+    --card: 40 15% 99%;
+    --card-foreground: 30 10% 12%;
+    --card-border: 35 10% 90%;
+    --popover: 40 15% 99%;
+    --popover-foreground: 30 10% 12%;
+    --border: 35 10% 88%;
+    --input: 35 10% 83%;
+    --secondary: 42 12% 93%;
+    --secondary-foreground: 30 10% 12%;
+    --muted: 42 12% 93%;
+    --gold-text: 39 56% 34%;
+    --elevate-1: rgba(0, 0, 0, 0.03);
+    --elevate-2: rgba(0, 0, 0, 0.08);
+    --button-outline: rgba(0, 0, 0, 0.1);
+    color: hsl(var(--foreground));
+  }
+
   .tone-ink-soft {
     --background: 30 8% 14%;
   }

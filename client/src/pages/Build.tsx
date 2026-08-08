@@ -151,14 +151,14 @@ export default function Build() {
             />
           </motion.div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-14">
             {PILLARS.map((p, i) => (
               <motion.div variants={fadeInUp} key={p.name}>
                 <div
-                  className="h-full bg-card border border-border rounded-lg p-7 text-center flex flex-col"
+                  className="h-full pt-8 border-t border-border text-center flex flex-col"
                   data-testid={`card-pillar-${i}`}
                 >
-                  <span className="font-mono text-xs text-gold/60 mb-3">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="font-mono text-[11px] text-muted-foreground mb-3">{String(i + 1).padStart(2, "0")}</span>
                   <h3 className="font-display text-2xl mb-4">{p.name}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed flex-1">{p.body}</p>
                   <p className="text-sm text-gold/85 mt-5 pt-4 border-t border-border italic">

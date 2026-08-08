@@ -80,11 +80,11 @@ export default function Restore() {
             />
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-5 max-w-4xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-x-12 gap-y-14 max-w-4xl mx-auto">
             {BURDENS.map((b, i) => (
               <motion.div variants={fadeInUp} key={b.title}>
                 <div
-                  className="h-full bg-card border border-card-border rounded-lg p-7 text-center"
+                  className="h-full pt-8 border-t border-border text-center"
                   data-testid={`card-burden-${i}`}
                 >
                   <h3 className="font-display text-xl mb-3">{b.title}</h3>
@@ -112,7 +112,7 @@ export default function Restore() {
             {ORDER.map((o, i) => (
               <motion.div variants={fadeInUp} key={o.step}>
                 <div className="bg-card p-7 text-center" data-testid={`row-order-${i}`}>
-                  <span className="font-mono text-xs text-gold/60">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="font-mono text-[11px] text-muted-foreground">{String(i + 1).padStart(2, "0")}</span>
                   <h3 className="font-display text-2xl mt-2 mb-3">{o.step}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed max-w-xl mx-auto">{o.body}</p>
                 </div>
@@ -151,7 +151,7 @@ export default function Restore() {
                 className="py-6 border-b border-border/50 last:border-0 text-center"
                 data-testid={`row-protocol-${i}`}
               >
-                <span className="font-mono text-xs text-gold/60 block mb-2">
+                <span className="font-mono text-[11px] text-muted-foreground block mb-2">
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <h3 className="font-display text-xl">{p.name}</h3>

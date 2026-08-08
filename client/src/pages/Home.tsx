@@ -220,15 +220,15 @@ export default function Home() {
             />
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-12 gap-y-14">
             {TERRITORIES.map((t, i) => (
               <motion.div variants={fadeInUp} key={t.key}>
                 <Link href={t.href}>
                   <div
-                    className="h-full bg-card border border-border rounded-lg p-7 text-center flex flex-col hover-elevate transition-colors"
+                    className="h-full pt-8 border-t border-border text-center flex flex-col hover-elevate transition-colors"
                     data-testid={`card-territory-${t.key}`}
                   >
-                    <span className="font-mono text-xs text-gold/60 mb-4">{String(i + 1).padStart(2, "0")}</span>
+                    <span className="font-mono text-[11px] text-muted-foreground mb-4">{String(i + 1).padStart(2, "0")}</span>
                     <span
                       className="h-10 w-10 rounded-full mx-auto mb-5 border border-white/10"
                       style={{ backgroundColor: `hsl(${t.color})` }}
@@ -347,11 +347,11 @@ export default function Home() {
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-x-12 gap-y-14">
             {ELEMENTS.map((el, i) => (
               <motion.div variants={fadeInUp} key={el.element}>
                 <div
-                  className="h-full bg-card border border-border rounded-lg p-6 text-center flex flex-col"
+                  className="h-full pt-8 border-t border-border text-center flex flex-col"
                   data-testid={`card-element-${i}`}
                 >
                   <span
@@ -484,7 +484,7 @@ export default function Home() {
       {/* ── Mastermind teaser ────────────────────────────────── */}
       <Section tone="ink" className="overflow-hidden">
         <div className="absolute inset-0 z-0">
-          <img src="/images/tropical-beach.png" alt="" className="w-full h-full object-cover opacity-20" />
+          <img src="/images/gathering-string-lights.jpg" alt="" className="w-full h-full object-cover opacity-30" />
           <div
             className="absolute inset-0"
             style={{

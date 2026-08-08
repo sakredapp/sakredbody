@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { PageHero, SectionHeader } from "@/components/PageHero";
+import { ImageBand } from "@/components/ImageBand";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { usePageMeta } from "@/hooks/use-page-meta";
@@ -92,6 +93,8 @@ export default function Retreats() {
         intro="The terrain isn't only biological. You are shaped by who you're around, what standards they hold, whether your life contains real challenge, and whether you ever get more than a day away from stimulation."
         note="Retreats aren't an unrelated product sitting beside the health work. They're the same philosophy, applied to the environment instead of the organism."
         testId="text-retreats-headline"
+        image="/images/estate-vineyard.jpg"
+        imageAlt="A stone estate set among vineyards and low green hills"
       />
 
       {/* ── The argument ─────────────────────────────────────── */}
@@ -114,7 +117,7 @@ export default function Retreats() {
                 className="flex flex-col items-center gap-1.5 py-5 border-b border-border/50 last:border-0 text-center"
                 data-testid={`row-social-${i}`}
               >
-                <span className="font-mono text-[10px] text-gold/50 shrink-0">
+                <span className="font-mono text-[10px] text-muted-foreground shrink-0">
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <span className="text-muted-foreground">{s}</span>
@@ -145,7 +148,7 @@ export default function Retreats() {
             />
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-5">
+          <div className="grid md:grid-cols-2 gap-x-12 gap-y-14">
             {FORMATS.map((f, i) => (
               <motion.div variants={fadeInUp} key={f.name}>
                 <div
@@ -185,6 +188,19 @@ export default function Retreats() {
           </motion.p>
         </motion.div>
       </Section>
+
+      <ImageBand
+        image="/images/table-by-ocean.jpg"
+        alt="A long candlelit table set for dinner beside the ocean"
+        eyebrow="The Table"
+        title={<>The conversation at dinner <span className="text-gold">is part of the programme.</span></>}
+        testId="text-table-headline"
+      >
+        <p>
+          Not a networking session with a seating chart. Long meals, real food, and the kind of talk that
+          only happens when nobody is trying to get somewhere afterwards.
+        </p>
+      </ImageBand>
 
       {/* ── CTA ──────────────────────────────────────────────── */}
       <Section tone="light" className="text-center py-20">

@@ -76,6 +76,8 @@ export default function Executive() {
         intro="Private health, performance, and capacity development for founders, executives, and people whose decisions affect a lot of others. Your responsibilities grew. The question is whether the body underneath them grew with you."
         note="Application only. Small number of clients at a time."
         testId="text-executive-headline"
+        image="/images/elegant-interior.jpg"
+        imageAlt="A quiet, elegant interior opening onto daylight"
       >
         <Button size="lg" className="gold-metallic-btn px-8" onClick={scrollToApply} data-testid="button-apply-hero">
           Apply <ArrowRight className="ml-2 h-5 w-5" />
@@ -132,11 +134,11 @@ export default function Executive() {
             />
           </motion.div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-14 max-w-5xl mx-auto">
             {DEBT.map((d, i) => (
               <motion.div variants={fadeInUp} key={d.line}>
                 <div
-                  className="h-full bg-card border border-card-border rounded-lg p-7 text-center"
+                  className="h-full pt-8 border-t border-border text-center"
                   data-testid={`card-debt-${i}`}
                 >
                   <h3 className="font-display text-xl mb-3">{d.line}</h3>
@@ -171,14 +173,14 @@ export default function Executive() {
             />
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-5">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-x-12 gap-y-14">
             {PILLARS.map((p, i) => (
               <motion.div variants={fadeInUp} key={p.name}>
                 <div
-                  className="h-full bg-card border border-border rounded-lg p-6 text-center"
+                  className="h-full pt-8 border-t border-border text-center"
                   data-testid={`card-pillar-${i}`}
                 >
-                  <span className="font-mono text-xs text-gold/60">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="font-mono text-[11px] text-muted-foreground">{String(i + 1).padStart(2, "0")}</span>
                   <h3 className="font-display text-xl mt-3 mb-3">{p.name}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">{p.body}</p>
                 </div>
@@ -200,11 +202,11 @@ export default function Executive() {
             />
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-5 max-w-4xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-x-12 gap-y-14 max-w-4xl mx-auto">
             {WHO.map((w, i) => (
               <motion.div variants={fadeInUp} key={w.title}>
                 <div
-                  className="h-full bg-card border border-card-border rounded-lg p-7 text-center"
+                  className="h-full pt-8 border-t border-border text-center"
                   data-testid={`card-who-${i}`}
                 >
                   <h3 className="font-display text-xl mb-3">{w.title}</h3>

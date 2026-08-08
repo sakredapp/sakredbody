@@ -83,7 +83,7 @@ export default function Terrain() {
                   className="border border-gold-subtle rounded-lg bg-card p-6 text-center"
                   data-testid={`chain-stage-${i}`}
                 >
-                  <span className="font-mono text-xs text-gold/60">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="font-mono text-[11px] text-muted-foreground">{String(i + 1).padStart(2, "0")}</span>
                   <h3 className="font-display text-2xl mt-2 mb-3">{c.stage}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">{c.body}</p>
                 </div>
@@ -116,11 +116,11 @@ export default function Terrain() {
             />
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-5 max-w-4xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-x-12 gap-y-14 max-w-4xl mx-auto">
             {IMPLICATIONS.map((im, i) => (
               <motion.div variants={fadeInUp} key={im.title}>
                 <div
-                  className="h-full bg-card border border-border rounded-lg p-7 text-center"
+                  className="h-full pt-8 border-t border-border text-center"
                   data-testid={`card-implication-${i}`}
                 >
                   <h3 className="font-display text-xl mb-3">{im.title}</h3>

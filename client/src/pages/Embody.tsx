@@ -111,14 +111,14 @@ export default function Embody() {
             />
           </motion.div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-14">
             {PRACTICES.map((p, i) => (
               <motion.div variants={fadeInUp} key={p.title}>
                 <div
-                  className="h-full bg-card border border-border rounded-lg p-7 text-center"
+                  className="h-full pt-8 border-t border-border text-center"
                   data-testid={`card-practice-${i}`}
                 >
-                  <span className="font-mono text-xs text-gold/60">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="font-mono text-[11px] text-muted-foreground">{String(i + 1).padStart(2, "0")}</span>
                   <h3 className="font-display text-xl mt-3 mb-4">{p.title}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">{p.body}</p>
                 </div>

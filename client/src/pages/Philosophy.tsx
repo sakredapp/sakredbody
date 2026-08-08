@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { PageHero, SectionHeader } from "@/components/PageHero";
+import { ImageBand } from "@/components/ImageBand";
 import { YinYang } from "@/components/YinYang";
 import { Button } from "@/components/ui/button";
 import { TERRITORIES, CAPACITY_MODEL, OPERATING_LOOP } from "@/data/territories";
@@ -65,7 +66,7 @@ export default function Philosophy() {
                 className="py-6 border-b border-border/50 last:border-0 text-center"
                 data-testid={`row-definition-${i}`}
               >
-                <span className="font-mono text-xs text-gold/60 block mb-2">
+                <span className="font-mono text-[11px] text-muted-foreground block mb-2">
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <p className="leading-relaxed">
@@ -103,7 +104,7 @@ export default function Philosophy() {
                         className="h-3 w-3 rounded-full"
                         style={{ backgroundColor: `hsl(${t.color})` }}
                       />
-                      <span className="font-mono text-xs text-gold/60">{String(i + 1).padStart(2, "0")}</span>
+                      <span className="font-mono text-[11px] text-muted-foreground">{String(i + 1).padStart(2, "0")}</span>
                       <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
                         {t.force}
                       </span>
@@ -124,6 +125,20 @@ export default function Philosophy() {
         </motion.div>
       </Section>
 
+      <ImageBand
+        image="/images/zen-sand-garden.jpg"
+        alt="A single stone at the centre of a raked circular sand garden"
+        eyebrow="Older Than the Research"
+        title={<>None of this is new. <span className="text-gold">We just stopped doing it.</span></>}
+        testId="text-older-headline"
+      >
+        <p>
+          Every tradition that lasted arrived at the same handful of conclusions long before anyone could
+          measure why they worked. We're not claiming to have discovered anything — only to have kept the
+          parts that hold up.
+        </p>
+      </ImageBand>
+
       {/* ── The capacity model ───────────────────────────────── */}
       <Section tone="ink">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
@@ -136,14 +151,14 @@ export default function Philosophy() {
             />
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 max-w-5xl mx-auto">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-12 gap-y-14 max-w-5xl mx-auto">
             {CAPACITY_MODEL.map((c, i) => (
               <motion.div variants={fadeInUp} key={c.stage}>
                 <div
-                  className="h-full bg-card border border-card-border rounded-lg p-6 text-center"
+                  className="h-full pt-8 border-t border-border text-center"
                   data-testid={`card-capacity-${i}`}
                 >
-                  <span className="font-mono text-xs text-gold/60">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="font-mono text-[11px] text-muted-foreground">{String(i + 1).padStart(2, "0")}</span>
                   <h3 className="font-display text-xl mt-3 mb-3">{c.stage}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">{c.body}</p>
                 </div>
@@ -174,7 +189,7 @@ export default function Philosophy() {
             />
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 max-w-5xl mx-auto">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-12 gap-y-14 max-w-5xl mx-auto">
             {OPERATING_LOOP.map((l, i) => (
               <motion.div variants={fadeInUp} key={l.step}>
                 <div

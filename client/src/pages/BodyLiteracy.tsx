@@ -127,11 +127,11 @@ export default function BodyLiteracy() {
             />
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-5">
+          <div className="grid md:grid-cols-2 gap-x-12 gap-y-14">
             {CONFUSIONS.map((c, i) => (
               <motion.div variants={fadeInUp} key={c.pair}>
                 <div
-                  className="h-full bg-card border border-border rounded-lg p-7 text-center"
+                  className="h-full pt-8 border-t border-border text-center"
                   data-testid={`card-confusion-${i}`}
                 >
                   <h3 className="font-display text-xl mb-3 text-gold">{c.pair}</h3>
@@ -163,7 +163,7 @@ export default function BodyLiteracy() {
                 className="flex flex-col items-center gap-1.5 py-4 border-b border-border/50 text-center"
                 data-testid={`row-signal-${i}`}
               >
-                <span className="font-mono text-[10px] text-gold/50 shrink-0">
+                <span className="font-mono text-[10px] text-muted-foreground shrink-0">
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <span className="text-sm text-muted-foreground">{s}</span>

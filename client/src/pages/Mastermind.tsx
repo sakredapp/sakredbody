@@ -161,7 +161,7 @@ export default function Mastermind() {
         <h2 className="text-3xl md:text-4xl font-display font-normal mb-4" data-testid="text-housing-headline">Pick Your Space. We Handle the Rest.</h2>
         <p className="text-muted-foreground mb-10 max-w-2xl leading-relaxed">Essential housing is included with every retreat. Upgrade to a five-star resort or a fully staffed private home if you want the top-tier experience.</p>
 
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-3 gap-x-12 gap-y-14">
           {[
             {
               tier: "Essential",
