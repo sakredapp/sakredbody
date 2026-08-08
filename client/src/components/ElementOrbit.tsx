@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ELEMENT_STONES, GemStone } from "./GemStone";
 
 export interface OrbitElement {
   element: string;
@@ -102,13 +101,22 @@ export function ElementOrbit({ elements }: { elements: OrbitElement[] }) {
           />
         </svg>
 
-        {/* The held element, as the stone it is rather than a colour chip. */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-          <GemStone
-            key={current.element}
-            stone={ELEMENT_STONES[current.element.toLowerCase()] ?? ELEMENT_STONES.earth}
-            className="w-[46%] h-[46%] opacity-95"
-          />
+        {/* The middle of the ring: what is held, and when it rules. */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 px-[26%]">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={active}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.28 }}
+              className="text-center"
+            >
+              <p className="font-display text-3xl sm:text-4xl leading-none mb-2">{current.element}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">{current.organs}</p>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-gold mt-1.5">{current.season}</p>
+            </motion.div>
+          </AnimatePresence>
         </div>
 
         {elements.map((el, i) => (
@@ -158,10 +166,6 @@ export function ElementOrbit({ elements }: { elements: OrbitElement[] }) {
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.3 }}
           >
-            <p className="font-display text-3xl mb-1.5">{current.element}</p>
-            <p className="text-[11px] uppercase tracking-[0.16em] text-gold mb-3">
-              {current.organs} · {current.season}
-            </p>
             <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-orbit-detail">
               {current.reads}
             </p>

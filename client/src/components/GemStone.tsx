@@ -21,6 +21,15 @@ export interface Stone {
   l: number;
 }
 
+/** The four territories, cut. Restore is jade, Build carnelian,
+ *  Embody amber, Gather sapphire — the sequence, in stone. */
+export const TERRITORY_STONES: Record<string, Stone> = {
+  restore: { h: 148, s: 34, l: 44 },
+  build: { h: 8, s: 58, l: 48 },
+  embody: { h: 38, s: 62, l: 52 },
+  gather: { h: 212, s: 34, l: 42 },
+};
+
 /** The five elements as minerals rather than swatches. */
 export const ELEMENT_STONES: Record<string, Stone> = {
   wood: { h: 148, s: 34, l: 44 },   // jade

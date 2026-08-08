@@ -12,6 +12,7 @@ import { ConstellationBody } from "@/components/ConstellationBody";
 import { StarDust } from "@/components/StarDust";
 import { AuroraOrb } from "@/components/AuroraOrb";
 import { ElementOrbit } from "@/components/ElementOrbit";
+import { GemStone, TERRITORY_STONES } from "@/components/GemStone";
 import { Tilt3D } from "@/components/Tilt3D";
 import { Magnetic } from "@/components/Magnetic";
 import { ParticleSphere } from "@/components/ParticleSphere";
@@ -72,35 +73,35 @@ const ELEMENTS = [
     organs: "Liver + Gallbladder",
     season: "Spring",
     color: "var(--element-wood)",
-    reads: "Flow and direction. When it moves freely you feel decisive; when it stagnates, tension gathers in the sinews and the temper goes short.",
+    reads: "Flow and direction. Free, you're decisive. Stagnant, the temper goes short.",
   },
   {
     element: "Fire",
     organs: "Heart + Small Intestine",
     season: "Summer",
     color: "var(--element-fire)",
-    reads: "Circulation and the settling of the mind. Fire governs whether the day's charge dissipates at night or keeps burning after the light goes.",
+    reads: "Circulation, and whether the day's charge settles at night or keeps burning.",
   },
   {
     element: "Earth",
     organs: "Spleen + Stomach",
     season: "Late Summer",
     color: "var(--element-earth)",
-    reads: "Transformation — turning what you take in into what you're made of. Worry sits here, and so does the ability to extract nourishment at all.",
+    reads: "Turning what you take in into what you're made of. Worry sits here too.",
   },
   {
     element: "Metal",
     organs: "Lung + Large Intestine",
     season: "Autumn",
     color: "var(--element-metal)",
-    reads: "Exchange and release. Breath in, waste out, grief moved through. Every channel the body uses to let go of something.",
+    reads: "Exchange and release. Breath in, waste out, grief moved through.",
   },
   {
     element: "Water",
     organs: "Kidney + Bladder",
     season: "Winter",
     color: "var(--element-water)",
-    reads: "The deep reserve. Bone, will, and the capacity you draw down under real load — the account everything else is borrowed against.",
+    reads: "The deep reserve. Bone, will, and what you draw down under real load.",
   },
 ];
 
@@ -283,9 +284,10 @@ export default function Home() {
                     className="h-full pt-8 border-t border-border text-center flex flex-col hover-elevate transition-colors"
                     data-testid={`card-territory-${t.key}`}
                   >
-                    <span
-                      className="h-10 w-10 rounded-full mx-auto mb-5 border border-white/10"
-                      style={{ backgroundColor: `hsl(${t.color})` }}
+                    <GemStone
+                      stone={TERRITORY_STONES[t.key] ?? TERRITORY_STONES.embody}
+                      spinRate={0.2}
+                      className="h-20 w-20 mx-auto mb-2"
                     />
                     <h3 className="font-display text-2xl mb-2">{t.name}</h3>
                     <p className="text-xs text-muted-foreground mb-1 flex-1">{t.force}</p>
