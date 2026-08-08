@@ -13,6 +13,7 @@ import { registerCoachingRoutes } from "./coaching/index.js";
 import { registerMasterclassRoutes } from "./masterclass/index.js";
 import { registerShopRoutes } from "./shop/index.js";
 import { registerLibraryRoutes } from "./library/index.js";
+import { registerEnergyRoutes } from "./energy/index.js";
 
 function isAdmin(req: Request, res: Response, next: NextFunction) {
   const userId = req.session?.userId;
@@ -439,6 +440,9 @@ export async function registerRoutes(
 
   // ── The Library ──────────────────────────────────────────────────────
   registerLibraryRoutes(app);
+
+  // ── The Body Map ─────────────────────────────────────────────────────
+  registerEnergyRoutes(app);
 
   return httpServer;
 }

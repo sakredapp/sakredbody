@@ -63,6 +63,7 @@ import {
 import { MasterclassTab } from "@/components/MasterclassTab";
 import { ApothecaryTab } from "@/components/ApothecaryTab";
 import { LibraryTab } from "@/components/LibraryTab";
+import { BodyMap } from "@/components/BodyMap";
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
 // Icon mapping (UI-only, can't live in shared/)
@@ -164,7 +165,7 @@ export default function MemberDashboard() {
 
   // Default to coaching tab if coming from /coaching URL
   const defaultSection = location === "/coaching" ? "coaching" : "retreat";
-  const [section, setSection] = useState<"retreat" | "coaching" | "masterclass" | "apothecary" | "library">(defaultSection);
+  const [section, setSection] = useState<"retreat" | "coaching" | "masterclass" | "apothecary" | "library" | "body">(defaultSection);
   const [retreatView, setRetreatView] = useState<"book" | "services" | "my-bookings">("book");
   const [coachingTab, setCoachingTab] = useState<"today" | "journey" | "routines" | "catalog" | "analytics" | "coach">("today");
   const [showBookingDialog, setShowBookingDialog] = useState(false);
@@ -305,6 +306,7 @@ export default function MemberDashboard() {
           <div className="flex items-center bg-muted/60 rounded-full p-1 gap-0.5 overflow-x-auto scrollbar-thin max-w-full">
             {([
               { id: "coaching" as const, label: "Coaching" },
+              { id: "body" as const, label: "The Body" },
               { id: "apothecary" as const, label: "Apothecary" },
               { id: "library" as const, label: "Library" },
               { id: "retreat" as const, label: "My Retreat" },
@@ -430,6 +432,19 @@ export default function MemberDashboard() {
             className="container max-w-3xl mx-auto px-4 py-8"
           >
             <ApothecaryTab />
+          </motion.div>
+        )}
+
+        {section === "body" && (
+          <motion.div
+            key="body"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="container max-w-4xl mx-auto px-4 py-8"
+          >
+            <BodyMap />
           </motion.div>
         )}
 
