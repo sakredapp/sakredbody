@@ -42,7 +42,22 @@
 
 import type { RequestHandler } from "express";
 
-const CSP = [
+/**
+ * Exported, and duplicated in `vercel.json`, on purpose.
+ *
+ * Express only ever sees `/api/*` in production — every HTML document and
+ * static asset is served straight off Vercel's CDN and never touches this
+ * function. So middleware alone left the actual pages with no policy at all,
+ * which is where `frame-ancestors` and `script-src` matter most. Verified
+ * against the live site rather than assumed: the headers were present on
+ * /api/health and absent on the page.
+ *
+ * `vercel.json` is JSON and cannot import this constant, so the string exists
+ * twice. That is the same shape as the bug in the community module — a rule
+ * written in two places drifts — so `script/test-headers.ts` fails the build
+ * if the two ever stop matching.
+ */
+export const CSP = [
   "default-src 'self'",
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
