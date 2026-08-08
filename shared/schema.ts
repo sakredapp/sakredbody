@@ -11,6 +11,7 @@ export * from "./models/library.js";
 export * from "./models/energy.js";
 export * from "./models/offerings.js";
 export * from "./models/telemetry.js";
+export * from "./models/wins.js";
 export * from "./models/daily.js";
 export * from "./models/community.js";
 

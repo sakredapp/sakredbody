@@ -44,6 +44,7 @@ import { isAuthenticated } from "../auth/index.js";
 import { storage } from "../storage.js";
 import { uploadFile, isStorageConfigured } from "../supabaseStorage.js";
 import { track, trackError } from "../telemetry/index.js";
+import { awardWins } from "../wins/index.js";
 import {
   wellnessRoutines,
   routineHabits,
@@ -453,6 +454,11 @@ export function registerCoachingRoutes(app: Express): void {
       // Update streak
       await updateStreak(userId);
 
+      // Anything just earned. Safe to call on every toggle — every award is
+      // ON CONFLICT DO NOTHING against uq_wins, so this is a no-op on the
+      // days nothing was crossed.
+      const earned = await awardWins(userId);
+
       // The core engagement metric. Recorded server-side, at the point the row
       // actually changed, because that is the only place that can't lie.
       track(completed ? "habit.complete" : "habit.uncomplete", {
@@ -469,7 +475,9 @@ export function registerCoachingRoutes(app: Express): void {
         },
       });
 
-      res.json(updated);
+      // Returned alongside so the client can celebrate without a second
+      // round trip on the one interaction that happens most.
+      res.json({ ...updated, earnedWins: earned });
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
       trackError("habit.toggle", err, { userId: req.session.userId });
