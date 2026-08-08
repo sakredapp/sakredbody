@@ -84,6 +84,32 @@ export default function Executive() {
         </Button>
       </PageHero>
 
+      {/* ── The application ──────────────────────────────────── */}
+      <Section tone="light" id="apply" className="scroll-mt-20">
+        <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
+          <motion.div variants={fadeInUp}>
+            <SectionHeader
+              eyebrow="Apply"
+              title={<>Start With the <span className="text-gold">Application</span></>}
+              intro="Around seven minutes. It's how we work out whether there's a real fit, where you'd start, and whether private coaching is even the right thing to point you at — sometimes it isn't, and we'll say so."
+              className="mb-12"
+              testId="text-apply-headline"
+            />
+          </motion.div>
+
+          <motion.div variants={fadeInUp}>
+            <ExecutiveApplication />
+          </motion.div>
+
+          <motion.p variants={fadeInUp} className="text-xs text-muted-foreground text-center mt-14 max-w-2xl mx-auto leading-relaxed">
+            Sakred Body is an education and coaching company. We do not diagnose, treat, cure, or prescribe,
+            and nothing here is medical advice. This application deliberately does not ask for your medical
+            history — please don't include it. Where clinical input is appropriate we work alongside
+            licensed professionals rather than in place of them.
+          </motion.p>
+        </motion.div>
+      </Section>
+
       {/* ── The premise ──────────────────────────────────────── */}
       <Section tone="ink">
         <motion.div
@@ -180,7 +206,6 @@ export default function Executive() {
                   className="h-full pt-8 border-t border-border text-center"
                   data-testid={`card-pillar-${i}`}
                 >
-                  <span className="font-mono text-[11px] text-muted-foreground">{String(i + 1).padStart(2, "0")}</span>
                   <h3 className="font-display text-xl mt-3 mb-3">{p.name}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">{p.body}</p>
                 </div>
@@ -215,32 +240,6 @@ export default function Executive() {
               </motion.div>
             ))}
           </div>
-        </motion.div>
-      </Section>
-
-      {/* ── The application ──────────────────────────────────── */}
-      <Section tone="ink" id="apply" className="scroll-mt-20">
-        <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
-          <motion.div variants={fadeInUp}>
-            <SectionHeader
-              eyebrow="Apply"
-              title={<>Start With the <span className="text-gold">Application</span></>}
-              intro="Around seven minutes. It's how we work out whether there's a real fit, where you'd start, and whether private coaching is even the right thing to point you at — sometimes it isn't, and we'll say so."
-              className="mb-12"
-              testId="text-apply-headline"
-            />
-          </motion.div>
-
-          <motion.div variants={fadeInUp}>
-            <ExecutiveApplication />
-          </motion.div>
-
-          <motion.p variants={fadeInUp} className="text-xs text-muted-foreground text-center mt-14 max-w-2xl mx-auto leading-relaxed">
-            Sakred Body is an education and coaching company. We do not diagnose, treat, cure, or prescribe,
-            and nothing here is medical advice. This application deliberately does not ask for your medical
-            history — please don't include it. Where clinical input is appropriate we work alongside
-            licensed professionals rather than in place of them.
-          </motion.p>
         </motion.div>
       </Section>
 

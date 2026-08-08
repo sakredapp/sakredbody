@@ -28,12 +28,12 @@ export function ImageBand({ image, alt, eyebrow, title, children, tall, testId }
       className={`tone-ink bg-background relative overflow-hidden ${tall ? "py-32 md:py-44" : "py-24 md:py-32"}`}
     >
       <div className="absolute inset-0 z-0">
-        <img src={image} alt={alt} className="w-full h-full object-cover opacity-45" />
+        <img src={image} alt={alt} className="w-full h-full object-cover" />
         <div
           className="absolute inset-0"
           style={{
             background:
-              "radial-gradient(ellipse 75% 70% at 50% 50%, hsl(30 10% 8% / 0.82), hsl(30 10% 7% / 0.95))",
+              "linear-gradient(to bottom, hsl(30 10% 7% / 0.72) 0%, hsl(30 10% 7% / 0.45) 45%, hsl(30 10% 7% / 0.78) 100%)",
           }}
         />
       </div>

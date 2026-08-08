@@ -30,12 +30,12 @@ export function PageHero({ eyebrow, title, intro, note, children, testId, image,
     <section className="tone-ink bg-background pt-36 pb-24 relative overflow-hidden">
       {image && (
         <div className="absolute inset-0 z-0">
-          <img src={image} alt={imageAlt ?? ""} className="w-full h-full object-cover opacity-45" />
+          <img src={image} alt={imageAlt ?? ""} className="w-full h-full object-cover" />
           <div
             className="absolute inset-0"
             style={{
               background:
-                "radial-gradient(ellipse 75% 65% at 50% 50%, hsl(30 10% 8% / 0.84), hsl(30 10% 7% / 0.96))",
+                "linear-gradient(to bottom, hsl(30 10% 7% / 0.78) 0%, hsl(30 10% 7% / 0.48) 50%, hsl(30 10% 7% / 0.82) 100%)",
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-b from-[hsl(30_10%_8%/0.6)] via-transparent to-[hsl(30_10%_10%)]" />

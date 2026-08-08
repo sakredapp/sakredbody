@@ -141,7 +141,7 @@ export function ExecutiveApplication() {
         </div>
       </div>
 
-      <div className="min-h-[340px]">
+      <div>
         <AnimatePresence mode="wait" custom={direction} initial={false}>
           <motion.div
             key={q.id}
@@ -156,8 +156,8 @@ export function ExecutiveApplication() {
             <h3 className="font-display text-2xl md:text-3xl leading-snug mb-3" data-testid="question-label">
               {q.label}
             </h3>
-            {q.help && <p className="text-sm text-muted-foreground mb-8 max-w-lg mx-auto">{q.help}</p>}
-            {!q.help && <div className="mb-8" />}
+            {q.help && <p className="text-sm text-muted-foreground mb-6 max-w-lg mx-auto">{q.help}</p>}
+            {!q.help && <div className="mb-6" />}
 
             {/* ── Free text ── */}
             {(q.type === "text" || q.type === "email" || q.type === "tel") && (
@@ -264,7 +264,7 @@ export function ExecutiveApplication() {
         </p>
       )}
 
-      <div className="flex items-center justify-center gap-3 mt-10">
+      <div className="flex items-center justify-center gap-3 mt-8">
         <Button
           variant="outline"
           onClick={() => go(-1)}

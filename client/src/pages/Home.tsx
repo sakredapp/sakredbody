@@ -228,7 +228,6 @@ export default function Home() {
                     className="h-full pt-8 border-t border-border text-center flex flex-col hover-elevate transition-colors"
                     data-testid={`card-territory-${t.key}`}
                   >
-                    <span className="font-mono text-[11px] text-muted-foreground mb-4">{String(i + 1).padStart(2, "0")}</span>
                     <span
                       className="h-10 w-10 rounded-full mx-auto mb-5 border border-white/10"
                       style={{ backgroundColor: `hsl(${t.color})` }}

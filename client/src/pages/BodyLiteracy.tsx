@@ -69,9 +69,8 @@ export default function BodyLiteracy() {
 
       <PageHero
         eyebrow="The Skill"
-        title={<>Body <span className="text-gold">Literacy</span></>}
-        intro="Learn to read the organism you live inside. Not diagnosing yourself, and not cataloguing symptoms — developing enough resolution to tell one signal from another and act on the difference."
-        note="It is the only health skill that keeps working when you're away from your routine, your coach, and your data."
+        title={<>Body Literacy.</>}
+        intro="Learn to read the organism you live inside."
         testId="text-literacy-headline"
       />
 
@@ -163,9 +162,6 @@ export default function BodyLiteracy() {
                 className="flex flex-col items-center gap-1.5 py-4 border-b border-border/50 text-center"
                 data-testid={`row-signal-${i}`}
               >
-                <span className="font-mono text-[10px] text-muted-foreground shrink-0">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
                 <span className="text-sm text-muted-foreground">{s}</span>
               </motion.div>
             ))}

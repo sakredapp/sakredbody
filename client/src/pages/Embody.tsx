@@ -54,9 +54,8 @@ export default function Embody() {
 
       <PageHero
         eyebrow="Territory Three · Where They Meet"
-        title={<>Embody. <span className="text-gold">Live Inside It.</span></>}
-        intro="Information is not enough. Health has to become perception, practice, and relationship — otherwise it stays a thing you read about and intend to start on Monday."
-        note="The body you inhabit becomes the life you are capable of living."
+        title={<>Embody.</>}
+        intro="The body you inhabit becomes the life you are capable of living."
         testId="text-embody-headline"
       />
 
@@ -118,7 +117,6 @@ export default function Embody() {
                   className="h-full pt-8 border-t border-border text-center"
                   data-testid={`card-practice-${i}`}
                 >
-                  <span className="font-mono text-[11px] text-muted-foreground">{String(i + 1).padStart(2, "0")}</span>
                   <h3 className="font-display text-xl mt-3 mb-4">{p.title}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">{p.body}</p>
                 </div>

@@ -58,9 +58,8 @@ export default function Terrain() {
 
       <PageHero
         eyebrow="The Signature Concept"
-        title={<>The <span className="text-gold">Terrain</span></>}
-        intro="Your body is not a collection of isolated parts to be treated one at a time. It is an environment — a connected chain where every stage sets the conditions for the next."
-        note="Once you can see the chain, most health advice sorts itself into 'right stage' and 'wrong stage' almost immediately."
+        title={<>The Terrain.</>}
+        intro="Your body is not a collection of parts. It is an environment."
         testId="text-terrain-headline"
       />
 
@@ -83,7 +82,6 @@ export default function Terrain() {
                   className="border border-gold-subtle rounded-lg bg-card p-6 text-center"
                   data-testid={`chain-stage-${i}`}
                 >
-                  <span className="font-mono text-[11px] text-muted-foreground">{String(i + 1).padStart(2, "0")}</span>
                   <h3 className="font-display text-2xl mt-2 mb-3">{c.stage}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">{c.body}</p>
                 </div>

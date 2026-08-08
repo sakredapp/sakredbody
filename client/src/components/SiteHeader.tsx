@@ -55,18 +55,25 @@ export function SiteHeader({ navItems = SITE_NAV, cta, overHero = true }: SiteHe
 
   const solid = scrolled || menuOpen || openGroup !== null;
   const isActive = (href: string) => location === href;
-  const linkTone = (active: boolean) =>
-    active ? "text-gold" : solid ? "text-muted-foreground" : "text-white/75";
+  const linkTone = (active: boolean) => (active ? "text-gold" : "text-white/75");
 
   return (
     <header
       className={cn(
         "fixed top-0 left-0 right-0 transition-all duration-300",
-        solid
-          ? "bg-background/95 backdrop-blur-md border-b border-border/50"
-          : "bg-gradient-to-b from-black/50 to-transparent",
+        // Ink-toned and edgeless. A solid cream bar read as a foreign strip
+        // pasted over a dark page, and a hard bottom border draws the eye to
+        // the seam — so the fill fades out toward the bottom instead. Dark
+        // enough throughout that white nav text stays legible over the light
+        // floating panels that scroll underneath it.
+        "tone-ink backdrop-blur-md",
       )}
-      style={{ zIndex: 9999 }}
+      style={{
+        zIndex: 9999,
+        background: solid
+          ? "linear-gradient(to bottom, hsl(30 10% 6% / 0.97) 0%, hsl(30 10% 6% / 0.93) 62%, hsl(30 10% 6% / 0.62) 100%)"
+          : "linear-gradient(to bottom, hsl(30 10% 6% / 0.86) 0%, hsl(30 10% 6% / 0.5) 55%, hsl(30 10% 6% / 0) 100%)",
+      }}
     >
       <div className="container max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
         <Link href="/" className="flex items-center shrink-0" data-testid="link-home">
@@ -137,7 +144,7 @@ export function SiteHeader({ navItems = SITE_NAV, cta, overHero = true }: SiteHe
             <Button
               variant="outline"
               size="sm"
-              className={cn("transition-colors duration-300", !solid && "border-white/25 text-white bg-white/5")}
+              className="transition-colors duration-300 border-white/25 text-white bg-white/5"
             >
               Member Portal
             </Button>
@@ -145,7 +152,7 @@ export function SiteHeader({ navItems = SITE_NAV, cta, overHero = true }: SiteHe
           {cta}
           <button
             onClick={() => setMenuOpen((v) => !v)}
-            className={cn("lg:hidden p-2 -mr-2", solid ? "text-foreground" : "text-white")}
+            className="lg:hidden p-2 -mr-2 text-white"
             aria-label={menuOpen ? "Close menu" : "Open menu"}
             aria-expanded={menuOpen}
             data-testid="button-mobile-menu"
@@ -156,7 +163,7 @@ export function SiteHeader({ navItems = SITE_NAV, cta, overHero = true }: SiteHe
       </div>
 
       {menuOpen && (
-        <nav className="lg:hidden border-t border-border/50 bg-background/95 backdrop-blur-md max-h-[75vh] overflow-y-auto">
+        <nav className="lg:hidden border-t border-white/10 bg-[hsl(30_10%_8%/0.96)] backdrop-blur-md max-h-[75vh] overflow-y-auto">
           <div className="container max-w-6xl mx-auto px-4 py-3 flex flex-col">
             {navItems.map((item) =>
               item.children ? (

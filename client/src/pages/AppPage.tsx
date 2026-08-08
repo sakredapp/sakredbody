@@ -169,7 +169,7 @@ function StoreButtons({ className }: { className?: string }) {
 
 export default function AppPage() {
   usePageMeta(
-    "The Sakred App — Five Guided Protocols | Sakred Body",
+    "The Sakred App — The Protocols | Sakred Body",
     "Liver, gut, lymphatic, sleep, and digestive protocols with daily steps, habit tracking, wearable sync, and coaching. Free on iOS and Android.",
   );
 
@@ -211,7 +211,7 @@ export default function AppPage() {
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-14">
             <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
-              Five Guided Protocols
+              The Protocols
             </p>
             <h2 className="text-3xl md:text-4xl font-display font-normal mb-5" data-testid="text-protocols-headline">
               Clear First. <span className="text-gold">Then Rebuild.</span>

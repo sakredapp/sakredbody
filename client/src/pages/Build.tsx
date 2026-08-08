@@ -17,36 +17,12 @@ const stagger = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { s
 const viewportOnce = { once: true, amount: 0.2 } as const;
 
 const PILLARS = [
-  {
-    name: "Strength",
-    body: "The ability to produce force. It protects your joints, your spine, your bone density, and your independence at seventy. Muscle is the largest glucose sink you own and the closest thing to an organ of longevity.",
-    practice: "Load something heavy, twice a week, and add to it over time.",
-  },
-  {
-    name: "Conditioning",
-    body: "Two systems, not one. A large aerobic base built from easy work, and a smaller amount of genuinely hard work at the top. Most people train permanently in the middle and develop neither.",
-    practice: "Mostly easy, occasionally very hard. Almost never moderate.",
-  },
-  {
-    name: "Mobility",
-    body: "Strength you cannot express through a full range is strength you don't functionally have. Mobility isn't stretching — it's control at end range, which is a strength quality.",
-    practice: "Load the positions you want to own, don't just hold them.",
-  },
-  {
-    name: "Work capacity",
-    body: "The total volume you can absorb and recover from in a week. It's the ceiling on everything else, and it's built slowly by doing slightly more than last month without breaking.",
-    practice: "Add volume before you add intensity.",
-  },
-  {
-    name: "Breathing mechanics",
-    body: "How you breathe under load determines how much load you can take. Nasal breathing, CO2 tolerance, and brace mechanics change what your body will let you attempt.",
-    practice: "Nose-breathe everything easy. Learn to brace before you learn to lift heavy.",
-  },
-  {
-    name: "Hormetic stress",
-    body: "Heat, cold, altitude, fasting. Small, deliberate doses of survivable stress that make the system more robust — and become just another burden when the terrain underneath can't clear them.",
-    practice: "Earn these. They're a garnish, not a foundation.",
-  },
+  { name: "Strength", body: "Load something heavy. Add to it over time." },
+  { name: "Conditioning", body: "Mostly easy. Occasionally very hard. Almost never moderate." },
+  { name: "Mobility", body: "Own the positions. Control at end range, not stretching." },
+  { name: "Work capacity", body: "Add volume before you add intensity." },
+  { name: "Breath", body: "Nose-breathe everything easy. Brace before you lift heavy." },
+  { name: "Hormesis", body: "Heat, cold, fasting. Earn these — they're a garnish." },
 ];
 
 const READINESS = [
@@ -89,9 +65,8 @@ export default function Build() {
 
       <PageHero
         eyebrow="Territory Two · Yang"
-        title={<>Build. <span className="text-gold">Health Becomes Capacity.</span></>}
-        intro="Once the terrain can receive demand, it needs demand worth adapting to. Not a body that merely avoids illness — a body that can carry weight, produce force, move through space, withstand adversity, and recover fast enough to do it again."
-        note="This is the half the wellness world quietly dropped, and the reason so much of it produces calm, fragile people."
+        title={<>Build.</>}
+        intro="A body that can carry weight, produce force, and recover fast enough to do it again."
         testId="text-build-headline"
       />
 
@@ -145,8 +120,8 @@ export default function Build() {
           <motion.div variants={fadeInUp}>
             <SectionHeader
               eyebrow="The Qualities"
-              title={<>Six Things Worth <span className="text-gold">Building</span></>}
-              intro="Not a program. The qualities that actually matter, what each one is for, and the single principle that governs it."
+              title={<>What We Build</>}
+              intro="Six qualities. One principle each."
               testId="text-pillars-headline"
             />
           </motion.div>
@@ -158,12 +133,8 @@ export default function Build() {
                   className="h-full pt-8 border-t border-border text-center flex flex-col"
                   data-testid={`card-pillar-${i}`}
                 >
-                  <span className="font-mono text-[11px] text-muted-foreground mb-3">{String(i + 1).padStart(2, "0")}</span>
-                  <h3 className="font-display text-2xl mb-4">{p.name}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed flex-1">{p.body}</p>
-                  <p className="text-sm text-gold/85 mt-5 pt-4 border-t border-border italic">
-                    {p.practice}
-                  </p>
+                  <h3 className="font-display text-2xl mb-3">{p.name}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{p.body}</p>
                 </div>
               </motion.div>
             ))}

@@ -89,9 +89,8 @@ export default function Retreats() {
 
       <PageHero
         eyebrow="Territory Four · The Social Terrain"
-        title={<>Gather. <span className="text-gold">Environment Holds It.</span></>}
-        intro="The terrain isn't only biological. You are shaped by who you're around, what standards they hold, whether your life contains real challenge, and whether you ever get more than a day away from stimulation."
-        note="Retreats aren't an unrelated product sitting beside the health work. They're the same philosophy, applied to the environment instead of the organism."
+        title={<>Gather.</>}
+        intro="The terrain isn't only biological. Who you're around is an input like any other."
         testId="text-retreats-headline"
         image="/images/estate-vineyard.jpg"
         imageAlt="A stone estate set among vineyards and low green hills"
@@ -117,9 +116,6 @@ export default function Retreats() {
                 className="flex flex-col items-center gap-1.5 py-5 border-b border-border/50 last:border-0 text-center"
                 data-testid={`row-social-${i}`}
               >
-                <span className="font-mono text-[10px] text-muted-foreground shrink-0">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
                 <span className="text-muted-foreground">{s}</span>
               </motion.div>
             ))}

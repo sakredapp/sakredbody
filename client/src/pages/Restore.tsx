@@ -62,9 +62,8 @@ export default function Restore() {
 
       <PageHero
         eyebrow="Territory One · Yin"
-        title={<>Restore. <span className="text-gold">Clear the Terrain.</span></>}
-        intro="Healing is not endlessly adding things. Most people are carrying a load they've never put down — and no supplement, protocol, or training block works well on top of it. Restoration begins by removing what's in the way."
-        note="This is the half of health that traditional medicine understood long before anyone had a word for inflammation."
+        title={<>Restore.</>}
+        intro="Healing is not endlessly adding things. It begins by removing what's in the way."
         testId="text-restore-headline"
       />
 
@@ -74,8 +73,8 @@ export default function Restore() {
           <motion.div variants={fadeInUp}>
             <SectionHeader
               eyebrow="The Burden"
-              title={<>What's Actually <span className="text-gold">In the Way</span></>}
-              intro="These four show up together far more often than they show up alone. They also explain why so many people do everything right and feel nothing change."
+              title={<>What's In the Way</>}
+              intro="These four travel together, and explain why doing everything right changes nothing."
               testId="text-burden-headline"
             />
           </motion.div>
@@ -102,8 +101,8 @@ export default function Restore() {
           <motion.div variants={fadeInUp}>
             <SectionHeader
               eyebrow="The Order"
-              title={<>Sequence Is <span className="text-gold">the Method</span></>}
-              intro="Almost every failed protocol is a right action taken at the wrong time. Run these in order and unremarkable interventions start working. Run them out of order and good ones make you feel worse."
+              title={<>Order Is the Method</>}
+              intro="Almost every failed protocol is a right action taken at the wrong time."
               testId="text-order-headline"
             />
           </motion.div>
@@ -112,7 +111,6 @@ export default function Restore() {
             {ORDER.map((o, i) => (
               <motion.div variants={fadeInUp} key={o.step}>
                 <div className="bg-card p-7 text-center" data-testid={`row-order-${i}`}>
-                  <span className="font-mono text-[11px] text-muted-foreground">{String(i + 1).padStart(2, "0")}</span>
                   <h3 className="font-display text-2xl mt-2 mb-3">{o.step}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed max-w-xl mx-auto">{o.body}</p>
                 </div>
@@ -137,8 +135,8 @@ export default function Restore() {
           <motion.div variants={fadeInUp}>
             <SectionHeader
               eyebrow="In Practice"
-              title={<>Five Protocols, <span className="text-gold">In Sequence</span></>}
-              intro="Each runs a fixed number of days with daily steps. They're listed here in the order most people should run them, which is not the order they look most exciting in."
+              title={<>Where to Start</>}
+              intro="A few of the protocols, in the order most people should run them. More are added over time."
               testId="text-protocols-headline"
             />
           </motion.div>
@@ -151,9 +149,6 @@ export default function Restore() {
                 className="py-6 border-b border-border/50 last:border-0 text-center"
                 data-testid={`row-protocol-${i}`}
               >
-                <span className="font-mono text-[11px] text-muted-foreground block mb-2">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
                 <h3 className="font-display text-xl">{p.name}</h3>
                 <p className="text-sm text-muted-foreground mt-1">{p.note}</p>
                 <p className="text-xs text-muted-foreground/70 mt-1.5">{p.days}</p>

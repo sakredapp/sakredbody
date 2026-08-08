@@ -40,9 +40,8 @@ export default function Philosophy() {
 
       <PageHero
         eyebrow="The Philosophy"
-        title={<>What Is a <span className="text-gold">Sakred Body?</span></>}
-        intro="Not a body that merely avoids illness. A human organism capable of inhabiting its own life — clear enough to perceive, strong enough to endure, and aware enough to adapt."
-        note="This is the worldview underneath everything else on this site. Every protocol, page, and retreat is downstream of it."
+        title={<>The Philosophy.</>}
+        intro="Not a body that avoids illness. One capable of inhabiting its own life."
         testId="text-philosophy-headline"
       />
 
@@ -66,9 +65,6 @@ export default function Philosophy() {
                 className="py-6 border-b border-border/50 last:border-0 text-center"
                 data-testid={`row-definition-${i}`}
               >
-                <span className="font-mono text-[11px] text-muted-foreground block mb-2">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
                 <p className="leading-relaxed">
                   <span className="font-display text-xl text-foreground">{d.quality}</span>{" "}
                   <span className="text-muted-foreground">{d.body}</span>
@@ -104,7 +100,6 @@ export default function Philosophy() {
                         className="h-3 w-3 rounded-full"
                         style={{ backgroundColor: `hsl(${t.color})` }}
                       />
-                      <span className="font-mono text-[11px] text-muted-foreground">{String(i + 1).padStart(2, "0")}</span>
                       <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
                         {t.force}
                       </span>
@@ -158,7 +153,6 @@ export default function Philosophy() {
                   className="h-full pt-8 border-t border-border text-center"
                   data-testid={`card-capacity-${i}`}
                 >
-                  <span className="font-mono text-[11px] text-muted-foreground">{String(i + 1).padStart(2, "0")}</span>
                   <h3 className="font-display text-xl mt-3 mb-3">{c.stage}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">{c.body}</p>
                 </div>
