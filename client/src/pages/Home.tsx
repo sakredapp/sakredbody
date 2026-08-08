@@ -10,7 +10,6 @@ import { JungleCanopy } from "@/components/JungleCanopy";
 import { Constellation } from "@/components/Constellation";
 import { ConstellationBody } from "@/components/ConstellationBody";
 import { StarDust } from "@/components/StarDust";
-import { AuroraOrb } from "@/components/AuroraOrb";
 import { ElementOrbit } from "@/components/ElementOrbit";
 import { GemStone, TERRITORY_STONES } from "@/components/GemStone";
 import { Tilt3D } from "@/components/Tilt3D";
@@ -535,8 +534,10 @@ export default function Home() {
       </Section>
 
       {/* ── Final CTA ────────────────────────────────────────── */}
+      {/* No orb behind this one. The aurora is built for an ink ground — its
+          blooms are additive, and clipped to a sphere they read as a grey
+          disc sitting behind the headline on a cream panel. */}
       <Section tone="light" className="text-center py-12 md:py-16 overflow-hidden">
-        <AuroraOrb className="absolute inset-0 w-full h-full z-0 opacity-40" />
         <motion.div
           initial="hidden"
           whileInView="visible"
