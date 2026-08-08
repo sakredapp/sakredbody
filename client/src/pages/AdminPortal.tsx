@@ -16,6 +16,7 @@ import { ApothecaryAdmin } from "@/components/admin/Apothecary";
 import { DailyNotesAdmin } from "@/components/admin/DailyNotes";
 import { CommunityAdmin } from "@/components/admin/CommunityAdmin";
 import { OfferingsAdmin } from "@/components/admin/Offerings";
+import { HostsAdmin } from "@/components/admin/Hosts";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -131,6 +132,7 @@ type AdminTab =
   | "coaching"
   | "community"
   | "offerings"
+  | "hosts"
   | "notes"
   | "masterclass"
   | "apothecary";
@@ -1237,6 +1239,7 @@ export default function AdminPortal() {
             { key: "coaching" as AdminTab, label: "Coaching", badge: null },
             { key: "notes" as AdminTab, label: "Daily Notes", badge: unreadNoteCount > 0 ? unreadNoteCount : null },
             { key: "offerings" as AdminTab, label: "What's On", badge: null },
+            { key: "hosts" as AdminTab, label: "Hosts", badge: null },
             { key: "community" as AdminTab, label: "Rooms", badge: null },
             { key: "masterclass" as AdminTab, label: "Masterclass", badge: null },
             { key: "apothecary" as AdminTab, label: "Apothecary", badge: null },
@@ -1270,6 +1273,9 @@ export default function AdminPortal() {
 
         {/* ═══════════════ WHAT'S ON TAB ═══════════════ */}
         {tab === "offerings" && <OfferingsAdmin />}
+
+        {/* ═══════════════ HOSTS TAB ═══════════════ */}
+        {tab === "hosts" && <HostsAdmin />}
 
         {/* ═══════════════ PARTNERS TAB ═══════════════ */}
         {tab === "partners" && !selectedPartner && (

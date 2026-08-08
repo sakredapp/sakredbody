@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Plus, Trash2, Check, X, Users, CalendarDays } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import {
   OFFERING_KIND_LABELS,
@@ -455,6 +456,95 @@ function Sessions({ offeringId }: { offeringId: string }) {
   );
 }
 
+// ─── Who's leading ─────────────────────────────────────────────────────────
+
+/**
+ * Set the host list.
+ *
+ * Sends the whole list rather than a diff, and the server replaces it inside
+ * one transaction — remove-then-add as two calls is how an offering ends up
+ * with no hosts at all when the second one fails.
+ */
+function Hosts({ offeringId }: { offeringId: string }) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+
+  const all = useQuery<Host[]>({ queryKey: ["/api/admin/hosts"] });
+
+  const detail = useQuery<Offering & { hosts: (Host & { role: string })[] }>({
+    queryKey: ["/api/offerings", offeringId],
+    queryFn: async () => {
+      const res = await fetch(`/api/offerings/${offeringId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Couldn't load this offering");
+      return res.json();
+    },
+  });
+
+  const assigned = detail.data?.hosts ?? [];
+  const assignedIds = new Set(assigned.map((h) => h.id));
+
+  const setHosts = useMutation({
+    mutationFn: (hosts: { hostId: string; role: string }[]) =>
+      apiRequest("PUT", `/api/admin/offerings/${offeringId}/hosts`, { hosts }).then((r) => r.json()),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/offerings", offeringId] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/offerings"] });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const toggle = (hostId: string) => {
+    const next = assignedIds.has(hostId)
+      ? assigned.filter((h) => h.id !== hostId).map((h) => ({ hostId: h.id, role: h.role }))
+      : [...assigned.map((h) => ({ hostId: h.id, role: h.role })), { hostId, role: "lead" }];
+    setHosts.mutate(next);
+  };
+
+  if (!all.data || all.data.length === 0) {
+    return (
+      <div className="space-y-2">
+        <p className="text-xs uppercase tracking-widest text-muted-foreground/70">Led by</p>
+        <p className="text-sm text-muted-foreground">
+          No hosts yet — add someone under Hosts first.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs uppercase tracking-widest text-muted-foreground/70">Led by</p>
+      <div className="flex flex-wrap gap-2">
+        {all.data.filter((h) => h.isActive).map((h) => {
+          const on = assignedIds.has(h.id);
+          return (
+            <button
+              key={h.id}
+              onClick={() => toggle(h.id)}
+              disabled={setHosts.isPending}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-full border pl-1 pr-3 py-1 transition-colors",
+                on
+                  ? "border-[hsl(var(--gold))] bg-[hsl(var(--gold))]/10"
+                  : "border-border/60 hover:border-border",
+              )}
+              data-testid={`toggle-host-${h.slug}`}
+            >
+              <Avatar className="h-6 w-6">
+                {h.avatarUrl && <AvatarImage src={h.avatarUrl} alt="" />}
+                <AvatarFallback className="text-[9px]">
+                  {h.name.split(" ").map((p) => p[0]).slice(0, 2).join("")}
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-xs">{h.name}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Roster ────────────────────────────────────────────────────────────────
 
 function Roster({ offeringId }: { offeringId: string }) {
@@ -641,6 +731,7 @@ export function OfferingsAdmin() {
                   Edit
                 </Button>
               </div>
+              <Hosts offeringId={selected.id} />
               <Sessions offeringId={selected.id} />
               <Roster offeringId={selected.id} />
             </div>
