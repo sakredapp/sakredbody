@@ -334,9 +334,9 @@ export default function Home() {
       </Section>
 
       {/* ── Five Elements ────────────────────────────────────── */}
-      <Section id="elements" tone="ink">
+      <Section id="elements" tone="ink" className="py-12 md:py-16">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
-          <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-14">
+          <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-8">
             <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
               Eastern Traditional Medicine
             </p>
@@ -355,14 +355,7 @@ export default function Home() {
             <ElementOrbit elements={ELEMENTS} />
           </motion.div>
 
-          <motion.p
-            variants={fadeInUp}
-            className="text-xs text-muted-foreground mt-8 max-w-2xl mx-auto text-center leading-relaxed"
-          >
-            We present the five-element framework as philosophy and structure — a way of organizing practice.
-            It is not a diagnostic system, and nothing here replaces care from a qualified provider.
-          </motion.p>
-        </motion.div>
+       </motion.div>
       </Section>
 
       {/* ── The Member Portal ────────────────────────────────── */}

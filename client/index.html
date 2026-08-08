@@ -2,7 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <!-- viewport-fit=cover so the ink reaches under the notch and the home
+         indicator once this is installed to a home screen. No maximum-scale:
+         it blocks pinch-zoom, which iOS has ignored since 10 anyway, and on
+         Android it just stops people enlarging text they can't read. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Sakred Body — Live in Harmony. Build Real Strength.</title>
     <meta name="description" content="Holistic health rooted in Eastern traditional medicine and the duality of rest and strength. Guided detox, gut, lymphatic, and sleep protocols in the Sakred app — plus a concierge mastermind and retreats in Puerto Rico." />
     <meta property="og:title" content="Sakred Body — Live in Harmony. Build Real Strength." />
@@ -15,6 +19,16 @@
     <meta name="twitter:image" content="/images/og-image.png" />
     <meta name="theme-color" content="#1a1a1a" />
     <link rel="icon" type="image/png" href="/favicon.png" />
+
+    <!-- Installed to a home screen, this opens standalone at /member: the
+         portal, no browser chrome. iOS reads the apple-* tags rather than the
+         manifest, so both are stated. `black-translucent` puts the ink behind
+         the status bar instead of leaving a white strip above it. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Sakred" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">

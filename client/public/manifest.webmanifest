@@ -1,0 +1,19 @@
+{
+  "name": "Sakred Body",
+  "short_name": "Sakred",
+  "description": "The daily note, your intention, and the protocol you're running.",
+  "start_url": "/member",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1a1a1a",
+  "theme_color": "#1a1a1a",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

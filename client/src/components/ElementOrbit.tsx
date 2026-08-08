@@ -79,7 +79,7 @@ export function ElementOrbit({ elements }: { elements: OrbitElement[] }) {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="relative w-full aspect-[16/11] max-w-[40rem] mx-auto" data-testid="element-orbit">
+      <div className="relative w-full aspect-[16/10] max-w-[36rem] mx-auto" data-testid="element-orbit">
         {/* The ring the stations ride, drawn as an ellipse in perspective. */}
         <svg viewBox="0 0 100 70" className="absolute inset-0 w-full h-full" aria-hidden="true">
           <ellipse
@@ -107,29 +107,8 @@ export function ElementOrbit({ elements }: { elements: OrbitElement[] }) {
           <GemStone
             key={current.element}
             stone={ELEMENT_STONES[current.element.toLowerCase()] ?? ELEMENT_STONES.earth}
-            className="w-[52%] h-[52%] opacity-90"
+            className="w-[46%] h-[46%] opacity-95"
           />
-        </div>
-
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-[24%] z-10">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={active}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.28 }}
-              className="text-center"
-            >
-              <p className="font-display text-2xl mb-1">{current.element}</p>
-              <p className="text-xs text-gold mb-3">
-                {current.organs} · {current.season}
-              </p>
-              <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-orbit-detail">
-                {current.reads}
-              </p>
-            </motion.div>
-          </AnimatePresence>
         </div>
 
         {elements.map((el, i) => (
@@ -169,9 +148,26 @@ export function ElementOrbit({ elements }: { elements: OrbitElement[] }) {
         ))}
       </div>
 
-      <p className="text-center text-xs text-muted-foreground mt-4">
-        Five stations of one cycle. Hover to hold it.
-      </p>
+      {/* The reading sits under the ring, where it can actually be read. */}
+      <div className="text-center max-w-xl mx-auto -mt-2">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={active}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.3 }}
+          >
+            <p className="font-display text-3xl mb-1.5">{current.element}</p>
+            <p className="text-[11px] uppercase tracking-[0.16em] text-gold mb-3">
+              {current.organs} · {current.season}
+            </p>
+            <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-orbit-detail">
+              {current.reads}
+            </p>
+          </motion.div>
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
