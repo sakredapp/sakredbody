@@ -1,10 +1,10 @@
 /**
  * Wins — API
  *
- *   GET  /api/wins            — everything this member has earned
- *   GET  /api/wins/unseen     — what to congratulate them for right now
- *   POST /api/wins/:id/seen   — stop congratulating them for it
- *   POST /api/wins/:id/share  — post it to the community
+ *   GET  /api/wins             — everything this member has earned
+ *   GET  /api/wins/unseen      — earned but not yet shared
+ *   POST /api/wins/:id/share   — post it to the community
+ *   POST /api/wins/:id/exported — they saved the image
  *
  * Sharing writes a real community message rather than a special "win post"
  * type. A win in the room should be repliable, reactable and searchable like
@@ -14,20 +14,19 @@
 
 import type { Express, Request, Response } from "express";
 import { db } from "../db.js";
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { isAuthenticated } from "../auth/index.js";
 import {
   wins,
   channels,
   communityMessages,
-  membershipTiers,
-  users,
   shareWinSchema,
   winHeadline,
   type WinKind,
 } from "../../shared/schema.js";
 import { track, trackError } from "../telemetry/index.js";
+import { visibleChannelIds } from "../community/index.js";
 
 function param(req: Request, name: string): string {
   const v = req.params[name];
@@ -57,11 +56,11 @@ export function registerWinRoutes(app: Express) {
   });
 
   /**
-   * What to celebrate right now.
+   * Earned but never shared.
    *
-   * "Unseen" is `onDate` being today's — a win from three weeks ago shouldn't
-   * ambush someone with a modal because they never opened the app that day.
-   * Bounded to today, so the celebration is timely or it doesn't happen.
+   * Not used for the celebration — that fires off the toggle's own response,
+   * so it can only ever interrupt for something that just happened. This is
+   * for a quieter "you never showed anyone this" prompt.
    */
   app.get("/api/wins/unseen", isAuthenticated, async (req, res) => {
     try {
@@ -101,31 +100,31 @@ export function registerWinRoutes(app: Express) {
         return res.status(409).json({ message: "You've already shared this one." });
       }
 
-      const [me] = await db
-        .select({ tier: users.membershipTier })
-        .from(users)
-        .where(eq(users.id, userId));
+      // Reuse the community's own gate rather than reimplementing the rank
+      // comparison here. The first version of this did reimplement it and
+      // dropped the admin bypass, so an admin without a paid tier — which is
+      // every admin today — could not share anything. The visibility rule is
+      // already written twice, once in TypeScript and once in SQL; a third
+      // copy was one too many.
+      const visible = await visibleChannelIds(userId);
 
-      const [tier] = me?.tier
+      const open = visible.length
         ? await db
-            .select({ rank: membershipTiers.rank })
-            .from(membershipTiers)
-            .where(eq(membershipTiers.id, me.tier))
+            .select()
+            .from(channels)
+            .where(
+              and(
+                inArray(channels.id, visible),
+                eq(channels.isActive, true),
+                eq(channels.isReadOnly, false),
+                // Not an offering's private room — a win belongs in the
+                // general population, not in the mastermind someone happens
+                // to be in.
+                isNull(channels.offeringId),
+              ),
+            )
+            .orderBy(channels.minTierRank, channels.sortOrder)
         : [];
-      const rank = tier?.rank ?? 0;
-
-      const open = await db
-        .select()
-        .from(channels)
-        .where(
-          and(
-            eq(channels.isActive, true),
-            eq(channels.isReadOnly, false),
-            isNull(channels.offeringId),
-            sql`${channels.minTierRank} <= ${rank}`,
-          ),
-        )
-        .orderBy(channels.minTierRank, channels.sortOrder);
 
       const target = input.channelId
         ? open.find((c) => c.id === input.channelId)

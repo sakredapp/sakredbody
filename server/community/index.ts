@@ -3,3 +3,4 @@
  */
 
 export { registerCommunityRoutes } from "./routes.js";
+export { visibleChannelIds } from "./routes.js";

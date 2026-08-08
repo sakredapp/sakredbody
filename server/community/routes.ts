@@ -94,7 +94,7 @@ function present(m: typeof communityMessages.$inferSelect) {
  * is open to its confirmed registrants whatever tier they hold, because they
  * paid for the room rather than for the tier.
  */
-async function visibleChannelIds(userId: string): Promise<string[]> {
+export async function visibleChannelIds(userId: string): Promise<string[]> {
   const [me] = await db
     .select({ tier: users.membershipTier, isAdmin: users.isAdmin })
     .from(users)
