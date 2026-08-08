@@ -144,17 +144,33 @@ product do not exist yet.
 **Sakred Executive — done except pricing.** 34-question application, server-side
 scoring, admin review queue.
 
+**The Apothecary — done.** `products`, `product_links`, `habit_products`,
+`routine_products`, `user_shop_checkoffs`. Supply list staged prepare → clear →
+rebuild; full shelf with search; admin editor with buy links and protocol
+attachment.
+
+**The Library — done.** `ebooks`, `ebook_sections`, `ebook_entitlements`,
+`ebook_progress`. Access is an entitlement row. The reader hands off to the
+paired protocol from the last chapter.
+
+**The Body Map — done.** `energy_centres` (nine seeded), `centre_habits`,
+`centre_routines`, `user_centre_readings`, `user_cosmology`. Readings are
+append-only so a coach sees movement rather than a snapshot.
+
+**Masterminds — done.** `cohorts`, `cohort_members`, `cohort_sessions`,
+`cohort_attendance`. Schedule visible only to confirmed members.
+
 ## 7. What is missing
 
-1. **The Apothecary** — no `products` at all. A protocol tells a member to do a
-   castor oil pack and then cannot tell them where to get castor oil. This is
-   the largest hole and it is being closed first.
-2. **Library / ebooks** — masterclass covers video; there is no written library
-   and no ebook↔protocol pairing.
-3. **Energy centres / body map** — the esoteric layer has no data model.
-4. **Masterminds as cohorts** — retreats are places; masterminds are groups
-   moving through time together. Different shape, not modelled.
-5. **Habit removal tombstones** — no `user_removed_habits`.
+1. **Admin surfaces for Library, Body Map and Masterminds.** The APIs are
+   complete and the member UIs are built; only the Apothecary has an admin
+   screen so far. Everything else is currently seeded or curl'd.
+2. **Habit removal tombstones in the app layer.** `user_removed_habits` exists
+   in SQL; nothing writes to it yet, because nothing regenerates habits after
+   enrollment. It matters the moment a top-up job is added.
+3. **Payment.** Nothing anywhere takes money. Prices are display-only.
+4. **Pricing figures** for Sakred Executive and the masterminds.
+5. **Native app.** The member portal is still web-only.
 
 ## 8. Defects inherited from the macro app — do not copy forward
 
@@ -162,9 +178,9 @@ Carried over from the teardown of `sakredportal`, with the local status:
 
 | Defect | Status here |
 |---|---|
-| `habits` has no uniqueness constraint; dedup done in app code | **open** — add `UNIQUE (user_id, title, scheduled_date)` |
-| `habits.user_routine_id` has no FK, orphans silently | **open** — add `ON DELETE CASCADE` |
-| Coin award guarded only by in-memory `Set`; restart re-awards | **open** — must be server-side, keyed on the habit row |
+| `habits` has no uniqueness constraint; dedup done in app code | **fixed** — `supabase/habit-integrity.sql` |
+| `habits.user_routine_id` has no FK, orphans silently | **fixed** — `ON DELETE CASCADE` |
+| Coin award guarded only by in-memory `Set`; restart re-awards | **fixed** — `rewards.habit_id` + partial unique index; balance moves only when a ledger row inserts |
 | `day_start` stored as TEXT | **fixed** — integer here |
 | `user_routines.current_day` stored but never incremented | **avoided** — not stored here; computed from `start_date` |
 | Two disagreeing sources of habit↔routine truth | **fixed** — `fetchFilteredHabits` merges both and dedups by id |
