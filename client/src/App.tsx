@@ -21,11 +21,23 @@ const MemberDashboard = lazy(() => import("@/pages/MemberDashboard"));
 const AdminPortal = lazy(() => import("@/pages/AdminPortal"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
+/**
+ * app.sakredbody.com and sakredbody.com are one deployment.
+ *
+ * The portal and the marketing site share a build, a session cookie and a
+ * router; only the front door differs. On the app host the root is the
+ * portal, because someone typing app.sakredbody.com is not arriving to read
+ * about the philosophy. Every other path resolves the same on both hosts, so
+ * a link shared from either one still works.
+ */
+const isAppHost =
+  typeof window !== "undefined" && window.location.hostname.startsWith("app.");
+
 function Router() {
   return (
     <Switch>
       {/* Marketing */}
-      <Route path="/" component={Home} />
+      <Route path="/">{() => (isAppHost ? <Redirect to="/member" /> : <Home />)}</Route>
       <Route path="/philosophy" component={Philosophy} />
       <Route path="/restore" component={Restore} />
       <Route path="/build" component={Build} />
