@@ -174,12 +174,14 @@ export default function FoodChart() {
         ) : (
           <>
             {!isFiltering && (
-              <div className="flex flex-wrap justify-center gap-2 mb-16">
+              // Eight categories on a fixed 4-up grid — a wrapping flex row
+              // broke into ragged rows of uneven pills.
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-16 max-w-3xl mx-auto">
                 {FOOD_CATEGORIES.map((c) => (
                   <a
                     key={c.name}
                     href={`#${slug(c.name)}`}
-                    className="px-4 py-1.5 rounded-full border border-border text-xs text-muted-foreground hover:text-gold hover:border-gold/40 transition-colors"
+                    className="px-4 py-2.5 rounded-md border border-border text-xs text-center text-muted-foreground hover:text-gold hover:border-gold/40 transition-colors flex items-center justify-center"
                   >
                     {c.name}
                   </a>
