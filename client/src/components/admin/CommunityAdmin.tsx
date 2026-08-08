@@ -1,9 +1,9 @@
 /**
  * Admin — the rooms.
  *
- * A channel is a name plus a gate. The gate is either a minimum tier rank or a
- * cohort id, never both in practice: a mastermind's room belongs to the people
- * who bought that mastermind, whatever tier they hold.
+ * A channel is a name plus a gate. The gate is either a minimum tier rank or an
+ * offering id, never both in practice: a mastermind's or a retreat's room
+ * belongs to the people who bought that offering, whatever tier they hold.
  *
  * Ranks are spaced by ten so a tier can be slotted between two existing ones
  * without renumbering every gate — see shared/models/community.ts, TIER_RANKS.
@@ -29,7 +29,7 @@ import {
 import { Plus, Trash2, Lock, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TIER_RANKS } from "@shared/schema";
-import type { Channel, Cohort } from "@shared/schema";
+import type { Channel, Offering } from "@shared/schema";
 
 const TIER_OPTIONS: { rank: number; label: string }[] = [
   { rank: TIER_RANKS.free, label: "Everyone" },
@@ -51,7 +51,7 @@ interface Draft {
   name: string;
   description: string;
   minTierRank: number;
-  cohortId: string | null;
+  offeringId: string | null;
   isReadOnly: boolean;
   isActive: boolean;
   sortOrder: number;
@@ -62,7 +62,7 @@ const EMPTY: Draft = {
   name: "",
   description: "",
   minTierRank: 0,
-  cohortId: null,
+  offeringId: null,
   isReadOnly: false,
   isActive: true,
   sortOrder: 0,
@@ -79,7 +79,7 @@ function slugify(name: string): string {
 function ChannelEditor({
   draft,
   setDraft,
-  cohorts,
+  offerings,
   onSave,
   onCancel,
   saving,
@@ -87,7 +87,7 @@ function ChannelEditor({
 }: {
   draft: Draft;
   setDraft: (d: Draft) => void;
-  cohorts: Cohort[];
+  offerings: Offering[];
   onSave: () => void;
   onCancel: () => void;
   saving: boolean;
@@ -141,12 +141,12 @@ function ChannelEditor({
         <div className="space-y-1.5">
           <Label className="text-xs">Who gets in</Label>
           <Select
-            value={draft.cohortId ? "cohort" : String(draft.minTierRank)}
+            value={draft.offeringId ? "offering" : String(draft.minTierRank)}
             onValueChange={(v) => {
-              if (v === "cohort") {
-                setDraft({ ...draft, cohortId: cohorts[0]?.id ?? null });
+              if (v === "offering") {
+                setDraft({ ...draft, offeringId: offerings[0]?.id ?? null });
               } else {
-                setDraft({ ...draft, minTierRank: Number(v), cohortId: null });
+                setDraft({ ...draft, minTierRank: Number(v), offeringId: null });
               }
             }}
           >
@@ -159,25 +159,25 @@ function ChannelEditor({
                   {t.label}
                 </SelectItem>
               ))}
-              {cohorts.length > 0 && (
-                <SelectItem value="cohort">A specific cohort</SelectItem>
+              {offerings.length > 0 && (
+                <SelectItem value="offering">A specific offering</SelectItem>
               )}
             </SelectContent>
           </Select>
         </div>
 
-        {draft.cohortId && (
+        {draft.offeringId && (
           <div className="space-y-1.5">
-            <Label className="text-xs">Which cohort</Label>
+            <Label className="text-xs">Which offering</Label>
             <Select
-              value={draft.cohortId}
-              onValueChange={(v) => setDraft({ ...draft, cohortId: v })}
+              value={draft.offeringId}
+              onValueChange={(v) => setDraft({ ...draft, offeringId: v })}
             >
-              <SelectTrigger data-testid="select-channel-cohort">
+              <SelectTrigger data-testid="select-channel-offering">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {cohorts.map((c) => (
+                {offerings.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
                     {c.name}
                   </SelectItem>
@@ -243,7 +243,7 @@ export function CommunityAdmin() {
   const [creating, setCreating] = useState(false);
 
   const channels = useQuery<Channel[]>({ queryKey: ["/api/admin/community/channels"] });
-  const cohorts = useQuery<Cohort[]>({ queryKey: ["/api/admin/cohorts"] });
+  const offerings = useQuery<Offering[]>({ queryKey: ["/api/admin/offerings"] });
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["/api/admin/community/channels"] });
@@ -285,15 +285,15 @@ export function CommunityAdmin() {
       name: c.name,
       description: c.description ?? "",
       minTierRank: c.minTierRank,
-      cohortId: c.cohortId,
+      offeringId: c.offeringId,
       isReadOnly: c.isReadOnly,
       isActive: c.isActive,
       sortOrder: c.sortOrder,
     });
   };
 
-  const cohortName = (id: string | null) =>
-    cohorts.data?.find((c) => c.id === id)?.name ?? "a cohort";
+  const offeringName = (id: string | null) =>
+    offerings.data?.find((c) => c.id === id)?.name ?? "an offering";
 
   return (
     <div className="space-y-6">
@@ -323,7 +323,7 @@ export function CommunityAdmin() {
         <ChannelEditor
           draft={draft}
           setDraft={setDraft}
-          cohorts={cohorts.data ?? []}
+          offerings={offerings.data ?? []}
           onSave={() => save.mutate({ id: null, draft })}
           onCancel={() => {
             setCreating(false);
@@ -348,7 +348,7 @@ export function CommunityAdmin() {
                 key={c.id}
                 draft={draft}
                 setDraft={setDraft}
-                cohorts={cohorts.data ?? []}
+                offerings={offerings.data ?? []}
                 onSave={() => save.mutate({ id: c.id, draft })}
                 onCancel={() => setEditingId(null)}
                 saving={save.isPending}
@@ -379,7 +379,7 @@ export function CommunityAdmin() {
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {c.cohortId ? `Only ${cohortName(c.cohortId)}` : tierLabel(c.minTierRank)}
+                    {c.offeringId ? `Only ${offeringName(c.offeringId)}` : tierLabel(c.minTierRank)}
                     {c.description ? ` · ${c.description}` : ""}
                   </p>
                 </div>

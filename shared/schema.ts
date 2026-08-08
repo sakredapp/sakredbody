@@ -9,7 +9,7 @@ export * from "./models/executive.js";
 export * from "./models/shop.js";
 export * from "./models/library.js";
 export * from "./models/energy.js";
-export * from "./models/cohorts.js";
+export * from "./models/offerings.js";
 export * from "./models/daily.js";
 export * from "./models/community.js";
 

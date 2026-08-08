@@ -65,7 +65,7 @@ import { MasterclassTab } from "@/components/MasterclassTab";
 import { ApothecaryTab } from "@/components/ApothecaryTab";
 import { LibraryTab } from "@/components/LibraryTab";
 import { BodyMap } from "@/components/BodyMap";
-import { MastermindsTab } from "@/components/MastermindsTab";
+import { OfferingsTab } from "@/components/OfferingsTab";
 import { CommunityTab } from "@/components/CommunityTab";
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
@@ -400,7 +400,7 @@ export default function MemberDashboard() {
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 }`}
               >
-                Masterminds
+                What's On
               </button>
               <button
                 onClick={() => setRetreatView("my-bookings")}
@@ -515,7 +515,7 @@ export default function MemberDashboard() {
             className="container max-w-6xl mx-auto px-4 py-8"
           >
 
-        {retreatView === "masterminds" && <MastermindsTab />}
+        {retreatView === "masterminds" && <OfferingsTab />}
 
         {retreatView === "book" && (
           <div className="space-y-8 max-w-3xl">

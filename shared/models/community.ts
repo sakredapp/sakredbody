@@ -89,10 +89,11 @@ export const channels = pgTable(
     /** Minimum tier rank to see this room at all. 0 = everyone. */
     minTierRank: integer("min_tier_rank").notNull().default(0),
     /**
-     * A cohort-bound room: only confirmed members of this cohort get in,
-     * regardless of tier. This is how a mastermind gets its own space.
+     * An offering-bound room: only confirmed registrants of that offering get
+     * in, regardless of tier. This is how a mastermind, a retreat or a
+     * recurring webinar gets its own space.
      */
-    cohortId: uuid("cohort_id"),
+    offeringId: uuid("offering_id"),
     /** Read-only for members — announcements. */
     isReadOnly: boolean("is_read_only").notNull().default(false),
     isActive: boolean("is_active").notNull().default(true),
@@ -101,7 +102,7 @@ export const channels = pgTable(
   },
   (t) => [
     index("idx_channels_tier").on(t.minTierRank),
-    index("idx_channels_cohort").on(t.cohortId),
+    index("idx_channels_offering").on(t.offeringId),
   ]
 );
 

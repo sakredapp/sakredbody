@@ -39,7 +39,7 @@ import {
   communityMessages,
   messageReactions,
   membershipTiers,
-  cohortMembers,
+  offeringRegistrations,
   users,
   insertChannelSchema,
   postMessageSchema,
@@ -90,9 +90,9 @@ function present(m: typeof communityMessages.$inferSelect) {
 /**
  * Which channels this member may see, as ids.
  *
- * A tier gate plus a cohort exception: a mastermind's room is open to its
- * confirmed members whatever tier they hold, because they paid for the room
- * rather than for the tier.
+ * A tier gate plus an offering exception: a mastermind's or a retreat's room
+ * is open to its confirmed registrants whatever tier they hold, because they
+ * paid for the room rather than for the tier.
  */
 async function visibleChannelIds(userId: string): Promise<string[]> {
   const [me] = await db
@@ -111,22 +111,27 @@ async function visibleChannelIds(userId: string): Promise<string[]> {
   const admin = me?.isAdmin === "true";
 
   const rows = await db
-    .select({ id: channels.id, minTierRank: channels.minTierRank, cohortId: channels.cohortId })
+    .select({ id: channels.id, minTierRank: channels.minTierRank, offeringId: channels.offeringId })
     .from(channels)
     .where(eq(channels.isActive, true));
 
   if (admin) return rows.map((r) => r.id);
 
-  // One query for every cohort this member is confirmed in, rather than one
+  // One query for every offering this member is confirmed in, rather than one
   // per gated channel.
-  const cohorts = await db
-    .select({ cohortId: cohortMembers.cohortId })
-    .from(cohortMembers)
-    .where(and(eq(cohortMembers.userId, userId), eq(cohortMembers.status, "confirmed")));
-  const mine = new Set(cohorts.map((c) => c.cohortId));
+  const registered = await db
+    .select({ offeringId: offeringRegistrations.offeringId })
+    .from(offeringRegistrations)
+    .where(
+      and(
+        eq(offeringRegistrations.userId, userId),
+        eq(offeringRegistrations.status, "confirmed"),
+      ),
+    );
+  const mine = new Set(registered.map((r) => r.offeringId));
 
   return rows
-    .filter((c) => (c.cohortId ? mine.has(c.cohortId) : rank >= c.minTierRank))
+    .filter((c) => (c.offeringId ? mine.has(c.offeringId) : rank >= c.minTierRank))
     .map((c) => c.id);
 }
 

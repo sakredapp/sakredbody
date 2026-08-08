@@ -14,7 +14,7 @@ import { registerMasterclassRoutes } from "./masterclass/index.js";
 import { registerShopRoutes } from "./shop/index.js";
 import { registerLibraryRoutes } from "./library/index.js";
 import { registerEnergyRoutes } from "./energy/index.js";
-import { registerCohortRoutes } from "./cohorts/index.js";
+import { registerOfferingRoutes } from "./offerings/index.js";
 import { registerDailyRoutes } from "./daily/index.js";
 import { registerCommunityRoutes } from "./community/index.js";
 
@@ -448,7 +448,7 @@ export async function registerRoutes(
   registerEnergyRoutes(app);
 
   // ── Masterminds ──────────────────────────────────────────────────────
-  registerCohortRoutes(app);
+  registerOfferingRoutes(app);
 
   // ── The daily ritual ─────────────────────────────────────────────────
   registerDailyRoutes(app);
