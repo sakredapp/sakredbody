@@ -423,3 +423,66 @@
     inset: -1px;
   }
 }
+
+/* ─── Reader typography ──────────────────────────────────────────────────────
+   Admin-authored guide HTML. Deliberately not @tailwindcss/typography: that
+   plugin brings its own colour scale, which fights the tone-ink / tone-light
+   scopes and would make chapter text the one thing on the page that doesn't
+   re-tone with its section. */
+@layer components {
+  .prose-sakred h2,
+  .prose-sakred h3 {
+    font-family: var(--font-display, ui-serif, Georgia, serif);
+    font-weight: 400;
+    line-height: 1.25;
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .prose-sakred h2 { font-size: 1.6rem; }
+  .prose-sakred h3 { font-size: 1.25rem; }
+
+  .prose-sakred p { margin-bottom: 1.25rem; }
+
+  .prose-sakred a {
+    color: hsl(var(--gold-text));
+    text-underline-offset: 3px;
+    text-decoration: underline;
+  }
+
+  .prose-sakred strong { font-weight: 600; }
+
+  .prose-sakred ul,
+  .prose-sakred ol {
+    margin: 0 0 1.25rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .prose-sakred ul { list-style: disc; }
+  .prose-sakred ol { list-style: decimal; }
+
+  /* A pulled quote is the one place a guide raises its voice. */
+  .prose-sakred blockquote {
+    border-left: 1px solid hsl(var(--gold) / 0.4);
+    padding-left: 1.25rem;
+    margin: 2rem 0;
+    font-family: var(--font-display, ui-serif, Georgia, serif);
+    font-size: 1.15rem;
+    line-height: 1.6;
+    color: hsl(var(--foreground));
+  }
+
+  .prose-sakred img {
+    max-width: 100%;
+    border-radius: 0.5rem;
+    margin: 2rem 0;
+  }
+
+  .prose-sakred hr {
+    border: 0;
+    border-top: 1px solid hsl(var(--border));
+    margin: 2.5rem 0;
+  }
+}

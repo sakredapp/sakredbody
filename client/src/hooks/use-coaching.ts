@@ -299,8 +299,8 @@ export function useEnrollInRoutine() {
     },
     onSuccess: (data) => {
       toast({
-        title: "Enrolled!",
-        description: `${data.habitsScheduled} habits scheduled. Let's go!`,
+        title: "Enrolled",
+        description: `${data.habitsScheduled} habits scheduled.`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/routines"] });
       queryClient.invalidateQueries({ queryKey: ["/api/routines/active"] });

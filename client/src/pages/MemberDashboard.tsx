@@ -62,6 +62,7 @@ import {
 } from "./CoachingDashboard";
 import { MasterclassTab } from "@/components/MasterclassTab";
 import { ApothecaryTab } from "@/components/ApothecaryTab";
+import { LibraryTab } from "@/components/LibraryTab";
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
 // Icon mapping (UI-only, can't live in shared/)
@@ -163,7 +164,7 @@ export default function MemberDashboard() {
 
   // Default to coaching tab if coming from /coaching URL
   const defaultSection = location === "/coaching" ? "coaching" : "retreat";
-  const [section, setSection] = useState<"retreat" | "coaching" | "masterclass" | "apothecary">(defaultSection);
+  const [section, setSection] = useState<"retreat" | "coaching" | "masterclass" | "apothecary" | "library">(defaultSection);
   const [retreatView, setRetreatView] = useState<"book" | "services" | "my-bookings">("book");
   const [coachingTab, setCoachingTab] = useState<"today" | "journey" | "routines" | "catalog" | "analytics" | "coach">("today");
   const [showBookingDialog, setShowBookingDialog] = useState(false);
@@ -305,6 +306,7 @@ export default function MemberDashboard() {
             {([
               { id: "coaching" as const, label: "Coaching" },
               { id: "apothecary" as const, label: "Apothecary" },
+              { id: "library" as const, label: "Library" },
               { id: "retreat" as const, label: "My Retreat" },
               { id: "masterclass" as const, label: "Masterclass" },
             ]).map(({ id, label }) => (
@@ -428,6 +430,19 @@ export default function MemberDashboard() {
             className="container max-w-3xl mx-auto px-4 py-8"
           >
             <ApothecaryTab />
+          </motion.div>
+        )}
+
+        {section === "library" && (
+          <motion.div
+            key="library"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="container max-w-4xl mx-auto px-4 py-8"
+          >
+            <LibraryTab />
           </motion.div>
         )}
 

@@ -12,6 +12,7 @@ import { submitExecutiveApplicationSchema, scoreApplication, EXEC_QUESTIONS } fr
 import { registerCoachingRoutes } from "./coaching/index.js";
 import { registerMasterclassRoutes } from "./masterclass/index.js";
 import { registerShopRoutes } from "./shop/index.js";
+import { registerLibraryRoutes } from "./library/index.js";
 
 function isAdmin(req: Request, res: Response, next: NextFunction) {
   const userId = req.session?.userId;
@@ -435,6 +436,9 @@ export async function registerRoutes(
 
   // ── The Apothecary ───────────────────────────────────────────────────
   registerShopRoutes(app);
+
+  // ── The Library ──────────────────────────────────────────────────────
+  registerLibraryRoutes(app);
 
   return httpServer;
 }
