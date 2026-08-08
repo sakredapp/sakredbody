@@ -256,11 +256,11 @@ export default function Home() {
       </Section>
 
       {/* ── Core lessons ─────────────────────────────────────── */}
-      <Section id="lessons" tone="light">
+      <Section id="lessons" tone="light" className="py-12 md:py-16">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.p
             variants={fadeInUp}
-            className="text-xs uppercase tracking-widest text-gold mb-14 rule-gold rule-gold-center text-center"
+            className="text-xs uppercase tracking-widest text-gold mb-7 rule-gold rule-gold-center text-center"
           >
             The Core Lessons
           </motion.p>
@@ -361,8 +361,16 @@ export default function Home() {
         </motion.div>
       </Section>
 
+      <ImageBand
+        image="/images/cliffs-sea.jpg"
+        alt="Cliffs falling into a calm blue sea"
+        title={<>Somewhere the noise <span className="text-gold">cannot reach you.</span></>}
+        tall
+        testId="text-coast-headline"
+      />
+
       {/* ── Food ─────────────────────────────────────────────── */}
-      <Section tone="ink">
+      <Section tone="light">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-10">
             <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">Food</p>
@@ -419,16 +427,9 @@ export default function Home() {
         </motion.div>
       </Section>
 
-      <ImageBand
-        image="/images/cliffs-sea.jpg"
-        alt="Cliffs falling into a calm blue sea"
-        title={<>Somewhere the noise <span className="text-gold">cannot reach you.</span></>}
-        tall
-        testId="text-coast-headline"
-      />
 
       {/* ── Mastermind teaser ────────────────────────────────── */}
-      <Section tone="light" className="overflow-hidden">
+      <Section tone="ink" className="overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img src="/images/gathering-string-lights.jpg" alt="" className="w-full h-full object-cover opacity-30" />
           <div
@@ -476,7 +477,7 @@ export default function Home() {
       </Section>
 
       {/* ── Final CTA ────────────────────────────────────────── */}
-      <Section tone="ink" className="text-center py-24">
+      <Section tone="light" className="text-center py-24">
         <motion.div
           initial="hidden"
           whileInView="visible"

@@ -241,7 +241,10 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply text-foreground font-sans antialiased;
+    /* Ink, not --background: the page ground is dark, and the light bands are
+       their own panels. Otherwise overscroll shows white above and below. */
+    background-color: hsl(var(--ink));
   }
   /* The page ground is ink, so the browser chrome should match it —
      otherwise the scrollbar gutter renders as a white stripe. */

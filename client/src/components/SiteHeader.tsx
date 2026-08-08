@@ -159,26 +159,26 @@ export function SiteHeader({ navItems = SITE_NAV, cta, overHero = true }: SiteHe
         </div>
 
         {menuOpen && (
-          <nav className="lg:hidden pointer-events-auto mt-2 rounded-3xl border border-white/12 bg-[hsl(30_10%_9%/0.96)] backdrop-blur-xl max-h-[70vh] overflow-y-auto shadow-lg shadow-black/30">
+          <nav className="tone-ink lg:hidden pointer-events-auto mt-2 rounded-3xl border border-white/12 bg-[hsl(30_10%_9%/0.96)] backdrop-blur-xl max-h-[70vh] overflow-y-auto shadow-lg shadow-black/30">
             <div className="px-5 py-3 flex flex-col">
             <Link
               href="/member"
-              className="py-3 text-sm text-gold border-b border-white/10"
+              className="py-3 text-sm text-gold-light border-b border-white/10"
               data-testid="link-member-portal-mobile"
             >
               Member Portal
             </Link>
             {navItems.map((item) =>
               item.children ? (
-                <div key={item.label} className="py-3 border-b border-border/30 last:border-0">
-                  <p className="text-xs uppercase tracking-widest text-gold mb-2">{item.label}</p>
+                <div key={item.label} className="py-3 border-b border-white/10 last:border-0">
+                  <p className="text-xs uppercase tracking-widest text-gold-light mb-2">{item.label}</p>
                   {item.children.map((c) => (
                     <Link
                       key={c.href}
                       href={c.href}
                       className={cn(
                         "block py-2 text-sm",
-                        isActive(c.href) ? "text-gold" : "text-muted-foreground",
+                        isActive(c.href) ? "text-gold-light" : "text-white/75",
                       )}
                     >
                       {c.label}
@@ -190,8 +190,8 @@ export function SiteHeader({ navItems = SITE_NAV, cta, overHero = true }: SiteHe
                   key={item.href}
                   href={item.href!}
                   className={cn(
-                    "py-3 text-sm border-b border-border/30 last:border-0",
-                    isActive(item.href!) ? "text-gold" : "text-muted-foreground",
+                    "py-3 text-sm border-b border-white/10 last:border-0",
+                    isActive(item.href!) ? "text-gold-light" : "text-white/75",
                   )}
                 >
                   {item.label}

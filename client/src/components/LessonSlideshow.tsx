@@ -69,7 +69,7 @@ export function LessonSlideshow({ lessons, intervalMs = 7000, className }: Lesso
           <ChevronLeft className="h-5 w-5" />
         </button>
 
-        <div className="flex-1 min-h-[300px] sm:min-h-[260px] flex items-center justify-center px-2">
+        <div className="flex-1 min-h-[190px] sm:min-h-[165px] flex items-center justify-center px-2">
           <AnimatePresence mode="wait" custom={direction} initial={false}>
             <motion.div
               key={index}
@@ -81,7 +81,7 @@ export function LessonSlideshow({ lessons, intervalMs = 7000, className }: Lesso
               transition={{ duration: 0.45, ease: "easeOut" }}
               className="text-center max-w-xl mx-auto"
             >
-              <h3 className="font-display text-3xl md:text-4xl mb-5" data-testid="text-lesson-title">
+              <h3 className="font-display text-3xl md:text-4xl mb-4" data-testid="text-lesson-title">
                 {lesson.title}
               </h3>
               <p className="text-muted-foreground leading-relaxed text-base md:text-lg">{lesson.body}</p>
@@ -99,7 +99,7 @@ export function LessonSlideshow({ lessons, intervalMs = 7000, className }: Lesso
         </button>
       </div>
 
-      <div className="flex justify-center items-center gap-2.5 mt-10">
+      <div className="flex justify-center items-center gap-2.5 mt-7">
         {lessons.map((l, i) => (
           <button
             key={l.title}
