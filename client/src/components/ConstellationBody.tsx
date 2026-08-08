@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { breathAt } from "@/lib/breath";
 import { hash01, mountStage } from "@/lib/canvasStage";
 
@@ -128,10 +127,16 @@ export function ConstellationBody({ className }: { className?: string }) {
         const breath = breathAt(t);
         ctx.clearRect(0, 0, w, h);
 
-        // Fit the 100 × 200 figure into the canvas with room for the halo.
-        const scale = Math.min(w / 150, h / 215);
-        const ox = w / 2 - 50 * scale;
-        const oy = h / 2 - 100 * scale;
+        // The figure occupies x 18…82 and y 8…160. Fitting to its actual
+        // extent — rather than to the nominal 100 × 200 box — is what keeps
+        // the feet on the canvas at every size.
+        const FIG_W = 64;
+        const FIG_H = 152;
+        const FIG_CX = 50;
+        const FIG_CY = 84;
+        const scale = Math.min((w * 0.82) / FIG_W, (h * 0.88) / FIG_H);
+        const ox = w / 2 - FIG_CX * scale;
+        const oy = h / 2 - FIG_CY * scale;
         const P = (s: Star) => ({ x: ox + s.x * scale, y: oy + s.y * scale });
 
         // Which region is lit, and is the pointer overriding the cycle?
@@ -223,8 +228,6 @@ export function ConstellationBody({ className }: { className?: string }) {
     });
   }, []);
 
-  const region = BODY_REGIONS[active];
-
   return (
     <div className="relative">
       <canvas
@@ -234,22 +237,6 @@ export function ConstellationBody({ className }: { className?: string }) {
         data-testid="constellation-body"
       />
 
-      {/* One name, drifting through. The figure is the argument; it doesn't
-          need paragraphs standing next to it explaining itself. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-6 flex justify-center">
-        <AnimatePresence mode="wait">
-          <motion.p
-            key={region.key}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.6 }}
-            className="text-[11px] uppercase tracking-[0.24em] text-gold"
-          >
-            {region.name}
-          </motion.p>
-        </AnimatePresence>
-      </div>
     </div>
   );
 }

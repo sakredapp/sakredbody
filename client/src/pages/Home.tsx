@@ -234,7 +234,7 @@ export default function Home() {
       </section>
 
       {/* ── The body, as a constellation ─────────────────────── */}
-      <Section tone="ink" className="overflow-hidden py-14 md:py-20">
+      <Section tone="ink" className="overflow-hidden pt-10 pb-0 md:pt-14 md:pb-0">
         <StarDust className="absolute inset-0 w-full h-full z-0" density={1.1} />
         <motion.div
           initial="hidden"
@@ -262,7 +262,7 @@ export default function Home() {
       </Section>
 
       {/* ── The Four Territories ─────────────────────────── */}
-      <Section id="territories" tone="ink" className="overflow-hidden">
+      <Section id="territories" tone="ink" className="overflow-hidden pt-4 md:pt-6">
         <Constellation className="absolute inset-0 w-full h-full z-0 opacity-90" />
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.div variants={fadeInUp}>
