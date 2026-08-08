@@ -1,291 +1,131 @@
 /**
- * Vitals — one organism, one clock.
+ * Vitals — a heartbeat, layered onto the existing breath.
  *
- * The brief was that the app should feel alive rather than drawn. The mistake
- * most attempts make is animating things *separately*: a pulsing button here,
- * a floating card there. That reads as a page with animations on it, not as a
- * living thing, because a body has one heart and one set of lungs and
- * everything in it moves to those.
+ * `breath.ts` is the clock. It came first, eight pages read from it, and there
+ * must only ever be one — two clocks is exactly the failure the shared-clock
+ * design exists to prevent, and an earlier draft of this file was that second
+ * clock. Everything here derives from `breathAt()` rather than re-deriving
+ * time, so the pulse below is phase-locked to the breath every other canvas is
+ * already following.
  *
- * So this is a single global clock. Every component subscribes to the same
- * breath and the same pulse. When the page breathes, all of it breathes
- * together — that synchrony is the whole effect.
+ * What this adds that breath alone doesn't:
  *
- * ── What actually reads as alive ──────────────────────────────────────────
+ *   PULSE — faster, sharper, mostly near zero. A real beat is a systolic
+ *   spike, a dip, then a smaller second bump as the aortic valve shuts. One
+ *   hump reads as a blink; two reads as a heart.
  *
- * 1. BREATH is the strongest signal, and it must not be a sine wave. Real
- *    breath is asymmetric: a shorter rise, a pause at the top, a longer fall,
- *    a rest at the bottom. A sine reads mechanical within about ten seconds.
+ *   COUPLING — the heart speeds up on the inhale and slows on the exhale.
+ *   That's respiratory sinus arrhythmia, and it's the detail that makes two
+ *   rhythms feel like one organism instead of two timers.
  *
- * 2. PULSE is faster, sharper and subtler. A heartbeat is a fast systolic
- *    spike, a dip, a smaller secondary bump (the dicrotic notch as the aortic
- *    valve closes), then decay. Two beats, not one.
+ *   DRIFT — a slow wander, so nothing loops exactly.
  *
- * 3. COUPLING is the detail that sells it. In a real body the heart speeds up
- *    on the inhale and slows on the exhale — respiratory sinus arrhythmia. So
- *    the pulse here is driven by the breath rather than running independently.
- *    Two rhythms that know about each other feel like one organism; two that
- *    don't feel like two timers.
- *
- * 4. DRIFT. Nothing living repeats exactly. A slow noise field detunes
- *    everything a little, forever, so no loop is ever quite the same.
- *
- * ── Cost ──────────────────────────────────────────────────────────────────
- *
- * One rAF loop for the entire app, whatever the number of subscribers. It
- * stops when the tab is hidden and when nobody is listening, and honours
- * prefers-reduced-motion by freezing at a resting pose rather than by
- * disappearing.
+ * Pure functions over a timestamp. No rAF, no subscribers — `mountStage`
+ * already runs the frame loop and hands every canvas the same `t`.
  */
 
-export interface Vitals {
-  /** Seconds since the clock started. Drifts, never resets. */
-  t: number;
+import { breathAt, phaseAt, type BreathPhase } from "./breath";
+import { noise2 } from "./canvasStage";
 
-  /** 0..1 through the breath cycle. */
-  breathPhase: number;
-  /** -1 (fully out) .. 1 (fully in). The one most components want. */
+export interface Vitals {
+  /** 0 at the bottom of the exhale, 1 at the top of the inhale. */
   breath: number;
-  /** Which part of the cycle we're in. */
-  breathStage: "in" | "hold" | "out" | "rest";
+  /** The same, as -1..1 — usually what you want for a swell. */
+  swell: number;
+  phase: BreathPhase;
 
   /** 0..1 through the current beat. */
   pulsePhase: number;
-  /** 0..1 — sharp rise, dicrotic notch, decay. Mostly near zero. */
+  /** 0..1 — sharp rise, dicrotic notch, decay. Near zero most of the time. */
   pulse: number;
-  /** Beats per minute right now. Varies with the breath. */
+  /** Beats per minute right now. Rises on the inhale. */
   bpm: number;
 
-  /** Slow wander in -1..1. Use to detune anything that would otherwise loop. */
+  /** Slow wander, -1..1. Detune anything that would otherwise loop. */
   drift: number;
-  /** A second, faster wander, uncorrelated with the first. */
+  /** A second wander, uncorrelated with the first. */
   drift2: number;
-
-  /** True when the user asked for less motion. Hold a resting pose. */
-  reduced: boolean;
 }
 
-// ─── Tuning ────────────────────────────────────────────────────────────────
-
-/**
- * 5.5 breaths per minute — the rate that shows up in coherent-breathing
- * practice, and slow enough to read as calm rather than as anxious. ~10.9s.
- */
-const BREATHS_PER_MINUTE = 5.5;
-const BREATH_PERIOD = 60 / BREATHS_PER_MINUTE;
-
-/** Proportions of one breath. They sum to 1. */
-const INHALE = 0.34;
-const HOLD = 0.08;
-const EXHALE = 0.44;
-const REST = 0.14;
-
-/** Resting heart rate, before the breath pushes it around. */
+/** Resting rate, before the breath pushes it around. */
 const BASE_BPM = 58;
-/** How much the breath swings it. ±6bpm is within a normal person's range. */
+/** How far the breath swings it. ±6 is within a normal person's range. */
 const BPM_SWING = 6;
 
-// ─── Curves ────────────────────────────────────────────────────────────────
+/**
+ * Beats have to be integrated rather than derived, because their rate keeps
+ * changing — you can't take `t * bpm` when bpm is a function of t.
+ *
+ * Module-level, advanced once per distinct timestamp. Every canvas on the page
+ * is handed the same `t` by `mountStage` in the same frame, so the guard means
+ * ten canvases don't advance the heart ten times.
+ */
+let lastT = 0;
+let beats = 0;
 
-/** Smooth 0→1 with zero velocity at both ends. Bodies don't start abruptly. */
+function advance(t: number) {
+  if (t === lastT) return;
+  // A backgrounded tab hands back a large jump; clamp so the heart doesn't
+  // fire a burst of beats the moment it returns.
+  const dt = Math.min(0.1, Math.max(0, t - lastT));
+  lastT = t;
+  const b = breathAt(t);
+  beats += (dt * (BASE_BPM + BPM_SWING * (b * 2 - 1))) / 60;
+}
+
+/** Smooth 0→1, zero velocity at both ends. */
 function smooth(x: number): number {
   const c = Math.min(1, Math.max(0, x));
   return c * c * (3 - 2 * c);
 }
 
 /**
- * The breath, as amplitude in 0..1 across the cycle.
+ * One beat across 0..1.
  *
- * Deliberately not a sine. The inhale is quicker than the exhale, there's a
- * pause at the top, and the bottom rests — which is what makes it read as
- * breathing rather than as oscillating.
+ * Systole is a fast rise and slower fall; the notch is a third the height and
+ * later. Past 0.55 the heart is simply waiting, which is why a pulse reads as
+ * punctuation rather than as throbbing.
  */
-function breathAmplitude(phase: number): { value: number; stage: Vitals["breathStage"] } {
-  let p = phase;
-
-  if (p < INHALE) return { value: smooth(p / INHALE), stage: "in" };
-  p -= INHALE;
-
-  if (p < HOLD) return { value: 1, stage: "hold" };
-  p -= HOLD;
-
-  if (p < EXHALE) return { value: 1 - smooth(p / EXHALE), stage: "out" };
-
-  return { value: 0, stage: "rest" };
-}
-
-/**
- * One heartbeat in 0..1.
- *
- * Two humps: the systolic spike, then the dicrotic notch — the smaller bounce
- * as the aortic valve shuts. A single pulse reads as a blink; two reads as a
- * heart. Most of the cycle is near zero, which is why a heartbeat feels like
- * punctuation rather than like throbbing.
- */
-function beat(phase: number): number {
+function beatShape(phase: number): number {
   if (phase > 0.55) return 0;
 
-  // Systole: fast up, slower down.
   const systole =
-    phase < 0.09
-      ? smooth(phase / 0.09)
-      : Math.max(0, 1 - smooth((phase - 0.09) / 0.16));
+    phase < 0.09 ? smooth(phase / 0.09) : Math.max(0, 1 - smooth((phase - 0.09) / 0.16));
 
-  // The notch, a third the height and later.
   const notch =
-    phase > 0.26 && phase < 0.5
-      ? 0.32 * Math.sin(((phase - 0.26) / 0.24) * Math.PI)
-      : 0;
+    phase > 0.26 && phase < 0.5 ? 0.32 * Math.sin(((phase - 0.26) / 0.24) * Math.PI) : 0;
 
   return Math.min(1, systole + notch);
 }
 
-/** Cheap smooth value noise. Deterministic, no dependency. */
-function noise(x: number, seed: number): number {
-  const i = Math.floor(x);
-  const f = x - i;
-  const h = (n: number) => {
-    const s = Math.sin((n + seed) * 127.1) * 43758.5453;
-    return (s - Math.floor(s)) * 2 - 1;
+/** Everything, for a given moment on the shared clock. */
+export function vitalsAt(t: number): Vitals {
+  advance(t);
+
+  const breath = breathAt(t);
+  const pulsePhase = beats % 1;
+
+  return {
+    breath,
+    swell: breath * 2 - 1,
+    phase: phaseAt(t),
+    pulsePhase,
+    pulse: beatShape(pulsePhase),
+    bpm: BASE_BPM + BPM_SWING * (breath * 2 - 1),
+    drift: noise2(t * 0.05, 0),
+    drift2: noise2(0, t * 0.17 + 40),
   };
-  return h(i) * (1 - smooth(f)) + h(i + 1) * smooth(f);
 }
 
-// ─── The clock ─────────────────────────────────────────────────────────────
-
-type Listener = (v: Vitals) => void;
-
-class Organism {
-  private listeners = new Set<Listener>();
-  private raf = 0;
-  private start = 0;
-  private last = 0;
-  /** Integrated separately from t, because its rate keeps changing. */
-  private beatAccumulator = 0;
-  private reduced = false;
-  private running = false;
-
-  private current: Vitals = {
-    t: 0,
-    breathPhase: 0,
-    breath: -1,
-    breathStage: "rest",
-    pulsePhase: 0,
-    pulse: 0,
-    bpm: BASE_BPM,
-    drift: 0,
-    drift2: 0,
-    reduced: false,
-  };
-
-  constructor() {
-    if (typeof window !== "undefined") {
-      const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-      this.reduced = mq.matches;
-      mq.addEventListener?.("change", (e) => {
-        this.reduced = e.matches;
-        this.emit();
-      });
-
-      // Nothing should animate behind a hidden tab.
-      document.addEventListener("visibilitychange", () => {
-        if (document.hidden) this.stop();
-        else if (this.listeners.size > 0) this.play();
-      });
-    }
-  }
-
-  subscribe(fn: Listener): () => void {
-    this.listeners.add(fn);
-    fn(this.current);
-    if (this.listeners.size === 1) this.play();
-    return () => {
-      this.listeners.delete(fn);
-      if (this.listeners.size === 0) this.stop();
-    };
-  }
-
-  /** Read without subscribing — for imperative canvas loops. */
-  read(): Vitals {
-    return this.current;
-  }
-
-  private play() {
-    if (this.running || typeof window === "undefined") return;
-    this.running = true;
-    this.start = performance.now() - this.current.t * 1000;
-    this.last = performance.now();
-    this.raf = requestAnimationFrame(this.tick);
-  }
-
-  private stop() {
-    this.running = false;
-    cancelAnimationFrame(this.raf);
-  }
-
-  private tick = (now: number) => {
-    if (!this.running) return;
-
-    // Clamp: a backgrounded tab can hand back a delta of many seconds, which
-    // would fire a burst of beats the moment it returns.
-    const dt = Math.min(0.1, (now - this.last) / 1000);
-    this.last = now;
-    const t = (now - this.start) / 1000;
-
-    if (this.reduced) {
-      // A resting pose: mid-exhale, no pulse. Still present, not moving.
-      this.current = {
-        ...this.current,
-        t,
-        breathPhase: 0,
-        breath: -0.3,
-        breathStage: "rest",
-        pulsePhase: 0,
-        pulse: 0,
-        drift: 0,
-        drift2: 0,
-        reduced: true,
-      };
-      this.emit();
-      this.raf = requestAnimationFrame(this.tick);
-      return;
-    }
-
-    const drift = noise(t * 0.05, 0);
-    const drift2 = noise(t * 0.17, 91.7);
-
-    // Breath, detuned slightly and continuously so it never loops exactly.
-    const period = BREATH_PERIOD * (1 + drift * 0.06);
-    const breathPhase = (t % period) / period;
-    const { value, stage } = breathAmplitude(breathPhase);
-
-    // Respiratory sinus arrhythmia: faster in, slower out.
-    const bpm = BASE_BPM + BPM_SWING * (value * 2 - 1) + drift2 * 1.5;
-
-    this.beatAccumulator += (dt * bpm) / 60;
-    const pulsePhase = this.beatAccumulator % 1;
-
-    this.current = {
-      t,
-      breathPhase,
-      breath: value * 2 - 1,
-      breathStage: stage,
-      pulsePhase,
-      pulse: beat(pulsePhase),
-      bpm,
-      drift,
-      drift2,
-      reduced: false,
-    };
-
-    this.emit();
-    this.raf = requestAnimationFrame(this.tick);
-  };
-
-  private emit() {
-    for (const fn of this.listeners) fn(this.current);
-  }
+/**
+ * The Opal detail: a tiny, fast oscillation riding the slow breath.
+ *
+ * Below the threshold of conscious notice — a few tenths of a pixel — but it
+ * puts a ring under tension instead of leaving it drawn. `excite` climbs on
+ * hover so the object answers when you approach it.
+ */
+export function resonance(t: number, excite = 0): number {
+  const amplitude = 0.35 + excite * 1.6;
+  const rate = 7.5 + excite * 5;
+  return Math.sin(t * rate) * amplitude * (0.6 + breathAt(t) * 0.4);
 }
-
-/** One per document. Every component shares this body. */
-export const organism = new Organism();
