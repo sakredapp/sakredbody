@@ -15,6 +15,7 @@
  *   AWS_PROFILE=your-profile npx tsx script/test-bedrock.ts
  */
 
+import { readFileSync, existsSync } from "node:fs";
 import { getModelClient } from "../server/daily/model.js";
 import {
   SYSTEM_PROMPT,
@@ -25,6 +26,45 @@ import {
   type NoteContext,
 } from "../server/daily/voice.js";
 import { almanacFor } from "../shared/utils/almanac.js";
+
+/**
+ * Load a local .env if there is one.
+ *
+ * The credentials live in Vercel, which a terminal can't see, and Vercel marks
+ * them sensitive so `vercel env pull` returns them empty. So the path of least
+ * friction is a local .env — which is gitignored, and which nothing else in
+ * this script writes to.
+ *
+ * Hand-rolled rather than adding a dependency: this is twelve lines and only
+ * a test script needs it.
+ */
+function loadDotEnv(path = ".env") {
+  if (!existsSync(path)) return false;
+  let loaded = 0;
+  for (const line of readFileSync(path, "utf8").split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    let value = trimmed.slice(eq + 1).trim();
+    // Strip one layer of matching quotes.
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    // A real environment variable always wins over the file.
+    if (value && process.env[key] === undefined) {
+      process.env[key] = value;
+      loaded++;
+    }
+  }
+  return loaded > 0;
+}
+
+loadDotEnv();
 
 const today = new Date().toISOString().slice(0, 10);
 
