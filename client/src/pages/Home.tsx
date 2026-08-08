@@ -237,9 +237,8 @@ export default function Home() {
                       style={{ backgroundColor: `hsl(${t.color})` }}
                     />
                     <h3 className="font-display text-2xl mb-2">{t.name}</h3>
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-5">{t.force}</p>
-                    <p className="font-display text-lg text-foreground/90 leading-snug flex-1">{t.verb}</p>
-                    <span className="mt-6 text-xs text-gold inline-flex items-center justify-center gap-1.5">
+                    <p className="text-xs text-muted-foreground mb-1 flex-1">{t.force}</p>
+                    <span className="mt-5 text-xs text-gold inline-flex items-center justify-center gap-1.5">
                       Explore <ArrowRight className="h-3.5 w-3.5" />
                     </span>
                   </div>
@@ -253,8 +252,6 @@ export default function Home() {
             className="text-center font-display text-3xl md:text-5xl mt-20 max-w-3xl mx-auto leading-[1.15] tracking-tight"
             data-testid="text-duality-thesis"
           >
-            Yin without Yang is decay. Yang without Yin is burnout.
-            <br />
             <span className="text-gold">We refuse to pick a side.</span>
           </motion.p>
 
@@ -268,36 +265,8 @@ export default function Home() {
         </motion.div>
       </Section>
 
-      {/* ── The refusal ──────────────────────────────────────── */}
-      <Section tone="light">
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={viewportOnce}
-          variants={staggerContainer}
-          className="max-w-4xl mx-auto text-center"
-        >
-          <motion.p variants={fadeInUp} className="text-xs uppercase tracking-widest text-gold mb-8 rule-gold rule-gold-center">
-            Where We Part Ways
-          </motion.p>
-          <motion.h2
-            variants={fadeInUp}
-            className="font-display text-3xl md:text-5xl lg:text-6xl font-normal leading-[1.12] tracking-tight"
-            data-testid="text-monk-headline"
-          >
-            Strength without recovery
-            <br />
-            is just a slower injury.
-            <br />
-            <span className="text-gold">Recovery without strength</span>
-            <br />
-            <span className="text-gold">is just decline with better branding.</span>
-          </motion.h2>
-        </motion.div>
-      </Section>
-
       {/* ── Core lessons ─────────────────────────────────────── */}
-      <Section id="lessons" tone="ink">
+      <Section id="lessons" tone="light">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.p
             variants={fadeInUp}
@@ -313,7 +282,7 @@ export default function Home() {
       </Section>
 
       {/* ── Five Elements ────────────────────────────────────── */}
-      <Section id="elements" tone="light">
+      <Section id="elements" tone="ink">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-14">
             <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
@@ -365,7 +334,7 @@ export default function Home() {
       </Section>
 
       {/* ── The App ──────────────────────────────────────────── */}
-      <Section id="app" tone="ink">
+      <Section id="app" tone="light">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-12">
             <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">The App</p>
@@ -407,7 +376,7 @@ export default function Home() {
       </Section>
 
       {/* ── Food ─────────────────────────────────────────────── */}
-      <Section tone="light">
+      <Section tone="ink">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-10">
             <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">Food</p>
@@ -473,7 +442,7 @@ export default function Home() {
       />
 
       {/* ── Mastermind teaser ────────────────────────────────── */}
-      <Section tone="ink" className="overflow-hidden">
+      <Section tone="light" className="overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img src="/images/gathering-string-lights.jpg" alt="" className="w-full h-full object-cover opacity-30" />
           <div
@@ -521,7 +490,7 @@ export default function Home() {
       </Section>
 
       {/* ── Final CTA ────────────────────────────────────────── */}
-      <Section tone="light" className="text-center py-24">
+      <Section tone="ink" className="text-center py-24">
         <motion.div
           initial="hidden"
           whileInView="visible"

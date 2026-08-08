@@ -58,26 +58,22 @@ export function SiteHeader({ navItems = SITE_NAV, cta, overHero = true }: SiteHe
   const linkTone = (active: boolean) => (active ? "text-gold" : "text-white/75");
 
   return (
-    <header
-      className={cn(
-        "fixed top-0 left-0 right-0 transition-all duration-300",
-        // Ink-toned and edgeless. A solid cream bar read as a foreign strip
-        // pasted over a dark page, and a hard bottom border draws the eye to
-        // the seam — so the fill fades out toward the bottom instead. Dark
-        // enough throughout that white nav text stays legible over the light
-        // floating panels that scroll underneath it.
-        "tone-ink backdrop-blur-md",
-      )}
-      style={{
-        zIndex: 9999,
-        background: solid
-          ? "linear-gradient(to bottom, hsl(30 10% 6% / 0.97) 0%, hsl(30 10% 6% / 0.93) 62%, hsl(30 10% 6% / 0.62) 100%)"
-          : "linear-gradient(to bottom, hsl(30 10% 6% / 0.86) 0%, hsl(30 10% 6% / 0.5) 55%, hsl(30 10% 6% / 0) 100%)",
-      }}
-    >
-      <div className="container max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+    <header className="fixed top-0 left-0 right-0 pointer-events-none" style={{ zIndex: 9999 }}>
+      <div className="container max-w-6xl mx-auto px-4 pt-3 sm:pt-4">
+        <div
+          className={cn(
+            // Floating pill: the page shows above it and down both sides, so it
+            // reads as an object on the page rather than a bar bolted to the top.
+            "pointer-events-auto rounded-full border backdrop-blur-xl transition-all duration-300",
+            "h-14 pl-5 pr-3 flex items-center justify-between gap-4",
+            solid ? "border-white/12 shadow-lg shadow-black/30" : "border-white/8",
+          )}
+          style={{
+            background: solid ? "hsl(30 10% 9% / 0.88)" : "hsl(30 10% 9% / 0.6)",
+          }}
+        >
         <Link href="/" className="flex items-center shrink-0" data-testid="link-home">
-          <img src={sakredLogo} alt="Sakred Body" className="h-10 w-10 object-contain" />
+          <img src={sakredLogo} alt="Sakred Body" className="h-9 w-9 object-contain" />
         </Link>
 
         <nav ref={navRef} className="hidden lg:flex items-center gap-6">
@@ -160,11 +156,11 @@ export function SiteHeader({ navItems = SITE_NAV, cta, overHero = true }: SiteHe
             {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
-      </div>
+        </div>
 
-      {menuOpen && (
-        <nav className="lg:hidden border-t border-white/10 bg-[hsl(30_10%_8%/0.96)] backdrop-blur-md max-h-[75vh] overflow-y-auto">
-          <div className="container max-w-6xl mx-auto px-4 py-3 flex flex-col">
+        {menuOpen && (
+          <nav className="lg:hidden pointer-events-auto mt-2 rounded-3xl border border-white/12 bg-[hsl(30_10%_9%/0.96)] backdrop-blur-xl max-h-[70vh] overflow-y-auto shadow-lg shadow-black/30">
+            <div className="px-5 py-3 flex flex-col">
             {navItems.map((item) =>
               item.children ? (
                 <div key={item.label} className="py-3 border-b border-border/30 last:border-0">
@@ -195,9 +191,10 @@ export function SiteHeader({ navItems = SITE_NAV, cta, overHero = true }: SiteHe
                 </Link>
               ),
             )}
-          </div>
-        </nav>
-      )}
+            </div>
+          </nav>
+        )}
+      </div>
     </header>
   );
 }

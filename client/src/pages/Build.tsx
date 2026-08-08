@@ -25,14 +25,6 @@ const PILLARS = [
   { name: "Hormesis", body: "Heat, cold, fasting. Earn these — they're a garnish." },
 ];
 
-const READINESS = [
-  "You sleep through the night most nights",
-  "You have a daily bowel movement without effort",
-  "You can nose-breathe on an easy walk",
-  "You are not relying on stimulants to start the day",
-  "You feel recovered within two days of hard effort",
-  "You are eating enough protein and drinking enough water to rebuild",
-];
 
 const MISTAKES = [
   {
@@ -142,44 +134,8 @@ export default function Build() {
         </motion.div>
       </Section>
 
-      {/* ── Readiness gate ───────────────────────────────────── */}
-      <Section tone="light">
-        <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
-          <motion.div variants={fadeInUp}>
-            <SectionHeader
-              eyebrow="The Gate"
-              title={<>Are You Ready to <span className="text-gold">Be Loaded?</span></>}
-              intro="This is the question almost no training program asks. If most of these aren't true, more intensity will make things worse, not better — go back to Restore first. It isn't a delay. It's what makes the training work at all."
-              testId="text-readiness-headline"
-            />
-          </motion.div>
-
-          <div className="max-w-2xl mx-auto">
-            {READINESS.map((r, i) => (
-              <motion.div
-                variants={fadeInUp}
-                key={r}
-                className="flex flex-col items-center gap-2.5 py-5 border-b border-border/50 last:border-0 text-center"
-                data-testid={`row-readiness-${i}`}
-              >
-                <span className="h-4 w-4 rounded-full border border-gold/40" />
-                <span className="text-muted-foreground">{r}</span>
-              </motion.div>
-            ))}
-          </div>
-
-          <motion.div variants={fadeInUp} className="text-center mt-10">
-            <Link href="/restore">
-              <Button variant="outline" className="border-gold-subtle text-gold px-8" data-testid="button-back-restore">
-                Not yet? Start with Restore
-              </Button>
-            </Link>
-          </motion.div>
-        </motion.div>
-      </Section>
-
       {/* ── Mistakes ─────────────────────────────────────────── */}
-      <Section tone="ink">
+      <Section tone="light">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
@@ -208,7 +164,7 @@ export default function Build() {
       </Section>
 
       {/* ── Next ─────────────────────────────────────────────── */}
-      <Section tone="light" className="text-center py-20">
+      <Section tone="ink" className="text-center py-20">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.h2 variants={fadeInUp} className="text-3xl md:text-4xl font-display font-normal mb-6">
             Capacity you never use

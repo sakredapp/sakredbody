@@ -19,13 +19,13 @@ const stagger = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { s
 const viewportOnce = { once: true, amount: 0.2 } as const;
 
 const DEFINITION = [
-  { quality: "Clear", body: "enough to perceive — not so loaded with burden that every signal is noise." },
-  { quality: "Regulated", body: "enough to recover — a nervous system that can actually downshift." },
-  { quality: "Nourished", body: "enough to rebuild — minerals, protein, water, light, sleep, in real amounts." },
-  { quality: "Strong", body: "enough to endure — able to carry weight and produce force under load." },
-  { quality: "Mobile", body: "enough to move — joints and tissue that let the strength be expressed." },
-  { quality: "Disciplined", body: "enough to develop — practice that survives a bad week." },
-  { quality: "Aware", body: "enough to adapt — reading the organism instead of outsourcing every decision." },
+  { quality: "Clear", body: "enough to perceive." },
+  { quality: "Regulated", body: "enough to recover." },
+  { quality: "Nourished", body: "enough to rebuild." },
+  { quality: "Strong", body: "enough to endure." },
+  { quality: "Mobile", body: "enough to move." },
+  { quality: "Disciplined", body: "enough to develop." },
+  { quality: "Aware", body: "enough to adapt." },
 ];
 
 export default function Philosophy() {
@@ -51,8 +51,8 @@ export default function Philosophy() {
           <motion.div variants={fadeInUp}>
             <SectionHeader
               eyebrow="The Definition"
-              title={<>Seven Words, <span className="text-gold">In Order</span></>}
-              intro="Each depends on the one before it. Awareness is useless in a body too loaded to send a clean signal, and strength is meaningless in a body that can't recover from it."
+              title={<>What We Mean</>}
+              intro="Each depends on the one before it."
               testId="text-definition-headline"
             />
           </motion.div>
@@ -62,7 +62,7 @@ export default function Philosophy() {
               <motion.div
                 variants={fadeInUp}
                 key={d.quality}
-                className="py-6 border-b border-border/50 last:border-0 text-center"
+                className="py-4 border-b border-border/50 last:border-0 text-center"
                 data-testid={`row-definition-${i}`}
               >
                 <p className="leading-relaxed">
