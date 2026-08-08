@@ -17,6 +17,7 @@ import { DailyNotesAdmin } from "@/components/admin/DailyNotes";
 import { CommunityAdmin } from "@/components/admin/CommunityAdmin";
 import { OfferingsAdmin } from "@/components/admin/Offerings";
 import { HostsAdmin } from "@/components/admin/Hosts";
+import { TelemetryAdmin } from "@/components/admin/Telemetry";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -133,6 +134,7 @@ type AdminTab =
   | "community"
   | "offerings"
   | "hosts"
+  | "telemetry"
   | "notes"
   | "masterclass"
   | "apothecary";
@@ -1241,6 +1243,7 @@ export default function AdminPortal() {
             { key: "offerings" as AdminTab, label: "What's On", badge: null },
             { key: "hosts" as AdminTab, label: "Hosts", badge: null },
             { key: "community" as AdminTab, label: "Rooms", badge: null },
+            { key: "telemetry" as AdminTab, label: "Activity", badge: null },
             { key: "masterclass" as AdminTab, label: "Masterclass", badge: null },
             { key: "apothecary" as AdminTab, label: "Apothecary", badge: null },
           ]).map((t) => (
@@ -1276,6 +1279,9 @@ export default function AdminPortal() {
 
         {/* ═══════════════ HOSTS TAB ═══════════════ */}
         {tab === "hosts" && <HostsAdmin />}
+
+        {/* ═══════════════ ACTIVITY TAB ═══════════════ */}
+        {tab === "telemetry" && <TelemetryAdmin />}
 
         {/* ═══════════════ PARTNERS TAB ═══════════════ */}
         {tab === "partners" && !selectedPartner && (

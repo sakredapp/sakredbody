@@ -86,6 +86,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DailyRitual } from "@/components/DailyRitual";
 import { InfoTip, LabelWithInfo } from "@/components/ui/info-tip";
+import { WinMoment } from "@/components/WinMoment";
+import type { Win } from "@shared/models/wins";
 
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
@@ -284,6 +286,10 @@ function TodayHabits() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The toggle returns anything newly earned. Read off the mutation's own
+  // result rather than threaded through state, and cleared by resetting it.
+  const earnedWins: Win[] = toggleMutation.data?.earnedWins ?? [];
+
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -335,6 +341,10 @@ function TodayHabits() {
           />
         </div>
       </div>
+
+      {earnedWins.length > 0 && (
+        <WinMoment wins={earnedWins} onClose={() => toggleMutation.reset()} />
+      )}
 
       {/* Habit sections */}
       {sections.map((section) => (
