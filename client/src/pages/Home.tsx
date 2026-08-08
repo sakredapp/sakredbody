@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { YinYang } from "@/components/YinYang";
+import { RippleField } from "@/components/RippleField";
 import { LessonSlideshow, type Lesson } from "@/components/LessonSlideshow";
 import { SectionHeader } from "@/components/PageHero";
 import { Button } from "@/components/ui/button";
@@ -144,6 +145,7 @@ export default function Home() {
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-b from-[hsl(30_10%_8%/0.7)] via-transparent to-[hsl(30_10%_9%)]" />
+          <RippleField className="absolute inset-0 w-full h-full" />
         </div>
 
         <div className="container max-w-6xl mx-auto px-4 relative z-20">
