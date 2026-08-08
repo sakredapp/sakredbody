@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/links";
-import { TOTAL_FOODS } from "@/data/foodChart";
+import { TOTAL_FOODS } from "@/data/foodCount";
 import { TERRITORIES } from "@/data/territories";
 import { usePageMeta } from "@/hooks/use-page-meta";
 

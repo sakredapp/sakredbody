@@ -6,20 +6,20 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import Home from "@/pages/Home";
-import Philosophy from "@/pages/Philosophy";
-import Restore from "@/pages/Restore";
-import Build from "@/pages/Build";
-import Embody from "@/pages/Embody";
-import Terrain from "@/pages/Terrain";
-import BodyLiteracy from "@/pages/BodyLiteracy";
-import Retreats from "@/pages/Retreats";
+const Philosophy = lazy(() => import("@/pages/Philosophy"));
+const Restore = lazy(() => import("@/pages/Restore"));
+const Build = lazy(() => import("@/pages/Build"));
+const Embody = lazy(() => import("@/pages/Embody"));
+const Terrain = lazy(() => import("@/pages/Terrain"));
+const BodyLiteracy = lazy(() => import("@/pages/BodyLiteracy"));
+const Retreats = lazy(() => import("@/pages/Retreats"));
 const Executive = lazy(() => import("@/pages/Executive"));
 const FoodChart = lazy(() => import("@/pages/FoodChart"));
 const Mastermind = lazy(() => import("@/pages/Mastermind"));
-import LoginPage from "@/pages/LoginPage";
+const LoginPage = lazy(() => import("@/pages/LoginPage"));
 const MemberDashboard = lazy(() => import("@/pages/MemberDashboard"));
 const AdminPortal = lazy(() => import("@/pages/AdminPortal"));
-import NotFound from "@/pages/not-found";
+const NotFound = lazy(() => import("@/pages/not-found"));
 
 function Router() {
   return (
