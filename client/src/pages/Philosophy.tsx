@@ -46,7 +46,7 @@ export default function Philosophy() {
       />
 
       {/* ── The definition ───────────────────────────────────── */}
-      <Section tone="light">
+      <Section tone="ink">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
@@ -62,10 +62,10 @@ export default function Philosophy() {
               <motion.div
                 variants={fadeInUp}
                 key={d.quality}
-                className="flex gap-5 py-5 border-b border-border/50 last:border-0 text-left"
+                className="py-6 border-b border-border/50 last:border-0 text-center"
                 data-testid={`row-definition-${i}`}
               >
-                <span className="font-mono text-xs text-gold/60 pt-1.5 shrink-0 w-6">
+                <span className="font-mono text-xs text-gold/60 block mb-2">
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <p className="leading-relaxed">
@@ -79,24 +79,23 @@ export default function Philosophy() {
       </Section>
 
       {/* ── Four territories ─────────────────────────────────── */}
-      <Section tone="ink">
+      <Section tone="light">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
               eyebrow="The Architecture"
               title={<>Restore. Build. <span className="text-gold">Embody. Gather.</span></>}
               intro="Health work and human environments aren't two businesses that happen to share a website. They're four territories of the same problem, in the order they have to be solved."
-              onInk
               testId="text-territories-headline"
             />
           </motion.div>
 
-          <div className="space-y-px bg-ink-line border border-ink-line rounded-lg overflow-hidden">
+          <div className="space-y-px bg-border border border-border rounded-lg overflow-hidden">
             {TERRITORIES.map((t, i) => (
               <motion.div variants={fadeInUp} key={t.key}>
                 <Link href={t.href}>
                   <div
-                    className="bg-ink-soft p-7 md:p-9 text-center hover-elevate transition-colors"
+                    className="bg-card p-7 md:p-9 text-center hover-elevate transition-colors"
                     data-testid={`row-territory-${t.key}`}
                   >
                     <div className="flex items-center justify-center gap-3 mb-4">
@@ -105,13 +104,13 @@ export default function Philosophy() {
                         style={{ backgroundColor: `hsl(${t.color})` }}
                       />
                       <span className="font-mono text-xs text-gold/60">{String(i + 1).padStart(2, "0")}</span>
-                      <span className="text-[10px] uppercase tracking-wider text-ink-foreground/40">
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
                         {t.force}
                       </span>
                     </div>
                     <h3 className="font-display text-3xl mb-3">{t.name}</h3>
                     <p className="text-gold/80 text-sm mb-4 max-w-xl mx-auto">{t.promise}</p>
-                    <p className="text-sm text-ink-foreground/55 leading-relaxed max-w-2xl mx-auto mb-5">
+                    <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl mx-auto mb-5">
                       {t.body}
                     </p>
                     <span className="text-xs text-gold inline-flex items-center gap-1.5">
@@ -126,7 +125,7 @@ export default function Philosophy() {
       </Section>
 
       {/* ── The capacity model ───────────────────────────────── */}
-      <Section tone="muted">
+      <Section tone="ink">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
@@ -216,13 +215,13 @@ export default function Philosophy() {
             <br />
             <span className="text-gold">Unresolved stress is.</span>
           </motion.h2>
-          <motion.div variants={fadeInUp} className="space-y-5 text-ink-foreground/60 leading-relaxed text-base md:text-lg">
+          <motion.div variants={fadeInUp} className="space-y-5 text-muted-foreground leading-relaxed text-base md:text-lg">
             <p>
               Muscle requires stress, then recovery. The nervous system requires challenge, then regulation.
               Fasting requires feeding. Cleansing requires rebuilding. Work requires sleep. Every adaptation
               worth having runs on the same two-stroke engine.
             </p>
-            <p className="text-ink-foreground/85">
+            <p className="text-foreground">
               So the goal was never a life with less stress in it. The goal is becoming an organism that can
               meet stress, adapt to it, and return to equilibrium — faster each time.
             </p>

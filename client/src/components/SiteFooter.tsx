@@ -42,7 +42,7 @@ const HEALTH_LINKS = [
 
 export function SiteFooter() {
   return (
-    <footer className="bg-ink text-ink-foreground border-t border-ink-line pt-16 pb-10">
+    <footer className="tone-ink bg-background border-t border-border pt-16 pb-10">
       <div className="container max-w-6xl mx-auto px-4">
         <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-6 mb-14">
           {/* Brand */}
@@ -51,7 +51,7 @@ export function SiteFooter() {
               <YinYang className="h-6 w-6 text-gold" voidColor="hsl(var(--ink))" />
               <span className="font-display text-2xl tracking-tight">Sakred Body</span>
             </Link>
-            <p className="text-sm text-ink-foreground/55 leading-relaxed max-w-sm mb-6">
+            <p className="text-sm text-muted-foreground leading-relaxed max-w-sm mb-6">
               Traditional principles, modern strength. Guided protocols, daily practice, and in-person
               retreats for people who want to live in harmony with their environment without giving up
               their edge.
@@ -129,15 +129,15 @@ export function SiteFooter() {
           </FooterColumn>
         </div>
 
-        <div className="border-t border-ink-line pt-8 space-y-5">
-          <p className="text-xs text-ink-foreground/40 leading-relaxed max-w-3xl">
+        <div className="border-t border-border pt-8 space-y-5">
+          <p className="text-xs text-muted-foreground leading-relaxed max-w-3xl">
             Sakred Body is an education and coaching company. We do not diagnose, treat, cure, or prescribe.
             Nothing here is medical advice. Traditional practices are presented as philosophy and lifestyle
             framework, not as a replacement for care from a qualified provider. Talk to your doctor before
             changing your health regimen — especially if you are pregnant, taking medication, or managing a
             diagnosed condition.
           </p>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-xs text-ink-foreground/40">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-xs text-muted-foreground">
             <span>Copyright {new Date().getFullYear()} Sakred Body. All rights reserved.</span>
             <div className="flex flex-wrap gap-x-6 gap-y-2">
               {LEGAL_LINKS.map((l) => (
@@ -164,7 +164,7 @@ function FooterColumn({ title, children }: { title: string; children: React.Reac
   return (
     <div>
       <h3 className="text-xs uppercase tracking-widest text-gold mb-4 font-sans">{title}</h3>
-      <ul className="space-y-2.5 text-sm text-ink-foreground/55">{children}</ul>
+      <ul className="space-y-2.5 text-sm text-muted-foreground">{children}</ul>
     </div>
   );
 }

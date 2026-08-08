@@ -131,7 +131,7 @@ export default function Home() {
       <SiteHeader />
 
       {/* ── Hero ─────────────────────────────────────────────── */}
-      <section className="relative min-h-[92vh] flex items-center pt-20 overflow-hidden bg-ink">
+      <section className="tone-ink relative min-h-[92vh] flex items-center pt-20 overflow-hidden bg-background">
         <div className="absolute inset-0 z-0">
           <img src="/images/retreat-jungle.jpg" alt="" className="w-full h-full object-cover opacity-55" />
           {/* Symmetric vignette so centered copy stays legible while the
@@ -216,7 +216,6 @@ export default function Home() {
               eyebrow="The Architecture"
               title={<>Four Territories. <span className="text-gold">One Sequence.</span></>}
               intro="These aren't categories to browse — they're an order of operations. A body that can't drain shouldn't be loaded. A body with capacity it never expresses is a waste. Each territory earns the next."
-              onInk
               testId="text-territories-headline"
             />
           </motion.div>
@@ -226,7 +225,7 @@ export default function Home() {
               <motion.div variants={fadeInUp} key={t.key}>
                 <Link href={t.href}>
                   <div
-                    className="h-full bg-ink-soft border border-ink-line rounded-lg p-7 text-center flex flex-col hover-elevate transition-colors"
+                    className="h-full bg-card border border-border rounded-lg p-7 text-center flex flex-col hover-elevate transition-colors"
                     data-testid={`card-territory-${t.key}`}
                   >
                     <span className="font-mono text-xs text-gold/60 mb-4">{String(i + 1).padStart(2, "0")}</span>
@@ -235,10 +234,10 @@ export default function Home() {
                       style={{ backgroundColor: `hsl(${t.color})` }}
                     />
                     <h3 className="font-display text-2xl mb-2">{t.name}</h3>
-                    <p className="text-[10px] uppercase tracking-wider text-ink-foreground/40 mb-5">{t.force}</p>
-                    <p className="text-sm text-ink-foreground/60 leading-relaxed flex-1">{t.promise}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-5">{t.force}</p>
+                    <p className="font-display text-lg text-foreground/90 leading-snug flex-1">{t.verb}</p>
                     <span className="mt-6 text-xs text-gold inline-flex items-center justify-center gap-1.5">
-                      {t.verb} <ArrowRight className="h-3.5 w-3.5" />
+                      Explore <ArrowRight className="h-3.5 w-3.5" />
                     </span>
                   </div>
                 </Link>
@@ -309,7 +308,7 @@ export default function Home() {
       </Section>
 
       {/* ── Core lessons ─────────────────────────────────────── */}
-      <Section id="lessons" tone="muted">
+      <Section id="lessons" tone="ink">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-14">
             <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
@@ -331,7 +330,7 @@ export default function Home() {
       </Section>
 
       {/* ── Five Elements ────────────────────────────────────── */}
-      <Section id="elements" tone="ink">
+      <Section id="elements" tone="light">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-14">
             <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
@@ -340,7 +339,7 @@ export default function Home() {
             <h2 className="text-3xl md:text-4xl font-display font-normal mb-5" data-testid="text-elements-headline">
               The Body, <span className="text-gold">The Way Tradition Reads It</span>
             </h2>
-            <p className="text-ink-foreground/60 leading-relaxed">
+            <p className="text-muted-foreground leading-relaxed">
               Traditional Chinese Medicine organizes the body into five elements — each with its own organs,
               its own season, and its own way of going wrong. It's a map refined over two thousand years, and
               it keeps lining up with what modern research rediscovers a piece at a time. We built our
@@ -352,7 +351,7 @@ export default function Home() {
             {ELEMENTS.map((el, i) => (
               <motion.div variants={fadeInUp} key={el.element}>
                 <div
-                  className="h-full bg-ink-soft border border-ink-line rounded-lg p-6 text-center flex flex-col"
+                  className="h-full bg-card border border-border rounded-lg p-6 text-center flex flex-col"
                   data-testid={`card-element-${i}`}
                 >
                   <span
@@ -360,12 +359,12 @@ export default function Home() {
                     style={{ backgroundColor: `hsl(${el.color})` }}
                   />
                   <h3 className="font-display text-2xl leading-none mb-2">{el.element}</h3>
-                  <p className="text-[10px] uppercase tracking-wider text-ink-foreground/40 mb-4">{el.season}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-4">{el.season}</p>
                   <p className="text-sm text-gold/80 mb-3">{el.organs}</p>
-                  <p className="text-sm text-ink-foreground/55 leading-relaxed flex-1">{el.reads}</p>
-                  <div className="mt-5 pt-4 border-t border-ink-line">
-                    <p className="text-sm text-ink-foreground/85">{el.protocol}</p>
-                    <p className="text-xs text-ink-foreground/40 mt-1">{el.days}</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed flex-1">{el.reads}</p>
+                  <div className="mt-5 pt-4 border-t border-border">
+                    <p className="text-sm text-foreground">{el.protocol}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{el.days}</p>
                   </div>
                 </div>
               </motion.div>
@@ -374,7 +373,7 @@ export default function Home() {
 
           <motion.p
             variants={fadeInUp}
-            className="text-xs text-ink-foreground/35 mt-8 max-w-2xl mx-auto text-center leading-relaxed"
+            className="text-xs text-muted-foreground mt-8 max-w-2xl mx-auto text-center leading-relaxed"
           >
             We present the five-element framework as philosophy and structure — a way of organizing practice.
             It is not a diagnostic system, and nothing here replaces care from a qualified provider.
@@ -383,17 +382,16 @@ export default function Home() {
       </Section>
 
       {/* ── The App ──────────────────────────────────────────── */}
-      <Section id="app" tone="light">
+      <Section id="app" tone="ink">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-12">
             <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">The App</p>
             <h2 className="text-3xl md:text-4xl font-display font-normal mb-5" data-testid="text-app-headline">
-              Practice Needs a <span className="text-gold">Place to Live</span>
+              The Practice, <span className="text-gold">In Your Pocket</span>
             </h2>
             <p className="text-muted-foreground leading-relaxed">
-              Principles don't do anything until they become a Tuesday. The Sakred app turns all of this into
-              guided protocols, daily habits, and a record you can actually look back on. Free to download on
-              iOS and Android.
+              Five guided protocols, habit tracking, the full food chart, and a coach you can message.
+              Free on iOS and Android.
             </p>
           </motion.div>
 
@@ -426,7 +424,7 @@ export default function Home() {
       </Section>
 
       {/* ── Food ─────────────────────────────────────────────── */}
-      <Section tone="muted">
+      <Section tone="light">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-10">
             <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">Food</p>
@@ -460,10 +458,10 @@ export default function Home() {
               />
               <ul className="space-y-3.5">
                 {FOOD_SAMPLES.map((f) => (
-                  <li key={f.name} className="flex items-center gap-3 text-sm">
-                    <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: `hsl(${f.color})` }} />
-                    <span className="text-foreground flex-1 text-left">{f.name}</span>
-                    <span className="text-xs text-muted-foreground text-right">{f.rating}</span>
+                  <li key={f.name} className="flex flex-col items-center gap-1.5 text-sm">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: `hsl(${f.color})` }} />
+                    <span className="text-foreground">{f.name}</span>
+                    <span className="text-xs text-muted-foreground">{f.rating}</span>
                   </li>
                 ))}
               </ul>
@@ -513,12 +511,12 @@ export default function Home() {
           >
             The Mastermind <span className="text-gold">+ Retreats</span>
           </motion.h2>
-          <motion.p variants={fadeInUp} className="text-ink-foreground/60 leading-relaxed mb-4">
+          <motion.p variants={fadeInUp} className="text-muted-foreground leading-relaxed mb-4">
             Some of this only lands in person. Our concierge mastermind and retreat experience in Puerto Rico
             takes the same principles and puts them somewhere with no distractions — small groups, custom
             dates, morning movement on the beach, breathwork, clean food, and real conversation.
           </motion.p>
-          <motion.p variants={fadeInUp} className="text-ink-foreground/60 leading-relaxed mb-9">
+          <motion.p variants={fadeInUp} className="text-muted-foreground leading-relaxed mb-9">
             Application required. Design your own retreat: private or shared, three days to two weeks.
           </motion.p>
           <motion.div variants={fadeInUp}>

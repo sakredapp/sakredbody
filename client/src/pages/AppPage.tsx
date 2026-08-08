@@ -178,7 +178,7 @@ export default function AppPage() {
       <SiteHeader overHero={false} />
 
       {/* ── Header ───────────────────────────────────────────── */}
-      <section className="bg-ink text-ink-foreground pt-32 pb-20">
+      <section className="tone-ink bg-background pt-36 pb-24">
         <div className="container max-w-6xl mx-auto px-4 text-center">
           <motion.div initial="hidden" animate="visible" variants={staggerContainer}>
             <motion.p
@@ -194,7 +194,7 @@ export default function AppPage() {
             >
               Practice Needs a <span className="text-gold">Place to Live</span>
             </motion.h1>
-            <motion.p variants={fadeInUp} className="text-ink-foreground/60 leading-relaxed max-w-2xl mx-auto mb-9">
+            <motion.p variants={fadeInUp} className="text-muted-foreground leading-relaxed max-w-2xl mx-auto mb-9">
               Principles don't do anything until they become a Tuesday. The Sakred app turns the whole
               philosophy into five guided protocols, daily habits, and a record you can actually look back
               on. Free on iOS and Android.
@@ -207,7 +207,7 @@ export default function AppPage() {
       </section>
 
       {/* ── Protocols ────────────────────────────────────────── */}
-      <Section tone="light">
+      <Section tone="ink">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-14">
             <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
@@ -239,10 +239,9 @@ export default function AppPage() {
                     </div>
                     <h3 className="font-display text-2xl md:text-3xl mb-3">{p.name}</h3>
                     <p className="text-muted-foreground leading-relaxed max-w-xl mx-auto mb-6">{p.summary}</p>
-                    <ul className="grid sm:grid-cols-2 gap-x-8 gap-y-2 max-w-xl mx-auto text-left">
+                    <ul className="max-w-xl mx-auto space-y-2.5">
                       {p.practices.map((practice) => (
-                        <li key={practice} className="text-sm text-muted-foreground flex gap-2.5">
-                          <span className="text-gold/50 mt-px shrink-0">—</span>
+                        <li key={practice} className="text-sm text-muted-foreground text-center">
                           {practice}
                         </li>
                       ))}
@@ -256,7 +255,7 @@ export default function AppPage() {
       </Section>
 
       {/* ── Features ─────────────────────────────────────────── */}
-      <Section tone="ink">
+      <Section tone="light">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-12">
             <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
@@ -271,11 +270,11 @@ export default function AppPage() {
             {FEATURES.map((f, i) => (
               <motion.div variants={fadeInUp} key={f.title}>
                 <div
-                  className="h-full bg-ink-soft border border-ink-line rounded-lg p-6 text-center"
+                  className="h-full bg-card border border-border rounded-lg p-6 text-center"
                   data-testid={`card-feature-${i}`}
                 >
                   <h3 className="font-display text-lg mb-3 text-gold">{f.title}</h3>
-                  <p className="text-sm text-ink-foreground/55 leading-relaxed">{f.body}</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{f.body}</p>
                 </div>
               </motion.div>
             ))}
@@ -284,7 +283,7 @@ export default function AppPage() {
       </Section>
 
       {/* ── FAQ ──────────────────────────────────────────────── */}
-      <Section tone="muted">
+      <Section tone="ink">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.h2
             variants={fadeInUp}
@@ -297,7 +296,7 @@ export default function AppPage() {
             <Accordion type="single" collapsible className="w-full">
               {FAQS.map((item, i) => (
                 <AccordionItem key={i} value={`faq-${i}`} data-testid={`faq-item-${i}`}>
-                  <AccordionTrigger className="text-left font-display text-base font-normal">
+                  <AccordionTrigger className="text-center justify-center gap-3 font-display text-base font-normal">
                     {item.q}
                   </AccordionTrigger>
                   <AccordionContent className="text-muted-foreground leading-relaxed text-sm">

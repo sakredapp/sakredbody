@@ -52,7 +52,8 @@ export default function Mastermind() {
 
       <section className="relative min-h-[90vh] flex items-center pt-20 overflow-hidden">
         <div className="absolute inset-0 z-0">
-          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-background z-10" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/65 to-black/40 z-10" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-background z-10" />
           <img 
             src="/images/hero-ocean.png"
             alt="Puerto Rico coastline"
@@ -94,7 +95,7 @@ export default function Mastermind() {
         </div>
       </section>
 
-      <Section dark className="border-y border-border/40 py-10">
+      <Section tone="ink" className="border-y border-border/40 py-10">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 max-w-xl sm:max-w-none mx-auto">
           {["Puerto Rico", "Small Groups", "Concierge Service", "Quarterly Retreats"].map((label, i) => (
             <div
@@ -109,7 +110,7 @@ export default function Mastermind() {
         </div>
       </Section>
 
-      <Section id="what-we-do">
+      <Section id="what-we-do" tone="light">
         <div className="grid md:grid-cols-2 gap-12 md:gap-24 items-center">
           <div>
             <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">What This Actually Is</p>
@@ -133,7 +134,7 @@ export default function Mastermind() {
         </div>
       </Section>
 
-      <Section dark>
+      <Section tone="ink">
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div className="order-2 md:order-1">
             <img 
@@ -155,7 +156,7 @@ export default function Mastermind() {
         </div>
       </Section>
 
-      <Section id="housing">
+      <Section id="housing" tone="light">
         <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">Housing Options</p>
         <h2 className="text-3xl md:text-4xl font-display font-normal mb-4" data-testid="text-housing-headline">Pick Your Space. We Handle the Rest.</h2>
         <p className="text-muted-foreground mb-10 max-w-2xl leading-relaxed">Essential housing is included with every retreat. Upgrade to a five-star resort or a fully staffed private home if you want the top-tier experience.</p>
@@ -208,7 +209,7 @@ export default function Mastermind() {
         </div>
       </Section>
 
-      <Section dark>
+      <Section tone="ink">
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div>
             <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">The Retreats</p>
@@ -233,7 +234,7 @@ export default function Mastermind() {
         </div>
       </Section>
 
-      <Section>
+      <Section tone="light">
         <div className="text-center mb-10">
           <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">Investment</p>
           <h2 className="text-3xl md:text-4xl font-display font-normal mb-4" data-testid="text-pricing-headline">Two Ways to Join</h2>
@@ -275,7 +276,7 @@ export default function Mastermind() {
         </div>
       </Section>
 
-      <Section dark>
+      <Section tone="ink">
         <div className="text-center mb-10">
           <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">Who This Is For</p>
           <h2 className="text-3xl md:text-4xl font-display font-normal mb-4" data-testid="text-who-headline">Built for People Who Build Things</h2>
@@ -291,7 +292,7 @@ export default function Mastermind() {
               { q: "You value experiences over information", a: "You don't need more content. You need an environment that pulls the best version of you forward." }
             ].map((item, i) => (
               <AccordionItem key={i} value={`who-${i}`} data-testid={`who-item-${i}`}>
-                <AccordionTrigger className="text-left font-display text-base font-normal">{item.q}</AccordionTrigger>
+                <AccordionTrigger className="text-center justify-center gap-3 font-display text-base font-normal">{item.q}</AccordionTrigger>
                 <AccordionContent className="text-muted-foreground leading-relaxed text-sm">
                   {item.a}
                 </AccordionContent>
@@ -301,7 +302,7 @@ export default function Mastermind() {
         </div>
       </Section>
 
-      <Section>
+      <Section tone="light">
         <div className="text-center mb-10">
           <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">What You Get</p>
           <h2 className="text-3xl md:text-4xl font-display font-normal mb-4" data-testid="text-deliverables-headline">Your Membership Includes</h2>
@@ -317,7 +318,7 @@ export default function Mastermind() {
               { q: "The Method: Stabilize, Clear, Build", a: "Our approach works in three phases. First, stabilize your foundation — hydration, sleep, gut health. Then clear what's dragging you down. Then build real capacity — nutrition, movement, breath, mental clarity. Systems that keep you strong long-term." }
             ].map((item, i) => (
               <AccordionItem key={i} value={`get-${i}`} data-testid={`deliverable-item-${i}`}>
-                <AccordionTrigger className="text-left font-display text-base font-normal">{item.q}</AccordionTrigger>
+                <AccordionTrigger className="text-center justify-center gap-3 font-display text-base font-normal">{item.q}</AccordionTrigger>
                 <AccordionContent className="text-muted-foreground leading-relaxed text-sm">
                   {item.a}
                 </AccordionContent>
@@ -327,7 +328,7 @@ export default function Mastermind() {
         </div>
       </Section>
 
-      <Section dark className="py-16">
+      <Section tone="ink" className="py-16">
         <div className="max-w-3xl mx-auto">
           <h2 className="text-3xl font-display font-normal mb-8 text-center" data-testid="text-faq-headline">Common Questions</h2>
           <Accordion type="single" collapsible className="w-full">
@@ -341,7 +342,7 @@ export default function Mastermind() {
               { q: "How much time does this take each week?", a: "The daily protocols take 30-60 minutes. Live calls are optional. Retreats are customizable — from 3 days to 2 weeks. Designed to fit into your life." }
             ].map((item, i) => (
               <AccordionItem key={i} value={`item-${i}`} data-testid={`faq-item-${i}`}>
-                <AccordionTrigger className="text-left font-display text-base font-normal">{item.q}</AccordionTrigger>
+                <AccordionTrigger className="text-center justify-center gap-3 font-display text-base font-normal">{item.q}</AccordionTrigger>
                 <AccordionContent className="text-muted-foreground leading-relaxed text-sm">
                   {item.a}
                 </AccordionContent>
@@ -351,7 +352,7 @@ export default function Mastermind() {
         </div>
       </Section>
 
-      <Section className="text-center py-24">
+      <Section tone="light" className="text-center py-24">
         <div className="max-w-2xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-display font-normal mb-6" data-testid="text-final-cta-headline">You've invested in your business.<br/><span className="text-gold">Now invest in yourself.</span></h2>
           <p className="text-muted-foreground text-lg mb-10 leading-relaxed">

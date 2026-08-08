@@ -112,7 +112,6 @@ export default function Terrain() {
               eyebrow="What It Means"
               title={<>Four Consequences of <span className="text-gold">Thinking This Way</span></>}
               intro="This isn't an abstraction. Holding the chain in mind changes what you do first, and first is usually the only decision that matters."
-              onInk
               testId="text-implications-headline"
             />
           </motion.div>
@@ -121,11 +120,11 @@ export default function Terrain() {
             {IMPLICATIONS.map((im, i) => (
               <motion.div variants={fadeInUp} key={im.title}>
                 <div
-                  className="h-full bg-ink-soft border border-ink-line rounded-lg p-7 text-center"
+                  className="h-full bg-card border border-border rounded-lg p-7 text-center"
                   data-testid={`card-implication-${i}`}
                 >
                   <h3 className="font-display text-xl mb-3">{im.title}</h3>
-                  <p className="text-sm text-ink-foreground/55 leading-relaxed">{im.body}</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{im.body}</p>
                 </div>
               </motion.div>
             ))}

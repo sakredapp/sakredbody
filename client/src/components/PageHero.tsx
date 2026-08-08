@@ -24,7 +24,7 @@ interface PageHeroProps {
 /** Dark centered hero shared by every pillar page. */
 export function PageHero({ eyebrow, title, intro, note, children, testId }: PageHeroProps) {
   return (
-    <section className="bg-ink text-ink-foreground pt-32 pb-20">
+    <section className="tone-ink bg-background pt-36 pb-24">
       <div className="container max-w-6xl mx-auto px-4 text-center">
         <motion.div initial="hidden" animate="visible" variants={stagger}>
           <motion.p
@@ -43,7 +43,7 @@ export function PageHero({ eyebrow, title, intro, note, children, testId }: Page
           {intro && (
             <motion.p
               variants={fadeInUp}
-              className="text-ink-foreground/60 leading-relaxed max-w-2xl mx-auto text-base md:text-lg"
+              className="text-muted-foreground leading-relaxed max-w-2xl mx-auto text-base md:text-lg"
             >
               {intro}
             </motion.p>
@@ -51,7 +51,7 @@ export function PageHero({ eyebrow, title, intro, note, children, testId }: Page
           {note && (
             <motion.p
               variants={fadeInUp}
-              className="text-ink-foreground/45 leading-relaxed max-w-2xl mx-auto mt-4 text-sm"
+              className="text-muted-foreground leading-relaxed max-w-2xl mx-auto mt-4 text-sm"
             >
               {note}
             </motion.p>
@@ -86,7 +86,7 @@ export function SectionHeader({ eyebrow, title, intro, onInk, className, testId 
         {title}
       </h2>
       {intro && (
-        <p className={`leading-relaxed ${onInk ? "text-ink-foreground/60" : "text-muted-foreground"}`}>
+        <p className={`leading-relaxed ${onInk ? "text-muted-foreground" : "text-muted-foreground"}`}>
           {intro}
         </p>
       )}

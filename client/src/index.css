@@ -93,6 +93,9 @@
   --gold: 39 48% 56%;
   --gold-light: 42 70% 76%;
   --gold-dark: 42 38% 47%;
+  /* Gold used for TEXT. Deeper on cream so small caps clear 4.5:1;
+     .tone-ink overrides it with the bright gold. */
+  --gold-text: 39 56% 34%;
 
   /* Warm-black "ink" surfaces — used for the dark bands on the homepage.
      Fixed values so they read the same regardless of light/dark mode. */
@@ -177,6 +180,37 @@
 }
 
 @layer base {
+  /**
+   * Tone scopes. A section marked .tone-ink redefines the theme tokens for its
+   * subtree, so ordinary classes (text-foreground, text-muted-foreground,
+   * bg-card, border-border) resolve correctly on dark ground. This is what
+   * makes flipping a section between light and dark a one-word change.
+   */
+  .tone-ink {
+    --background: 30 10% 10%;
+    --foreground: 45 20% 96%;
+    --muted-foreground: 40 10% 60%;
+    --card: 30 8% 14%;
+    --card-foreground: 45 20% 96%;
+    --card-border: 30 8% 20%;
+    --popover: 30 8% 14%;
+    --popover-foreground: 45 20% 96%;
+    --border: 30 8% 20%;
+    --input: 30 8% 26%;
+    --secondary: 30 8% 20%;
+    --secondary-foreground: 45 15% 90%;
+    --muted: 30 8% 18%;
+    --gold-text: 42 70% 76%;
+    --elevate-1: rgba(255, 255, 255, 0.04);
+    --elevate-2: rgba(255, 255, 255, 0.09);
+    --button-outline: rgba(255, 255, 255, 0.1);
+    color: hsl(var(--foreground));
+  }
+
+  .tone-ink-soft {
+    --background: 30 8% 14%;
+  }
+
   * {
     @apply border-border;
   }
@@ -196,7 +230,7 @@
   }
 
   .text-gold {
-    color: hsl(var(--gold));
+    color: hsl(var(--gold-text));
   }
   .text-gold-light {
     color: hsl(var(--gold-light));

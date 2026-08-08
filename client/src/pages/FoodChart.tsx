@@ -56,7 +56,7 @@ export default function FoodChart() {
       <SiteHeader overHero={false} />
 
       {/* ── Header ───────────────────────────────────────────── */}
-      <section className="bg-ink text-ink-foreground pt-32 pb-16">
+      <section className="tone-ink bg-background pt-36 pb-20">
         <div className="container max-w-6xl mx-auto px-4 text-center">
           <motion.div initial="hidden" animate="visible" variants={fadeInUp}>
             <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
@@ -68,12 +68,12 @@ export default function FoodChart() {
             >
               The Anti-Inflammatory <span className="text-gold">Food Chart</span>
             </h1>
-            <p className="text-ink-foreground/60 leading-relaxed max-w-2xl mx-auto">
+            <p className="text-muted-foreground leading-relaxed max-w-2xl mx-auto">
               {TOTAL_FOODS} everyday foods rated on a seven-point scale, from strongly anti-inflammatory to
               highly inflammatory. Chronic inflammation is a shared driver across metabolic, cardiovascular,
               and digestive conditions — and diet is one of the few inputs you control every day.
             </p>
-            <p className="text-ink-foreground/45 leading-relaxed max-w-2xl mx-auto mt-4 text-sm">
+            <p className="text-muted-foreground leading-relaxed max-w-2xl mx-auto mt-4 text-sm">
               Both ends of this scale have a place in a balanced diet. Awareness is the goal, not restriction.
             </p>
           </motion.div>
@@ -81,13 +81,13 @@ export default function FoodChart() {
       </section>
 
       {/* ── The scale ────────────────────────────────────────── */}
-      <Section tone="ink-soft" className="border-y border-ink-line py-10">
+      <Section tone="light" className="border-y border-border py-10">
         <p className="text-xs uppercase tracking-widest text-gold mb-6 text-center">The Scale</p>
         <div className="flex flex-wrap justify-center gap-2.5">
           {FOOD_RATINGS.map((r) => (
             <div
               key={r}
-              className="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-ink-line text-xs text-ink-foreground/70"
+              className="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-border text-xs text-foreground/80"
             >
               <span
                 className="h-2.5 w-2.5 rounded-full"
@@ -100,7 +100,7 @@ export default function FoodChart() {
       </Section>
 
       {/* ── Controls ─────────────────────────────────────────── */}
-      <Section tone="muted" className="py-10">
+      <Section tone="ink" className="py-10">
         <div className="max-w-3xl mx-auto">
           <div className="relative mb-6">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />

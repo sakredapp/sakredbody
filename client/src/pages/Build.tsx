@@ -147,7 +147,6 @@ export default function Build() {
               eyebrow="The Qualities"
               title={<>Six Things Worth <span className="text-gold">Building</span></>}
               intro="Not a program. The qualities that actually matter, what each one is for, and the single principle that governs it."
-              onInk
               testId="text-pillars-headline"
             />
           </motion.div>
@@ -156,13 +155,13 @@ export default function Build() {
             {PILLARS.map((p, i) => (
               <motion.div variants={fadeInUp} key={p.name}>
                 <div
-                  className="h-full bg-ink-soft border border-ink-line rounded-lg p-7 text-center flex flex-col"
+                  className="h-full bg-card border border-border rounded-lg p-7 text-center flex flex-col"
                   data-testid={`card-pillar-${i}`}
                 >
                   <span className="font-mono text-xs text-gold/60 mb-3">{String(i + 1).padStart(2, "0")}</span>
                   <h3 className="font-display text-2xl mb-4">{p.name}</h3>
-                  <p className="text-sm text-ink-foreground/55 leading-relaxed flex-1">{p.body}</p>
-                  <p className="text-sm text-gold/85 mt-5 pt-4 border-t border-ink-line italic">
+                  <p className="text-sm text-muted-foreground leading-relaxed flex-1">{p.body}</p>
+                  <p className="text-sm text-gold/85 mt-5 pt-4 border-t border-border italic">
                     {p.practice}
                   </p>
                 </div>
@@ -173,7 +172,7 @@ export default function Build() {
       </Section>
 
       {/* ── Readiness gate ───────────────────────────────────── */}
-      <Section tone="muted">
+      <Section tone="light">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
@@ -189,10 +188,10 @@ export default function Build() {
               <motion.div
                 variants={fadeInUp}
                 key={r}
-                className="flex items-center gap-4 py-4 border-b border-border/50 last:border-0 text-left"
+                className="flex flex-col items-center gap-2.5 py-5 border-b border-border/50 last:border-0 text-center"
                 data-testid={`row-readiness-${i}`}
               >
-                <span className="h-5 w-5 rounded-full border border-gold/40 shrink-0" />
+                <span className="h-4 w-4 rounded-full border border-gold/40" />
                 <span className="text-muted-foreground">{r}</span>
               </motion.div>
             ))}
@@ -209,7 +208,7 @@ export default function Build() {
       </Section>
 
       {/* ── Mistakes ─────────────────────────────────────────── */}
-      <Section tone="light">
+      <Section tone="ink">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
@@ -224,7 +223,7 @@ export default function Build() {
             <Accordion type="single" collapsible className="w-full">
               {MISTAKES.map((m, i) => (
                 <AccordionItem key={i} value={`mistake-${i}`} data-testid={`mistake-item-${i}`}>
-                  <AccordionTrigger className="text-left font-display text-base font-normal">
+                  <AccordionTrigger className="text-center justify-center gap-3 font-display text-base font-normal">
                     {m.q}
                   </AccordionTrigger>
                   <AccordionContent className="text-muted-foreground leading-relaxed text-sm">
@@ -238,14 +237,14 @@ export default function Build() {
       </Section>
 
       {/* ── Next ─────────────────────────────────────────────── */}
-      <Section tone="ink" className="text-center py-20">
+      <Section tone="light" className="text-center py-20">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.h2 variants={fadeInUp} className="text-3xl md:text-4xl font-display font-normal mb-6">
             Capacity you never use
             <br />
             <span className="text-gold">is just potential energy.</span>
           </motion.h2>
-          <motion.p variants={fadeInUp} className="text-ink-foreground/60 max-w-xl mx-auto mb-9 leading-relaxed">
+          <motion.p variants={fadeInUp} className="text-muted-foreground max-w-xl mx-auto mb-9 leading-relaxed">
             Knowing what to do has never been the hard part. Becoming the kind of person who does it — on a
             bad week, in a bad mood, without supervision — is the whole game.
           </motion.p>

@@ -1,21 +1,24 @@
 import { cn } from "@/lib/utils";
 import { ReactNode } from "react";
 
-type SectionTone = "light" | "muted" | "ink" | "ink-soft" | "none";
+export type SectionTone = "light" | "ink" | "none";
 
 interface SectionProps extends React.HTMLAttributes<HTMLElement> {
   children: ReactNode;
-  /** Legacy flag from the mastermind page: renders the plain cream background. */
+  /** Legacy flag from the mastermind page. */
   dark?: boolean;
+  /**
+   * Sections alternate light / ink down every page. `ink` scopes the theme
+   * tokens (see .tone-ink in index.css) so ordinary utility classes work on
+   * dark ground — never hardcode dark-only colours inside a section.
+   */
   tone?: SectionTone;
   containerClassName?: string;
 }
 
 const toneClasses: Record<SectionTone, string> = {
   light: "bg-background",
-  muted: "bg-card/30",
-  ink: "bg-ink text-ink-foreground",
-  "ink-soft": "bg-ink-soft text-ink-foreground",
+  ink: "tone-ink bg-background",
   none: "",
 };
 
@@ -27,11 +30,11 @@ export function Section({
   containerClassName,
   ...props
 }: SectionProps) {
-  const resolvedTone: SectionTone = tone ?? (dark ? "light" : "muted");
+  const resolvedTone: SectionTone = tone ?? (dark ? "light" : "light");
 
   return (
     <section
-      className={cn("py-16 md:py-24 relative", toneClasses[resolvedTone], className)}
+      className={cn("py-20 md:py-28 relative", toneClasses[resolvedTone], className)}
       {...props}
     >
       <div className={cn("container max-w-6xl mx-auto px-4 sm:px-6 relative z-10", containerClassName)}>

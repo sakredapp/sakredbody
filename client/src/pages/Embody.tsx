@@ -61,7 +61,7 @@ export default function Embody() {
       />
 
       {/* ── The argument ─────────────────────────────────────── */}
-      <Section tone="light">
+      <Section tone="ink">
         <motion.div
           initial="hidden"
           whileInView="visible"
@@ -100,14 +100,13 @@ export default function Embody() {
       </Section>
 
       {/* ── Practices ────────────────────────────────────────── */}
-      <Section tone="ink">
+      <Section tone="light">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
               eyebrow="The Practice"
               title={<>Six Things That <span className="text-gold">Actually Hold</span></>}
               intro="Not motivation. Structure — the kind that keeps working on the days you don't feel like it, which are the only days that ever mattered."
-              onInk
               testId="text-practices-headline"
             />
           </motion.div>
@@ -116,12 +115,12 @@ export default function Embody() {
             {PRACTICES.map((p, i) => (
               <motion.div variants={fadeInUp} key={p.title}>
                 <div
-                  className="h-full bg-ink-soft border border-ink-line rounded-lg p-7 text-center"
+                  className="h-full bg-card border border-border rounded-lg p-7 text-center"
                   data-testid={`card-practice-${i}`}
                 >
                   <span className="font-mono text-xs text-gold/60">{String(i + 1).padStart(2, "0")}</span>
                   <h3 className="font-display text-xl mt-3 mb-4">{p.title}</h3>
-                  <p className="text-sm text-ink-foreground/55 leading-relaxed">{p.body}</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{p.body}</p>
                 </div>
               </motion.div>
             ))}
@@ -130,7 +129,7 @@ export default function Embody() {
       </Section>
 
       {/* ── Metrics ──────────────────────────────────────────── */}
-      <Section tone="muted">
+      <Section tone="ink">
         <motion.div
           initial="hidden"
           whileInView="visible"

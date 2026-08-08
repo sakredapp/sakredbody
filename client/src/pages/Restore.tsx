@@ -69,7 +69,7 @@ export default function Restore() {
       />
 
       {/* ── The burden ───────────────────────────────────────── */}
-      <Section tone="light">
+      <Section tone="ink">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
@@ -97,25 +97,24 @@ export default function Restore() {
       </Section>
 
       {/* ── The order ────────────────────────────────────────── */}
-      <Section tone="ink">
+      <Section tone="light">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
               eyebrow="The Order"
               title={<>Sequence Is <span className="text-gold">the Method</span></>}
               intro="Almost every failed protocol is a right action taken at the wrong time. Run these in order and unremarkable interventions start working. Run them out of order and good ones make you feel worse."
-              onInk
               testId="text-order-headline"
             />
           </motion.div>
 
-          <div className="max-w-3xl mx-auto space-y-px bg-ink-line border border-ink-line rounded-lg overflow-hidden">
+          <div className="max-w-3xl mx-auto space-y-px bg-border border border-border rounded-lg overflow-hidden">
             {ORDER.map((o, i) => (
               <motion.div variants={fadeInUp} key={o.step}>
-                <div className="bg-ink-soft p-7 text-center" data-testid={`row-order-${i}`}>
+                <div className="bg-card p-7 text-center" data-testid={`row-order-${i}`}>
                   <span className="font-mono text-xs text-gold/60">{String(i + 1).padStart(2, "0")}</span>
                   <h3 className="font-display text-2xl mt-2 mb-3">{o.step}</h3>
-                  <p className="text-sm text-ink-foreground/55 leading-relaxed max-w-xl mx-auto">{o.body}</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed max-w-xl mx-auto">{o.body}</p>
                 </div>
               </motion.div>
             ))}
@@ -133,7 +132,7 @@ export default function Restore() {
       </Section>
 
       {/* ── Protocols ────────────────────────────────────────── */}
-      <Section tone="muted">
+      <Section tone="ink">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
@@ -149,17 +148,15 @@ export default function Restore() {
               <motion.div
                 variants={fadeInUp}
                 key={p.name}
-                className="flex items-center gap-5 py-5 border-b border-border/50 last:border-0 text-left"
+                className="py-6 border-b border-border/50 last:border-0 text-center"
                 data-testid={`row-protocol-${i}`}
               >
-                <span className="font-mono text-xs text-gold/60 shrink-0 w-6">
+                <span className="font-mono text-xs text-gold/60 block mb-2">
                   {String(i + 1).padStart(2, "0")}
                 </span>
-                <div className="flex-1">
-                  <h3 className="font-display text-lg">{p.name}</h3>
-                  <p className="text-sm text-muted-foreground">{p.note}</p>
-                </div>
-                <span className="text-xs text-muted-foreground shrink-0">{p.days}</span>
+                <h3 className="font-display text-xl">{p.name}</h3>
+                <p className="text-sm text-muted-foreground mt-1">{p.note}</p>
+                <p className="text-xs text-muted-foreground/70 mt-1.5">{p.days}</p>
               </motion.div>
             ))}
           </div>

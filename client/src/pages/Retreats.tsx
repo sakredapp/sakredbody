@@ -111,7 +111,7 @@ export default function Retreats() {
               <motion.div
                 variants={fadeInUp}
                 key={s}
-                className="flex items-center gap-4 py-4 border-b border-border/50 last:border-0 text-left"
+                className="flex flex-col items-center gap-1.5 py-5 border-b border-border/50 last:border-0 text-center"
                 data-testid={`row-social-${i}`}
               >
                 <span className="font-mono text-[10px] text-gold/50 shrink-0">
@@ -141,7 +141,6 @@ export default function Retreats() {
               eyebrow="The Formats"
               title={<>Six Ways In, <span className="text-gold">One Infrastructure</span></>}
               intro="All of these run in Puerto Rico, concierge-managed, with essential housing included and Premium or Elite upgrades available. Every format is application-only."
-              onInk
               testId="text-formats-headline"
             />
           </motion.div>
@@ -151,7 +150,7 @@ export default function Retreats() {
               <motion.div variants={fadeInUp} key={f.name}>
                 <div
                   className={`h-full rounded-lg p-7 text-center flex flex-col border ${
-                    f.flagship ? "bg-ink-soft border-gold/30 shadow-gold-subtle" : "bg-ink-soft border-ink-line"
+                    f.flagship ? "bg-card border-gold/30 shadow-gold-subtle" : "bg-card border-border"
                   }`}
                   data-testid={`card-format-${i}`}
                 >
@@ -164,13 +163,13 @@ export default function Retreats() {
                     </Badge>
                   )}
                   <h3 className="font-display text-2xl mb-2">{f.name}</h3>
-                  <p className="text-[10px] uppercase tracking-wider text-ink-foreground/40 mb-5">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-5">
                     {f.length} · {f.focus}
                   </p>
-                  <p className="text-sm text-ink-foreground/55 leading-relaxed flex-1">{f.body}</p>
-                  <ul className="mt-6 pt-5 border-t border-ink-line space-y-2">
+                  <p className="text-sm text-muted-foreground leading-relaxed flex-1">{f.body}</p>
+                  <ul className="mt-6 pt-5 border-t border-border space-y-2">
                     {f.includes.map((inc) => (
-                      <li key={inc} className="text-xs text-ink-foreground/70">
+                      <li key={inc} className="text-xs text-foreground/80">
                         {inc}
                       </li>
                     ))}
@@ -180,7 +179,7 @@ export default function Retreats() {
             ))}
           </div>
 
-          <motion.p variants={fadeInUp} className="text-xs text-ink-foreground/35 text-center mt-8 max-w-2xl mx-auto">
+          <motion.p variants={fadeInUp} className="text-xs text-muted-foreground text-center mt-8 max-w-2xl mx-auto">
             Reset and Performance run on a regular schedule. The remaining formats are built to request —
             tell us which one fits and we'll schedule a call.
           </motion.p>

@@ -123,7 +123,6 @@ export default function BodyLiteracy() {
               eyebrow="The Distinctions"
               title={<>Six Pairs Worth <span className="text-gold">Telling Apart</span></>}
               intro="Each of these pairs feels similar from the inside and calls for opposite responses. Getting them backwards is how people spend years working hard in the wrong direction."
-              onInk
               testId="text-confusions-headline"
             />
           </motion.div>
@@ -132,11 +131,11 @@ export default function BodyLiteracy() {
             {CONFUSIONS.map((c, i) => (
               <motion.div variants={fadeInUp} key={c.pair}>
                 <div
-                  className="h-full bg-ink-soft border border-ink-line rounded-lg p-7 text-center"
+                  className="h-full bg-card border border-border rounded-lg p-7 text-center"
                   data-testid={`card-confusion-${i}`}
                 >
                   <h3 className="font-display text-xl mb-3 text-gold">{c.pair}</h3>
-                  <p className="text-sm text-ink-foreground/55 leading-relaxed">{c.body}</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{c.body}</p>
                 </div>
               </motion.div>
             ))}
@@ -145,7 +144,7 @@ export default function BodyLiteracy() {
       </Section>
 
       {/* ── Signals ──────────────────────────────────────────── */}
-      <Section tone="muted">
+      <Section tone="light">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
@@ -161,7 +160,7 @@ export default function BodyLiteracy() {
               <motion.div
                 variants={fadeInUp}
                 key={s}
-                className="flex items-center gap-3 py-3.5 border-b border-border/50 text-left"
+                className="flex flex-col items-center gap-1.5 py-4 border-b border-border/50 text-center"
                 data-testid={`row-signal-${i}`}
               >
                 <span className="font-mono text-[10px] text-gold/50 shrink-0">
@@ -190,13 +189,13 @@ export default function BodyLiteracy() {
           >
             Attention, <span className="text-gold">not vigilance.</span>
           </motion.h2>
-          <motion.div variants={fadeInUp} className="space-y-5 text-ink-foreground/60 leading-relaxed">
+          <motion.div variants={fadeInUp} className="space-y-5 text-muted-foreground leading-relaxed">
             <p>
               There's a version of this that goes wrong, and it's worth naming. Scanning yourself constantly
               for problems isn't literacy — it's anxiety with a health vocabulary, and it makes the nervous
               system worse, not better.
             </p>
-            <p className="text-ink-foreground/85">
+            <p className="text-foreground">
               The goal is a light, regular read. Check in, note it, act if the pattern holds for a few days,
               and then get on with your life. Literacy should make you spend <em>less</em> time thinking about
               your body, not more — because you'll trust what you're hearing.
