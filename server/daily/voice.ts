@@ -81,6 +81,35 @@ const BANNED_PATTERNS: { re: RegExp; why: string }[] = [
   },
 ];
 
+/**
+ * The vocabulary this register actually uses. Only for detecting dropped
+ * spaces — deliberately not the same list as `anchors`, which has to stay
+ * strict to mean anything as a groundedness test.
+ */
+const DOMAIN_WORDS = [
+  // sky and time
+  "moon", "season", "summer", "winter", "spring", "autumn", "waning", "waxing",
+  "crescent", "gibbous", "morning", "evening", "night", "today", "tonight",
+  // body
+  "spleen", "stomach", "liver", "kidney", "lung", "heart", "gallbladder",
+  "bladder", "intestine", "body", "breath", "sleep",
+  // the work
+  "protocol", "phase", "habit", "water", "food", "meal", "rest", "ground",
+  "clear", "prepare", "rebuild",
+];
+
+/**
+ * What the *second* half of a fused pair looks like. A closed list, because
+ * the alternative — guessing from remainder length — flagged "clearing" and
+ * "moonlight", and rejecting good copy is worse than passing a rare typo.
+ */
+const FUSION_TAILS = new Set([
+  "asks", "ask", "needs", "need", "wants", "want", "gives", "give",
+  "takes", "take", "holds", "hold", "means", "mean", "carries", "carry",
+  "and", "the", "for", "with", "that", "this", "your", "you",
+  "are", "was", "were", "will", "can", "does", "has", "have", "belongs",
+]);
+
 export interface Candidate {
   headline: string;
   body: string;
@@ -170,9 +199,12 @@ export function judge(c: Candidate, anchors?: string[]): Verdict {
   if (!headline) reasons.push("no headline");
   if (!body) reasons.push("no body");
 
-  // A headline is two or three words. Four is a sentence.
+  // Six words, because four was wrong. "Clear ground, hold the line" and
+  // "The moon is almost dark" are both good headlines and both five words;
+  // the cap was rejecting the model for writing well. The character limit is
+  // the real constraint on length — word count only catches rambling.
   const headlineWords = headline.split(/\s+/).filter(Boolean).length;
-  if (headlineWords > 4) reasons.push(`headline is ${headlineWords} words, max 4`);
+  if (headlineWords > 6) reasons.push(`headline is ${headlineWords} words, max 6`);
   if (headline.length > 40) reasons.push(`headline is ${headline.length} chars, max 40`);
 
   const bodyWords = body.split(/\s+/).filter(Boolean).length;
@@ -197,6 +229,31 @@ export function judge(c: Candidate, anchors?: string[]): Verdict {
 
   // A headline that ends in a question mark is asking, not saying.
   if (headline.endsWith("?")) reasons.push("headline is a question");
+
+  // Dropped spaces. A live run produced "The spleen seasonasks for simple
+  // food" — two words fused, which reads as broken software rather than a typo.
+  //
+  // Length can't catch it: "seasonasks" is ten letters, the same as
+  // "everything". The fusion always involves a word from this register though,
+  // so we check against a fixed vocabulary rather than against `anchors` —
+  // anchors exist to prove groundedness, and padding them with generic words
+  // like "season" would quietly weaken that check.
+  //
+  // Matching on remainder *length* was too crude — it flagged "clearing"
+  // ("clear" + "ing"), which is just a word. What actually happens is a domain
+  // word fused to a common one, so the tail is matched against a closed list.
+  // "seasonasks" is caught; "clearing", "seasonal" and "moonlight" are not.
+  const tokens = `${headline} ${body} ${invitation}`
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter(Boolean);
+
+  const fused = tokens.find((w) =>
+    DOMAIN_WORDS.some(
+      (d) => w.length > d.length && w.startsWith(d) && FUSION_TAILS.has(w.slice(d.length)),
+    ),
+  );
+  if (fused) reasons.push(`looks like a dropped space: "${fused}"`);
 
   // The groundedness check. A note that refers to nothing true is about
   // nothing, however clean its vocabulary — "honour what is shifting" passes
@@ -281,6 +338,9 @@ A headline of two to four words, a body of under seventy words, and optionally o
 VOICE
 Old money, eastern philosophy, plain speech. Think of a note left on a table by someone who knows you, not a caption. Short declarative sentences. Concrete nouns. You may name what is physically true — the moon is emptying, the season has turned, they are on day nine of twenty-one — and say what follows from it in ordinary language.
 
+ON "DAY N"
+Write "Day nine of twenty-one" only about their protocol, and only when they are running one. A member reads "Day 25" as their own progress, so never use a bare day number for the moon, the month or anything else. For the moon, say what it looks like — near dark, three days past full — not what number it is.
+
 NEVER WRITE
 - "journey", "embrace", "unlock", "manifest", "abundance", "highest self", "sacred", "divine timing", "the universe", "energy that no longer serves", "trust the process", "lean into", "step into your"
 - "X without Y is Z" constructions
@@ -326,9 +386,14 @@ export function buildUserPrompt(ctx: NoteContext): string {
   lines.push(`DATE: ${a.date}`);
   lines.push("");
   lines.push("SKY AND SEASON (computed, all true)");
+  // The moon's age is deliberately NOT given as "day N". A live run handed a
+  // member on day 3 of a 28-day protocol the headline "Day 25." — the model
+  // had reached for the lunar day, and to the member "Day 25" can only mean
+  // their protocol. The number is worth having; the phrasing was the problem.
   lines.push(
     `Moon: ${a.moon.phase}${a.moon.direction ? `, ${a.moon.direction}` : ""}, ` +
-      `${Math.round(a.moon.illumination * 100)}% lit, day ${Math.round(a.moon.age)} of the cycle`,
+      `${Math.round(a.moon.illumination * 100)}% lit, ` +
+      `${Math.round(a.moon.age)} days since the last new moon`,
   );
   lines.push(`Sun in ${a.sunSign}. Season: ${a.season}.`);
   lines.push(
@@ -403,7 +468,13 @@ export function buildUserPrompt(ctx: NoteContext): string {
   }
   if (ctx.intention) {
     lines.push(`Their own intention today, in their words: "${ctx.intention}"`);
-    lines.push("You may answer it, but do not repeat it back to them.");
+    // A live run echoed "Stop eating after 8pm" straight back as "tonight you
+    // stop eating at eight", which tells the member nothing they didn't write
+    // themselves ten seconds earlier.
+    lines.push(
+      "Do NOT restate this. They wrote it; they know it. Either say something that " +
+        "makes it easier to keep, or ignore it entirely and write about the day.",
+    );
   }
 
   lines.push("");

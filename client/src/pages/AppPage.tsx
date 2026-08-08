@@ -140,6 +140,10 @@ const FAQS = [
     a: "The app is free to download on iOS and Android.",
   },
   {
+    q: "What does membership add?",
+    a: "The member portal opens the layer underneath the app: The Apothecary, which sources the supply each protocol requires; The Library, where guides and ebooks are paired to the protocol you're running; The Body Map, which reads the body as nine energy centres and keeps your readings in sequence; Masterminds, which are cohorts with a real schedule; and a daily note written from the season, the moon, the day you're on, and your own numbers. Coaching runs through all of it.",
+  },
+  {
     q: "Is this medical treatment?",
     a: "No. Sakred Body is education and coaching. We do not diagnose, treat, cure, or prescribe. If you're pregnant, taking medication, or managing a diagnosed condition, talk to your provider before starting any protocol.",
   },
@@ -310,7 +314,7 @@ export default function AppPage() {
       </Section>
 
       {/* ── CTA ──────────────────────────────────────────────── */}
-      <Section tone="light" className="text-center py-20">
+      <Section tone="light" className="text-center py-12 md:py-16">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.h2 variants={fadeInUp} className="text-3xl md:text-4xl font-display font-normal mb-6">
             Pick one. <span className="text-gold">Run it to the end.</span>

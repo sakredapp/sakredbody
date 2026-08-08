@@ -6,6 +6,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { PageHero, SectionHeader } from "@/components/PageHero";
 import { ImageBand } from "@/components/ImageBand";
+import { DiagonalStack } from "@/components/DiagonalStack";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { usePageMeta } from "@/hooks/use-page-meta";
@@ -131,6 +132,46 @@ export default function Retreats() {
         </motion.div>
       </Section>
 
+      {/* ── The places ───────────────────────────────────────── */}
+      <Section tone="ink" className="overflow-hidden">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={viewportOnce}
+          variants={stagger}
+          className="grid lg:grid-cols-2 gap-14 lg:gap-20 items-center"
+        >
+          <motion.div variants={fadeInUp} className="order-2 lg:order-1">
+            <DiagonalStack
+              testId="stack-places"
+              className="mx-auto max-w-md lg:max-w-none"
+              images={[
+                { src: "/images/stone-villa.jpg", alt: "A stone villa above the water" },
+                { src: "/images/wooden-pavilion.jpg", alt: "An open wooden pavilion looking out over green" },
+                { src: "/images/zen-sand-garden.jpg", alt: "A raked sand garden in morning light" },
+              ]}
+            />
+          </motion.div>
+
+          <div className="order-1 lg:order-2 text-center">
+            <motion.p
+              variants={fadeInUp}
+              className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center"
+            >
+              The Places
+            </motion.p>
+            <motion.h2 variants={fadeInUp} className="text-3xl md:text-4xl font-display font-normal mb-6">
+              Chosen for What They <span className="text-gold">Remove</span>
+            </motion.h2>
+            <motion.p variants={fadeInUp} className="text-muted-foreground leading-relaxed">
+              Stone, water, and enough distance that the phone stops being the point. Every property is held
+              to the same standard as the practice: quiet enough to hear the body, comfortable enough that
+              nobody spends the week negotiating with the room.
+            </motion.p>
+          </div>
+        </motion.div>
+      </Section>
+
       {/* ── Formats ──────────────────────────────────────────── */}
       <Section tone="ink">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
@@ -198,7 +239,7 @@ export default function Retreats() {
       </ImageBand>
 
       {/* ── CTA ──────────────────────────────────────────────── */}
-      <Section tone="light" className="text-center py-20">
+      <Section tone="light" className="text-center py-12 md:py-16">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.h2 variants={fadeInUp} className="text-3xl md:text-4xl font-display font-normal mb-6">
             Application <span className="text-gold">required.</span>

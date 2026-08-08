@@ -6,6 +6,8 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { YinYang } from "@/components/YinYang";
 import { CelestialField } from "@/components/CelestialField";
+import { ParticleSphere } from "@/components/ParticleSphere";
+import { DiagonalStack } from "@/components/DiagonalStack";
 import { ImageBand } from "@/components/ImageBand";
 import { LessonSlideshow, type Lesson } from "@/components/LessonSlideshow";
 import { SectionHeader } from "@/components/PageHero";
@@ -101,6 +103,33 @@ const APP_FEATURES = [
   { title: "Wearable sync", body: "Connects to Garmin, Oura, WHOOP, and Fitbit so your sleep and recovery data lands in one place." },
   { title: "eBook library", body: "A reading library with audio, covering the traditions and the research behind the protocols." },
   { title: "A real coach", body: "Message a coach directly from inside the app. Ask the question you'd otherwise search badly." },
+];
+
+const PORTAL_LAYERS = [
+  {
+    title: "The Apothecary",
+    body: "Every protocol arrives with the supply it actually requires — staged prepare, clear, rebuild, sourced with buy links, and checked off as it lands.",
+  },
+  {
+    title: "The Library",
+    body: "Guides and ebooks paired to the protocol you're running, in a reader that hands you back to the practice at the last chapter.",
+  },
+  {
+    title: "The Body Map",
+    body: "Nine energy centres — the body read as regions and flows rather than organs and labs. Readings are kept in sequence, so your coach sees movement instead of a snapshot.",
+  },
+  {
+    title: "Masterminds",
+    body: "Cohorts with a real schedule: sessions, attendance, and a room kept small enough that the standard holds.",
+  },
+  {
+    title: "The Daily Note",
+    body: "One note each morning, written from the season, the moon, the day you're on, and your own numbers. If it can't cite something true about today, it doesn't get sent.",
+  },
+  {
+    title: "Your Coach",
+    body: "The thread is the product, not a support inbox. You are never more than one screen from the person who set the protocol.",
+  },
 ];
 
 const FOOD_SAMPLES = [
@@ -256,7 +285,7 @@ export default function Home() {
       </Section>
 
       {/* ── Core lessons ─────────────────────────────────────── */}
-      <Section id="lessons" tone="light" className="py-12 md:py-16">
+      <Section id="lessons" tone="light" className="py-10 md:py-12">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.p
             variants={fadeInUp}
@@ -361,6 +390,40 @@ export default function Home() {
         </motion.div>
       </Section>
 
+      {/* ── The Member Portal ────────────────────────────────── */}
+      <Section id="portal" tone="ink" className="overflow-hidden">
+        <ParticleSphere className="absolute inset-0 w-full h-full z-0 opacity-70" />
+        <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
+          <motion.div variants={fadeInUp}>
+            <SectionHeader
+              eyebrow="The Member Portal"
+              title={<>Where the Work <span className="text-gold">Actually Lives</span></>}
+              intro="Membership opens the layer underneath the app — supply, study, the body read as energy, and the room you sit in with other members."
+              testId="text-portal-headline"
+            />
+          </motion.div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-14">
+            {PORTAL_LAYERS.map((layer, i) => (
+              <motion.div variants={fadeInUp} key={layer.title}>
+                <div className="h-full pt-8 border-t border-border text-center" data-testid={`card-portal-layer-${i}`}>
+                  <h3 className="font-display text-xl mb-3 text-gold">{layer.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{layer.body}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          <motion.div variants={fadeInUp} className="text-center mt-14">
+            <Link href="/member">
+              <Button variant="outline" className="border-gold-subtle text-gold" data-testid="button-portal">
+                Enter the Portal <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </motion.div>
+        </motion.div>
+      </Section>
+
       <ImageBand
         image="/images/cliffs-sea.jpg"
         alt="Cliffs falling into a calm blue sea"
@@ -446,38 +509,55 @@ export default function Home() {
           whileInView="visible"
           viewport={viewportOnce}
           variants={staggerContainer}
-          className="max-w-2xl mx-auto text-center relative z-10"
+          className="relative z-10 grid lg:grid-cols-2 gap-14 lg:gap-20 items-center"
         >
-          <motion.p variants={fadeInUp} className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
-            Go Deeper
-          </motion.p>
-          <motion.h2
-            variants={fadeInUp}
-            className="text-3xl md:text-4xl font-display font-normal mb-6"
-            data-testid="text-mastermind-teaser-headline"
-          >
-            The Mastermind <span className="text-gold">+ Retreats</span>
-          </motion.h2>
-          <motion.p variants={fadeInUp} className="text-muted-foreground leading-relaxed mb-4">
-            Some of this only lands in person. Our concierge mastermind and retreat experience in Puerto Rico
-            takes the same principles and puts them somewhere with no distractions — small groups, custom
-            dates, morning movement on the beach, breathwork, clean food, and real conversation.
-          </motion.p>
-          <motion.p variants={fadeInUp} className="text-muted-foreground leading-relaxed mb-9">
-            Application required. Design your own retreat: private or shared, three days to two weeks.
-          </motion.p>
+          <div className="text-center">
+            <motion.p
+              variants={fadeInUp}
+              className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center"
+            >
+              Go Deeper
+            </motion.p>
+            <motion.h2
+              variants={fadeInUp}
+              className="text-3xl md:text-4xl font-display font-normal mb-6"
+              data-testid="text-mastermind-teaser-headline"
+            >
+              The Mastermind <span className="text-gold">+ Retreats</span>
+            </motion.h2>
+            <motion.p variants={fadeInUp} className="text-muted-foreground leading-relaxed mb-4">
+              Some of this only lands in person. Our concierge mastermind and retreat experience in Puerto Rico
+              takes the same principles and puts them somewhere with no distractions — small groups, custom
+              dates, morning movement on the beach, breathwork, clean food, and real conversation.
+            </motion.p>
+            <motion.p variants={fadeInUp} className="text-muted-foreground leading-relaxed mb-9">
+              Application required. Design your own retreat: private or shared, three days to two weeks.
+            </motion.p>
+            <motion.div variants={fadeInUp}>
+              <Link href="/mastermind">
+                <Button size="lg" className="gold-metallic-btn px-8" data-testid="button-explore-mastermind">
+                  Explore the Mastermind <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
+            </motion.div>
+          </div>
+
           <motion.div variants={fadeInUp}>
-            <Link href="/mastermind">
-              <Button size="lg" className="gold-metallic-btn px-8" data-testid="button-explore-mastermind">
-                Explore the Mastermind <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
+            <DiagonalStack
+              testId="stack-mastermind"
+              className="mx-auto max-w-md lg:max-w-none"
+              images={[
+                { src: "/images/terrace-ocean.jpg", alt: "A terrace opening onto the ocean at dusk" },
+                { src: "/images/long-dining-table.jpg", alt: "A long table laid for a shared dinner" },
+                { src: "/images/tropical-villa.jpg", alt: "A villa set back in tropical planting" },
+              ]}
+            />
           </motion.div>
         </motion.div>
       </Section>
 
       {/* ── Final CTA ────────────────────────────────────────── */}
-      <Section tone="light" className="text-center py-24">
+      <Section tone="light" className="text-center py-12 md:py-16">
         <motion.div
           initial="hidden"
           whileInView="visible"

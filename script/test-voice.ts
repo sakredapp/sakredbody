@@ -102,8 +102,21 @@ rejects("headline as a question", {
 
 section("Length is the main defence against generated mysticism");
 
+// Five-word headlines are good and must survive — a live run rejected
+// "Clear ground, hold the line" and "The moon is almost dark", which was the
+// rule being wrong rather than the model.
+accepts("five-word headline", {
+  headline: "Clear ground, hold the line",
+  body: "Day 9 of 21. The moon is waning. Steady rather than heroic — you can afford the slower pace this week.",
+});
+
+accepts("another five-word headline", {
+  headline: "The moon is almost dark",
+  body: "Waning crescent, and the spleen is ascendant in late summer. Simple food. Nothing raw, nothing cold, nothing late.",
+});
+
 rejects("headline too long", {
-  headline: "A Very Long Headline That Rambles On",
+  headline: "A Very Long Headline That Rambles On And On",
   body: "The moon is emptying. Finish what is open. Sleep is the work tonight and tomorrow will be lighter for it.",
 }, "headline");
 
@@ -130,6 +143,7 @@ rejects("too many em-dashes", {
 
 section("Malformed output is rejected");
 rejects("no headline", { headline: "", body: "The moon is emptying. Finish what is open before starting anything." }, "no headline");
+
 rejects("no body", { headline: "Let It Leave", body: "" }, "no body");
 
 // ═══ Good copy must survive ════════════════════════════════════════════════
@@ -196,6 +210,17 @@ function rejectsUngrounded(name: string, c: Candidate) {
   } else passed++;
 }
 
+function rejectsFused(name: string, c: Candidate) {
+  const v = judge(c, anchors);
+  if (v.ok) {
+    failed++;
+    console.log(`  ✗ should have caught a dropped space: ${name}`);
+  } else if (!v.reasons.some((r) => r.includes("dropped space"))) {
+    failed++;
+    console.log(`  ✗ wrong reason: ${name}\n      ${JSON.stringify(v.reasons)}`);
+  } else passed++;
+}
+
 function acceptsGrounded(name: string, c: Candidate) {
   const v = judge(c, anchors);
   if (!v.ok) {
@@ -240,6 +265,20 @@ acceptsGrounded("names the protocol day", {
 acceptsGrounded("names the organ and season", {
   headline: "Spleen weather",
   body: "Late summer, and the old reading puts the spleen ascendant. Cooked food over raw today. Skip the cold drinks.",
+});
+
+// A live run produced "The spleen seasonasks for simple food" — two words
+// fused. Length can't catch it ("seasonasks" is as long as "everything"), but
+// it always fuses a domain word we already know about.
+rejectsFused("dropped space after a domain word", {
+  headline: "Waning and weighted",
+  body: "The moon is near empty. The spleen seasonasks for simple food and early rest. Nothing needs building today.",
+});
+
+// Ordinary inflections of the same words must survive.
+acceptsGrounded("seasonal is not a fusion", {
+  headline: "Late summer",
+  body: "The spleen is ascendant in this seasonal turn. Simple food today — nothing raw, nothing cold, nothing late.",
 });
 
 acceptsGrounded("names a number", {

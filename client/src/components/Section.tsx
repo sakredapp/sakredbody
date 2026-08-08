@@ -35,7 +35,7 @@ export function Section({
       <div className="tone-ink bg-background px-4 sm:px-8 lg:px-14 py-4 sm:py-6">
         <section
           className={cn(
-            "tone-light bg-background rounded-2xl sm:rounded-[1.75rem] py-20 md:py-28 relative overflow-hidden",
+            "tone-light bg-background rounded-2xl sm:rounded-[1.75rem] py-12 md:py-16 relative overflow-hidden",
             className,
           )}
           {...props}

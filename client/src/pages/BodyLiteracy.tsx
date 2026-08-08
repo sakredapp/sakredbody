@@ -204,7 +204,7 @@ export default function BodyLiteracy() {
       </Section>
 
       {/* ── CTA ──────────────────────────────────────────────── */}
-      <Section tone="light" className="text-center py-20">
+      <Section tone="light" className="text-center py-12 md:py-16">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.h2 variants={fadeInUp} className="text-3xl md:text-4xl font-display font-normal mb-6">
             Practice it <span className="text-gold">daily.</span>
