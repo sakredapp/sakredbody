@@ -51,6 +51,7 @@ import {
   habits,
   rewards,
   userAssignedHabits,
+  userRemovedHabits,
   users,
   coachingMessages,
   insertWellnessRoutineSchema,
@@ -61,12 +62,20 @@ import {
   enrollInRoutine,
   reconcileHabits,
   pauseRoutine,
+  resumeRoutine,
   abandonRoutine,
+  removeHabitSeries,
+  restoreHabitSeries,
+  settleRoutines,
+  getActiveEnrollment,
+  memberToday,
 } from "./enrollment.js";
 import {
   formatLocalDateString,
   parseLocalDate,
   addDays,
+  addDaysToString,
+  isValidTimeZone,
 } from "../../shared/utils/dates.js";
 
 // ─── Middleware ────────────────────────────────────────────────────────────
@@ -149,6 +158,36 @@ export function registerCoachingRoutes(app: Express): void {
   // USER ROUTES
   // ═══════════════════════════════════════════════════════════════════════
 
+  // ── Record the member's timezone ─────────────────────────────────────
+  // Everything in this engine is scheduled by calendar date, and the server
+  // has no other way to know when a member's day starts. The client posts its
+  // IANA zone on load; until it does, the member is treated as UTC.
+  app.put("/api/coaching/timezone", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const { timezone } = z.object({ timezone: z.string().min(1).max(64) }).parse(req.body);
+
+      if (!isValidTimeZone(timezone)) {
+        return res.status(400).json({ message: "Unrecognised timezone" });
+      }
+
+      const userId = req.session.userId!;
+      const [updated] = await db
+        .update(users)
+        .set({ timezone, updatedAt: new Date() })
+        .where(eq(users.id, userId))
+        .returning({ timezone: users.timezone });
+
+      // A member whose zone just moved may have crossed a day boundary.
+      await settleRoutines(userId);
+
+      res.json({ timezone: updated?.timezone ?? timezone });
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
   // ── List available routines ──────────────────────────────────────────
   app.get("/api/routines", async (_req: Request, res: Response) => {
     try {
@@ -164,10 +203,11 @@ export function registerCoachingRoutes(app: Express): void {
   app.get("/api/routines/active", isAuthenticated, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
-      const [active] = await db
-        .select()
-        .from(userRoutines)
-        .where(and(eq(userRoutines.userId, userId), eq(userRoutines.status, "active")));
+      // Settle first: a routine whose start date arrived, or whose end date
+      // passed, must move before anyone reads its status.
+      await settleRoutines(userId);
+
+      const active = await getActiveEnrollment(userId);
       if (!active) return res.json(null);
 
       const [routine] = await db
@@ -261,6 +301,31 @@ export function registerCoachingRoutes(app: Express): void {
     }
   });
 
+  // ── Resume a paused routine ──────────────────────────────────────────
+  // Pause used to be a one-way door: no resume endpoint existed, and
+  // re-enrolling hit the idempotency key and returned "already enrolled" with
+  // no habits. The days spent paused are given back, not lost.
+  app.post("/api/routines/resume", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const { enrollmentId } = z
+        .object({ enrollmentId: z.string().uuid().optional() })
+        .parse(req.body ?? {});
+
+      const result = await resumeRoutine(req.session.userId!, enrollmentId);
+      if (!result) return res.status(404).json({ message: "No paused routine to resume" });
+
+      res.json({
+        message: "Routine resumed",
+        enrollment: result.enrollment,
+        habitsScheduled: result.habitsScheduled,
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
   // ── Abandon active routine ───────────────────────────────────────────
   app.post("/api/routines/abandon", isAuthenticated, async (req: Request, res: Response) => {
     try {
@@ -278,7 +343,11 @@ export function registerCoachingRoutes(app: Express): void {
   app.get("/api/habits/today", isAuthenticated, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
-      const today = formatLocalDateString();
+      // The member's today, not the server's. On Vercel the process runs in
+      // UTC, so a member in Los Angeles would be served tomorrow's habits from
+      // 5pm onward — and tick off rows belonging to a day that hasn't started.
+      const today = await memberToday(userId);
+      await settleRoutines(userId, today);
 
       const todayHabits = await db
         .select()
@@ -391,6 +460,54 @@ export function registerCoachingRoutes(app: Express): void {
     }
   });
 
+  // ── Remove a habit from every remaining day ──────────────────────────
+  // Deleting one day's row is pointless — the habit is back tomorrow. This
+  // clears the series from today forward and writes a tombstone so a resume
+  // or re-enrol doesn't bring it straight back. History is untouched.
+  app.delete("/api/habits/series", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const input = z
+        .object({
+          routineHabitId: z.string().uuid().nullable().optional(),
+          title: z.string().min(1).nullable().optional(),
+          userRoutineId: z.string().uuid().nullable().optional(),
+        })
+        .refine((v) => v.routineHabitId || v.title, {
+          message: "Need a habit template or a title",
+        })
+        .parse(req.body ?? {});
+
+      const result = await removeHabitSeries(req.session.userId!, input);
+      res.json(result);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // ── Put a removed habit back ─────────────────────────────────────────
+  app.post("/api/habits/series/restore", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const input = z
+        .object({
+          routineHabitId: z.string().uuid().nullable().optional(),
+          title: z.string().min(1).nullable().optional(),
+        })
+        .refine((v) => v.routineHabitId || v.title, {
+          message: "Need a habit template or a title",
+        })
+        .parse(req.body ?? {});
+
+      const result = await restoreHabitSeries(req.session.userId!, input);
+      res.json(result);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
   // ── Habit detail view (Part 3) ───────────────────────────────────────
   // Fetches the full template for expanded habit card
   app.get("/api/habits/:id/detail", isAuthenticated, async (req: Request, res: Response) => {
@@ -438,10 +555,8 @@ export function registerCoachingRoutes(app: Express): void {
   app.post("/api/habits/reconcile", isAuthenticated, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
-      const [active] = await db
-        .select()
-        .from(userRoutines)
-        .where(and(eq(userRoutines.userId, userId), eq(userRoutines.status, "active")));
+      await settleRoutines(userId);
+      const active = await getActiveEnrollment(userId);
 
       if (!active) return res.json({ reconciled: false, habitsAdded: 0 });
       const result = await reconcileHabits(userId, active.id);
@@ -456,8 +571,9 @@ export function registerCoachingRoutes(app: Express): void {
   app.get("/api/habits/range", isAuthenticated, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
-      const startDate = (req.query.start as string) || formatLocalDateString(addDays(new Date(), -13));
-      const endDate = (req.query.end as string) || formatLocalDateString();
+      const memberNow = await memberToday(userId);
+      const startDate = (req.query.start as string) || addDaysToString(memberNow, -13);
+      const endDate = (req.query.end as string) || memberNow;
 
       const rangeData = await db
         .select({
@@ -490,10 +606,8 @@ export function registerCoachingRoutes(app: Express): void {
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ message: "User not found" });
 
-      const [activeEnrollment] = await db
-        .select()
-        .from(userRoutines)
-        .where(and(eq(userRoutines.userId, userId), eq(userRoutines.status, "active")));
+      await settleRoutines(userId);
+      const activeEnrollment = await getActiveEnrollment(userId);
 
       const [completedStats] = await db
         .select({ total: count() })
@@ -638,14 +752,33 @@ export function registerCoachingRoutes(app: Express): void {
         assignment = created;
       }
 
-      // Pre-schedule habit rows
-      const today = new Date();
+      // Adding a habit back means the member wants it — clear any tombstone,
+      // or fetchFilteredHabits will keep filtering it out of every routine.
+      await db
+        .delete(userRemovedHabits)
+        .where(
+          and(
+            eq(userRemovedHabits.userId, userId),
+            eq(userRemovedHabits.routineHabitId, routineHabitId)
+          )
+        );
+
+      // Pre-schedule habit rows. ON CONFLICT because uq_habits makes
+      // (user, title, date) unique and re-assigning after unassigning would
+      // otherwise collide with rows an active routine already owns.
+      const today = parseLocalDate(await memberToday(userId));
       const habitRows = buildStandaloneHabitRows(userId, template, today);
+      let scheduled = 0;
       if (habitRows.length > 0) {
-        await db.insert(habits).values(habitRows);
+        const inserted = await db
+          .insert(habits)
+          .values(habitRows)
+          .onConflictDoNothing()
+          .returning({ id: habits.id });
+        scheduled = inserted.length;
       }
 
-      res.status(201).json({ assignment, habitsScheduled: habitRows.length });
+      res.status(201).json({ assignment, habitsScheduled: scheduled });
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
       console.error(err);
@@ -671,13 +804,23 @@ export function registerCoachingRoutes(app: Express): void {
         })
         .returning();
 
-      const today = new Date();
+      await db
+        .delete(userRemovedHabits)
+        .where(and(eq(userRemovedHabits.userId, userId), eq(userRemovedHabits.title, input.title)));
+
+      const today = parseLocalDate(await memberToday(userId));
       const habitRows = buildCustomHabitRows(userId, input, today);
+      let scheduled = 0;
       if (habitRows.length > 0) {
-        await db.insert(habits).values(habitRows);
+        const inserted = await db
+          .insert(habits)
+          .values(habitRows)
+          .onConflictDoNothing()
+          .returning({ id: habits.id });
+        scheduled = inserted.length;
       }
 
-      res.status(201).json({ assignment, habitsScheduled: habitRows.length });
+      res.status(201).json({ assignment, habitsScheduled: scheduled });
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
       console.error(err);
@@ -700,7 +843,15 @@ export function registerCoachingRoutes(app: Express): void {
         .returning();
 
       if (!updated) return res.status(404).json({ message: "Assignment not found" });
-      res.json({ success: true });
+
+      // Soft-deleting the assignment alone left all 30 materialised days in
+      // place, so the habit the member just removed kept appearing daily.
+      const { removed } = await removeHabitSeries(userId, {
+        routineHabitId: updated.routineHabitId,
+        title: updated.title,
+      });
+
+      res.json({ success: true, removed });
     } catch (err) {
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });
@@ -1098,10 +1249,8 @@ export function registerCoachingRoutes(app: Express): void {
       if (!user) return res.status(404).json({ message: "User not found" });
 
       // Active enrollment
-      const [activeEnrollment] = await db
-        .select()
-        .from(userRoutines)
-        .where(and(eq(userRoutines.userId, userId), eq(userRoutines.status, "active")));
+      await settleRoutines(userId);
+      const activeEnrollment = await getActiveEnrollment(userId);
 
       // Routine name if enrolled
       let routineName: string | null = null;
@@ -1113,8 +1262,8 @@ export function registerCoachingRoutes(app: Express): void {
         routineName = routine?.name || null;
       }
 
-      // Today's habits
-      const today = formatLocalDateString();
+      // Today's habits, in the member's zone rather than the server's.
+      const today = await memberToday(userId);
       const todayHabits = await db
         .select()
         .from(habits)
@@ -1318,7 +1467,7 @@ function buildCustomHabitRows(
 
 // ─── Streak Calculator ──────────────────────────────────────────────────
 
-async function updateStreak(userId: string): Promise<void> {
+async function updateStreak(userId: string, today?: string): Promise<void> {
   const completedDates = await db
     .selectDistinct({ date: habits.scheduledDate })
     .from(habits)
@@ -1333,18 +1482,20 @@ async function updateStreak(userId: string): Promise<void> {
     return;
   }
 
-  // Use local date handling (Part 9)
-  const today = parseLocalDate(formatLocalDateString());
-  const yesterday = addDays(today, -1);
+  // The member's day boundary, not the process's — a streak computed against
+  // UTC breaks for anyone west of it every evening.
+  const todayStr = today ?? (await memberToday(userId));
+  const todayDate = parseLocalDate(todayStr);
+  const yesterday = addDays(todayDate, -1);
 
   let streak = 0;
-  let expectedDate = today;
+  let expectedDate = todayDate;
 
   for (const row of completedDates) {
     const rowDate = parseLocalDate(row.date);
 
     if (streak === 0) {
-      if (rowDate.getTime() === today.getTime() || rowDate.getTime() === yesterday.getTime()) {
+      if (rowDate.getTime() === todayDate.getTime() || rowDate.getTime() === yesterday.getTime()) {
         streak = 1;
         expectedDate = addDays(rowDate, -1);
       } else {

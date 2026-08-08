@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
+import { useTimezoneSync } from "@/hooks/use-timezone";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/auth-utils";
@@ -162,6 +163,10 @@ function BookingRequestCard({ booking }: { booking: BookingRequest }) {
 export default function MemberDashboard() {
   const { user, isLoading: authLoading, isAuthenticated, logout } = useAuth();
   const { toast } = useToast();
+
+  // The server schedules by calendar date and runs in UTC; it needs to know
+  // when this member's day actually starts.
+  useTimezoneSync(isAuthenticated);
   const [location] = useLocation();
 
   // Default to coaching tab if coming from /coaching URL

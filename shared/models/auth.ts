@@ -21,6 +21,10 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   isAdmin: varchar("is_admin").default("false"),
+  // IANA zone, e.g. "America/Los_Angeles". The server has no other way to know
+  // when this member's day starts, and every habit is scheduled by calendar
+  // date — get this wrong and completions land on the wrong day.
+  timezone: varchar("timezone").default("UTC"),
   // Coaching profile fields
   activeRoutineId: varchar("active_routine_id"), // FK → wellness_routines.id
   routineIntensity: varchar("routine_intensity").default("lite"), // 'lite' | 'intense'

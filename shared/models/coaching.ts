@@ -128,9 +128,19 @@ export const userRoutines = pgTable(
     userId: text("user_id").notNull(), // FK → users.id
     routineId: text("routine_id").notNull(), // FK → wellness_routines.id
     startDate: date("start_date").notNull(),
-    endDate: date("end_date").notNull(), // computed: start_date + duration_days
-    status: text("status").notNull().default("active"), // 'active' | 'completed' | 'paused' | 'abandoned'
+    // The last day habits are scheduled — start_date + duration_days - 1, so
+    // a 21-day routine starting the 1st ends on the 21st, not the 22nd.
+    endDate: date("end_date").notNull(),
+    // scheduled — enrolled with a future start; nothing materialised yet
+    // active    — running
+    // paused    — stopped by the member; future rows cleared, resumable
+    // completed — ran to end_date
+    // abandoned — ended early by the member
+    status: text("status").notNull().default("active"),
     intensity: text("intensity").notNull().default("lite"), // 'lite' | 'intense'
+    // Set when paused. Resuming shifts end_date by the days spent paused, so a
+    // 21-day routine still delivers 21 days of habits.
+    pausedAt: date("paused_at"),
     clientRequestId: text("client_request_id"), // SHA-256 idempotency key
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
@@ -148,7 +158,19 @@ export const insertUserRoutineSchema = createInsertSchema(userRoutines).omit({
   updatedAt: true,
 });
 
-export const userRoutineStatusEnum = z.enum(["active", "completed", "paused", "abandoned"]);
+export const userRoutineStatusEnum = z.enum([
+  "scheduled",
+  "active",
+  "paused",
+  "completed",
+  "abandoned",
+]);
+export type UserRoutineStatus = z.infer<typeof userRoutineStatusEnum>;
+
+/** Statuses that should still be serving habits. */
+export const LIVE_ROUTINE_STATUSES = ["active"] as const;
+/** Statuses a member can resume from. */
+export const RESUMABLE_ROUTINE_STATUSES = ["paused"] as const;
 
 export type UserRoutine = typeof userRoutines.$inferSelect;
 export type InsertUserRoutine = z.infer<typeof insertUserRoutineSchema>;
@@ -239,6 +261,31 @@ export const userAssignedHabits = pgTable(
 );
 
 export type UserAssignedHabit = typeof userAssignedHabits.$inferSelect;
+
+// ─── 8. REMOVED HABITS (suppression tombstones) ───────────────────────────
+
+/**
+ * "I don't want this one." Without a tombstone, the next resume or re-enrol
+ * re-materialises exactly what the member just deleted.
+ *
+ * Two suppression kinds: by template id, or by title for a custom habit that
+ * has no template row. Scoped to an enrollment where one is known, so removing
+ * a habit from one protocol doesn't blacklist it from every future one.
+ */
+export const userRemovedHabits = pgTable(
+  "user_removed_habits",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: text("user_id").notNull(),
+    userRoutineId: uuid("user_routine_id"), // FK → user_routines.id, nullable
+    routineHabitId: uuid("routine_habit_id"), // FK → routine_habits.id, nullable
+    title: text("title"), // used when there is no template
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => [index("idx_removed_habits_user").on(table.userId)]
+);
+
+export type UserRemovedHabit = typeof userRemovedHabits.$inferSelect;
 
 // ─── Coaching-specific enums & constants ──────────────────────────────────
 
