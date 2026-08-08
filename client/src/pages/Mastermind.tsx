@@ -82,7 +82,7 @@ export default function Mastermind() {
             </motion.h1>
             
             <motion.p variants={fadeInUp} className="text-base md:text-lg text-white/60 mb-8 max-w-2xl leading-relaxed font-sans font-normal">
-              The room, and the people in it. Cohorts that meet on a real schedule, the portal that runs your practice between them, and retreats at member rates when the work needs a place to go.
+              Discussion and teaching, not treatment. Cohorts that meet on a real schedule, people who hold the same standard, and the portal that runs your practice between sessions. The protocols live in the app; the retreats are where they're run in person.
             </motion.p>
             
             <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4">
@@ -164,8 +164,9 @@ export default function Mastermind() {
             Members Travel at <span className="text-gold">Member Rates</span>
           </h2>
           <p className="text-muted-foreground leading-relaxed mb-8">
-            Six formats, three days to two weeks, private or shared, with housing and the whole itinerary
-            handled. Membership is what gets you the rate and the first look at dates.
+            The mastermind is where the thinking happens. A retreat is where the work does — protocols run,
+            training programmed, sleep repaired, for days at a time. Membership gets you the rate and the
+            first look at dates.
           </p>
           <Link href="/retreats">
             <Button variant="outline" className="border-gold-subtle text-gold gold-outline-lift px-8" data-testid="button-see-retreats">

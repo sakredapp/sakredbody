@@ -9,9 +9,13 @@ import { GemStone, type Stone } from "@/components/GemStone";
  * Retreats, the Mastermind and Sakred Executive overlapped enough on the site
  * that a reader landing on any one of them could not tell what the other two
  * were — the three pages each described small groups, coaching and a week
- * somewhere good. The distinction is not the content, it is the shape: a
- * place, a room, and one person. Saying that plainly on all three pages costs
- * one band and removes the whole confusion.
+ * somewhere good.
+ *
+ * The distinction is what actually happens. A retreat is the work: protocols
+ * run, bodies trained, sleep repaired, in a place with nothing in the way. A
+ * mastermind is discussion and teaching — minds meeting, not treatment.
+ * Executive is one person, privately. Stated plainly on all three pages, the
+ * confusion goes away for the cost of one band.
  */
 
 interface Way {
@@ -27,16 +31,16 @@ const WAYS: Way[] = [
   {
     key: "retreats",
     name: "Retreats",
-    shape: "A place",
-    body: "Days somewhere with no distractions, run properly. Six formats, three days to two weeks, private or shared.",
+    shape: "The work, in person",
+    body: "Days of actual practice — drainage, training, sleep repair, breathwork — run properly somewhere with nothing in the way. Six formats, three days to two weeks.",
     href: "/retreats",
     stone: { h: 148, s: 34, l: 44 },
   },
   {
     key: "mastermind",
     name: "The Mastermind",
-    shape: "A room",
-    body: "The membership and the people in it. Cohorts with a real schedule, the portal, and retreats at member rates.",
+    shape: "Minds, meeting",
+    body: "Discussion and teaching, not protocols. Cohorts on a real schedule, the room they meet in, and the portal that runs your practice between them.",
     href: "/mastermind",
     stone: { h: 38, s: 62, l: 52 },
   },
@@ -44,7 +48,7 @@ const WAYS: Way[] = [
     key: "executive",
     name: "Sakred Executive",
     shape: "One to one",
-    body: "Private coaching for founders and executives. A small number of clients at a time, by application.",
+    body: "Private coaching, built around your body and your calendar. A small number of clients at a time, by application.",
     href: "/executive",
     stone: { h: 212, s: 34, l: 42 },
   },

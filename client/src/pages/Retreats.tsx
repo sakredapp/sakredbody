@@ -57,12 +57,12 @@ const FORMATS = [
     includes: ["Structured strength + conditioning", "Recovery protocols and contrast work", "Performance nutrition", "Movement assessment"],
   },
   {
-    name: "Founder Mastermind",
+    name: "Founder's Reset",
     length: "5–7 days",
-    focus: "Embody + Gather",
+    focus: "Restore + Build",
     flagship: false,
-    body: "Business and body in the same week. Strategic work in the mornings, physical discipline around it, and a small group of people who are actually building things.",
-    includes: ["Small-group mastermind sessions", "Daily physical practice", "Strategic working blocks", "Peer accountability"],
+    body: "For people carrying a company. The same restoration and training work, run around a body that has been running on caffeine and five hours for years — and a small group in the same position.",
+    includes: ["Drainage and sleep repair", "Daily physical practice", "Nervous-system downshift work", "A small group carrying the same load"],
   },
   {
     name: "Executive Reset",
@@ -86,14 +86,14 @@ const FORMATS = [
     focus: "All four",
     flagship: false,
     body: "The full arc, in one stay. Restoration into training into practice design, inside a group holding the same standard. The most complete version of everything on this site.",
-    includes: ["Full protocol run, start to finish", "Strength and conditioning block", "Practice and environment design", "Mastermind and community"],
+    includes: ["Full protocol run, start to finish", "Strength and conditioning block", "Practice and environment design", "The group you run it with"],
   },
 ];
 
 export default function Retreats() {
   usePageMeta(
     "Retreats + Mastermind — Gather | Sakred Body",
-    "The terrain isn't only biological. Restoration, performance and mastermind retreats — small groups, custom dates, concierge-run.",
+    "Where the work is actually done. Restoration, performance and immersion retreats — protocols run properly, small groups, custom dates, concierge-run.",
   );
 
   return (
@@ -103,7 +103,7 @@ export default function Retreats() {
       <PageHero
         eyebrow="Territory Four · The Social Terrain"
         title={<>Gather.</>}
-        intro="The terrain isn't only biological. Who you're around is an input like any other."
+        intro="Where the work is actually done — protocols run properly, in a place with nothing in the way."
         testId="text-retreats-headline"
         image="/images/estate-vineyard.webp"
         imageAlt="A stone estate set among vineyards and low green hills"
