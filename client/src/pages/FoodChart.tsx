@@ -91,7 +91,7 @@ export default function FoodChart() {
       </section>
 
       {/* ── Sticky controls. The scale is the filter — one control, not two. ── */}
-      <div className="tone-ink bg-background border-y border-border sticky top-16 z-40">
+      <div className="tone-ink bg-background border-y border-border sticky top-[84px] z-30">
         <div className="container max-w-5xl mx-auto px-4 py-5">
           <div className="relative mb-5 max-w-md mx-auto">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -165,18 +165,21 @@ export default function FoodChart() {
         </div>
       </div>
 
-      {/* ── Categories ───────────────────────────────────────── */}
-      <Section tone="light" className="pt-14">
-        {grouped.length === 0 ? (
-          <p className="text-center text-muted-foreground py-20" data-testid="text-no-results">
+      {/* ── Categories ───────────────────────────────────────
+          Each category is its own floating panel. As one section it ran
+          6400px — eight screens of unbroken white, with the rounded corners
+          only ever visible at the very top and very bottom. */}
+      {grouped.length === 0 ? (
+        <Section tone="light">
+          <p className="text-center text-muted-foreground py-10" data-testid="text-no-results">
             No foods match that search. Try a different term or clear the filters.
           </p>
-        ) : (
-          <>
-            {!isFiltering && (
-              // Eight categories on a fixed 4-up grid — a wrapping flex row
-              // broke into ragged rows of uneven pills.
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-16 max-w-3xl mx-auto">
+        </Section>
+      ) : (
+        <>
+          {!isFiltering && (
+            <Section tone="light" className="py-12">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 max-w-3xl mx-auto">
                 {FOOD_CATEGORIES.map((c) => (
                   <a
                     key={c.name}
@@ -187,61 +190,61 @@ export default function FoodChart() {
                   </a>
                 ))}
               </div>
-            )}
+            </Section>
+          )}
 
-            <div className="space-y-20">
-              {grouped.map((cat) => (
-                <div
-                  key={cat.name}
-                  id={slug(cat.name)}
-                  className="scroll-mt-48"
-                  data-testid={`category-${slug(cat.name)}`}
-                >
-                  <div className="text-center max-w-2xl mx-auto mb-10">
-                    <h2 className="text-2xl md:text-3xl font-display font-normal mb-2">{cat.name}</h2>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{cat.description}</p>
-                    <p className="text-xs text-gold mt-2">{cat.count} items</p>
+          {grouped.map((cat) => (
+            <Section
+              key={cat.name}
+              tone="light"
+              id={slug(cat.name)}
+              className="py-14 md:py-16 scroll-mt-[110px]"
+              data-testid={`category-${slug(cat.name)}`}
+            >
+              <div className="text-center max-w-2xl mx-auto mb-10">
+                <h2 className="text-2xl md:text-3xl font-display font-normal mb-2">{cat.name}</h2>
+                <p className="text-sm text-muted-foreground leading-relaxed">{cat.description}</p>
+                <p className="text-xs text-gold mt-2">{cat.count} items</p>
+              </div>
+
+              <div className="space-y-8 max-w-4xl mx-auto">
+                {cat.bands.map((band) => (
+                  <div key={band.rating}>
+                    <div className="flex items-center justify-center gap-2.5 mb-4">
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: `hsl(${RATING_META[band.rating].color})` }}
+                      />
+                      <span className="text-[11px] uppercase tracking-widest text-muted-foreground">
+                        {band.rating}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {band.foods.map((f) => (
+                        <span
+                          key={f.name}
+                          className="px-3.5 py-1.5 rounded-full text-sm border"
+                          style={{
+                            borderColor: `hsl(${RATING_META[band.rating].color} / 0.35)`,
+                            backgroundColor: `hsl(${RATING_META[band.rating].color} / 0.08)`,
+                          }}
+                        >
+                          {f.name}
+                        </span>
+                      ))}
+                    </div>
                   </div>
+                ))}
+              </div>
+            </Section>
+          ))}
+        </>
+      )}
 
-                  <div className="space-y-8 max-w-4xl mx-auto">
-                    {cat.bands.map((band) => (
-                      <div key={band.rating}>
-                        <div className="flex items-center justify-center gap-2.5 mb-4">
-                          <span
-                            className="h-2.5 w-2.5 rounded-full"
-                            style={{ backgroundColor: `hsl(${RATING_META[band.rating].color})` }}
-                          />
-                          <span className="text-[11px] uppercase tracking-widest text-muted-foreground">
-                            {band.rating}
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap justify-center gap-2">
-                          {band.foods.map((f) => (
-                            <span
-                              key={f.name}
-                              className="px-3.5 py-1.5 rounded-full text-sm border"
-                              style={{
-                                borderColor: `hsl(${RATING_META[band.rating].color} / 0.35)`,
-                                backgroundColor: `hsl(${RATING_META[band.rating].color} / 0.08)`,
-                              }}
-                            >
-                              {f.name}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        <p className="text-xs text-muted-foreground max-w-2xl mx-auto text-center mt-20 leading-relaxed">
-          This chart is general education, not medical or nutritional advice. Individual responses to food
-          vary, and ratings reflect typical inflammatory potential rather than a judgment about any single
-          diet. Talk to a qualified provider before making significant dietary changes.
+      <Section tone="light" className="py-12">
+        <p className="text-xs text-muted-foreground max-w-2xl mx-auto text-center leading-relaxed">
+          General education, not medical or nutritional advice. Individual responses vary. Talk to a
+          qualified provider before making significant dietary changes.
         </p>
       </Section>
 

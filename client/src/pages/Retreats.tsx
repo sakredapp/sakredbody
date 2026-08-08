@@ -103,7 +103,6 @@ export default function Retreats() {
             <SectionHeader
               eyebrow="Why Environment"
               title={<>You Cannot Out-Discipline <span className="text-gold">Your Surroundings</span></>}
-              intro="These are inputs in exactly the way food and sleep are inputs. People try to fix a physiology problem with willpower while sitting inside an environment engineered against them."
               testId="text-environment-headline"
             />
           </motion.div>
@@ -139,7 +138,7 @@ export default function Retreats() {
             <SectionHeader
               eyebrow="The Formats"
               title={<>Six Ways In, <span className="text-gold">One Infrastructure</span></>}
-              intro="All of these run in Puerto Rico, concierge-managed, with essential housing included and Premium or Elite upgrades available. Every format is application-only."
+              intro="Puerto Rico. Concierge-managed. Application only."
               testId="text-formats-headline"
             />
           </motion.div>

@@ -141,7 +141,6 @@ export default function Build() {
             <SectionHeader
               eyebrow="Where It Goes Wrong"
               title={<>Four Ways to <span className="text-gold">Waste Years</span></>}
-              intro="Two of these are errors of too much. Two are errors of too little. People rarely make both kinds — they pick the one that flatters their temperament."
               testId="text-mistakes-headline"
             />
           </motion.div>

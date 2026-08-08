@@ -62,45 +62,35 @@ const ELEMENTS = [
     organs: "Liver + Gallbladder",
     season: "Spring",
     color: "var(--element-wood)",
-    reads: "Detox pathways, bile flow, and the tension that settles into the sinews.",
-    protocol: "Liver & Detox Support",
-    days: "21 days",
+    reads: "Flow and direction. When it moves freely you feel decisive; when it stagnates, tension gathers in the sinews and the temper goes short.",
   },
   {
     element: "Fire",
     organs: "Heart + Small Intestine",
     season: "Summer",
     color: "var(--element-fire)",
-    reads: "Circulation, sleep, and whether the mind settles when the light goes.",
-    protocol: "Sleep & Nervous System",
-    days: "14 days",
+    reads: "Circulation and the settling of the mind. Fire governs whether the day's charge dissipates at night or keeps burning after the light goes.",
   },
   {
     element: "Earth",
     organs: "Spleen + Stomach",
     season: "Late Summer",
     color: "var(--element-earth)",
-    reads: "Digestion, enzyme output, the gut lining, and the worry that sits in the stomach.",
-    protocol: "Digestive Stability, then Gut Reset",
-    days: "21 + 28 days",
+    reads: "Transformation — turning what you take in into what you're made of. Worry sits here, and so does the ability to extract nourishment at all.",
   },
   {
     element: "Metal",
     organs: "Lung + Large Intestine",
     season: "Autumn",
     color: "var(--element-metal)",
-    reads: "Breath, skin, lymph, elimination — every channel the body uses to clear.",
-    protocol: "Lymphatic & Circulatory Cleanse",
-    days: "21 days",
+    reads: "Exchange and release. Breath in, waste out, grief moved through. Every channel the body uses to let go of something.",
   },
   {
     element: "Water",
     organs: "Kidney + Bladder",
     season: "Winter",
     color: "var(--element-water)",
-    reads: "Deep reserves, bone, and the will you draw on under real load. The strength layer.",
-    protocol: "Training, minerals, and capacity",
-    days: "Ongoing",
+    reads: "The deep reserve. Bone, will, and the capacity you draw down under real load — the account everything else is borrowed against.",
   },
 ];
 
@@ -219,7 +209,7 @@ export default function Home() {
             <SectionHeader
               eyebrow="The Architecture"
               title={<>Four Territories. <span className="text-gold">One Sequence.</span></>}
-              intro="These aren't categories to browse — they're an order of operations. A body that can't drain shouldn't be loaded. A body with capacity it never expresses is a waste. Each territory earns the next."
+              intro="An order of operations, not a menu."
               testId="text-territories-headline"
             />
           </motion.div>
@@ -313,11 +303,7 @@ export default function Home() {
                   <h3 className="font-display text-2xl leading-none mb-2">{el.element}</h3>
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-4">{el.season}</p>
                   <p className="text-sm text-gold/80 mb-3">{el.organs}</p>
-                  <p className="text-sm text-muted-foreground leading-relaxed flex-1">{el.reads}</p>
-                  <div className="mt-5 pt-4 border-t border-border">
-                    <p className="text-sm text-foreground">{el.protocol}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{el.days}</p>
-                  </div>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{el.reads}</p>
                 </div>
               </motion.div>
             ))}

@@ -136,7 +136,7 @@ export default function Restore() {
             <SectionHeader
               eyebrow="In Practice"
               title={<>Where to Start</>}
-              intro="A few of the protocols, in the order most people should run them. More are added over time."
+              intro="A few of them. More over time."
               testId="text-protocols-headline"
             />
           </motion.div>

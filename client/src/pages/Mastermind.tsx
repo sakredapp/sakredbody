@@ -55,7 +55,7 @@ export default function Mastermind() {
           <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/65 to-black/40 z-10" />
           <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-background z-10" />
           <img 
-            src="/images/hero-ocean.png"
+            src="/images/hero-ocean.jpg"
             alt="Puerto Rico coastline"
             className="w-full h-full object-cover"
           />
@@ -126,7 +126,7 @@ export default function Mastermind() {
           <div className="relative">
             <div className="absolute -inset-4 bg-gold/10 blur-3xl rounded-full opacity-30"></div>
             <img 
-              src="/images/group-wellness.png" 
+              src="/images/group-wellness.jpg" 
               alt="Beachside wellness space"
               className="relative rounded-md shadow-gold-subtle border border-gold-subtle"
             />
@@ -138,7 +138,7 @@ export default function Mastermind() {
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div className="order-2 md:order-1">
             <img 
-              src="/images/tropical-villa.png" 
+              src="/images/tropical-villa.jpg" 
               alt="Caribbean beachside property"
               className="rounded-md shadow-gold-subtle border border-gold-subtle"
             />
@@ -168,7 +168,7 @@ export default function Mastermind() {
               price: "Included",
               priceNote: "with membership",
               desc: "Boutique hotel-style room with shared common spaces. Clean, comfortable, and everything you need to focus on the experience.",
-              img: "/images/housing-essential.png",
+              img: "/images/housing-essential.jpg",
               features: ["Private hotel-style room", "Shared common areas", "Wi-Fi, A/C, daily housekeeping"]
             },
             {
@@ -176,7 +176,7 @@ export default function Mastermind() {
               price: "$450",
               priceNote: "/night",
               desc: "Your own suite at a five-star resort. Full resort amenities, pool, spa access, and room service — all coordinated by our concierge team.",
-              img: "/images/housing-premium.png",
+              img: "/images/housing-premium.jpg",
               features: ["Private suite at 5-star resort", "Pool, spa + fitness center", "Restaurant access + room service"]
             },
             {
@@ -184,7 +184,7 @@ export default function Mastermind() {
               price: "$1,500",
               priceNote: "/night",
               desc: "A fully private 4-5 bedroom luxury home with your own chef, daily catering, housekeeping, and a personal trainer on call.",
-              img: "/images/housing-elite.png",
+              img: "/images/housing-elite.jpg",
               features: ["Private luxury home (4-5 bedrooms)", "Private chef + daily catering", "Housekeeping + personal trainer"]
             }
           ].map((item, i) => (
@@ -226,7 +226,7 @@ export default function Mastermind() {
           </div>
           <div>
             <img 
-              src="/images/tropical-beach.png" 
+              src="/images/tropical-beach.jpg" 
               alt="Puerto Rico beach"
               className="rounded-md shadow-gold-subtle border border-gold-subtle"
             />

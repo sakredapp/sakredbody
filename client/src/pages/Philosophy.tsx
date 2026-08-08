@@ -82,7 +82,6 @@ export default function Philosophy() {
             <SectionHeader
               eyebrow="The Architecture"
               title={<>Restore. Build. <span className="text-gold">Embody. Gather.</span></>}
-              intro="Health work and human environments aren't two businesses that happen to share a website. They're four territories of the same problem, in the order they have to be solved."
               testId="text-territories-headline"
             />
           </motion.div>
@@ -141,7 +140,6 @@ export default function Philosophy() {
             <SectionHeader
               eyebrow="The Capacity Model"
               title={<>Health Is the Floor, <span className="text-gold">Not the Ceiling</span></>}
-              intro="Most health advice stops at the first stage and calls it the destination. Being not-sick is where this starts, not where it ends."
               testId="text-capacity-headline"
             />
           </motion.div>
@@ -178,7 +176,7 @@ export default function Philosophy() {
             <SectionHeader
               eyebrow="The Operating Loop"
               title={<>Clear. Nourish. <span className="text-gold">Challenge. Recover.</span></>}
-              intro="This is the whole method compressed into four beats. It applies to a 21-day protocol, a training block, a work quarter, and a retreat. Skip a beat and the loop stops turning."
+              intro="Health, training, work. The same four beats."
               testId="text-loop-headline"
             />
           </motion.div>

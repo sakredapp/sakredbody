@@ -89,7 +89,6 @@ export default function Terrain() {
             <SectionHeader
               eyebrow="What It Means"
               title={<>Four Consequences of <span className="text-gold">Thinking This Way</span></>}
-              intro="This isn't an abstraction. Holding the chain in mind changes what you do first, and first is usually the only decision that matters."
               testId="text-implications-headline"
             />
           </motion.div>

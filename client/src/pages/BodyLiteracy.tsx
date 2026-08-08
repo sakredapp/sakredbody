@@ -121,7 +121,6 @@ export default function BodyLiteracy() {
             <SectionHeader
               eyebrow="The Distinctions"
               title={<>Six Pairs Worth <span className="text-gold">Telling Apart</span></>}
-              intro="Each of these pairs feels similar from the inside and calls for opposite responses. Getting them backwards is how people spend years working hard in the wrong direction."
               testId="text-confusions-headline"
             />
           </motion.div>
@@ -149,7 +148,7 @@ export default function BodyLiteracy() {
             <SectionHeader
               eyebrow="The Instrument Panel"
               title={<>Twelve Things Worth <span className="text-gold">Noticing</span></>}
-              intro="None of these require a device. Check a few daily for a month and you'll have a baseline no wearable can give you — because it's calibrated to you rather than to a population average."
+              intro="No device required."
               testId="text-signals-headline"
             />
           </motion.div>

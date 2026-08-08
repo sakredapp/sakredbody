@@ -73,7 +73,7 @@ export default function Executive() {
             <span className="text-gold">Carrying the Life You've Built.</span>
           </>
         }
-        intro="Private health, performance, and capacity development for founders, executives, and people whose decisions affect a lot of others. Your responsibilities grew. The question is whether the body underneath them grew with you."
+        intro="For founders and executives whose responsibilities outgrew the body carrying them."
         note="Application only. Small number of clients at a time."
         testId="text-executive-headline"
         image="/images/elegant-interior.jpg"
@@ -85,13 +85,13 @@ export default function Executive() {
       </PageHero>
 
       {/* ── The application ──────────────────────────────────── */}
-      <Section tone="light" id="apply" className="scroll-mt-20">
+      <Section tone="light" id="apply" className="scroll-mt-28">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
               eyebrow="Apply"
               title={<>Start With the <span className="text-gold">Application</span></>}
-              intro="Around seven minutes. It's how we work out whether there's a real fit, where you'd start, and whether private coaching is even the right thing to point you at — sometimes it isn't, and we'll say so."
+              intro="Seven minutes. Sometimes we'll tell you it isn't the right fit."
               className="mb-12"
               testId="text-apply-headline"
             />
@@ -155,7 +155,6 @@ export default function Executive() {
             <SectionHeader
               eyebrow="The Core Idea"
               title={<>Physical <span className="text-gold">Capacity Debt</span></>}
-              intro="You already understand leverage. Output can be sustained well past what the underlying system is producing — by borrowing. It works for a long time, and the balance is still real."
               testId="text-debt-headline"
             />
           </motion.div>
@@ -194,7 +193,6 @@ export default function Executive() {
             <SectionHeader
               eyebrow="What We Actually Work On"
               title={<>Five Layers, <span className="text-gold">One System</span></>}
-              intro="This isn't executive performance coaching with mindset and productivity at the centre. We start underneath that, at the physical infrastructure the rest of it runs on."
               testId="text-pillars-headline"
             />
           </motion.div>
@@ -222,7 +220,6 @@ export default function Executive() {
             <SectionHeader
               eyebrow="Who This Is For"
               title={<>Four Ways People <span className="text-gold">Arrive Here</span></>}
-              intro="The starting point differs. The intake decides where you begin rather than pushing everyone through one identical programme."
               testId="text-who-headline"
             />
           </motion.div>
