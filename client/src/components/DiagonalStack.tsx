@@ -39,11 +39,13 @@ export function DiagonalStack({
     useTransform(scrollYProgress, [0, 1], [-14, 40]),
   ];
 
-  // top-left, middle-right, bottom-left — a falling diagonal.
+  // A falling diagonal: top-left, middle-right, bottom-centre. Each plate
+  // stacks above the one before it, so the last is never buried under the
+  // first — which is exactly what a tall opening plate used to do.
   const PLATES = [
-    { pos: "left-0 top-0 w-[62%]", ratio: "4 / 5", rotate: -3.2, z: "z-20" },
-    { pos: "right-0 top-[22%] w-[54%]", ratio: "4 / 3", rotate: 2.4, z: "z-30" },
-    { pos: "left-[8%] bottom-0 w-[46%]", ratio: "1 / 1", rotate: -1.4, z: "z-10" },
+    { pos: "left-0 top-0 w-[50%]", ratio: "4 / 5", rotate: -3.2, z: "z-10" },
+    { pos: "right-0 top-[13%] w-[45%]", ratio: "4 / 3", rotate: 2.4, z: "z-20" },
+    { pos: "left-[19%] bottom-0 w-[43%]", ratio: "1 / 1", rotate: -1.4, z: "z-30" },
   ];
 
   return (

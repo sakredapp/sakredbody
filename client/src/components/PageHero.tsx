@@ -22,12 +22,35 @@ interface PageHeroProps {
   /** Optional backdrop photo. A scrim keeps the copy well past AA contrast. */
   image?: string;
   imageAlt?: string;
+  /**
+   * A live backdrop — the flow field on Restore, embers on Build. Rendered
+   * behind the photo scrim and above the photograph.
+   */
+  ambient?: ReactNode;
+  /**
+   * Short factual marks printed along the bottom of the hero: the length of a
+   * protocol, the number of stages, what the territory governs. They exist so
+   * the hero states something instead of only naming the page — the reason
+   * the old one ran straight into the next header with nothing said.
+   */
+  marks?: string[];
 }
 
 /** Dark centered hero shared by every pillar page. */
-export function PageHero({ eyebrow, title, intro, note, children, testId, image, imageAlt }: PageHeroProps) {
+export function PageHero({
+  eyebrow,
+  title,
+  intro,
+  note,
+  children,
+  testId,
+  image,
+  imageAlt,
+  ambient,
+  marks,
+}: PageHeroProps) {
   return (
-    <section className="tone-ink bg-background pt-36 pb-24 relative overflow-hidden">
+    <section className="tone-ink bg-background relative overflow-hidden min-h-[80vh] flex flex-col justify-center pt-32 pb-14">
       {image && (
         <div className="absolute inset-0 z-0">
           <img src={image} alt={imageAlt ?? ""} className="w-full h-full object-cover" />
@@ -41,6 +64,8 @@ export function PageHero({ eyebrow, title, intro, note, children, testId, image,
           <div className="absolute inset-0 bg-gradient-to-b from-[hsl(30_10%_8%/0.6)] via-transparent to-[hsl(30_10%_10%)]" />
         </div>
       )}
+      {ambient && <div className="absolute inset-0 z-0">{ambient}</div>}
+
       <div className="container max-w-6xl mx-auto px-4 text-center relative z-10">
         <motion.div initial="hidden" animate="visible" variants={stagger}>
           <motion.p
@@ -75,6 +100,25 @@ export function PageHero({ eyebrow, title, intro, note, children, testId, image,
           {children && <motion.div variants={fadeInUp} className="mt-9">{children}</motion.div>}
         </motion.div>
       </div>
+
+      {marks && marks.length > 0 && (
+        <motion.ul
+          initial="hidden"
+          animate="visible"
+          variants={stagger}
+          className="container max-w-4xl mx-auto px-4 relative z-10 mt-14 flex flex-wrap justify-center gap-x-10 gap-y-4 list-none"
+        >
+          {marks.map((mark) => (
+            <motion.li
+              key={mark}
+              variants={fadeInUp}
+              className="text-[0.7rem] uppercase tracking-[0.18em] text-muted-foreground"
+            >
+              {mark}
+            </motion.li>
+          ))}
+        </motion.ul>
+      )}
     </section>
   );
 }

@@ -39,6 +39,7 @@ import {
   type NoteContext,
 } from "./voice.js";
 import { getModelClient } from "./model.js";
+import { afterResponse } from "./background.js";
 
 const MAX_ATTEMPTS = 3;
 
@@ -254,10 +255,49 @@ async function generate(ctx: NoteContext): Promise<Generated> {
 // ─── The entry point ──────────────────────────────────────────────────────
 
 /**
+ * The note for today, without ever waiting on the model.
+ *
+ * Generation was measured between 1.4s and 25.5s against a 30s function
+ * ceiling, so the read path returns immediately: the stored note if there is
+ * one, otherwise computed fallback text, with the real generation continuing
+ * after the response. The member sees something true straight away and the
+ * written note is there on their next load.
+ *
+ * `pending` tells the client whether it's worth asking again shortly.
+ */
+export async function getDailyNoteFast(
+  userId: string,
+  onDate: string,
+): Promise<{ note: DailyNote | { headline: string; body: string; invitation: string | null }; pending: boolean }> {
+  const [existing] = await db
+    .select()
+    .from(dailyNotes)
+    .where(and(eq(dailyNotes.userId, userId), eq(dailyNotes.onDate, onDate)));
+
+  if (existing) return { note: existing, pending: false };
+
+  // Nothing stored yet. Answer from the almanac now, write the real one behind.
+  const ctx = await buildContext(userId, onDate);
+  const placeholder = fallbackNote(ctx);
+
+  afterResponse(() => getOrCreateDailyNote(userId, onDate));
+
+  return {
+    note: {
+      headline: placeholder.headline,
+      body: placeholder.body,
+      invitation: placeholder.invitation ?? null,
+    },
+    pending: true,
+  };
+}
+
+/**
  * Today's note for this member, generating it if it doesn't exist yet.
  *
- * `force` regenerates over an existing row — for the admin, after a prompt
- * change, never on a member's request.
+ * Blocks on the model, so this belongs in a background task or a cron — not
+ * on a request path. `force` regenerates over an existing row: for the admin,
+ * after a prompt change, never on a member's request.
  */
 export async function getOrCreateDailyNote(
   userId: string,

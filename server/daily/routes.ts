@@ -34,8 +34,9 @@ import {
   frequencyMomentEnum,
 } from "../../shared/schema.js";
 import { almanacFor, nameNumbers, lifePathFromDate } from "../../shared/utils/almanac.js";
+import { todayInZone } from "../../shared/utils/dates.js";
 import { memberToday } from "../coaching/enrollment.js";
-import { getOrCreateDailyNote } from "./generate.js";
+import { getOrCreateDailyNote, getDailyNoteFast } from "./generate.js";
 
 function isAdmin(req: Request, res: Response, next: NextFunction) {
   const userId = req.session?.userId;
@@ -101,11 +102,18 @@ export function registerDailyRoutes(app: Express) {
         .from(dailyIntentions)
         .where(and(eq(dailyIntentions.userId, userId), eq(dailyIntentions.onDate, onDate)));
 
-      // Generating is the slow part, so everything else is already in hand if
-      // it fails. A member must never get an error page for their own day.
-      let note = null;
+      // Never blocks on the model — see getDailyNoteFast. A member gets a true
+      // note immediately and the written one on their next load.
+      let note: { headline: string; body: string; invitation: string | null } | null = null;
+      let pending = false;
       try {
-        note = await getOrCreateDailyNote(userId, onDate);
+        const result = await getDailyNoteFast(userId, onDate);
+        note = {
+          headline: result.note.headline,
+          body: result.note.body,
+          invitation: result.note.invitation ?? null,
+        };
+        pending = result.pending;
       } catch (err) {
         console.error("[daily] note unavailable:", err);
       }
@@ -121,13 +129,10 @@ export function registerDailyRoutes(app: Express) {
 
       res.json({
         date: onDate,
-        note: note
-          ? {
-              headline: note.headline,
-              body: note.body,
-              invitation: note.invitation,
-            }
-          : null,
+        note,
+        // True while the written note is still being generated behind this
+        // response. The client polls once rather than spinning.
+        pending,
         intention: intention ?? null,
         almanac,
         // Nudge the chart form only when there's something real to gain.
@@ -247,6 +252,86 @@ export function registerDailyRoutes(app: Express) {
       fail(res, err);
     }
   });
+
+  // ─── CRON ────────────────────────────────────────────────────────────────
+
+  /**
+   * Pre-generate today's notes.
+   *
+   * The read path already never blocks, but a member whose note isn't written
+   * yet still gets fallback text on their first open of the day. Running this
+   * hourly means the real note is nearly always already there.
+   *
+   * Hourly rather than nightly because members are in different timezones —
+   * there is no single moment when it becomes tomorrow for everyone. Each pass
+   * picks up whoever has just crossed midnight where they are.
+   */
+  // Vercel Cron issues a GET; POST is accepted so it can be triggered by hand.
+  const cronHandler = async (req: Request, res: Response) => {
+    // Vercel Cron sends the secret as a bearer token. Without one configured
+    // the endpoint stays shut rather than defaulting to open.
+    const secret = process.env.CRON_SECRET;
+    const auth = req.get("authorization");
+    if (!secret || auth !== `Bearer ${secret}`) {
+      return res.status(401).json({ message: "Not authorised" });
+    }
+
+    try {
+      const members = await db
+        .select({ id: users.id, timezone: users.timezone })
+        .from(users)
+        .limit(500);
+
+      let written = 0;
+      let already = 0;
+      let deferred = 0;
+      const failures: string[] = [];
+
+      // The function ceiling is 30s and one generation was measured at 25.5s,
+      // so this works to a budget and leaves the rest for the next pass. Any
+      // member not reached keeps the non-blocking read path as their safety
+      // net, so nobody is ever without a note — only without a written one.
+      const started = Date.now();
+      const BUDGET_MS = 20_000;
+
+      // Sequential on purpose. Generation takes seconds and the model is a
+      // shared resource; a burst of parallel calls would rate-limit us and
+      // save nothing, since nobody is waiting on this.
+      for (const member of members) {
+        const onDate = todayInZone(member.timezone);
+
+        const [exists] = await db
+          .select({ id: dailyNotes.id })
+          .from(dailyNotes)
+          .where(and(eq(dailyNotes.userId, member.id), eq(dailyNotes.onDate, onDate)));
+
+        if (exists) {
+          already++;
+          continue;
+        }
+
+        if (Date.now() - started > BUDGET_MS) {
+          deferred++;
+          continue;
+        }
+
+        try {
+          await getOrCreateDailyNote(member.id, onDate);
+          written++;
+        } catch (err) {
+          failures.push(member.id);
+          console.error(`[cron] note failed for ${member.id}:`, err);
+        }
+      }
+
+      res.json({ written, already, deferred, failed: failures.length });
+    } catch (err) {
+      fail(res, err);
+    }
+  };
+
+  app.get("/api/cron/daily-notes", cronHandler);
+  app.post("/api/cron/daily-notes", cronHandler);
 
   // ─── ADMIN ───────────────────────────────────────────────────────────────
 
