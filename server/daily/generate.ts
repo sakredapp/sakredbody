@@ -14,7 +14,6 @@
  * A member never sees an error here. The worst case is a terse, true note.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
 import { db } from "../db.js";
 import { eq, and, gte, sql, count } from "drizzle-orm";
 import {
@@ -34,24 +33,14 @@ import {
   SYSTEM_PROMPT,
   buildUserPrompt,
   judge,
+  anchorsFor,
   fallbackNote,
   type Candidate,
   type NoteContext,
 } from "./voice.js";
+import { getModelClient } from "./model.js";
 
-/** Sonnet is right for sixty words a day: fast, cheap, and good enough that
- *  the filter rarely fires. Overridable without a deploy. */
-const MODEL = process.env.SAKRED_DAILY_MODEL || "claude-sonnet-5";
 const MAX_ATTEMPTS = 3;
-
-let client: Anthropic | null = null;
-function anthropic(): Anthropic | null {
-  if (client) return client;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-  client = new Anthropic({ apiKey });
-  return client;
-}
 
 // ─── Context gathering ────────────────────────────────────────────────────
 
@@ -203,42 +192,41 @@ interface Generated {
  * only says "no" wastes the attempt.
  */
 async function generate(ctx: NoteContext): Promise<Generated> {
-  const api = anthropic();
-  if (!api) {
+  const client = await getModelClient();
+  if (!client) {
     return { candidate: fallbackNote(ctx), source: "fallback", model: null, attempts: 0 };
   }
 
   const userPrompt = buildUserPrompt(ctx);
+  // The facts this note is allowed to be about. A note citing none of them is
+  // about nothing, which is the failure mode that matters most here.
+  const anchors = anchorsFor(ctx);
   let lastReasons: string[] = [];
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const messages: Anthropic.MessageParam[] = [{ role: "user", content: userPrompt }];
+    const messages: { role: "user" | "assistant"; content: string }[] = [
+      { role: "user", content: userPrompt },
+    ];
 
     if (lastReasons.length > 0) {
-      messages.push({
-        role: "assistant",
-        content: "{}",
-      });
+      // Tell it exactly what was wrong. A filter that only says "no" wastes
+      // the retry.
+      messages.push({ role: "assistant", content: "{}" });
       messages.push({
         role: "user",
         content:
           `That was rejected: ${lastReasons.join("; ")}. ` +
-          "Write it again, shorter and plainer, fixing exactly those problems. JSON only.",
+          "Write it again, shorter and plainer, naming a fact about today and " +
+          "what follows from it. JSON only.",
       });
     }
 
     try {
-      const response = await api.messages.create({
-        model: MODEL,
-        max_tokens: 600,
+      const { text } = await client.complete({
         system: SYSTEM_PROMPT,
         messages,
+        maxTokens: 600,
       });
-
-      const text = response.content
-        .filter((b): b is Anthropic.TextBlock => b.type === "text")
-        .map((b) => b.text)
-        .join("");
 
       const candidate = parseCandidate(text);
       if (!candidate) {
@@ -246,9 +234,9 @@ async function generate(ctx: NoteContext): Promise<Generated> {
         continue;
       }
 
-      const verdict = judge(candidate);
+      const verdict = judge(candidate, anchors);
       if (verdict.ok) {
-        return { candidate, source: "model", model: MODEL, attempts: attempt };
+        return { candidate, source: "model", model: client.model, attempts: attempt };
       }
       lastReasons = verdict.reasons;
       console.warn(`[daily] attempt ${attempt} rejected:`, verdict.reasons.join("; "));
@@ -260,7 +248,7 @@ async function generate(ctx: NoteContext): Promise<Generated> {
 
   // Everything was rejected. Terse and true beats plausible and wrong.
   console.warn("[daily] falling back after", MAX_ATTEMPTS, "attempts:", lastReasons.join("; "));
-  return { candidate: fallbackNote(ctx), source: "fallback", model: MODEL, attempts: MAX_ATTEMPTS };
+  return { candidate: fallbackNote(ctx), source: "fallback", model: client.model, attempts: MAX_ATTEMPTS };
 }
 
 // ─── The entry point ──────────────────────────────────────────────────────

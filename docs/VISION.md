@@ -196,3 +196,50 @@ Carried over from the teardown of `sakredportal`, with the local status:
 - No free tier that dilutes the coaching. Membership is the floor.
 - No webview wrapper if this becomes a native app. Native design or nothing.
 - No feature that only makes sense at ten thousand users. This app is for tens.
+
+---
+
+## 10. The model
+
+Daily notes are generated on **AWS Bedrock** via the **Converse API**, not a
+vendor SDK. The model is `zai.glm-5` (Z.AI, serverless, us-west-2).
+
+Converse rather than a vendor SDK because GLM-5 is not an Anthropic model, and
+Converse is the one Bedrock interface that speaks to every provider with the
+same message shape. Changing model is then `SAKRED_DAILY_MODEL`, not a rewrite.
+
+Bedrock rather than a direct API because it is what the business already runs
+on, it can sit under a BAA — which matters when the surrounding business is
+health and insurance — and serverless GLM-5 is Haiku-priced for Sonnet-class
+output.
+
+| Variable | Purpose |
+|---|---|
+| `SAKRED_DAILY_MODEL` | Bedrock model id or inference-profile ARN. Defaults to `zai.glm-5`. |
+| `AWS_REGION` | Defaults to `us-west-2`. |
+| `SAKRED_MODEL_PROVIDER` | `bedrock` \| `anthropic` \| `auto` (default). |
+| `ANTHROPIC_API_KEY` | Local development only, when there are no AWS credentials. |
+
+With nothing configured, every note is the computed fallback — terse and true,
+never an error.
+
+### Why a note is allowed to exist
+
+The filter in `server/daily/voice.ts` has three layers, and only the third is
+about meaning:
+
+1. **Banned phrases** — the house style list from §5, plus wellness filler.
+2. **Shape** — length caps, no question headlines, no step numbers. The failure
+   mode of generated mysticism is volume, so the caps do most of the work.
+3. **Groundedness** — the note must cite at least one fact it was given: the
+   moon, the season, the organ, the protocol day, one of their numbers.
+
+The third is the one that matters. "Embrace the cosmic release" fails on
+vocabulary, but "honour what is shifting" and "today asks you to slow down"
+pass every word rule and still mean nothing — because they refer to nothing
+that is true today. A member reads them and learns nothing.
+
+Grounding is checkable exactly because we compute the inputs ourselves. The
+form every note must take:
+
+    the fact → what it means for today's effort

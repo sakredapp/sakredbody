@@ -8,7 +8,7 @@
  *   npx tsx script/test-voice.ts
  */
 
-import { judge, fallbackNote, type Candidate } from "../server/daily/voice.js";
+import { judge, anchorsFor, fallbackNote, type Candidate } from "../server/daily/voice.js";
 import { almanacFor } from "../shared/utils/almanac.js";
 
 let passed = 0;
@@ -37,6 +37,14 @@ function accepts(name: string, c: Candidate) {
     return;
   }
   passed++;
+}
+
+function check(name: string, actual: unknown, expected: unknown) {
+  if (JSON.stringify(actual) === JSON.stringify(expected)) passed++;
+  else {
+    failed++;
+    console.log(`  ✗ ${name}\n      expected ${JSON.stringify(expected)}\n      got      ${JSON.stringify(actual)}`);
+  }
 }
 
 const section = (t: string) => console.log(`\n${t}`);
@@ -160,6 +168,83 @@ accepts("knows almost nothing", {
 accepts("uses a first name once", {
   headline: "Hold the line",
   body: "Jace, day nine of twenty-one is where most people quit. The moon is emptying with you. Two more days and it turns.",
+});
+
+// ═══ Groundedness ══════════════════════════════════════════════════════════
+// The rule that matters most. Banning phrases removes bad words; it does not
+// make a note *say* anything. A note that refers to nothing true about today
+// is about nothing, however clean its vocabulary.
+
+section("Groundedness — a note must cite a fact about today");
+
+// 2026-08-08: waning gibbous, Leo, late summer (earth), spleen and stomach.
+const ctx = {
+  almanac: almanacFor("2026-08-08", { birthDate: "1990-05-14", lifePathNumber: 2 }),
+  protocol: { name: "Liver Support", dayNumber: 9, durationDays: 21, phase: "clear" },
+  centre: { id: "gut", name: "Gut", aspect: "Terrain" },
+};
+const anchors = anchorsFor(ctx);
+
+function rejectsUngrounded(name: string, c: Candidate) {
+  const v = judge(c, anchors);
+  if (v.ok) {
+    failed++;
+    console.log(`  ✗ should have rejected as ungrounded: ${name}\n      "${c.body}"`);
+  } else if (!v.reasons.some((r) => r.includes("says nothing specific"))) {
+    failed++;
+    console.log(`  ✗ rejected for the wrong reason: ${name}\n      ${JSON.stringify(v.reasons)}`);
+  } else passed++;
+}
+
+function acceptsGrounded(name: string, c: Candidate) {
+  const v = judge(c, anchors);
+  if (!v.ok) {
+    failed++;
+    console.log(`  ✗ should have accepted: ${name}\n      ${JSON.stringify(v.reasons)}`);
+  } else passed++;
+}
+
+check("anchors were derived", anchors.length > 5, true);
+check("anchors include the moon", anchors.includes("waning"), true);
+check("anchors include the protocol day", anchors.includes("9"), true);
+check("anchors include the organ", anchors.includes("spleen"), true);
+
+// Phrase-clean, rule-clean, and about nothing. These are the notes that get
+// past a banned-word list and still waste a member's time.
+rejectsUngrounded("pure vibes, no facts", {
+  headline: "Soften today",
+  body: "There is a quiet asking to be met. Notice what wants attention and give it room. Nothing needs forcing right now.",
+});
+
+rejectsUngrounded("honour what is shifting", {
+  headline: "What is shifting",
+  body: "Something is turning over in you. Let it turn. You do not have to name it or fix it or explain it to anyone.",
+});
+
+rejectsUngrounded("generic slow down", {
+  headline: "Slow down",
+  body: "You have been moving quickly. Today asks for less speed and more attention to what is already in front of you.",
+});
+
+// The same sentiment, anchored to something real, is fine.
+acceptsGrounded("names the moon", {
+  headline: "Let it leave",
+  body: "The moon is waning. Finish what is open before you start anything new. That is the whole instruction today.",
+});
+
+acceptsGrounded("names the protocol day", {
+  headline: "Day nine",
+  body: "Day 9 of 21 is where most people quit. Nothing has gone wrong. Eat earlier tonight and sleep before eleven.",
+});
+
+acceptsGrounded("names the organ and season", {
+  headline: "Spleen weather",
+  body: "Late summer, and the old reading puts the spleen ascendant. Cooked food over raw today. Skip the cold drinks.",
+});
+
+acceptsGrounded("names a number", {
+  headline: "A 2 day",
+  body: "Your personal day is 2 — pairing and patience. The moon is waning with it. Wait for the reply before you push.",
 });
 
 // ═══ The fallback must pass its own filter ═════════════════════════════════

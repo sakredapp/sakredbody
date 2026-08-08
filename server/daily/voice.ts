@@ -93,13 +93,74 @@ export interface Verdict {
 }
 
 /**
+ * The facts this note was given. A note must cite at least one of them.
+ *
+ * This is the check that matters most. Banning phrases only removes bad
+ * words — it does nothing to make a note *say* something. "Embrace the cosmic
+ * release" and "Honour what is shifting" are both phrase-clean and both mean
+ * nothing, because neither refers to anything that is true today.
+ *
+ * Grounding is checkable precisely because we computed the inputs ourselves.
+ * If none of the moon, the season, the organ, the protocol day or the member's
+ * numbers appears anywhere in the text, the note is about nothing.
+ */
+export function anchorsFor(ctx: NoteContext): string[] {
+  const a = ctx.almanac;
+  const anchors: string[] = [];
+
+  // Moon — the phase words plus how people actually say them.
+  anchors.push(...a.moon.phase.split(" "));
+  anchors.push("moon");
+  if (a.moon.direction) anchors.push(a.moon.direction);
+  if (a.moon.phase === "new") anchors.push("dark");
+  if (a.moon.phase === "full") anchors.push("full");
+  anchors.push("emptying", "filling");
+
+  // Season, element, organs.
+  anchors.push(a.season, a.elemental.season, a.elemental.element);
+  anchors.push(...a.elemental.organ.split(/\s+and\s+|\s+/));
+
+  // Where they are in the work.
+  if (ctx.protocol) {
+    anchors.push(...ctx.protocol.name.toLowerCase().split(/\s+/));
+    anchors.push(ctx.protocol.phase);
+    anchors.push("day", String(ctx.protocol.dayNumber), String(ctx.protocol.durationDays));
+  }
+  if (ctx.centre) {
+    anchors.push(ctx.centre.name.toLowerCase());
+    if (ctx.centre.aspect) anchors.push(ctx.centre.aspect.toLowerCase());
+  }
+
+  // Numbers, spelled and digit.
+  const WORDS = ["zero","one","two","three","four","five","six","seven","eight","nine","ten"];
+  const nums = [a.universalDay, a.personal?.personalDay, a.personal?.lifePath].filter(
+    (n): n is number => typeof n === "number",
+  );
+  for (const n of nums) {
+    anchors.push(String(n));
+    if (n < WORDS.length) anchors.push(WORDS[n]);
+  }
+
+  // Short words ("the", "of") would make anything look grounded, so they go —
+  // but digits stay whatever their length, because "day 9 of 21" is exactly
+  // the kind of specificity this check exists to reward.
+  return Array.from(
+    new Set(
+      anchors
+        .map((s) => s.toLowerCase())
+        .filter((s) => s && (s.length > 2 || /^\d+$/.test(s))),
+    ),
+  );
+}
+
+/**
  * Reject anything that reads like the thing we're trying not to build.
  *
  * Length limits are part of this, not a separate concern: the failure mode of
  * generated mysticism is *volume*, and a hard cap is the single most effective
  * constraint on it.
  */
-export function judge(c: Candidate): Verdict {
+export function judge(c: Candidate, anchors?: string[]): Verdict {
   const reasons: string[] = [];
   const headline = (c.headline ?? "").trim();
   const body = (c.body ?? "").trim();
@@ -136,6 +197,17 @@ export function judge(c: Candidate): Verdict {
 
   // A headline that ends in a question mark is asking, not saying.
   if (headline.endsWith("?")) reasons.push("headline is a question");
+
+  // The groundedness check. A note that refers to nothing true is about
+  // nothing, however clean its vocabulary — "honour what is shifting" passes
+  // every rule above and means as little as the copy those rules exist to stop.
+  if (anchors && anchors.length > 0) {
+    const words = new Set(all.split(/[^a-z0-9]+/).filter(Boolean));
+    const cited = anchors.filter((a) => words.has(a));
+    if (cited.length === 0) {
+      reasons.push("says nothing specific — cites no fact about today");
+    }
+  }
 
   return { ok: reasons.length === 0, reasons };
 }
@@ -218,10 +290,23 @@ NEVER WRITE
 - Explanatory subtitles restating the headline
 - Hedges: "you may find", "perhaps consider", "it might be that"
 
+THE TEST EVERY NOTE MUST PASS
+Could this note have been written for anyone, on any day? If yes, it has failed. Delete it and write one that could only have been written for this person, today.
+
+"Embrace the cosmic release" is a failure. So is "honour what is shifting" and "today asks you to slow down". They are not wrong; they are about nothing. A member reads them and learns nothing they did not know before.
+
+Every note must refer to at least one thing that is actually true today — the moon's phase, the season and the organ it belongs to, the day number of their protocol, one of their numbers. Name the fact. Then say what follows from it. That is the whole form:
+
+    the fact  →  what it means for today's effort
+
+A member should finish reading knowing something concrete: push or rest, begin or finish, eat more or less, sleep earlier. If you cannot get to something concrete, say less — two true sentences beat six evocative ones.
+
 ON THE ESOTERIC MATERIAL
-The moon phase, season and numbers you are given are real and computed. Treat them the way a farmer treats an almanac: as conditions worth knowing, not as fate. Never predict. Never tell them what will happen. Say what is true today and what it suggests about effort — whether to push or to rest, to begin or to finish. If two signals agree, saying so is the most useful thing you can do.
+The moon phase, season and numbers you are given are real and computed. Treat them the way a farmer treats an almanac: as conditions worth knowing, not as fate. Never predict. Never tell them what will happen.
 
 Do not explain the system. They know what a waning moon is. Never define a term.
+
+When two signals agree — a waning moon and a clearing phase, spring and a liver protocol — saying so plainly is the single most useful thing you can write. That is the note earning its place.
 
 WHEN YOU KNOW LITTLE
 You will sometimes be given almost nothing about the person. Then write about the day itself and say less. A short true note beats a long personal-sounding one. Never imply you know something you were not told.
