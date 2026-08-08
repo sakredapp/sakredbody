@@ -179,14 +179,17 @@ export default function Home() {
             variants={staggerContainer}
             className="max-w-3xl mx-auto text-center"
           >
-            <motion.div variants={fadeInUp} className="flex items-center justify-center gap-4 mb-8">
-              <YinYang className="h-9 w-9 text-gold" voidColor="hsl(30 10% 9%)" />
+            <motion.div variants={fadeInUp} className="flex items-center justify-center mb-8">
+              {/* The yin-yang is the separator. It was standing outside the
+                  badge doing the same job a middle dot was already doing. */}
               <Badge
                 variant="outline"
-                className="border-gold-subtle text-gold-light tracking-widest uppercase bg-gold-subtle px-4 py-1 font-normal"
+                className="border-gold-subtle text-gold-light tracking-widest uppercase bg-gold-subtle pl-4 pr-4 py-1 font-normal inline-flex items-center gap-3"
                 data-testid="badge-tagline"
               >
-                Holistic Health · Traditional Medicine
+                Holistic Health
+                <YinYang className="h-4 w-4 shrink-0 text-gold" voidColor="hsl(30 10% 9%)" />
+                Traditional Medicine
               </Badge>
             </motion.div>
 
