@@ -85,6 +85,7 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DailyRitual } from "@/components/DailyRitual";
+import { InfoTip, LabelWithInfo } from "@/components/ui/info-tip";
 
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
@@ -175,8 +176,15 @@ function HabitCard({
                 {habit.title}
               </h4>
               {habit.cadence !== "daily" && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1">
                   {habit.cadence === "weekly" ? "Weekly" : "As Needed"}
+                  {/* Two words that look self-explanatory and aren't: people
+                      assume "as needed" means optional, and it doesn't. */}
+                  <InfoTip label="What this cadence means" side="bottom">
+                    {habit.cadence === "weekly"
+                      ? "This one appears on the same day each week rather than every day. Missing a day in between doesn't break your streak."
+                      : "There's no schedule for this one — do it when the protocol calls for it. It stays on your list until you tick it."}
+                  </InfoTip>
                 </Badge>
               )}
               {habit.dayNumber && (
@@ -841,7 +849,16 @@ export function RoutinesTab() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Intensity</label>
+                {/* "Lite" and "Intense" meant nothing without a sentence
+                    somewhere. The sentence is behind the icon rather than
+                    permanently under the field. */}
+                <label className="text-sm font-medium inline-flex items-center">
+                  <LabelWithInfo label="Intensity" title="Lite or Intense">
+                    Lite runs the core habits of the protocol. Intense adds the
+                    optional ones on top. You can't change this without
+                    restarting, so start where you'll actually keep up.
+                  </LabelWithInfo>
+                </label>
                 <Select value={intensity} onValueChange={setIntensity}>
                   <SelectTrigger>
                     <SelectValue />

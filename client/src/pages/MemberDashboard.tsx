@@ -68,6 +68,13 @@ import { BodyMap } from "@/components/BodyMap";
 import { OfferingsTab } from "@/components/OfferingsTab";
 import { CommunityTab } from "@/components/CommunityTab";
 import { WinsTab } from "@/components/WinsTab";
+import { SubNav } from "@/components/SubNav";
+import {
+  MemberTopNav,
+  MemberBottomNav,
+  BottomNavSpacer,
+  type MemberSection,
+} from "@/components/MemberNav";
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
 // Icon mapping (UI-only, can't live in shared/)
@@ -171,10 +178,14 @@ export default function MemberDashboard() {
   useTimezoneSync(isAuthenticated);
   const [location] = useLocation();
 
-  // Default to coaching tab if coming from /coaching URL
-  const defaultSection = location === "/coaching" ? "coaching" : "retreat";
-  const [section, setSection] = useState<"retreat" | "coaching" | "community" | "wins" | "masterclass" | "apothecary" | "library" | "body">(defaultSection);
-  const [retreatView, setRetreatView] = useState<"book" | "services" | "my-bookings" | "masterminds">("book");
+  // Today is the product, so it is where the portal opens. The old default
+  // was the retreat booking form, which is a thing a member does once.
+  const defaultSection: MemberSection = location === "/app" ? "coaching" : "coaching";
+  const [section, setSection] = useState<MemberSection>(defaultSection);
+  // "What's On" first, not the booking form. The catalogue is the thing a
+  // member browses repeatedly; designing a bespoke retreat is something they
+  // do once, and it was standing in front of everything else.
+  const [retreatView, setRetreatView] = useState<"book" | "services" | "my-bookings" | "masterminds">("masterminds");
   const [coachingTab, setCoachingTab] = useState<"today" | "journey" | "routines" | "catalog" | "analytics" | "coach">("today");
   const [showBookingDialog, setShowBookingDialog] = useState(false);
 
@@ -303,39 +314,13 @@ export default function MemberDashboard() {
   return (
     <div className="min-h-screen bg-background">
       {/* ─── Header ─── */}
-      <header className="sticky top-0 border-b border-border/50 bg-background/90 backdrop-blur-md" style={{ zIndex: 9999 }}>
+      <header className="sticky top-0 pt-safe border-b border-border/50 bg-background/90 backdrop-blur-md" style={{ zIndex: 9999 }}>
         <div className="container max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-2" data-testid="link-home-dashboard">
             <img src={sakredLogo} alt="Sakred Body" className="h-9 w-9 object-contain" />
           </Link>
 
-          {/* Main section toggle — scrolls rather than wraps once there are
-              four of these, so the header height stays fixed on a phone. */}
-          <div className="flex items-center bg-muted/60 rounded-full p-1 gap-0.5 overflow-x-auto scrollbar-thin max-w-full">
-            {([
-              { id: "coaching" as const, label: "Coaching" },
-              { id: "community" as const, label: "Community" },
-              { id: "wins" as const, label: "Wins" },
-              { id: "body" as const, label: "The Body" },
-              { id: "apothecary" as const, label: "Apothecary" },
-              { id: "library" as const, label: "Library" },
-              { id: "retreat" as const, label: "My Retreat" },
-              { id: "masterclass" as const, label: "Masterclass" },
-            ]).map(({ id, label }) => (
-              <button
-                key={id}
-                onClick={() => setSection(id)}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-300 ${
-                  section === id
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                data-testid={`member-section-${id}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <MemberTopNav section={section} onChange={setSection} />
 
           <div className="flex items-center gap-3 flex-wrap">
             <Avatar className="w-8 h-8">
@@ -352,74 +337,30 @@ export default function MemberDashboard() {
 
       {/* ─── Sub-navigation ─── */}
       {section === "coaching" && (
-        <div className="border-b border-border/50 bg-background/50 backdrop-blur-sm sticky top-16" style={{ zIndex: 9998 }}>
-          <div className="container max-w-6xl mx-auto px-4">
-            <div className="flex gap-1 overflow-x-auto py-1.5 scrollbar-thin">
-              {([
-                { id: "today" as const, label: "Today" },
-                { id: "journey" as const, label: "Journey" },
-                { id: "routines" as const, label: "Routines" },
-                { id: "catalog" as const, label: "Habits" },
-                { id: "analytics" as const, label: "Stats" },
-                { id: "coach" as const, label: "Coach" },
-              ]).map(({ id, label }) => (
-                <button
-                  key={id}
-                  onClick={() => setCoachingTab(id)}
-                  className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-md whitespace-nowrap transition-colors ${
-                    coachingTab === id
-                      ? "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))] font-medium"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+        <SubNav
+          value={coachingTab}
+          onChange={setCoachingTab}
+          items={[
+            { id: "today", label: "Today" },
+            { id: "journey", label: "Journey" },
+            { id: "routines", label: "Routines" },
+            { id: "catalog", label: "Habits" },
+            { id: "analytics", label: "Stats" },
+            { id: "coach", label: "Coach" },
+          ]}
+        />
       )}
 
       {section === "retreat" && (
-        <div className="border-b border-border/50 bg-background/50 backdrop-blur-sm sticky top-16" style={{ zIndex: 9998 }}>
-          <div className="container max-w-6xl mx-auto px-4">
-            <div className="flex gap-1 overflow-x-auto py-1.5 scrollbar-thin">
-              <button
-                onClick={() => setRetreatView("book")}
-                className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-md whitespace-nowrap transition-colors ${
-                  retreatView === "book"
-                    ? "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))] font-medium"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                }`}
-              >
-                Design Your Retreat
-              </button>
-              <button
-                onClick={() => setRetreatView("masterminds")}
-                className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-md whitespace-nowrap transition-colors ${
-                  retreatView === "masterminds"
-                    ? "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))] font-medium"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                }`}
-              >
-                What's On
-              </button>
-              <button
-                onClick={() => setRetreatView("my-bookings")}
-                className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-md whitespace-nowrap transition-colors ${
-                  retreatView === "my-bookings"
-                    ? "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))] font-medium"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                }`}
-              >
-                My Requests
-                {bookingsQuery.data && bookingsQuery.data.length > 0 && (
-                  <Badge variant="secondary" className="ml-2 text-[10px]">{bookingsQuery.data.length}</Badge>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
+        <SubNav
+          value={retreatView}
+          onChange={setRetreatView}
+          items={[
+            { id: "masterminds", label: "What's On" },
+            { id: "book", label: "Design a Retreat" },
+            { id: "my-bookings", label: "My Requests", badge: bookingsQuery.data?.length ?? null },
+          ]}
+        />
       )}
 
       {/* ─── Content Area ─── */}
@@ -875,6 +816,9 @@ export default function MemberDashboard() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <BottomNavSpacer />
+      <MemberBottomNav section={section} onChange={setSection} />
 
       <Dialog open={showBookingDialog} onOpenChange={setShowBookingDialog}>
         <DialogContent className="max-w-md" data-testid="dialog-booking">
