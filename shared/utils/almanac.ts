@@ -400,3 +400,15 @@ export function almanacFor(date: string, chart?: MemberChart | null): AlmanacDay
 
   return day;
 }
+
+/**
+ * Life path — sum every digit of the birth date and reduce.
+ *
+ * Re-exported here so the almanac is the single place that owns numerology.
+ * `shared/models/energy.ts` has an older copy under `lifePathNumber`; both
+ * agree, and this is the one new code should use.
+ */
+export function lifePathFromDate(isoDate: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return null;
+  return universalDay(isoDate);
+}

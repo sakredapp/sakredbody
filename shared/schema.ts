@@ -10,6 +10,7 @@ export * from "./models/shop.js";
 export * from "./models/library.js";
 export * from "./models/energy.js";
 export * from "./models/cohorts.js";
+export * from "./models/daily.js";
 
 export const applications = pgTable("applications", {
   id: serial("id").primaryKey(),

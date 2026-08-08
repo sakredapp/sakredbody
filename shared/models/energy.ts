@@ -179,11 +179,31 @@ export const userCosmology = pgTable(
     birthTime: text("birth_time"), // "HH:MM", local to birth place
     birthPlace: text("birth_place"),
 
+    /**
+     * The full name given at birth, including any middle name — that's the
+     * convention numerology uses, and it's why signup asks for the middle name
+     * rather than just first and last.
+     *
+     * Deliberately separate from users.firstName/lastName: people marry, and
+     * changing your display name shouldn't silently change your numbers.
+     */
+    birthName: text("birth_name"),
+
+    /**
+     * Self-described energetic polarity, used to pitch the daily note.
+     * masculine | feminine | balanced. Optional and self-selected — this is a
+     * register for the writing, not a claim about who someone is.
+     */
+    polarity: text("polarity"),
+
     sunSign: text("sun_sign"),
     moonSign: text("moon_sign"),
     risingSign: text("rising_sign"),
 
     lifePathNumber: integer("life_path_number"),
+    expressionNumber: integer("expression_number"),
+    soulUrgeNumber: integer("soul_urge_number"),
+    personalityNumber: integer("personality_number"),
 
     // The coach's reading. Long-form, deliberately not structured — this is
     // interpretation, and schema would only flatten it.
@@ -195,6 +215,9 @@ export const userCosmology = pgTable(
   (t) => [uniqueIndex("uq_user_cosmology").on(t.userId)]
 );
 
+export const polarityEnum = z.enum(["masculine", "feminine", "balanced"]);
+export type Polarity = z.infer<typeof polarityEnum>;
+
 export const insertCosmologySchema = createInsertSchema(userCosmology).omit({
   id: true,
   createdAt: true,
@@ -203,6 +226,27 @@ export const insertCosmologySchema = createInsertSchema(userCosmology).omit({
 
 export type UserCosmology = typeof userCosmology.$inferSelect;
 export type InsertCosmology = z.infer<typeof insertCosmologySchema>;
+
+/**
+ * What a member may set about themselves. Everything is optional — the note
+ * gets more personal as more is given, and none of it gates access.
+ *
+ * `disposition` and the derived numbers are absent by design: the first is the
+ * coach's reading, the rest are computed server-side from the name and date so
+ * they can't be spoofed or drift out of step with their inputs.
+ */
+export const memberChartSchema = z.object({
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  birthTime: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+  birthPlace: z.string().max(200).nullable().optional(),
+  birthName: z.string().max(200).nullable().optional(),
+  polarity: polarityEnum.nullable().optional(),
+  sunSign: z.string().max(40).nullable().optional(),
+  moonSign: z.string().max(40).nullable().optional(),
+  risingSign: z.string().max(40).nullable().optional(),
+});
+
+export type MemberChartInput = z.infer<typeof memberChartSchema>;
 
 // ─── Numerology ────────────────────────────────────────────────────────────
 
