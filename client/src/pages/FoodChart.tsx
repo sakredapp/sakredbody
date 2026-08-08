@@ -95,16 +95,16 @@ export default function FoodChart() {
           scrolled underneath it and the bar covered what you were
           reading — worse than simply scrolling back up. Search and the
           scale now share one line and stay where they were put. */}
-      <div className="tone-ink bg-background border-y border-border">
+      <div className="tone-ink bg-background">
         <div className="container max-w-5xl mx-auto px-4 py-4">
-          <div className="flex flex-col sm:flex-row items-center gap-3">
-            <div className="relative w-full sm:max-w-xs">
+          <div className="flex flex-col items-center gap-4">
+            <div className="relative w-full max-w-md">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={`Search ${TOTAL_FOODS} foods…`}
-                className="pl-10 pr-10 h-10"
+                className="pl-10 pr-10 h-10 text-center"
                 aria-label="Search foods"
                 data-testid="input-food-search"
               />
@@ -119,7 +119,7 @@ export default function FoodChart() {
               )}
             </div>
 
-            <div className="flex-1 w-full">
+            <div className="w-full max-w-md">
               <div className="flex rounded-full overflow-hidden border border-border">
                 {FOOD_RATINGS.map((r) => {
                   const active = activeRatings.has(r);
@@ -146,10 +146,25 @@ export default function FoodChart() {
               </div>
             </div>
 
+            {/* Jump links live here rather than in a white panel of their own. */}
+            {!isFiltering && (
+              <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 max-w-3xl pt-1">
+                {FOOD_CATEGORIES.map((c) => (
+                  <a
+                    key={c.name}
+                    href={`#${slug(c.name)}`}
+                    className="text-[11px] uppercase tracking-wider text-muted-foreground hover:text-gold transition-colors"
+                  >
+                    {c.name}
+                  </a>
+                ))}
+              </div>
+            )}
+
             {isFiltering && (
               <button
                 onClick={clearAll}
-                className="text-xs text-gold hover:underline whitespace-nowrap"
+                className="text-xs text-gold hover:underline"
                 data-testid="button-clear-filters"
               >
                 {shown} of {TOTAL_FOODS} · Clear
@@ -164,35 +179,19 @@ export default function FoodChart() {
           6400px — eight screens of unbroken white, with the rounded corners
           only ever visible at the very top and very bottom. */}
       {grouped.length === 0 ? (
-        <Section tone="light">
+        <Section tone="ink">
           <p className="text-center text-muted-foreground py-10" data-testid="text-no-results">
             No foods match that search. Try a different term or clear the filters.
           </p>
         </Section>
       ) : (
         <>
-          {!isFiltering && (
-            <Section tone="light" className="py-12">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 max-w-3xl mx-auto">
-                {FOOD_CATEGORIES.map((c) => (
-                  <a
-                    key={c.name}
-                    href={`#${slug(c.name)}`}
-                    className="px-4 py-2.5 rounded-md border border-border text-xs text-center text-muted-foreground hover:text-gold hover:border-gold/40 transition-colors flex items-center justify-center"
-                  >
-                    {c.name}
-                  </a>
-                ))}
-              </div>
-            </Section>
-          )}
-
           {grouped.map((cat) => (
             <Section
               key={cat.name}
-              tone="light"
+              tone="ink"
               id={slug(cat.name)}
-              className="py-14 md:py-16 scroll-mt-[110px]"
+              className="py-12 md:py-14 scroll-mt-[110px]"
               data-testid={`category-${slug(cat.name)}`}
             >
               <div className="text-center max-w-2xl mx-auto mb-10">
@@ -235,7 +234,7 @@ export default function FoodChart() {
         </>
       )}
 
-      <Section tone="light" className="py-12">
+      <Section tone="ink" className="py-10">
         <p className="text-xs text-muted-foreground max-w-2xl mx-auto text-center leading-relaxed">
           General education, not medical or nutritional advice. Individual responses vary. Talk to a
           qualified provider before making significant dietary changes.
