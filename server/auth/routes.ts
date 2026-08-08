@@ -99,12 +99,22 @@ async function recordFailure(email: string, ip: string): Promise<void> {
   const windowSec = Math.floor(THROTTLE.windowMs / 1000);
   const lockSec = Math.floor(THROTTLE.lockMs / 1000);
 
-  // `make_interval(secs => $n)` rather than the more familiar
-  // `($n || ' seconds')::interval`. The concatenation form works when the
-  // number is written into the SQL as a literal and is a coin-flip when it
-  // arrives as a bind parameter, because Postgres then has to infer the
-  // parameter's type from `||` alone. `make_interval` has a declared
-  // signature, so the parameter is unambiguously an integer.
+  // Every number here is either an argument to a function with a declared
+  // signature or explicitly cast, and neither is decoration.
+  //
+  // node-postgres sends bind parameters without type OIDs and lets Postgres
+  // infer them. Where both sides of an expression are parameters, there is
+  // nothing to infer from and it settles on text — so
+  // `(case … then $5 else $6 end)` came back as text and the comparison
+  // against an integer count failed with *operator does not exist: integer >=
+  // text*, taking every failed login to a 500 while successful ones worked
+  // fine. `make_interval(secs => $n)` is safe for the opposite reason: the
+  // function's signature declares the argument is an integer.
+  //
+  // This is invisible when the statement is tested with literals in place of
+  // the parameters, which is how it got through the first time. The test that
+  // catches it is PREPARE, which infers types exactly the way the driver
+  // makes Postgres infer them.
   await db.execute(sql`
     insert into login_attempts (identifier, attempts, window_start, locked_until)
     values
@@ -128,8 +138,8 @@ async function recordFailure(email: string, ip: string): Promise<void> {
                 else login_attempts.attempts + 1
               end)
              >= (case when excluded.identifier like 'email:%'
-                        then ${THROTTLE.emailMax}
-                        else ${THROTTLE.ipMax} end)
+                        then ${THROTTLE.emailMax}::int
+                        else ${THROTTLE.ipMax}::int end)
           then now() + make_interval(secs => ${lockSec})
         else login_attempts.locked_until
       end
