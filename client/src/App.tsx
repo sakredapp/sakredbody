@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -13,7 +13,6 @@ import Terrain from "@/pages/Terrain";
 import BodyLiteracy from "@/pages/BodyLiteracy";
 import Retreats from "@/pages/Retreats";
 import Executive from "@/pages/Executive";
-import AppPage from "@/pages/AppPage";
 import FoodChart from "@/pages/FoodChart";
 import Mastermind from "@/pages/Mastermind";
 import LoginPage from "@/pages/LoginPage";
@@ -34,7 +33,8 @@ function Router() {
       <Route path="/body-literacy" component={BodyLiteracy} />
       <Route path="/retreats" component={Retreats} />
       <Route path="/executive" component={Executive} />
-      <Route path="/app" component={AppPage} />
+      {/* The app and the portal are the same product. Old /app links land there. */}
+      <Route path="/app">{() => <Redirect to="/member" />}</Route>
       <Route path="/food-chart" component={FoodChart} />
       <Route path="/mastermind" component={Mastermind} />
 

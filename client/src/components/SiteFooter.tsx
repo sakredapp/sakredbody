@@ -25,7 +25,7 @@ const PHILOSOPHY_LINKS = [
 
 /** Product + tools. */
 const EXPLORE_LINKS = [
-  { label: "The App", href: "/app" },
+  { label: "Portal", href: "/member" },
   { label: "Food Chart", href: "/food-chart" },
   { label: "Sakred Executive", href: "/executive" },
   { label: "Mastermind", href: "/mastermind" },

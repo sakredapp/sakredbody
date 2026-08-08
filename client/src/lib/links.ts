@@ -31,7 +31,7 @@ export const SITE_NAV: NavEntry[] = [
       { label: "Gather", href: "/retreats", note: "Environment that holds" },
     ],
   },
-  { label: "The App", href: "/app" },
+  { label: "Portal", href: "/member" },
   { label: "Food Chart", href: "/food-chart" },
   {
     label: "Work With Us",

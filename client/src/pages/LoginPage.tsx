@@ -4,7 +4,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Download, Loader2, Smartphone } from "lucide-react";
+import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/links";
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
 type Mode = "login" | "register";
@@ -160,6 +161,44 @@ export default function LoginPage() {
                   )}
                 </Button>
               </form>
+
+              {/* The portal and the app are the same product — the web is
+                  simply one of the doors into it. */}
+              <div className="pt-1">
+                <p className="text-white/35 text-[10px] uppercase tracking-[0.18em] text-center mb-3">
+                  Or take it with you
+                </p>
+                <div className="flex gap-3">
+                  <a
+                    href={APP_STORE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1"
+                    data-testid="link-login-ios"
+                  >
+                    <Button
+                      variant="outline"
+                      className="w-full border-white/20 text-white bg-white/5 gold-outline-lift"
+                    >
+                      <Download className="w-4 h-4 mr-2" /> iOS
+                    </Button>
+                  </a>
+                  <a
+                    href={PLAY_STORE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1"
+                    data-testid="link-login-android"
+                  >
+                    <Button
+                      variant="outline"
+                      className="w-full border-white/20 text-white bg-white/5 gold-outline-lift"
+                    >
+                      <Smartphone className="w-4 h-4 mr-2" /> Android
+                    </Button>
+                  </a>
+                </div>
+              </div>
 
               <div className="text-center">
                 <button
