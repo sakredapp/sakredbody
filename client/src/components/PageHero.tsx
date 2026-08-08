@@ -35,7 +35,7 @@ export function PageHero({ eyebrow, title, intro, note, children, testId, image,
             className="absolute inset-0"
             style={{
               background:
-                "linear-gradient(to bottom, hsl(30 10% 7% / 0.78) 0%, hsl(30 10% 7% / 0.48) 50%, hsl(30 10% 7% / 0.82) 100%)",
+                "linear-gradient(to bottom, hsl(30 10% 10% / 0.92) 0%, hsl(30 10% 10% / 0.6) 40%, hsl(30 10% 10% / 0.78) 78%, hsl(30 10% 10%) 100%)",
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-b from-[hsl(30_10%_8%/0.6)] via-transparent to-[hsl(30_10%_10%)]" />

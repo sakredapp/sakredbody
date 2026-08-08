@@ -1,10 +1,11 @@
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { ArrowRight, ChevronDown } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { PageHero, SectionHeader } from "@/components/PageHero";
+import { TerrainWheel } from "@/components/TerrainWheel";
 import { Button } from "@/components/ui/button";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
@@ -69,36 +70,15 @@ export default function Terrain() {
           <motion.div variants={fadeInUp}>
             <SectionHeader
               eyebrow="The Chain"
-              title={<>Nine Stages, <span className="text-gold">One System</span></>}
-              intro="Read it top to bottom. Then notice that the last stage feeds back into the first — this is a loop, not a line."
+              title={<>The Cycle</>}
+              intro="Every stage sets the conditions for the next."
               testId="text-chain-headline"
             />
           </motion.div>
 
-          <div className="max-w-2xl mx-auto">
-            {CHAIN.map((c, i) => (
-              <motion.div variants={fadeInUp} key={c.stage}>
-                <div
-                  className="border border-gold-subtle rounded-lg bg-card p-6 text-center"
-                  data-testid={`chain-stage-${i}`}
-                >
-                  <h3 className="font-display text-2xl mt-2 mb-3">{c.stage}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{c.body}</p>
-                </div>
-                {i < CHAIN.length - 1 && (
-                  <div className="flex justify-center py-2" aria-hidden="true">
-                    <ChevronDown className="h-5 w-5 text-gold/40" />
-                  </div>
-                )}
-              </motion.div>
-            ))}
-
-            <motion.div variants={fadeInUp} className="mt-8 text-center">
-              <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-gold/30 bg-gold/5 text-xs uppercase tracking-wider text-gold">
-                Elimination feeds back into digestion
-              </div>
-            </motion.div>
-          </div>
+          <motion.div variants={fadeInUp}>
+            <TerrainWheel stages={CHAIN} />
+          </motion.div>
         </motion.div>
       </Section>
 

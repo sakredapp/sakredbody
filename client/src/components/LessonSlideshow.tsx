@@ -16,9 +16,9 @@ interface LessonSlideshowProps {
 }
 
 const slideVariants = {
-  enter: (direction: number) => ({ opacity: 0, y: direction > 0 ? 28 : -28 }),
-  center: { opacity: 1, y: 0 },
-  exit: (direction: number) => ({ opacity: 0, y: direction > 0 ? -28 : 28 }),
+  enter: (direction: number) => ({ opacity: 0, x: direction > 0 ? 48 : -48 }),
+  center: { opacity: 1, x: 0 },
+  exit: (direction: number) => ({ opacity: 0, x: direction > 0 ? -48 : 48 }),
 };
 
 export function LessonSlideshow({ lessons, intervalMs = 7000, className }: LessonSlideshowProps) {

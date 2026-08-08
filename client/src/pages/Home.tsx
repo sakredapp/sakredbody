@@ -268,63 +268,43 @@ export default function Home() {
         </motion.div>
       </Section>
 
-      {/* ── Not monk mode ────────────────────────────────────── */}
+      {/* ── The refusal ──────────────────────────────────────── */}
       <Section tone="light">
         <motion.div
           initial="hidden"
           whileInView="visible"
           viewport={viewportOnce}
           variants={staggerContainer}
-          className="max-w-3xl mx-auto text-center"
+          className="max-w-4xl mx-auto text-center"
         >
-          <motion.p variants={fadeInUp} className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
+          <motion.p variants={fadeInUp} className="text-xs uppercase tracking-widest text-gold mb-8 rule-gold rule-gold-center">
             Where We Part Ways
           </motion.p>
           <motion.h2
             variants={fadeInUp}
-            className="text-4xl md:text-6xl font-display font-normal mb-10 leading-[1.05] tracking-tight"
+            className="font-display text-3xl md:text-5xl lg:text-6xl font-normal leading-[1.12] tracking-tight"
             data-testid="text-monk-headline"
           >
-            This isn't monk mode.
+            Strength without recovery
+            <br />
+            is just a slower injury.
+            <br />
+            <span className="text-gold">Recovery without strength</span>
+            <br />
+            <span className="text-gold">is just decline with better branding.</span>
           </motion.h2>
-          <motion.div variants={fadeInUp} className="space-y-5 text-muted-foreground leading-relaxed text-base md:text-lg">
-            <p>
-              There's a version of holistic health that ends with a robe, a mountain, a bowl of rice, and a
-              quiet withdrawal from the world. We understand the appeal. It isn't what we're building.
-            </p>
-            <p className="text-foreground">
-              We think you should be able to carry your own weight — literally. Strong back. Real muscle. A
-              body that can work, lift, fight, and take a hit without folding.
-            </p>
-            <p>
-              We also think you should sleep through the night, digest your food, breathe through your nose,
-              and get out of bed without a stimulant. Those aren't competing goals. Most people were simply
-              never taught how to hold both at once, so they pick the one that matches their personality and
-              call the other one soft.
-            </p>
-            <p className="text-foreground">
-              Strength without recovery is just a slower injury. Recovery without strength is just decline
-              with better branding.
-            </p>
-          </motion.div>
         </motion.div>
       </Section>
 
       {/* ── Core lessons ─────────────────────────────────────── */}
       <Section id="lessons" tone="ink">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
-          <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-14">
-            <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
-              The Core Lessons
-            </p>
-            <h2 className="text-4xl md:text-5xl font-display font-normal mb-6 tracking-tight leading-[1.08]" data-testid="text-lessons-headline">
-              Live With Your Environment, <span className="text-gold">Not Against It</span>
-            </h2>
-            <p className="text-muted-foreground leading-relaxed">
-              None of this is new. It's what nearly every traditional system arrived at independently, long
-              before it could be measured. We just stopped doing it.
-            </p>
-          </motion.div>
+          <motion.p
+            variants={fadeInUp}
+            className="text-xs uppercase tracking-widest text-gold mb-14 rule-gold rule-gold-center text-center"
+          >
+            The Core Lessons
+          </motion.p>
 
           <motion.div variants={fadeInUp} className="max-w-3xl mx-auto">
             <LessonSlideshow lessons={LESSONS} />

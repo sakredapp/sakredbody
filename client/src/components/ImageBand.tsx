@@ -33,7 +33,7 @@ export function ImageBand({ image, alt, eyebrow, title, children, tall, testId }
           className="absolute inset-0"
           style={{
             background:
-              "linear-gradient(to bottom, hsl(30 10% 7% / 0.72) 0%, hsl(30 10% 7% / 0.45) 45%, hsl(30 10% 7% / 0.78) 100%)",
+              "linear-gradient(to bottom, hsl(30 10% 10%) 0%, hsl(30 10% 10% / 0.66) 16%, hsl(30 10% 10% / 0.45) 50%, hsl(30 10% 10% / 0.72) 84%, hsl(30 10% 10%) 100%)",
           }}
         />
       </div>
