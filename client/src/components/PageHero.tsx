@@ -66,6 +66,11 @@ export function PageHero({
       )}
       {ambient && <div className="absolute inset-0 z-0">{ambient}</div>}
 
+      {/* Sections should hand off, not stop. Both edges resolve into the
+          page ink so a backdrop never ends on a hard line. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-24 z-[1] bg-gradient-to-b from-background to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 z-[1] bg-gradient-to-t from-background to-transparent" />
+
       <div className="container max-w-6xl mx-auto px-4 text-center relative z-10">
         <motion.div initial="hidden" animate="visible" variants={stagger}>
           <motion.p

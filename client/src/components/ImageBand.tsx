@@ -29,6 +29,8 @@ export function ImageBand({ image, alt, eyebrow, title, children, tall, testId }
     >
       <div className="absolute inset-0 z-0">
         <img src={image} alt={alt} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-background to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-background to-transparent" />
         <div
           className="absolute inset-0"
           style={{

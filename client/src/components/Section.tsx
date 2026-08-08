@@ -51,6 +51,15 @@ export function Section({
       className={cn("py-20 md:py-28 relative", resolvedTone === "ink" ? "tone-ink bg-background" : "", className)}
       {...props}
     >
+      {/* Ink sections often carry a canvas. Fading both edges into the page
+          ink means one section hands off to the next instead of butting
+          against it on a hard line. */}
+      {resolvedTone === "ink" && (
+        <>
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-24 z-[1] bg-gradient-to-b from-background to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 z-[1] bg-gradient-to-t from-background to-transparent" />
+        </>
+      )}
       {inner}
     </section>
   );

@@ -161,10 +161,13 @@ export default function Home() {
                 "radial-gradient(ellipse 70% 60% at 50% 50%, hsl(30 10% 8% / 0.82), hsl(30 10% 7% / 0.96))",
             }}
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-[hsl(30_10%_8%/0.7)] via-transparent to-[hsl(30_10%_9%)]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[hsl(30_10%_8%/0.7)] via-transparent to-background" />
           <JungleCanopy className="absolute inset-0 w-full h-full opacity-70" />
           <CelestialField className="absolute inset-0 w-full h-full opacity-70" />
         </div>
+
+        {/* The hero resolves into the ink below it instead of stopping. */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 z-10 bg-gradient-to-t from-background to-transparent" />
 
         <div className="container max-w-6xl mx-auto px-4 relative z-20">
           <motion.div

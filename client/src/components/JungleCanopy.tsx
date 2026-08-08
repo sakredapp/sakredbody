@@ -74,8 +74,8 @@ function frond(
 
 /** Two times of day. `deep` is the ink hero; `dawn` lifts the page. */
 const SKIES = {
-  deep: { top: "#141A16", mid: "#0F1310", bottom: "#0A0C0A", shaft: 0.16, warm: 0.035 },
-  dawn: { top: "#3A3A2C", mid: "#242519", bottom: "#141610", shaft: 0.4, warm: 0.1 },
+  deep: { top: "#141A16", mid: "#0F1310", bottom: "#1C1917", shaft: 0.16, warm: 0.035 },
+  dawn: { top: "#3A3A2C", mid: "#242519", bottom: "#1C1917", shaft: 0.4, warm: 0.1 },
 } as const;
 
 export function JungleCanopy({
