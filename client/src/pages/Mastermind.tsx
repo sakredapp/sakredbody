@@ -42,7 +42,7 @@ export default function Mastermind() {
           <Button
             onClick={openApplication}
             size="sm"
-            className="bg-gold border-gold-border text-white"
+            className="rounded-full px-4 bg-gold border-gold-border text-white"
             data-testid="button-apply-header"
           >
             Apply Now

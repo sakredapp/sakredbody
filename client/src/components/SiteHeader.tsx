@@ -140,7 +140,7 @@ export function SiteHeader({ navItems = SITE_NAV, cta, overHero = true }: SiteHe
             <Button
               variant="outline"
               size="sm"
-              className="transition-colors duration-300 border-white/25 text-white bg-white/5"
+              className="rounded-full px-4 transition-colors duration-300 border-white/25 text-white bg-white/5 hover:bg-white/10"
             >
               Member Portal
             </Button>
