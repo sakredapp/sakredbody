@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
+import { Deck } from "@/components/Deck";
 import { PageHero, SectionHeader } from "@/components/PageHero";
 import { ResonantRing } from "@/components/ResonantRing";
 import { Button } from "@/components/ui/button";
@@ -113,19 +114,13 @@ export default function BodyLiteracy() {
             />
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-x-12 gap-y-14">
-            {CONFUSIONS.map((c, i) => (
-              <motion.div variants={fadeInUp} key={c.pair}>
-                <div
-                  className="h-full pt-8 border-t border-border text-center"
-                  data-testid={`card-confusion-${i}`}
-                >
-                  <h3 className="font-display text-xl mb-3 text-gold">{c.pair}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{c.body}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          <motion.div variants={fadeInUp}>
+            <Deck
+              testId="deck-confusions"
+              autoAdvanceMs={9000}
+              cards={CONFUSIONS.map((c) => ({ title: c.pair, body: c.body }))}
+            />
+          </motion.div>
         </motion.div>
       </Section>
 
@@ -175,7 +170,7 @@ export default function BodyLiteracy() {
             record you can look back on.
           </motion.p>
           <motion.div variants={fadeInUp}>
-            <Link href="/app">
+            <Link href="/member">
               <Button size="lg" className="gold-metallic-btn px-8" data-testid="button-app">
                 See the App <ArrowRight className="ml-2 h-5 w-5" />
               </Button>

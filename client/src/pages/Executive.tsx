@@ -160,19 +160,12 @@ export default function Executive() {
             />
           </motion.div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-14 max-w-5xl mx-auto">
-            {DEBT.map((d, i) => (
-              <motion.div variants={fadeInUp} key={d.line}>
-                <div
-                  className="h-full pt-8 border-t border-border text-center"
-                  data-testid={`card-debt-${i}`}
-                >
-                  <h3 className="font-display text-xl mb-3">{d.line}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{d.body}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          <motion.div variants={fadeInUp}>
+            <Deck
+              testId="deck-debt"
+              cards={DEBT.map((d) => ({ title: d.line, body: d.body, meta: "Borrowed against" }))}
+            />
+          </motion.div>
 
           <motion.p
             variants={fadeInUp}
@@ -214,19 +207,9 @@ export default function Executive() {
             />
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-x-12 gap-y-14 max-w-4xl mx-auto">
-            {WHO.map((w, i) => (
-              <motion.div variants={fadeInUp} key={w.title}>
-                <div
-                  className="h-full pt-8 border-t border-border text-center"
-                  data-testid={`card-who-${i}`}
-                >
-                  <h3 className="font-display text-xl mb-3">{w.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{w.body}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          <motion.div variants={fadeInUp}>
+            <Deck testId="deck-who" cards={WHO.map((w) => ({ title: w.title, body: w.body }))} />
+          </motion.div>
         </motion.div>
       </Section>
 

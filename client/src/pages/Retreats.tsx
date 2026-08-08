@@ -7,6 +7,7 @@ import { Section } from "@/components/Section";
 import { PageHero, SectionHeader } from "@/components/PageHero";
 import { ImageBand } from "@/components/ImageBand";
 import { DiagonalStack } from "@/components/DiagonalStack";
+import { Deck } from "@/components/Deck";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { usePageMeta } from "@/hooks/use-page-meta";
@@ -19,12 +20,22 @@ const stagger = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { s
 const viewportOnce = { once: true, amount: 0.15 } as const;
 
 const SOCIAL_INPUTS = [
-  "Who you're around, and what they expect of you",
-  "Whether your life contains any real challenge",
-  "Whether you're constantly digitally stimulated",
-  "Whether you ever spend uninterrupted days in nature",
-  "What standards the people near you actually hold",
-  "Whether anyone around you is building something",
+  { title: "The room", body: "Who you're around, and what they quietly expect of you. It sets a floor you will not drop below and a ceiling you will not rise past." },
+  { title: "Real difficulty", body: "Whether your life contains any genuine challenge. A body with nothing asked of it stops being able to answer." },
+  { title: "Stimulation", body: "Constant low-grade input is a physiological load, not a lifestyle preference. The nervous system does not know the difference." },
+  { title: "Time outdoors", body: "Whether you ever spend uninterrupted days in weather, light and ground. Not a walk — days." },
+  { title: "The standard", body: "What the people near you actually hold themselves to. Standards are contagious in both directions." },
+  { title: "Building", body: "Whether anyone around you is making something. Proximity to work changes what feels normal to attempt." },
+];
+
+/** The retreat photography, put to work behind the argument. */
+const SOCIAL_IMAGES = [
+  "/images/long-dining-table.webp",
+  "/images/rugged-cliffs.webp",
+  "/images/wooden-pavilion.webp",
+  "/images/tropical-beach.webp",
+  "/images/gathering-string-lights.webp",
+  "/images/stone-villa.webp",
 ];
 
 const FORMATS = [
@@ -109,18 +120,18 @@ export default function Retreats() {
             />
           </motion.div>
 
-          <div className="max-w-2xl mx-auto">
-            {SOCIAL_INPUTS.map((s, i) => (
-              <motion.div
-                variants={fadeInUp}
-                key={s}
-                className="flex flex-col items-center gap-1.5 py-5 border-b border-border/50 last:border-0 text-center"
-                data-testid={`row-social-${i}`}
-              >
-                <span className="text-muted-foreground">{s}</span>
-              </motion.div>
-            ))}
-          </div>
+          <motion.div variants={fadeInUp}>
+            <Deck
+              testId="deck-social"
+              autoAdvanceMs={7000}
+              cards={SOCIAL_INPUTS.map((input, i) => ({
+                title: input.title,
+                body: input.body,
+                image: SOCIAL_IMAGES[i % SOCIAL_IMAGES.length],
+                imageAlt: "",
+              }))}
+            />
+          </motion.div>
 
           <motion.p
             variants={fadeInUp}

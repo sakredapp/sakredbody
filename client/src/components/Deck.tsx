@@ -99,7 +99,7 @@ export function Deck({
       ref={hostRef}
     >
       <div
-        className="relative h-[26rem] sm:h-[24rem]"
+        className="relative min-h-[24rem] sm:min-h-[22rem] flex items-stretch"
         style={{ perspective: "1400px", perspectiveOrigin: "50% 45%" }}
       >
         <motion.div
@@ -128,7 +128,7 @@ export function Deck({
                 aria-label={card.title}
                 aria-current={off === 0}
                 tabIndex={off === 0 ? 0 : -1}
-                className="absolute left-1/2 top-0 w-[19rem] sm:w-[21rem] h-full -ml-[9.5rem] sm:-ml-[10.5rem] text-left cursor-pointer"
+                className="absolute left-1/2 top-0 bottom-0 w-[19rem] sm:w-[21rem] -ml-[9.5rem] sm:-ml-[10.5rem] text-left cursor-pointer"
                 style={{ transformStyle: "preserve-3d" }}
                 animate={{
                   x: off * 132,

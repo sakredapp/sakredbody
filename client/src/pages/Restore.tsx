@@ -6,6 +6,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { PageHero, SectionHeader } from "@/components/PageHero";
 import { FlowField } from "@/components/FlowField";
+import { Deck } from "@/components/Deck";
 import { Button } from "@/components/ui/button";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
@@ -144,23 +145,15 @@ export default function Restore() {
             />
           </motion.div>
 
-          <div className="max-w-2xl mx-auto">
-            {PROTOCOLS.map((p, i) => (
-              <motion.div
-                variants={fadeInUp}
-                key={p.name}
-                className="py-6 border-b border-border/50 last:border-0 text-center"
-                data-testid={`row-protocol-${i}`}
-              >
-                <h3 className="font-display text-xl">{p.name}</h3>
-                <p className="text-sm text-muted-foreground mt-1">{p.note}</p>
-                <p className="text-xs text-muted-foreground/70 mt-1.5">{p.days}</p>
-              </motion.div>
-            ))}
-          </div>
+          <motion.div variants={fadeInUp}>
+            <Deck
+              testId="deck-protocols"
+              cards={PROTOCOLS.map((p) => ({ title: p.name, body: p.note, meta: p.days }))}
+            />
+          </motion.div>
 
           <motion.div variants={fadeInUp} className="text-center mt-10 flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/app">
+            <Link href="/member">
               <Button className="gold-metallic-btn px-8 w-full sm:w-auto" data-testid="button-see-protocols">
                 See the Protocols <ArrowRight className="ml-2 h-4 w-4" />
               </Button>

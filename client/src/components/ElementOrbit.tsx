@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { ELEMENT_STONES, GemStone } from "./GemStone";
 
 export interface OrbitElement {
   element: string;
@@ -101,7 +102,15 @@ export function ElementOrbit({ elements }: { elements: OrbitElement[] }) {
           />
         </svg>
 
-        {/* What the held element reads as, in the middle of its own cycle. */}
+        {/* The held element, as the stone it is rather than a colour chip. */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+          <GemStone
+            key={current.element}
+            stone={ELEMENT_STONES[current.element.toLowerCase()] ?? ELEMENT_STONES.earth}
+            className="w-[52%] h-[52%] opacity-90"
+          />
+        </div>
+
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-[24%] z-10">
           <AnimatePresence mode="wait">
             <motion.div
@@ -148,7 +157,10 @@ export function ElementOrbit({ elements }: { elements: OrbitElement[] }) {
           >
             <span
               className="h-4 w-4 rounded-full border border-white/10 transition-shadow duration-300 group-hover:shadow-gold-medium"
-              style={{ backgroundColor: `hsl(${el.color})` }}
+              style={{
+                background: `radial-gradient(circle at 32% 28%, hsl(${el.color} / 1), hsl(${el.color} / 0.55) 55%, hsl(${el.color} / 0.25))`,
+                boxShadow: `0 0 12px hsl(${el.color} / 0.45)`,
+              }}
             />
             <span className="text-[11px] sm:text-xs whitespace-nowrap text-muted-foreground group-hover:text-foreground transition-colors">
               {el.season}
