@@ -13,6 +13,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { ExecutiveApplications } from "@/components/admin/ExecutiveApplications";
 import { ApothecaryAdmin } from "@/components/admin/Apothecary";
+import { DailyNotesAdmin } from "@/components/admin/DailyNotes";
+import { CommunityAdmin } from "@/components/admin/CommunityAdmin";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -121,7 +123,15 @@ const COACHING_CATEGORIES = [
   "Nutrition", "Recovery", "Energy", "Stress", "Performance",
 ];
 
-type AdminTab = "partners" | "bookings" | "executive" | "coaching" | "masterclass" | "apothecary";
+type AdminTab =
+  | "partners"
+  | "bookings"
+  | "executive"
+  | "coaching"
+  | "community"
+  | "notes"
+  | "masterclass"
+  | "apothecary";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // AUTH GATES
@@ -779,6 +789,14 @@ export default function AdminPortal() {
     enabled: isAdmin,
   });
 
+  // Notes nobody has read yet. Fetched here rather than inside the tab so the
+  // count is visible without opening it — an unread queue that only announces
+  // itself once you're already looking at it isn't a queue.
+  const unreadNotesQuery = useQuery<{ note: { reviewedAt: string | null } }[]>({
+    queryKey: ["/api/admin/daily/notes"],
+    enabled: isAdmin,
+  });
+
   // Partner mutations
   const createPartnerMut = useMutation({
     mutationFn: async (data: PartnerFormData) => {
@@ -1080,6 +1098,8 @@ export default function AdminPortal() {
   const partnerCount = partnersQuery.data?.length || 0;
   const bookingCount = bookingsQuery.data?.filter((b) => b.status === "requested").length || 0;
   const execNewCount = execAppsQuery.data?.filter((a) => a.status === "new").length || 0;
+  const unreadNoteCount =
+    unreadNotesQuery.data?.filter((r) => !r.note.reviewedAt).length || 0;
 
   // Partners
   const openAddPartner = () => { setEditingPartner(null); setPartnerForm(emptyPartnerForm); setShowPartnerDialog(true); };
@@ -1213,6 +1233,8 @@ export default function AdminPortal() {
             { key: "bookings" as AdminTab, label: "Bookings", badge: bookingCount > 0 ? bookingCount : null },
             { key: "executive" as AdminTab, label: "Executive", badge: execNewCount > 0 ? execNewCount : null },
             { key: "coaching" as AdminTab, label: "Coaching", badge: null },
+            { key: "notes" as AdminTab, label: "Daily Notes", badge: unreadNoteCount > 0 ? unreadNoteCount : null },
+            { key: "community" as AdminTab, label: "Rooms", badge: null },
             { key: "masterclass" as AdminTab, label: "Masterclass", badge: null },
             { key: "apothecary" as AdminTab, label: "Apothecary", badge: null },
           ]).map((t) => (
@@ -1236,6 +1258,12 @@ export default function AdminPortal() {
 
         {/* ═══════════════ APOTHECARY TAB ═══════════════ */}
         {tab === "apothecary" && <ApothecaryAdmin enabled={isAdmin} />}
+
+        {/* ═══════════════ DAILY NOTES TAB ═══════════════ */}
+        {tab === "notes" && <DailyNotesAdmin />}
+
+        {/* ═══════════════ ROOMS TAB ═══════════════ */}
+        {tab === "community" && <CommunityAdmin />}
 
         {/* ═══════════════ PARTNERS TAB ═══════════════ */}
         {tab === "partners" && !selectedPartner && (

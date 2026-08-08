@@ -66,6 +66,7 @@ import { ApothecaryTab } from "@/components/ApothecaryTab";
 import { LibraryTab } from "@/components/LibraryTab";
 import { BodyMap } from "@/components/BodyMap";
 import { MastermindsTab } from "@/components/MastermindsTab";
+import { CommunityTab } from "@/components/CommunityTab";
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
 // Icon mapping (UI-only, can't live in shared/)
@@ -171,7 +172,7 @@ export default function MemberDashboard() {
 
   // Default to coaching tab if coming from /coaching URL
   const defaultSection = location === "/coaching" ? "coaching" : "retreat";
-  const [section, setSection] = useState<"retreat" | "coaching" | "masterclass" | "apothecary" | "library" | "body">(defaultSection);
+  const [section, setSection] = useState<"retreat" | "coaching" | "community" | "masterclass" | "apothecary" | "library" | "body">(defaultSection);
   const [retreatView, setRetreatView] = useState<"book" | "services" | "my-bookings" | "masterminds">("book");
   const [coachingTab, setCoachingTab] = useState<"today" | "journey" | "routines" | "catalog" | "analytics" | "coach">("today");
   const [showBookingDialog, setShowBookingDialog] = useState(false);
@@ -312,6 +313,7 @@ export default function MemberDashboard() {
           <div className="flex items-center bg-muted/60 rounded-full p-1 gap-0.5 overflow-x-auto scrollbar-thin max-w-full">
             {([
               { id: "coaching" as const, label: "Coaching" },
+              { id: "community" as const, label: "Community" },
               { id: "body" as const, label: "The Body" },
               { id: "apothecary" as const, label: "Apothecary" },
               { id: "library" as const, label: "Library" },
@@ -435,6 +437,19 @@ export default function MemberDashboard() {
             {coachingTab === "catalog" && <CatalogSection />}
             {coachingTab === "analytics" && <AnalyticsTab />}
             {coachingTab === "coach" && <CoachChat />}
+          </motion.div>
+        )}
+
+        {section === "community" && (
+          <motion.div
+            key="community"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="container max-w-3xl mx-auto px-4 py-8"
+          >
+            <CommunityTab />
           </motion.div>
         )}
 

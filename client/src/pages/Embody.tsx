@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { PageHero, SectionHeader } from "@/components/PageHero";
+import { Deck } from "@/components/Deck";
 import { BreathPacer } from "@/components/BreathPacer";
 import { Button } from "@/components/ui/button";
 import { usePageMeta } from "@/hooks/use-page-meta";
@@ -113,19 +114,13 @@ export default function Embody() {
             />
           </motion.div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-14">
-            {PRACTICES.map((p, i) => (
-              <motion.div variants={fadeInUp} key={p.title}>
-                <div
-                  className="h-full pt-8 border-t border-border text-center"
-                  data-testid={`card-practice-${i}`}
-                >
-                  <h3 className="font-display text-xl mt-3 mb-4">{p.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{p.body}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          <motion.div variants={fadeInUp}>
+            <Deck
+              testId="deck-practices"
+              autoAdvanceMs={8000}
+              cards={PRACTICES.map((p) => ({ title: p.title, body: p.body }))}
+            />
+          </motion.div>
         </motion.div>
       </Section>
 

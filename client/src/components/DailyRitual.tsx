@@ -1,13 +1,14 @@
 /**
- * Today.
+ * The daily ritual — the top of Today.
  *
- * The first screen. What is true about this day, what the member said they
- * would do about it, and — only if it would actually improve tomorrow's note —
- * an invitation to tell us more about themselves.
+ * What is true about this day, what the member said they would do about it,
+ * and — only if it would actually improve tomorrow's note — an invitation to
+ * tell us more about themselves. The day's habits sit underneath it, in
+ * CoachingDashboard's TodayTab.
  *
- * Deliberately quiet. This screen is read before anything is done, so it
- * carries almost no controls: the note, one line the member writes, and the
- * sky underneath it.
+ * Deliberately quiet. This is read before anything is done, so it carries
+ * almost no controls: the note, one line the member writes, and the sky it was
+ * written from.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -259,7 +260,7 @@ function ChartInvite({ depth }: { depth: number }) {
 
 // ─── The screen ────────────────────────────────────────────────────────────
 
-export function TodayTab() {
+export function DailyRitual() {
   const today = useToday();
   const setIntention = useSetIntention();
   const markMet = useMarkIntentionMet();

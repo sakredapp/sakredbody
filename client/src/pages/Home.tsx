@@ -8,6 +8,8 @@ import { YinYang } from "@/components/YinYang";
 import { CelestialField } from "@/components/CelestialField";
 import { JungleCanopy } from "@/components/JungleCanopy";
 import { Constellation } from "@/components/Constellation";
+import { ConstellationBody } from "@/components/ConstellationBody";
+import { StarDust } from "@/components/StarDust";
 import { AuroraOrb } from "@/components/AuroraOrb";
 import { ElementOrbit } from "@/components/ElementOrbit";
 import { Tilt3D } from "@/components/Tilt3D";
@@ -230,6 +232,34 @@ export default function Home() {
           </motion.div>
         </div>
       </section>
+
+      {/* ── The body, as a constellation ─────────────────────── */}
+      <Section tone="ink" className="overflow-hidden py-14 md:py-20">
+        <StarDust className="absolute inset-0 w-full h-full z-0" density={1.1} />
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={viewportOnce}
+          variants={staggerContainer}
+          className="relative z-10"
+        >
+          <motion.div variants={fadeInUp} className="text-center max-w-xl mx-auto mb-4">
+            <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
+              The Sakred Body
+            </p>
+            <h2
+              className="text-3xl md:text-5xl font-display font-normal tracking-tight leading-[1.08]"
+              data-testid="text-body-headline"
+            >
+              You are an <span className="text-gold">energetic being.</span>
+            </h2>
+          </motion.div>
+
+          <motion.div variants={fadeInUp}>
+            <ConstellationBody />
+          </motion.div>
+        </motion.div>
+      </Section>
 
       {/* ── The Four Territories ─────────────────────────── */}
       <Section id="territories" tone="ink" className="overflow-hidden">

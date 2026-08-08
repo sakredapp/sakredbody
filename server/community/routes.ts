@@ -46,6 +46,7 @@ import {
   editMessageSchema,
   MAX_THREAD_DEPTH,
 } from "../../shared/schema.js";
+import { headlineOptions, segmentHeadline } from "../../shared/utils/highlight.js";
 
 function isAdmin(req: Request, res: Response, next: NextFunction) {
   const userId = req.session?.userId;
@@ -151,6 +152,37 @@ async function authorsFor(rows: { userId: string }[]) {
   return new Map(people.map((p) => [p.id, p]));
 }
 
+/**
+ * Reactions for a set of messages, grouped by emoji, in one query.
+ *
+ * `mine` rather than a list of user ids: the client only ever needs to know
+ * whether to light the button up, and shipping the roster would leak who
+ * reacted to what across a paid-tier boundary.
+ */
+async function reactionsFor(rows: { id: string }[], userId: string) {
+  const byMessage = new Map<string, { emoji: string; count: number; mine: boolean }[]>();
+  if (rows.length === 0) return byMessage;
+
+  const reactions = await db
+    .select()
+    .from(messageReactions)
+    .where(inArray(messageReactions.messageId, rows.map((r) => r.id)));
+
+  for (const r of reactions) {
+    const list = byMessage.get(r.messageId) ?? [];
+    const found = list.find((x) => x.emoji === r.emoji);
+    if (found) {
+      found.count++;
+      if (r.userId === userId) found.mine = true;
+    } else {
+      list.push({ emoji: r.emoji, count: 1, mine: r.userId === userId });
+    }
+    byMessage.set(r.messageId, list);
+  }
+
+  return byMessage;
+}
+
 export function registerCommunityRoutes(app: Express) {
   // ─── MEMBER ──────────────────────────────────────────────────────────────
 
@@ -198,11 +230,13 @@ export function registerCommunityRoutes(app: Express) {
         .limit(40);
 
       const authors = await authorsFor(rows);
+      const reactions = await reactionsFor(rows, userId);
 
       res.json(
         rows.map((m) => ({
           ...present(m),
           author: m.deletedAt ? null : authors.get(m.userId) ?? null,
+          reactions: reactions.get(m.id) ?? [],
         })),
       );
     } catch (err) {
@@ -241,23 +275,7 @@ export function registerCommunityRoutes(app: Express) {
         .orderBy(asc(communityMessages.createdAt));
 
       const authors = await authorsFor(rows);
-      const reactions = await db
-        .select()
-        .from(messageReactions)
-        .where(inArray(messageReactions.messageId, rows.map((r) => r.id)));
-
-      const byMessage = new Map<string, { emoji: string; count: number; mine: boolean }[]>();
-      for (const r of reactions) {
-        const list = byMessage.get(r.messageId) ?? [];
-        const found = list.find((x) => x.emoji === r.emoji);
-        if (found) {
-          found.count++;
-          if (r.userId === userId) found.mine = true;
-        } else {
-          list.push({ emoji: r.emoji, count: 1, mine: r.userId === userId });
-        }
-        byMessage.set(r.messageId, list);
-      }
+      const byMessage = await reactionsFor(rows, userId);
 
       res.json(
         rows.map((m) => ({
@@ -342,6 +360,23 @@ export function registerCommunityRoutes(app: Express) {
           .set({ rootId: created.id })
           .where(eq(communityMessages.id, created.id));
         created.rootId = created.id;
+      } else {
+        // Every ancestor's count goes up, not just the root — the channel list
+        // reads the root's, and a collapsed reply reads its own. Walking up the
+        // parent chain is bounded by MAX_THREAD_DEPTH, so this is at most eight
+        // rows and stays one round trip.
+        await db.execute(sql`
+          WITH RECURSIVE ancestors(id, parent_id) AS (
+            SELECT id, parent_id FROM community_messages WHERE id = ${parentId}
+            UNION ALL
+            SELECT m.id, m.parent_id
+            FROM community_messages m
+            JOIN ancestors a ON m.id = a.parent_id
+          )
+          UPDATE community_messages
+             SET reply_count = reply_count + 1
+           WHERE id IN (SELECT id FROM ancestors)
+        `);
       }
 
       const authors = await authorsFor([created]);
@@ -449,6 +484,10 @@ export function registerCommunityRoutes(app: Express) {
    * Postgres full-text over the generated tsvector column. `websearch_to_tsquery`
    * because it takes what people actually type — quoted phrases, `or`, `-not` —
    * without the query having to be well-formed.
+   *
+   * The snippet comes back as segments rather than markup — `ts_headline` does
+   * not escape the text it highlights, so an HTML headline would make any
+   * message a stored XSS. See shared/utils/highlight.ts.
    */
   app.get("/api/community/search", isAuthenticated, async (req, res) => {
     try {
@@ -477,7 +516,7 @@ export function registerCommunityRoutes(app: Express) {
         SELECT m.id, m.channel_id, m.root_id, m.user_id, m.body, m.created_at,
                ts_rank(m.search_vector, websearch_to_tsquery('english', ${q})) AS rank,
                ts_headline('english', m.body, websearch_to_tsquery('english', ${q}),
-                           'MaxFragments=1, MaxWords=24, MinWords=8') AS headline
+                           ${headlineOptions()}) AS headline
         FROM community_messages m
         WHERE m.channel_id IN (${channelFilter})
           AND m.deleted_at IS NULL
@@ -495,7 +534,7 @@ export function registerCommunityRoutes(app: Express) {
           channelId: r.channel_id,
           rootId: r.root_id,
           body: r.body,
-          headline: r.headline,
+          headline: segmentHeadline(r.headline ?? ""),
           createdAt: r.created_at,
           author: authors.get(r.user_id) ?? null,
         })),

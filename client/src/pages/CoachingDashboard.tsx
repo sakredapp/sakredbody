@@ -84,6 +84,7 @@ import {
   Download,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { DailyRitual } from "@/components/DailyRitual";
 
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
@@ -260,12 +261,16 @@ function HabitCard({
 
 // ─── Today Tab (Part 3) ──────────────────────────────────────────────────
 
-export function TodayTab() {
+/** The day's habits. Read the ritual first, then do these. */
+function TodayHabits() {
   const { data: todayData, isLoading } = useTodayHabits();
   const toggleMutation = useToggleHabit();
   const reconcileMutation = useReconcileHabits();
   const { data: activeEnrollment } = useActiveEnrollment();
 
+  // Settle any routine that started, ended or was paused since the last visit.
+  // On read rather than on a cron: the member's own timezone is only knowable
+  // when they're here, and a cron can't know it has become tomorrow for them.
   useEffect(() => {
     reconcileMutation.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -274,28 +279,22 @@ export function TodayTab() {
   if (isLoading) {
     return (
       <div className="space-y-3">
-        {[1, 2, 3, 4].map((i) => (
+        {[1, 2, 3].map((i) => (
           <Skeleton key={i} className="h-16 w-full rounded-md" />
         ))}
       </div>
     );
   }
 
+  // Quieter than a card. The ritual above is the screen's content, so an empty
+  // habit list is a note rather than an announcement of absence.
   if (!todayData || todayData.habits.length === 0) {
     return (
-      <Card>
-        <CardContent className="p-12 text-center space-y-3">
-          <ListChecks className="w-12 h-12 mx-auto text-muted-foreground" />
-          <div>
-            <h3 className="font-display text-lg mb-1">No Habits Today</h3>
-            <p className="text-sm text-muted-foreground">
-              {activeEnrollment
-                ? "All caught up! Check back tomorrow."
-                : "Browse routines to start your wellness journey."}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <p className="text-sm text-muted-foreground" data-testid="text-no-habits">
+        {activeEnrollment
+          ? "Nothing scheduled today. Your routine picks up tomorrow."
+          : "No routine running. Start one under Routines and the days fill in."}
+      </p>
     );
   }
 
@@ -345,6 +344,24 @@ export function TodayTab() {
           ))}
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Today, whole.
+ *
+ * The note and the sky it was written from, then what the member said they'd
+ * do, then the day's actual work. One screen in that order because that's the
+ * order the day happens in — you find out what today is before you do it.
+ */
+export function TodayTab() {
+  return (
+    <div className="space-y-12">
+      <DailyRitual />
+      <div className="border-t border-border/50 pt-8">
+        <TodayHabits />
+      </div>
     </div>
   );
 }

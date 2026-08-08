@@ -3,6 +3,7 @@ import { ArrowRight } from "lucide-react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
+import { Deck } from "@/components/Deck";
 import { PageHero, SectionHeader } from "@/components/PageHero";
 import { ExecutiveApplication } from "@/components/ExecutiveApplication";
 import { Button } from "@/components/ui/button";
@@ -193,19 +194,12 @@ export default function Executive() {
             />
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-x-12 gap-y-14">
-            {PILLARS.map((p, i) => (
-              <motion.div variants={fadeInUp} key={p.name}>
-                <div
-                  className="h-full pt-8 border-t border-border text-center"
-                  data-testid={`card-pillar-${i}`}
-                >
-                  <h3 className="font-display text-xl mt-3 mb-3">{p.name}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{p.body}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          <motion.div variants={fadeInUp}>
+            <Deck
+              testId="deck-pillars"
+              cards={PILLARS.map((p) => ({ title: p.name, body: p.body }))}
+            />
+          </motion.div>
         </motion.div>
       </Section>
 
