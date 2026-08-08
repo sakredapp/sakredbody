@@ -104,11 +104,17 @@ async function fetchFilteredHabits(
 /**
  * Write the habit rows for a date range of a routine.
  *
- * `ON CONFLICT DO NOTHING` is load-bearing, not defensive. `uq_habits` makes
- * (user, title, date) unique, and there are legitimate collisions: two
- * templates sharing a title, a standalone habit the member already added, a
- * resume that overlaps rows already present. Every one of those used to be a
- * duplicate row and would now be a 500.
+ * `ON CONFLICT DO NOTHING` is load-bearing, not defensive. A habit is unique
+ * per (user, template, date) — see supabase/habit-identity.sql — and there are
+ * legitimate collisions: a standalone habit the member already added from the
+ * same template, and a resume that overlaps rows already present. Both used to
+ * be duplicate rows and would now be a 500.
+ *
+ * Identity is the template id, never the title. `routine_habits.title` is
+ * editable, and keying on it meant a rename inserted a parallel series instead
+ * of matching the existing one — the member saw the habit twice, the day could
+ * never read as complete, and the streak broke from an edit nobody thought was
+ * destructive.
  */
 async function materialise(opts: {
   userId: string;

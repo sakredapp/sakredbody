@@ -763,9 +763,10 @@ export function registerCoachingRoutes(app: Express): void {
           )
         );
 
-      // Pre-schedule habit rows. ON CONFLICT because uq_habits makes
-      // (user, title, date) unique and re-assigning after unassigning would
-      // otherwise collide with rows an active routine already owns.
+      // Pre-schedule habit rows. ON CONFLICT because a habit is unique per
+      // (user, template, date), and re-assigning after unassigning would
+      // otherwise collide with rows an active routine already owns — this
+      // template can legitimately be in both places at once.
       const today = parseLocalDate(await memberToday(userId));
       const habitRows = buildStandaloneHabitRows(userId, template, today);
       let scheduled = 0;
