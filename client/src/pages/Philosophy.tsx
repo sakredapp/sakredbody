@@ -6,6 +6,8 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { PageHero, SectionHeader } from "@/components/PageHero";
 import { Constellation } from "@/components/Constellation";
+import { MoonPhase, moonPhaseName } from "@/components/MoonPhase";
+import { StarDust } from "@/components/StarDust";
 import { ImageBand } from "@/components/ImageBand";
 import { YinYang } from "@/components/YinYang";
 import { Button } from "@/components/ui/button";
@@ -47,6 +49,21 @@ export default function Philosophy() {
         ambient={<Constellation className="absolute inset-0 w-full h-full opacity-80" />}
         marks={["Four territories", "One sequence", "East and the barbell"]}
       />
+
+      {/* ── Tonight ──────────────────────────────────────────
+          The phase is computed from the date, not chosen. The sky is a
+          fact the practice is timed against, so it should be the real one. */}
+      <Section tone="ink" className="py-12 md:py-16 overflow-hidden">
+        <StarDust className="absolute inset-0 w-full h-full z-0" density={1.2} />
+        <div className="relative z-10 flex flex-col items-center text-center gap-4">
+          <MoonPhase className="h-40 w-40" testId="moon-tonight" />
+          <p className="text-[10px] uppercase tracking-[0.22em] text-gold">{moonPhaseName()}</p>
+          <p className="text-muted-foreground max-w-md leading-relaxed text-sm">
+            Timing and disposition, not fortune-telling. The body is read against the season and the sky
+            because both are inputs, and both are checkable.
+          </p>
+        </div>
+      </Section>
 
       {/* ── The definition ───────────────────────────────────── */}
       <Section tone="ink">

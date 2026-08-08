@@ -336,7 +336,8 @@ export default function Home() {
       </Section>
 
       {/* ── Five Elements ────────────────────────────────────── */}
-      <Section id="elements" tone="ink" className="py-12 md:py-16">
+      <Section id="elements" tone="ink" className="py-12 md:py-16 overflow-hidden">
+        <StarDust className="absolute inset-0 w-full h-full z-0" density={0.7} />
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-8">
             <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">

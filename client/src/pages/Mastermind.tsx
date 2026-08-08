@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Check } from "lucide-react";
 import { ApplicationModal } from "@/components/ApplicationModal";
 import { Section } from "@/components/Section";
+import { WaysToWork } from "@/components/WaysToWork";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Button } from "@/components/ui/button";
@@ -117,6 +118,17 @@ export default function Mastermind() {
             />
           </div>
         </div>
+      </Section>
+
+      {/* ── Told apart from the other two ──────────────────── */}
+      <Section tone="ink" className="py-10 md:py-14">
+        <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center text-center">
+          Work With Us
+        </p>
+        <h2 className="text-3xl md:text-4xl font-display font-normal mb-10 text-center">
+          Three Shapes, <span className="text-gold">One Standard</span>
+        </h2>
+        <WaysToWork current="mastermind" />
       </Section>
 
       <Section tone="ink">

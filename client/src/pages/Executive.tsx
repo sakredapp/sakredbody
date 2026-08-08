@@ -4,6 +4,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { Deck } from "@/components/Deck";
+import { WaysToWork } from "@/components/WaysToWork";
 import { PageHero, SectionHeader } from "@/components/PageHero";
 import { ExecutiveApplication } from "@/components/ExecutiveApplication";
 import { Button } from "@/components/ui/button";
@@ -174,6 +175,16 @@ export default function Executive() {
             Every demanding life has a <span className="text-gold">physiological cost.</span>
           </motion.p>
         </motion.div>
+      </Section>
+
+      {/* ── Told apart from the other two ──────────────────── */}
+      <Section tone="ink" className="py-10 md:py-14">
+        <SectionHeader
+          eyebrow="Work With Us"
+          title={<>Three Shapes, <span className="text-gold">One Standard</span></>}
+          className="mb-10"
+        />
+        <WaysToWork current="executive" />
       </Section>
 
       {/* ── The five pillars ─────────────────────────────────── */}

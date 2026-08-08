@@ -8,6 +8,7 @@ import { PageHero, SectionHeader } from "@/components/PageHero";
 import { ImageBand } from "@/components/ImageBand";
 import { DiagonalStack } from "@/components/DiagonalStack";
 import { Deck } from "@/components/Deck";
+import { WaysToWork } from "@/components/WaysToWork";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { usePageMeta } from "@/hooks/use-page-meta";
@@ -108,6 +109,16 @@ export default function Retreats() {
         imageAlt="A stone estate set among vineyards and low green hills"
         marks={["Puerto Rico", "Three days to two weeks", "Private or shared", "Application required"]}
       />
+
+      {/* ── Told apart from the other two ──────────────────── */}
+      <Section tone="ink" className="py-10 md:py-14">
+        <SectionHeader
+          eyebrow="Work With Us"
+          title={<>Three Shapes, <span className="text-gold">One Standard</span></>}
+          className="mb-10"
+        />
+        <WaysToWork current="retreats" />
+      </Section>
 
       {/* ── The argument ─────────────────────────────────────── */}
       <Section tone="light">
