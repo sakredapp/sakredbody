@@ -97,6 +97,12 @@ export const EVENT_NAMES = [
   "win.share",
   "win.export_image",
 
+  // Getting in. `auth.throttled` is the one to watch: a spike on it is
+  // somebody guessing passwords, and it is the only signal we get.
+  "auth.login",
+  "auth.register",
+  "auth.throttled",
+
   // Failures worth knowing about, rather than an empty catch.
   "error.client",
   "error.server",

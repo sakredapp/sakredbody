@@ -143,21 +143,33 @@ export function registerWinRoutes(app: Express) {
         .filter(Boolean)
         .join("\n\n");
 
-      const [message] = await db
-        .insert(communityMessages)
-        .values({ channelId: target.id, userId, body })
-        .returning();
+      // All three writes or none.
+      //
+      // These were three separate statements. A failure between them — a
+      // dropped connection, a statement timeout — left the worst possible
+      // shape: a message in the room with a null `root_id`, which the channel
+      // list filters on and so would never render, plus a win still marked
+      // unshared. The member sees "that didn't go through", tries again, and
+      // gets a second invisible post. Nothing cleans either up.
+      const message = await db.transaction(async (tx) => {
+        const [row] = await tx
+          .insert(communityMessages)
+          .values({ channelId: target.id, userId, body })
+          .returning();
 
-      // A top-level message is its own root, same as any other post.
-      await db
-        .update(communityMessages)
-        .set({ rootId: message.id })
-        .where(eq(communityMessages.id, message.id));
+        // A top-level message is its own root, same as any other post.
+        await tx
+          .update(communityMessages)
+          .set({ rootId: row.id })
+          .where(eq(communityMessages.id, row.id));
 
-      await db
-        .update(wins)
-        .set({ sharedAt: new Date(), sharedMessageId: message.id })
-        .where(eq(wins.id, win.id));
+        await tx
+          .update(wins)
+          .set({ sharedAt: new Date(), sharedMessageId: row.id })
+          .where(eq(wins.id, win.id));
+
+        return row;
+      });
 
       track("win.share", {
         userId,

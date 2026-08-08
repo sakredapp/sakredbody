@@ -1,8 +1,30 @@
+/**
+ * Authentication.
+ *
+ * Three things were wrong here and all three are fixed below. They are
+ * documented at the point of the fix rather than listed, but in summary:
+ *
+ *   1. A malformed stored hash crashed the entire server process.
+ *   2. Logging in did not change the session id, so a session could be fixed
+ *      on a victim before they authenticated.
+ *   3. Nothing limited password guessing.
+ *
+ * The hashing itself lives in `./password.ts` — separated so it can be tested
+ * without opening a database connection, which is the reason it had no tests
+ * and therefore the reason (1) shipped.
+ */
+
 import type { Express, Request, Response } from "express";
 import { storage } from "../storage.js";
 import { isAuthenticated } from "./sessionAuth.js";
+import { db } from "../db.js";
+import { sql } from "drizzle-orm";
+import { loginAttempts, THROTTLE } from "../../shared/models/security.js";
+import { track, trackError } from "../telemetry/index.js";
 import { z } from "zod";
-import crypto from "crypto";
+import { hashPassword, verifyPassword, burnTime } from "./password.js";
+
+// ─── What we accept ────────────────────────────────────────────────────────
 
 const loginSchema = z.object({
   email: z.string().email("Valid email is required"),
@@ -11,91 +33,211 @@ const loginSchema = z.object({
 
 const registerSchema = z.object({
   email: z.string().email("Valid email is required"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
+  // 8 characters is the floor, not the goal. Length is the only property that
+  // matters against an offline attack on a stolen hash, so there is no
+  // composition rule and no low maximum — a passphrase should be allowed to
+  // be one. The cap exists only so nobody can make us scrypt a megabyte.
+  password: z.string().min(8, "Password must be at least 8 characters").max(1024),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
 });
 
-// Password hashing using Node's built-in scrypt (no external deps)
-async function hashPassword(password: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const salt = crypto.randomBytes(16).toString("hex");
-    crypto.scrypt(password, salt, 64, (err: Error | null, derivedKey: Buffer) => {
-      if (err) reject(err);
-      resolve(`${salt}:${derivedKey.toString("hex")}`);
-    });
-  });
+// ─── Throttling ────────────────────────────────────────────────────────────
+
+function clientIp(req: Request): string {
+  // `app.set("trust proxy", 1)` is set in sessionAuth, so req.ip already
+  // reflects the last hop's X-Forwarded-For entry rather than Vercel's own
+  // address. Reading the raw header instead would let a caller forge it.
+  return req.ip ?? "unknown";
 }
 
-async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  return new Promise((resolve, reject) => {
-    const [salt, key] = hash.split(":");
-    crypto.scrypt(password, salt, 64, (err: Error | null, derivedKey: Buffer) => {
-      if (err) reject(err);
-      resolve(crypto.timingSafeEqual(Buffer.from(key, "hex"), derivedKey));
-    });
-  });
+interface ThrottleState {
+  locked: boolean;
+  retryAfterSec: number;
 }
+
+/** Is either counter currently locked? Reads only — never counts a check. */
+async function throttleState(keys: string[]): Promise<ThrottleState> {
+  const rows = await db
+    .select()
+    .from(loginAttempts)
+    .where(sql`${loginAttempts.identifier} = ANY(${keys})`);
+
+  const now = Date.now();
+  let worst = 0;
+  for (const r of rows) {
+    const until = r.lockedUntil ? new Date(r.lockedUntil).getTime() : 0;
+    if (until > now) worst = Math.max(worst, until);
+  }
+  return { locked: worst > now, retryAfterSec: Math.ceil((worst - now) / 1000) };
+}
+
+/**
+ * Record one failure against both keys.
+ *
+ * The whole decision happens inside the SQL statement rather than as
+ * read-then-write in TypeScript, because concurrent guesses are the entire
+ * point of the attack: two requests landing together would each read 4, each
+ * write 5, and the counter would advance by one instead of two. `ON CONFLICT
+ * DO UPDATE` makes the increment atomic per row, so parallel guessing gets an
+ * attacker nothing.
+ *
+ * The window resets inside the same statement — a failure more than
+ * `windowMs` after the window opened starts a fresh count rather than adding
+ * to a stale one.
+ */
+async function recordFailure(email: string, ip: string): Promise<void> {
+  const windowSec = Math.floor(THROTTLE.windowMs / 1000);
+  const lockSec = Math.floor(THROTTLE.lockMs / 1000);
+
+  // `make_interval(secs => $n)` rather than the more familiar
+  // `($n || ' seconds')::interval`. The concatenation form works when the
+  // number is written into the SQL as a literal and is a coin-flip when it
+  // arrives as a bind parameter, because Postgres then has to infer the
+  // parameter's type from `||` alone. `make_interval` has a declared
+  // signature, so the parameter is unambiguously an integer.
+  await db.execute(sql`
+    insert into login_attempts (identifier, attempts, window_start, locked_until)
+    values
+      (${"email:" + email}, 1, now(), null),
+      (${"ip:" + ip},       1, now(), null)
+    on conflict (identifier) do update set
+      attempts = case
+        when login_attempts.window_start < now() - make_interval(secs => ${windowSec})
+          then 1
+        else login_attempts.attempts + 1
+      end,
+      window_start = case
+        when login_attempts.window_start < now() - make_interval(secs => ${windowSec})
+          then now()
+        else login_attempts.window_start
+      end,
+      locked_until = case
+        when (case
+                when login_attempts.window_start < now() - make_interval(secs => ${windowSec})
+                  then 1
+                else login_attempts.attempts + 1
+              end)
+             >= (case when excluded.identifier like 'email:%'
+                        then ${THROTTLE.emailMax}
+                        else ${THROTTLE.ipMax} end)
+          then now() + make_interval(secs => ${lockSec})
+        else login_attempts.locked_until
+      end
+  `);
+}
+
+/** A correct password wipes the slate for that email. */
+async function clearFailures(email: string): Promise<void> {
+  await db.execute(
+    sql`delete from login_attempts where identifier = ${"email:" + email}`,
+  );
+}
+
+/**
+ * Swap the session id, then store the user on the new one.
+ *
+ * Without this, `req.session.userId = user.id` promoted whatever session id
+ * the browser arrived with — including one an attacker planted, since
+ * `saveUninitialized: false` still honours a supplied cookie once the session
+ * is written to. Regenerating means the id that ends up authenticated is one
+ * only the server has seen.
+ *
+ * `save()` afterwards is not optional: the response sets the cookie, and
+ * without an explicit save there is a window where the client holds a session
+ * id the store does not yet know about.
+ */
+async function establishSession(req: Request, userId: string): Promise<void> {
+  await new Promise<void>((resolve, reject) =>
+    req.session.regenerate((err) => (err ? reject(err) : resolve())),
+  );
+  req.session.userId = userId;
+  await new Promise<void>((resolve, reject) =>
+    req.session.save((err) => (err ? reject(err) : resolve())),
+  );
+}
+
+// ─── Routes ────────────────────────────────────────────────────────────────
 
 export function registerAuthRoutes(app: Express): void {
-  // Login with email + password
   app.post("/api/login", async (req: Request, res: Response) => {
     try {
-      const { email, password } = loginSchema.parse(req.body);
+      const parsed = loginSchema.parse(req.body);
+      // Addresses are case-insensitive in practice, so the counter has to be
+      // too — otherwise Foo@x.com and foo@x.com are five free guesses each.
+      const email = parsed.email.toLowerCase();
+      const ip = clientIp(req);
+
+      const state = await throttleState([`email:${email}`, `ip:${ip}`]);
+      if (state.locked) {
+        res.setHeader("Retry-After", String(state.retryAfterSec));
+        track("auth.throttled", { surface: "login", props: { minutes: Math.ceil(state.retryAfterSec / 60) } });
+        return res.status(429).json({
+          message: `Too many attempts. Try again in ${Math.max(1, Math.ceil(state.retryAfterSec / 60))} minutes.`,
+        });
+      }
+
       const user = await storage.getUserByEmail(email);
 
-      if (!user || !user.password) {
+      // Same branch, same cost, same message whether the account exists or
+      // the password is wrong.
+      if (!user || !user.password || !(await verifyPassword(parsed.password, user.password))) {
+        if (!user || !user.password) await burnTime(parsed.password);
+        await recordFailure(email, ip);
         return res.status(401).json({ message: "Invalid email or password" });
       }
 
-      const valid = await verifyPassword(password, user.password);
-      if (!valid) {
-        return res.status(401).json({ message: "Invalid email or password" });
-      }
+      await clearFailures(email);
+      await establishSession(req, user.id);
 
-      req.session.userId = user.id;
+      track("auth.login", { userId: user.id, surface: "login" });
+
       const { password: _, ...safeUser } = user;
       res.json(safeUser);
     } catch (error: unknown) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: error.errors[0].message });
       }
-      console.error("Login error:", error);
+      trackError("auth.login", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });
 
-  // Register new user
   app.post("/api/register", async (req: Request, res: Response) => {
     try {
-      const { email, password, firstName, lastName } = registerSchema.parse(req.body);
+      const parsed = registerSchema.parse(req.body);
+      const email = parsed.email.toLowerCase();
 
       const existing = await storage.getUserByEmail(email);
       if (existing) {
         return res.status(409).json({ message: "An account with this email already exists" });
       }
 
-      const hashedPassword = await hashPassword(password);
+      const hashedPassword = await hashPassword(parsed.password);
       const user = await storage.upsertUser({
         email,
         password: hashedPassword,
-        firstName,
-        lastName,
+        firstName: parsed.firstName,
+        lastName: parsed.lastName,
       });
 
-      req.session.userId = user.id;
+      // Registration authenticates, so it fixes a session exactly the same
+      // way login does and needs the same treatment.
+      await establishSession(req, user.id);
+
+      track("auth.register", { userId: user.id, surface: "register" });
+
       const { password: _, ...safeUser } = user;
       res.status(201).json(safeUser);
     } catch (error: unknown) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: error.errors[0].message });
       }
-      console.error("Registration error:", error);
+      trackError("auth.register", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });
 
-  // Get current authenticated user
   app.get("/api/auth/user", isAuthenticated, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
@@ -111,19 +253,22 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
-  // Logout (POST)
   app.post("/api/logout", (req: Request, res: Response) => {
     req.session.destroy((err: Error | null) => {
       if (err) {
         return res.status(500).json({ message: "Logout failed" });
       }
+      // Destroying the session leaves the cookie in the browser pointing at a
+      // store entry that no longer exists. Clearing it too means the next
+      // request arrives clean instead of with a dead id.
+      res.clearCookie("connect.sid");
       res.json({ message: "Logged out" });
     });
   });
 
-  // Logout (GET — backward compat, redirects to home)
   app.get("/api/logout", (req: Request, res: Response) => {
     req.session.destroy(() => {
+      res.clearCookie("connect.sid");
       res.redirect("/");
     });
   });
