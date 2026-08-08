@@ -67,7 +67,7 @@ export function FlowField({
         ctx.fillRect(0, 0, w, h);
 
         // A drift that swells on the inhale and nearly stalls on the exhale.
-        const drift = (0.16 + breath * 0.34) * speed;
+        const drift = (0.1 + breath * 0.2) * speed;
 
         for (const p of motes) {
           p.px = p.x;

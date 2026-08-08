@@ -177,11 +177,7 @@ export default function Executive() {
             variants={fadeInUp}
             className="text-center font-display text-xl md:text-2xl mt-14 max-w-2xl mx-auto leading-relaxed"
           >
-            Every demanding life has a physiological cost.
-            <br />
-            <span className="text-gold">
-              The question is whether you're earning capacity faster than you're spending it.
-            </span>
+            Every demanding life has a <span className="text-gold">physiological cost.</span>
           </motion.p>
         </motion.div>
       </Section>

@@ -43,21 +43,6 @@ const CONFUSIONS = [
   },
 ];
 
-const SIGNALS = [
-  "Morning energy before caffeine",
-  "Whether you woke at the same time unprompted",
-  "Bowel regularity, form, and ease",
-  "Whether you're breathing through your nose at rest",
-  "How food sits twenty minutes after eating",
-  "Grip strength and willingness on a warm-up set",
-  "How fast your heart rate settles after effort",
-  "Whether you feel warm at the hands and feet",
-  "Thirst, and the colour of first urine",
-  "Whether your mind stops when the light goes",
-  "Tension in the jaw, shoulders, and gut",
-  "Cravings, and what specifically you crave",
-];
-
 export default function BodyLiteracy() {
   usePageMeta(
     "Body Literacy — Learn to Read the Organism You Live In | Sakred Body",
@@ -138,33 +123,6 @@ export default function BodyLiteracy() {
                   <h3 className="font-display text-xl mb-3 text-gold">{c.pair}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">{c.body}</p>
                 </div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-      </Section>
-
-      {/* ── Signals ──────────────────────────────────────────── */}
-      <Section tone="light">
-        <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
-          <motion.div variants={fadeInUp}>
-            <SectionHeader
-              eyebrow="The Instrument Panel"
-              title={<>Twelve Things Worth <span className="text-gold">Noticing</span></>}
-              intro="No device required."
-              testId="text-signals-headline"
-            />
-          </motion.div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-px max-w-4xl mx-auto">
-            {SIGNALS.map((s, i) => (
-              <motion.div
-                variants={fadeInUp}
-                key={s}
-                className="flex flex-col items-center gap-1.5 py-4 border-b border-border/50 text-center"
-                data-testid={`row-signal-${i}`}
-              >
-                <span className="text-sm text-muted-foreground">{s}</span>
               </motion.div>
             ))}
           </div>

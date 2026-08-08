@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -12,12 +13,12 @@ import Embody from "@/pages/Embody";
 import Terrain from "@/pages/Terrain";
 import BodyLiteracy from "@/pages/BodyLiteracy";
 import Retreats from "@/pages/Retreats";
-import Executive from "@/pages/Executive";
-import FoodChart from "@/pages/FoodChart";
-import Mastermind from "@/pages/Mastermind";
+const Executive = lazy(() => import("@/pages/Executive"));
+const FoodChart = lazy(() => import("@/pages/FoodChart"));
+const Mastermind = lazy(() => import("@/pages/Mastermind"));
 import LoginPage from "@/pages/LoginPage";
-import MemberDashboard from "@/pages/MemberDashboard";
-import AdminPortal from "@/pages/AdminPortal";
+const MemberDashboard = lazy(() => import("@/pages/MemberDashboard"));
+const AdminPortal = lazy(() => import("@/pages/AdminPortal"));
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -51,13 +52,20 @@ function Router() {
   );
 }
 
+/** Held for the split-out routes. Ink, so it never flashes white. */
+function RouteFallback() {
+  return <div className="min-h-screen bg-background" aria-busy="true" />;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <ScrollToTop />
-        <Router />
+        <Suspense fallback={<RouteFallback />}>
+          <Router />
+        </Suspense>
       </TooltipProvider>
     </QueryClientProvider>
   );

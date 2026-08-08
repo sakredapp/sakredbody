@@ -5,7 +5,6 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { PageHero, SectionHeader } from "@/components/PageHero";
-import { JungleCanopy } from "@/components/JungleCanopy";
 import { ImageBand } from "@/components/ImageBand";
 import { DiagonalStack } from "@/components/DiagonalStack";
 import { Button } from "@/components/ui/button";
@@ -96,7 +95,6 @@ export default function Retreats() {
         testId="text-retreats-headline"
         image="/images/estate-vineyard.webp"
         imageAlt="A stone estate set among vineyards and low green hills"
-        ambient={<JungleCanopy variant="dawn" className="absolute inset-0 w-full h-full opacity-45" />}
         marks={["Puerto Rico", "Three days to two weeks", "Private or shared", "Application required"]}
       />
 

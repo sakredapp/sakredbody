@@ -90,78 +90,72 @@ export default function FoodChart() {
         </div>
       </section>
 
-      {/* ── Sticky controls. The scale is the filter — one control, not two. ── */}
-      <div className="tone-ink bg-background border-y border-border sticky top-[84px] z-30">
-        <div className="container max-w-5xl mx-auto px-4 py-5">
-          <div className="relative mb-5 max-w-md mx-auto">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={`Search ${TOTAL_FOODS} foods…`}
-              className="pl-10 pr-10 h-11 text-center"
-              aria-label="Search foods"
-              data-testid="input-food-search"
-            />
-            {query && (
+      {/* ── Controls ─────────────────────────────────────────────
+          Not sticky. A pinned slab this tall meant the whole chart
+          scrolled underneath it and the bar covered what you were
+          reading — worse than simply scrolling back up. Search and the
+          scale now share one line and stay where they were put. */}
+      <div className="tone-ink bg-background border-y border-border">
+        <div className="container max-w-5xl mx-auto px-4 py-4">
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <div className="relative w-full sm:max-w-xs">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={`Search ${TOTAL_FOODS} foods…`}
+                className="pl-10 pr-10 h-10"
+                aria-label="Search foods"
+                data-testid="input-food-search"
+              />
+              {query && (
+                <button
+                  onClick={() => setQuery("")}
+                  aria-label="Clear search"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex-1 w-full">
+              <div className="flex rounded-full overflow-hidden border border-border">
+                {FOOD_RATINGS.map((r) => {
+                  const active = activeRatings.has(r);
+                  const dim = activeRatings.size > 0 && !active;
+                  return (
+                    <button
+                      key={r}
+                      onClick={() => toggleRating(r)}
+                      aria-pressed={active}
+                      aria-label={`Filter by ${r}`}
+                      title={r}
+                      className={cn("h-6 flex-1 transition-all relative", dim ? "opacity-25" : "opacity-100")}
+                      style={{ backgroundColor: `hsl(${RATING_META[r].color})` }}
+                      data-testid={`filter-${slug(r)}`}
+                    >
+                      {active && <span className="absolute inset-0 ring-2 ring-inset ring-white/80" />}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex justify-between mt-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                <span>Anti-inflammatory</span>
+                <span>Inflammatory</span>
+              </div>
+            </div>
+
+            {isFiltering && (
               <button
-                onClick={() => setQuery("")}
-                aria-label="Clear search"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={clearAll}
+                className="text-xs text-gold hover:underline whitespace-nowrap"
+                data-testid="button-clear-filters"
               >
-                <X className="h-4 w-4" />
+                {shown} of {TOTAL_FOODS} · Clear
               </button>
             )}
           </div>
-
-          <div className="max-w-md mx-auto">
-            <div className="flex rounded-full overflow-hidden border border-border">
-              {FOOD_RATINGS.map((r) => {
-                const active = activeRatings.has(r);
-                const dim = activeRatings.size > 0 && !active;
-                return (
-                  <button
-                    key={r}
-                    onClick={() => toggleRating(r)}
-                    aria-pressed={active}
-                    aria-label={`Filter by ${r}`}
-                    title={r}
-                    className={cn(
-                      "h-7 flex-1 transition-all relative",
-                      dim ? "opacity-25" : "opacity-100",
-                    )}
-                    style={{ backgroundColor: `hsl(${RATING_META[r].color})` }}
-                    data-testid={`filter-${slug(r)}`}
-                  >
-                    {active && <span className="absolute inset-0 ring-2 ring-inset ring-white/80" />}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex justify-between mt-2 text-[10px] uppercase tracking-wider text-muted-foreground">
-              <span>Anti-inflammatory</span>
-              <span>Inflammatory</span>
-            </div>
-          </div>
-
-          <p className="text-center text-xs text-muted-foreground mt-4" data-testid="text-result-count">
-            {isFiltering ? (
-              <>
-                Showing <span className="text-foreground">{shown}</span> of {TOTAL_FOODS} ·{" "}
-                <button
-                  onClick={clearAll}
-                  className="text-gold hover:underline"
-                  data-testid="button-clear-filters"
-                >
-                  Clear
-                </button>
-              </>
-            ) : (
-              <>
-                Tap the scale to filter · {TOTAL_FOODS} foods across {FOOD_CATEGORIES.length} categories
-              </>
-            )}
-          </p>
         </div>
       </div>
 

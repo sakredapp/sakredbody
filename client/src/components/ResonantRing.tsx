@@ -44,8 +44,8 @@ export function ResonantRing({
         const base = Math.min(w, h) * 0.14;
         for (let i = 0; i < rings; i++) {
           const R = base * (1 + i * 0.42) * (1 + breath * 0.05);
-          const amp = 0.35 + excite * 2.4;
-          const freq = 9 + i * 3.5 + excite * 7;
+          const amp = 0.3 + excite * 1.4;
+          const freq = 2.4 + i * 0.9 + excite * 2.2;
 
           ctx.beginPath();
           for (let a = 0; a <= Math.PI * 2 + 0.01; a += 0.06) {

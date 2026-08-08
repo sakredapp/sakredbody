@@ -68,7 +68,7 @@ export default function Terrain() {
       />
 
       {/* ── The chain ────────────────────────────────────────── */}
-      <Section tone="light">
+      <Section tone="ink" className="py-10 md:py-14">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader

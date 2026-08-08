@@ -25,11 +25,11 @@ interface Layer {
 }
 
 const LAYERS: Layer[] = [
-  { fill: "#0C0F0D", rate: 4, scale: 1.5, count: 5, y: 0.3 },
-  { fill: "#121712", rate: 9, scale: 1.2, count: 6, y: 0.44 },
-  { fill: "#161C16", rate: 17, scale: 0.95, count: 6, y: 0.6 },
-  { fill: "#1A211A", rate: 30, scale: 0.72, count: 5, y: 0.78 },
-  { fill: "#0E120E", rate: 52, scale: 0.5, count: 4, y: 0.98 },
+  { fill: "#0C0F0D", rate: 3, scale: 1.5, count: 5, y: 0.3 },
+  { fill: "#121712", rate: 6, scale: 1.2, count: 6, y: 0.44 },
+  { fill: "#161C16", rate: 10, scale: 0.95, count: 6, y: 0.6 },
+  { fill: "#1A211A", rate: 16, scale: 0.72, count: 5, y: 0.78 },
+  { fill: "#0E120E", rate: 26, scale: 0.5, count: 4, y: 0.98 },
 ];
 
 /** A frond: one curved spine with leaflets stepped down either side. */
@@ -92,6 +92,12 @@ export function JungleCanopy({
     if (!canvas) return;
     const sky = SKIES[variant];
 
+    // The eye the scene is viewed from. It chases the pointer rather than
+    // snapping to it — reading the raw position every frame is what made a
+    // fast mouse tear the layers apart.
+    let eyeX = 0;
+    let eyeY = 0;
+
     return mountStage(canvas, (S) => (t) => {
       const { ctx, w, h } = S;
       const breath = breathAt(t);
@@ -111,8 +117,12 @@ export function JungleCanopy({
       ctx.fillStyle = shaft;
       ctx.fillRect(0, 0, w, h);
 
-      const mx = S.inside ? S.px / w - 0.5 : 0;
-      const my = S.inside ? S.py / h - 0.5 : 0;
+      const targetX = S.inside ? S.px / w - 0.5 : 0;
+      const targetY = S.inside ? S.py / h - 0.5 : 0;
+      eyeX += (targetX - eyeX) * 0.05;
+      eyeY += (targetY - eyeY) * 0.05;
+      const mx = eyeX;
+      const my = eyeY;
 
       LAYERS.forEach((L, li) => {
         const sway = Math.sin(t * 0.16 + li) * (3 + L.rate * 0.12) * (0.6 + breath * 0.8);

@@ -95,21 +95,6 @@ export default function Mastermind() {
         </div>
       </section>
 
-      <Section tone="ink" className="border-y border-border/40 py-10">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 max-w-xl sm:max-w-none mx-auto">
-          {["Puerto Rico", "Small Groups", "Concierge Service", "Quarterly Retreats"].map((label, i) => (
-            <div
-              key={i}
-              className="px-5 py-2 rounded-full border border-gold/30 bg-gold/5 text-xs font-sans font-normal uppercase tracking-wider text-muted-foreground text-center"
-              style={{ boxShadow: '0 0 14px hsl(39 48% 56% / 0.15)' }}
-              data-testid={`trust-marker-${i}`}
-            >
-              {label}
-            </div>
-          ))}
-        </div>
-      </Section>
-
       <Section id="what-we-do" tone="light">
         <div className="grid md:grid-cols-2 gap-12 md:gap-24 items-center">
           <div>
