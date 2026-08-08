@@ -139,12 +139,9 @@ export function GemStone({
         return { pts, depth, lambert, spec: Math.pow(lambert, 22) };
       }).sort((a, b) => a.depth - b.depth);
 
-      // Light leaving through the pavilion, pooled on the page.
-      const glow = ctx.createRadialGradient(cx, cy + R * 0.5, 0, cx, cy + R * 0.5, R * 2);
-      glow.addColorStop(0, `hsla(${stone.h},${stone.s}%,${stone.l}%,${0.16 + breath * 0.07})`);
-      glow.addColorStop(1, `hsla(${stone.h},${stone.s}%,${stone.l}%,0)`);
-      ctx.fillStyle = glow;
-      ctx.fillRect(0, 0, w, h);
+      // No pooled glow. Painting it with fillRect tinted the whole canvas,
+      // and at these sizes the gradient never reached zero before the edge —
+      // so every stone sat on a hard-cornered square. The stone is enough.
 
       for (const f of drawn) {
         ctx.beginPath();
