@@ -18,7 +18,7 @@ import type { Express, Request, Response } from "express";
 import { storage } from "../storage.js";
 import { isAuthenticated } from "./sessionAuth.js";
 import { db } from "../db.js";
-import { sql } from "drizzle-orm";
+import { sql, inArray } from "drizzle-orm";
 import { loginAttempts, THROTTLE } from "../../shared/models/security.js";
 import { track, trackError } from "../telemetry/index.js";
 import { z } from "zod";
@@ -56,12 +56,21 @@ interface ThrottleState {
   retryAfterSec: number;
 }
 
-/** Is either counter currently locked? Reads only — never counts a check. */
+/**
+ * Is either counter currently locked? Reads only — never counts a check.
+ *
+ * `inArray`, not a raw `= ANY(${keys})`. The raw form looks equivalent and is
+ * not: drizzle's `sql` template flattens a JavaScript array into one bind
+ * parameter per element, so Postgres saw `= ANY($1, $2)` and refused with
+ * *op ANY/ALL (array) requires array on right side*. That took every login
+ * to a 500 in production. `inArray` expands the placeholders itself and gets
+ * it right.
+ */
 async function throttleState(keys: string[]): Promise<ThrottleState> {
   const rows = await db
     .select()
     .from(loginAttempts)
-    .where(sql`${loginAttempts.identifier} = ANY(${keys})`);
+    .where(inArray(loginAttempts.identifier, keys));
 
   const now = Date.now();
   let worst = 0;
