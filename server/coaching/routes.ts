@@ -43,6 +43,7 @@ import { z } from "zod";
 import { isAuthenticated } from "../auth/index.js";
 import { storage } from "../storage.js";
 import { uploadFile, isStorageConfigured } from "../supabaseStorage.js";
+import { track, trackError } from "../telemetry/index.js";
 import {
   wellnessRoutines,
   routineHabits,
@@ -452,10 +453,26 @@ export function registerCoachingRoutes(app: Express): void {
       // Update streak
       await updateStreak(userId);
 
+      // The core engagement metric. Recorded server-side, at the point the row
+      // actually changed, because that is the only place that can't lie.
+      track(completed ? "habit.complete" : "habit.uncomplete", {
+        userId,
+        surface: "today",
+        subjectId: habitId,
+        onDate: habit.scheduledDate ?? undefined,
+        props: {
+          title: habit.title,
+          routineHabitId: habit.routineHabitId,
+          userRoutineId: habit.userRoutineId,
+          dayNumber: habit.dayNumber,
+          fromRoutine: habit.isFromRoutine,
+        },
+      });
+
       res.json(updated);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
-      console.error(err);
+      trackError("habit.toggle", err, { userId: req.session.userId });
       res.status(500).json({ message: "Internal Server Error" });
     }
   });
@@ -478,6 +495,14 @@ export function registerCoachingRoutes(app: Express): void {
         .parse(req.body ?? {});
 
       const result = await removeHabitSeries(req.session.userId!, input);
+
+      track("habit.remove", {
+        userId: req.session.userId!,
+        surface: "habits",
+        subjectId: input.routineHabitId ?? input.title ?? undefined,
+        props: { ...input, removed: result },
+      });
+
       res.json(result);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });

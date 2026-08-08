@@ -42,6 +42,7 @@ import { eq, and, or, inArray, asc, desc, ne, gte, sql, count, isNotNull } from 
 import { isAuthenticated } from "../auth/index.js";
 import { storage } from "../storage.js";
 import { z } from "zod";
+import { track } from "../telemetry/index.js";
 import {
   offerings,
   offeringRegistrations,
@@ -461,6 +462,13 @@ export function registerOfferingRoutes(app: Express) {
         takenSeats(offering.id),
       ]);
 
+      track("offering.view", {
+        userId,
+        surface: "offering_detail",
+        subjectId: offering.id,
+        props: { kind: offering.kind, status: offering.status },
+      });
+
       res.json({
         ...present(offering, confirmed),
         myStatus: registration?.status ?? null,
@@ -538,6 +546,28 @@ export function registerOfferingRoutes(app: Express) {
           note: offeringRegistrations.note,
         });
 
+      // Three different facts, not one — an application that gets declined and
+      // a place taken on the spot are not the same event, and rolling them up
+      // would make the funnel unreadable.
+      track(
+        status === "confirmed"
+          ? "offering.register"
+          : status === "waitlist"
+            ? "offering.waitlist"
+            : "offering.apply",
+        {
+          userId,
+          surface: "offering_detail",
+          subjectId: offeringId,
+          props: {
+            kind: offering.kind,
+            format: offering.format,
+            mode: offering.registrationMode,
+            priceCents: offering.priceCents,
+          },
+        },
+      );
+
       res.status(201).json(saved);
     } catch (err) {
       fail(res, err);
@@ -558,6 +588,13 @@ export function registerOfferingRoutes(app: Express) {
         .returning({ id: offeringRegistrations.id, status: offeringRegistrations.status });
 
       if (!updated) return res.status(404).json({ message: "You're not on this roster." });
+
+      track("offering.withdraw", {
+        userId: req.session!.userId!,
+        surface: "offering_detail",
+        subjectId: param(req, "id"),
+      });
+
       res.json(updated);
     } catch (err) {
       fail(res, err);
@@ -931,6 +968,13 @@ export function registerOfferingRoutes(app: Express) {
           set: { present: wasPresent, note: note ?? null, recordedAt: new Date() },
         })
         .returning();
+
+      track("session.attend", {
+        userId,
+        surface: "admin_attendance",
+        subjectId: sessionId,
+        props: { present: wasPresent },
+      });
 
       res.json(saved);
     } catch (err) {

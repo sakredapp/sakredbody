@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import { Search, Check, ExternalLink, Leaf } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { track, trackBuyClick } from "@/lib/track";
 
 const PHASE_LABEL: Record<string, string> = {
   prepare: "Prepare",
@@ -110,6 +111,17 @@ function ProductRow({ product, note, essential, checked, onToggle, onOpen }: Row
             href={primary.url}
             target="_blank"
             rel="noopener noreferrer"
+            /* Recorded in the click handler rather than after an await: the
+               anchor's own default opens the tab, which keeps the browser's
+               user-gesture semantics a deferred window.open would lose. */
+            onClick={() =>
+              trackBuyClick({
+                productId: product.id,
+                url: primary.url,
+                surface: "apothecary_row",
+                name: product.name,
+              })
+            }
             className="text-xs text-[hsl(var(--gold))] hover:underline inline-flex items-center gap-1"
             data-testid={`apothecary-link-${product.id}`}
           >
@@ -178,6 +190,14 @@ function ProductDialog({
                       href={l.url}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={() =>
+                        trackBuyClick({
+                          productId: product.id,
+                          url: l.url,
+                          surface: "apothecary_detail",
+                          name: product.name,
+                        })
+                      }
                       className="flex items-center justify-between py-2.5 px-3 rounded-md border border-border/60 hover:border-[hsl(var(--gold))]/50 transition-colors"
                     >
                       <span className="text-sm">{l.label}</span>
@@ -293,7 +313,14 @@ export function ApothecaryTab() {
                         essential={item.isEssential}
                         checked={isChecked(item.id)}
                         onToggle={() => flip(item.id)}
-                        onOpen={() => setOpen(item)}
+                        onOpen={() => {
+                          setOpen(item);
+                          track("product.view", {
+                            surface: "apothecary_protocol",
+                            subjectId: item.id,
+                            props: { name: item.name },
+                          });
+                        }}
                       />
                     ))}
                   </div>
@@ -357,7 +384,14 @@ export function ApothecaryTab() {
                     product={p}
                     checked={isChecked(p.id)}
                     onToggle={() => flip(p.id)}
-                    onOpen={() => setOpen(p)}
+                    onOpen={() => {
+                      setOpen(p);
+                      track("product.view", {
+                        surface: "apothecary_shelf",
+                        subjectId: p.id,
+                        props: { name: p.name },
+                      });
+                    }}
                   />
                 ))}
               </div>

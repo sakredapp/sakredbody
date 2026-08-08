@@ -17,6 +17,7 @@ import { registerEnergyRoutes } from "./energy/index.js";
 import { registerOfferingRoutes } from "./offerings/index.js";
 import { registerDailyRoutes } from "./daily/index.js";
 import { registerCommunityRoutes } from "./community/index.js";
+import { registerTelemetryRoutes } from "./telemetry/index.js";
 
 function isAdmin(req: Request, res: Response, next: NextFunction) {
   const userId = req.session?.userId;
@@ -455,6 +456,9 @@ export async function registerRoutes(
 
   // ── Community ────────────────────────────────────────────────────────
   registerCommunityRoutes(app);
+
+  // Telemetry last: it observes the app, so nothing else should depend on it.
+  registerTelemetryRoutes(app);
 
   return httpServer;
 }
