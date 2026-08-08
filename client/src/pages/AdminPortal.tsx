@@ -11,6 +11,7 @@ import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { ExecutiveApplications } from "@/components/admin/ExecutiveApplications";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -119,7 +120,7 @@ const COACHING_CATEGORIES = [
   "Nutrition", "Recovery", "Energy", "Stress", "Performance",
 ];
 
-type AdminTab = "partners" | "bookings" | "coaching" | "masterclass";
+type AdminTab = "partners" | "bookings" | "executive" | "coaching" | "masterclass";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // AUTH GATES
@@ -772,6 +773,11 @@ export default function AdminPortal() {
     enabled: isAdmin,
   });
 
+  const execAppsQuery = useQuery<{ status: string }[]>({
+    queryKey: ["/api/executive-applications"],
+    enabled: isAdmin,
+  });
+
   // Partner mutations
   const createPartnerMut = useMutation({
     mutationFn: async (data: PartnerFormData) => {
@@ -1072,6 +1078,7 @@ export default function AdminPortal() {
   const initials = [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join("") || "A";
   const partnerCount = partnersQuery.data?.length || 0;
   const bookingCount = bookingsQuery.data?.filter((b) => b.status === "requested").length || 0;
+  const execNewCount = execAppsQuery.data?.filter((a) => a.status === "new").length || 0;
 
   // Partners
   const openAddPartner = () => { setEditingPartner(null); setPartnerForm(emptyPartnerForm); setShowPartnerDialog(true); };
@@ -1203,6 +1210,7 @@ export default function AdminPortal() {
           {([
             { key: "partners" as AdminTab, label: "Partners", badge: partnerCount > 0 ? partnerCount : null },
             { key: "bookings" as AdminTab, label: "Bookings", badge: bookingCount > 0 ? bookingCount : null },
+            { key: "executive" as AdminTab, label: "Executive", badge: execNewCount > 0 ? execNewCount : null },
             { key: "coaching" as AdminTab, label: "Coaching", badge: null },
             { key: "masterclass" as AdminTab, label: "Masterclass", badge: null },
           ]).map((t) => (
@@ -1220,6 +1228,9 @@ export default function AdminPortal() {
       </div>
 
       <div className="container max-w-6xl mx-auto px-4 py-6">
+
+        {/* ═══════════════ EXECUTIVE TAB ═══════════════ */}
+        {tab === "executive" && <ExecutiveApplications enabled={isAdmin} />}
 
         {/* ═══════════════ PARTNERS TAB ═══════════════ */}
         {tab === "partners" && !selectedPartner && (
