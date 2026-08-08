@@ -12,6 +12,7 @@ import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { ExecutiveApplications } from "@/components/admin/ExecutiveApplications";
+import { ApothecaryAdmin } from "@/components/admin/Apothecary";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -120,7 +121,7 @@ const COACHING_CATEGORIES = [
   "Nutrition", "Recovery", "Energy", "Stress", "Performance",
 ];
 
-type AdminTab = "partners" | "bookings" | "executive" | "coaching" | "masterclass";
+type AdminTab = "partners" | "bookings" | "executive" | "coaching" | "masterclass" | "apothecary";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // AUTH GATES
@@ -1213,6 +1214,7 @@ export default function AdminPortal() {
             { key: "executive" as AdminTab, label: "Executive", badge: execNewCount > 0 ? execNewCount : null },
             { key: "coaching" as AdminTab, label: "Coaching", badge: null },
             { key: "masterclass" as AdminTab, label: "Masterclass", badge: null },
+            { key: "apothecary" as AdminTab, label: "Apothecary", badge: null },
           ]).map((t) => (
             <Button
               key={t.key}
@@ -1231,6 +1233,9 @@ export default function AdminPortal() {
 
         {/* ═══════════════ EXECUTIVE TAB ═══════════════ */}
         {tab === "executive" && <ExecutiveApplications enabled={isAdmin} />}
+
+        {/* ═══════════════ APOTHECARY TAB ═══════════════ */}
+        {tab === "apothecary" && <ApothecaryAdmin enabled={isAdmin} />}
 
         {/* ═══════════════ PARTNERS TAB ═══════════════ */}
         {tab === "partners" && !selectedPartner && (

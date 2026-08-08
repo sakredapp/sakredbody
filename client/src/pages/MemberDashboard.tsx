@@ -61,6 +61,7 @@ import {
   CoachChat,
 } from "./CoachingDashboard";
 import { MasterclassTab } from "@/components/MasterclassTab";
+import { ApothecaryTab } from "@/components/ApothecaryTab";
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
 // Icon mapping (UI-only, can't live in shared/)
@@ -162,7 +163,7 @@ export default function MemberDashboard() {
 
   // Default to coaching tab if coming from /coaching URL
   const defaultSection = location === "/coaching" ? "coaching" : "retreat";
-  const [section, setSection] = useState<"retreat" | "coaching" | "masterclass">(defaultSection);
+  const [section, setSection] = useState<"retreat" | "coaching" | "masterclass" | "apothecary">(defaultSection);
   const [retreatView, setRetreatView] = useState<"book" | "services" | "my-bookings">("book");
   const [coachingTab, setCoachingTab] = useState<"today" | "journey" | "routines" | "catalog" | "analytics" | "coach">("today");
   const [showBookingDialog, setShowBookingDialog] = useState(false);
@@ -298,38 +299,28 @@ export default function MemberDashboard() {
             <img src={sakredLogo} alt="Sakred Body" className="h-9 w-9 object-contain" />
           </Link>
 
-          {/* Main section toggle */}
-          <div className="flex items-center bg-muted/60 rounded-full p-1 gap-0.5">
-            <button
-              onClick={() => setSection("coaching")}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-300 ${
-                section === "coaching"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Coaching
-            </button>
-            <button
-              onClick={() => setSection("retreat")}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-300 ${
-                section === "retreat"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              My Retreat
-            </button>
-            <button
-              onClick={() => setSection("masterclass")}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-300 ${
-                section === "masterclass"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Masterclass
-            </button>
+          {/* Main section toggle — scrolls rather than wraps once there are
+              four of these, so the header height stays fixed on a phone. */}
+          <div className="flex items-center bg-muted/60 rounded-full p-1 gap-0.5 overflow-x-auto scrollbar-thin max-w-full">
+            {([
+              { id: "coaching" as const, label: "Coaching" },
+              { id: "apothecary" as const, label: "Apothecary" },
+              { id: "retreat" as const, label: "My Retreat" },
+              { id: "masterclass" as const, label: "Masterclass" },
+            ]).map(({ id, label }) => (
+              <button
+                key={id}
+                onClick={() => setSection(id)}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-300 ${
+                  section === id
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                data-testid={`member-section-${id}`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
@@ -424,6 +415,19 @@ export default function MemberDashboard() {
             {coachingTab === "catalog" && <CatalogSection />}
             {coachingTab === "analytics" && <AnalyticsTab />}
             {coachingTab === "coach" && <CoachChat />}
+          </motion.div>
+        )}
+
+        {section === "apothecary" && (
+          <motion.div
+            key="apothecary"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="container max-w-3xl mx-auto px-4 py-8"
+          >
+            <ApothecaryTab />
           </motion.div>
         )}
 

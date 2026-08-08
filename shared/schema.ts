@@ -6,6 +6,7 @@ export * from "./models/auth.js";
 export * from "./models/coaching.js";
 export * from "./models/masterclass.js";
 export * from "./models/executive.js";
+export * from "./models/shop.js";
 
 export const applications = pgTable("applications", {
   id: serial("id").primaryKey(),

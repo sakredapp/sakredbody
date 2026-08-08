@@ -197,6 +197,10 @@ export const rewards = pgTable(
   {
     id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
     userId: text("user_id").notNull(), // FK → users.id
+    // The habit that earned it. A partial unique index on (user_id, habit_id)
+    // where type = 'earn' is what makes a habit payable exactly once — the macro
+    // app guarded this in client memory, so an app restart re-paid every toggle.
+    habitId: uuid("habit_id"), // FK → habits.id, NULL for non-habit rewards
     amount: integer("amount").notNull(), // positive = earn, negative = spend
     reason: text("reason").notNull(), // e.g. "Completed habit: Morning Meditation"
     type: text("type").notNull(), // 'earn' | 'spend'
@@ -205,6 +209,7 @@ export const rewards = pgTable(
   (table) => [
     index("idx_rewards_user").on(table.userId),
     index("idx_rewards_user_date").on(table.userId, table.createdAt),
+    index("idx_rewards_habit").on(table.habitId),
   ]
 );
 

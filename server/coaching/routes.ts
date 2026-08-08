@@ -349,22 +349,34 @@ export function registerCoachingRoutes(app: Express): void {
         .where(eq(habits.id, habitId))
         .returning();
 
-      // Coin economy: award coins on completion only (Part 3: no reversal on uncheck)
+      // Coin economy: a habit pays exactly once, ever.
+      //
+      // `!habit.completed` alone is not enough — uncheck then recheck makes it
+      // false again and pays a second time. The ledger's partial unique index
+      // on (user_id, habit_id) WHERE type = 'earn' is the real guard, and the
+      // balance only moves when a ledger row was genuinely inserted.
       if (completed && !habit.completed) {
-        await db.insert(rewards).values({
-          userId,
-          amount: COINS_PER_HABIT_COMPLETION,
-          reason: `Completed habit: ${habit.title}`,
-          type: "earn",
-        });
-
-        await db
-          .update(users)
-          .set({
-            sakredCoins: sql`COALESCE(${users.sakredCoins}, 0) + ${COINS_PER_HABIT_COMPLETION}`,
-            updatedAt: new Date(),
+        const awarded = await db
+          .insert(rewards)
+          .values({
+            userId,
+            habitId,
+            amount: COINS_PER_HABIT_COMPLETION,
+            reason: `Completed habit: ${habit.title}`,
+            type: "earn",
           })
-          .where(eq(users.id, userId));
+          .onConflictDoNothing()
+          .returning({ id: rewards.id });
+
+        if (awarded.length > 0) {
+          await db
+            .update(users)
+            .set({
+              sakredCoins: sql`COALESCE(${users.sakredCoins}, 0) + ${COINS_PER_HABIT_COMPLETION}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(users.id, userId));
+        }
       }
       // No coin reversal when unchecking — coins are permanent once earned
 

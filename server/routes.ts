@@ -11,6 +11,7 @@ import { insertPartnerSchema, insertPartnerServiceSchema, users } from "../share
 import { submitExecutiveApplicationSchema, scoreApplication, EXEC_QUESTIONS } from "../shared/models/executive.js";
 import { registerCoachingRoutes } from "./coaching/index.js";
 import { registerMasterclassRoutes } from "./masterclass/index.js";
+import { registerShopRoutes } from "./shop/index.js";
 
 function isAdmin(req: Request, res: Response, next: NextFunction) {
   const userId = req.session?.userId;
@@ -431,6 +432,9 @@ export async function registerRoutes(
 
   // ── Masterclass Video Library ────────────────────────────────────────
   registerMasterclassRoutes(app);
+
+  // ── The Apothecary ───────────────────────────────────────────────────
+  registerShopRoutes(app);
 
   return httpServer;
 }
