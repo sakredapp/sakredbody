@@ -51,7 +51,7 @@ export function PageHero({ eyebrow, title, intro, note, children, testId, image,
           </motion.p>
           <motion.h1
             variants={fadeInUp}
-            className="text-4xl md:text-6xl font-display font-normal mb-6 tracking-tight leading-[1.1]"
+            className="text-5xl md:text-7xl font-display font-normal mb-7 tracking-[-0.03em] leading-[1.02]"
             data-testid={testId}
           >
             {title}
@@ -98,7 +98,7 @@ export function SectionHeader({ eyebrow, title, intro, onInk, className, testId 
           {eyebrow}
         </p>
       )}
-      <h2 className="text-3xl md:text-4xl font-display font-normal mb-5" data-testid={testId}>
+      <h2 className="text-4xl md:text-5xl font-display font-normal mb-6 tracking-tight leading-[1.08]" data-testid={testId}>
         {title}
       </h2>
       {intro && (

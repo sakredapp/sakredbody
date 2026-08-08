@@ -5,7 +5,8 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { YinYang } from "@/components/YinYang";
-import { RippleField } from "@/components/RippleField";
+import { CelestialField } from "@/components/CelestialField";
+import { ImageBand } from "@/components/ImageBand";
 import { LessonSlideshow, type Lesson } from "@/components/LessonSlideshow";
 import { SectionHeader } from "@/components/PageHero";
 import { Button } from "@/components/ui/button";
@@ -145,7 +146,7 @@ export default function Home() {
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-b from-[hsl(30_10%_8%/0.7)] via-transparent to-[hsl(30_10%_9%)]" />
-          <RippleField className="absolute inset-0 w-full h-full" />
+          <CelestialField className="absolute inset-0 w-full h-full" />
         </div>
 
         <div className="container max-w-6xl mx-auto px-4 relative z-20">
@@ -168,7 +169,7 @@ export default function Home() {
 
             <motion.h1
               variants={fadeInUp}
-              className="text-4xl md:text-6xl font-display font-normal leading-[1.1] mb-7 tracking-tight text-white"
+              className="text-5xl md:text-7xl lg:text-[5.5rem] font-display font-normal leading-[1.02] mb-8 tracking-[-0.03em] text-white"
               data-testid="text-hero-headline"
             >
               Restore the Body.
@@ -211,7 +212,8 @@ export default function Home() {
       </section>
 
       {/* ── The Four Territories ─────────────────────────── */}
-      <Section id="territories" tone="ink">
+      <Section id="territories" tone="ink" className="overflow-hidden">
+        <CelestialField className="absolute inset-0 w-full h-full z-0 opacity-80" />
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
@@ -248,7 +250,7 @@ export default function Home() {
 
           <motion.p
             variants={fadeInUp}
-            className="text-center font-display text-xl md:text-2xl mt-14 max-w-2xl mx-auto leading-relaxed"
+            className="text-center font-display text-3xl md:text-5xl mt-20 max-w-3xl mx-auto leading-[1.15] tracking-tight"
             data-testid="text-duality-thesis"
           >
             Yin without Yang is decay. Yang without Yin is burnout.
@@ -280,7 +282,7 @@ export default function Home() {
           </motion.p>
           <motion.h2
             variants={fadeInUp}
-            className="text-3xl md:text-5xl font-display font-normal mb-8 leading-tight"
+            className="text-4xl md:text-6xl font-display font-normal mb-10 leading-[1.05] tracking-tight"
             data-testid="text-monk-headline"
           >
             This isn't monk mode.
@@ -315,7 +317,7 @@ export default function Home() {
             <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
               The Core Lessons
             </p>
-            <h2 className="text-3xl md:text-4xl font-display font-normal mb-5" data-testid="text-lessons-headline">
+            <h2 className="text-4xl md:text-5xl font-display font-normal mb-6 tracking-tight leading-[1.08]" data-testid="text-lessons-headline">
               Live With Your Environment, <span className="text-gold">Not Against It</span>
             </h2>
             <p className="text-muted-foreground leading-relaxed">
@@ -337,7 +339,7 @@ export default function Home() {
             <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
               Eastern Traditional Medicine
             </p>
-            <h2 className="text-3xl md:text-4xl font-display font-normal mb-5" data-testid="text-elements-headline">
+            <h2 className="text-4xl md:text-5xl font-display font-normal mb-6 tracking-tight leading-[1.08]" data-testid="text-elements-headline">
               The Body, <span className="text-gold">The Way Tradition Reads It</span>
             </h2>
             <p className="text-muted-foreground leading-relaxed">
@@ -387,7 +389,7 @@ export default function Home() {
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-12">
             <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">The App</p>
-            <h2 className="text-3xl md:text-4xl font-display font-normal mb-5" data-testid="text-app-headline">
+            <h2 className="text-4xl md:text-5xl font-display font-normal mb-6 tracking-tight leading-[1.08]" data-testid="text-app-headline">
               The Practice, <span className="text-gold">In Your Pocket</span>
             </h2>
             <p className="text-muted-foreground leading-relaxed">
@@ -429,7 +431,7 @@ export default function Home() {
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-10">
             <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">Food</p>
-            <h2 className="text-3xl md:text-4xl font-display font-normal mb-5" data-testid="text-food-headline">
+            <h2 className="text-4xl md:text-5xl font-display font-normal mb-6 tracking-tight leading-[1.08]" data-testid="text-food-headline">
               Eat Like It <span className="text-gold">Matters</span>
             </h2>
             <p className="text-muted-foreground leading-relaxed mb-4">
@@ -481,6 +483,14 @@ export default function Home() {
           </motion.div>
         </motion.div>
       </Section>
+
+      <ImageBand
+        image="/images/cliffs-sea.jpg"
+        alt="Cliffs falling into a calm blue sea"
+        title={<>Somewhere the noise <span className="text-gold">cannot reach you.</span></>}
+        tall
+        testId="text-coast-headline"
+      />
 
       {/* ── Mastermind teaser ────────────────────────────────── */}
       <Section tone="ink" className="overflow-hidden">

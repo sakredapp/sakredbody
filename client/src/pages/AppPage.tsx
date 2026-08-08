@@ -213,7 +213,7 @@ export default function AppPage() {
             <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
               The Protocols
             </p>
-            <h2 className="text-3xl md:text-4xl font-display font-normal mb-5" data-testid="text-protocols-headline">
+            <h2 className="text-4xl md:text-5xl font-display font-normal mb-6 tracking-tight leading-[1.08]" data-testid="text-protocols-headline">
               Clear First. <span className="text-gold">Then Rebuild.</span>
             </h2>
             <p className="text-muted-foreground leading-relaxed">

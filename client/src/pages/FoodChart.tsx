@@ -76,7 +76,7 @@ export default function FoodChart() {
         <div className="container max-w-6xl mx-auto px-4 text-center">
           <motion.div initial="hidden" animate="visible" variants={fadeInUp}>
             <h1
-              className="text-4xl md:text-6xl font-display font-normal mb-6 tracking-tight leading-[1.1]"
+              className="text-5xl md:text-7xl font-display font-normal mb-7 tracking-[-0.03em] leading-[1.02]"
               data-testid="text-foodchart-headline"
             >
               The Anti-Inflammatory <span className="text-gold">Food Chart</span>
