@@ -31,6 +31,7 @@ ALTER TABLE IF EXISTS rewards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS user_assigned_habits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS booking_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS applications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS executive_applications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS retreats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS properties ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS partners ENABLE ROW LEVEL SECURITY;
@@ -254,6 +255,17 @@ CREATE POLICY sakred_applications_insert ON applications
 
 CREATE POLICY sakred_applications_select ON applications
   FOR SELECT USING (public.is_sakred_admin());
+
+-- executive_applications: same shape — anyone may apply, only admins may read.
+-- Applicants never read back their own row, so there is no self-select policy.
+CREATE POLICY sakred_exec_applications_insert ON executive_applications
+  FOR INSERT WITH CHECK (true);
+
+CREATE POLICY sakred_exec_applications_select ON executive_applications
+  FOR SELECT USING (public.is_sakred_admin());
+
+CREATE POLICY sakred_exec_applications_update ON executive_applications
+  FOR UPDATE USING (public.is_sakred_admin());
 
 -- coaching_messages: users can read/write their own messages
 CREATE POLICY sakred_coaching_msgs_select ON coaching_messages

@@ -33,7 +33,14 @@ export const SITE_NAV: NavEntry[] = [
   },
   { label: "The App", href: "/app" },
   { label: "Food Chart", href: "/food-chart" },
-  { label: "Mastermind", href: "/mastermind" },
+  {
+    label: "Work With Us",
+    children: [
+      { label: "Sakred Executive", href: "/executive", note: "Private coaching · application only" },
+      { label: "Mastermind", href: "/mastermind", note: "Membership + retreats" },
+      { label: "Retreats", href: "/retreats", note: "Puerto Rico, six formats" },
+    ],
+  },
 ];
 
 /** Legal pages are shared across the brands and live on the Sakred Health domain. */

@@ -8,6 +8,7 @@ import { z } from "zod";
 import { isAuthenticated } from "./auth/index.js";
 import "./auth/sessionAuth.js"; // session type augmentation
 import { insertPartnerSchema, insertPartnerServiceSchema, users } from "../shared/schema.js";
+import { submitExecutiveApplicationSchema, scoreApplication, EXEC_QUESTIONS } from "../shared/models/executive.js";
 import { registerCoachingRoutes } from "./coaching/index.js";
 import { registerMasterclassRoutes } from "./masterclass/index.js";
 
@@ -43,6 +44,77 @@ export async function registerRoutes(
           field: err.errors[0].path.join('.'),
         });
       }
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // ── Sakred Executive applications ────────────────────────────────────
+  // Scoring happens here, never on the client.
+  app.post("/api/executive-applications", async (req, res) => {
+    try {
+      const { answers } = submitExecutiveApplicationSchema.parse(req.body);
+
+      const missing = EXEC_QUESTIONS.filter((q) => {
+        if (!q.required) return false;
+        const v = answers[q.id];
+        if (Array.isArray(v)) return v.length === 0;
+        return v === undefined || v === null || String(v).trim() === "";
+      }).map((q) => q.id);
+
+      if (missing.length) {
+        return res.status(400).json({ message: "Some required answers are missing", field: missing[0] });
+      }
+
+      const str = (k: string) => (typeof answers[k] === "string" ? (answers[k] as string).trim() : "");
+      const email = str("email");
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+        return res.status(400).json({ message: "Please enter a valid email address", field: "email" });
+      }
+
+      const { score, route } = scoreApplication(answers);
+
+      const created = await storage.createExecutiveApplication({
+        firstName: str("firstName"),
+        lastName: str("lastName"),
+        email,
+        phone: str("phone"),
+        location: str("location"),
+        occupation: str("occupation"),
+        role: str("role"),
+        answers,
+        fitScore: score,
+        route,
+      });
+
+      // The applicant is told what happens next, not their score.
+      res.status(201).json({ id: created.id, route });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join(".") });
+      }
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.get("/api/executive-applications", isAdmin, async (_req, res) => {
+    try {
+      res.json(await storage.getExecutiveApplications());
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.patch("/api/executive-applications/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(String(req.params.id));
+      const { status, notes } = req.body ?? {};
+      const updated = await storage.updateExecutiveApplication(id, { status, notes });
+      if (!updated) return res.status(404).json({ message: "Application not found" });
+      res.json(updated);
+    } catch (err) {
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });
     }

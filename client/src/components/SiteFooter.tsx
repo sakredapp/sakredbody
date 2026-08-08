@@ -27,6 +27,7 @@ const PHILOSOPHY_LINKS = [
 const EXPLORE_LINKS = [
   { label: "The App", href: "/app" },
   { label: "Food Chart", href: "/food-chart" },
+  { label: "Sakred Executive", href: "/executive" },
   { label: "Mastermind", href: "/mastermind" },
   { label: "Member Portal", href: "/member" },
   { label: "Sign In", href: "/login" },

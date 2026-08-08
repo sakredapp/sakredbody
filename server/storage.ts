@@ -1,5 +1,5 @@
 import { db } from "./db.js";
-import { eq, and, ne } from "drizzle-orm";
+import { eq, and, ne, desc } from "drizzle-orm";
 import {
   applications,
   retreats,
@@ -21,10 +21,19 @@ import {
   type InsertPartnerService,
   type PartnerService,
   type User,
+  executiveApplications,
+  type ExecutiveApplication,
 } from "../shared/schema.js";
 
 export interface IStorage {
   createApplication(application: InsertApplication): Promise<Application>;
+  createExecutiveApplication(data: {
+    firstName: string; lastName: string; email: string; phone: string;
+    location?: string; occupation?: string; role?: string;
+    answers: unknown; fitScore: number; route: string;
+  }): Promise<ExecutiveApplication>;
+  getExecutiveApplications(): Promise<ExecutiveApplication[]>;
+  updateExecutiveApplication(id: number, data: { status?: string; notes?: string }): Promise<ExecutiveApplication | undefined>;
   getRetreats(): Promise<Retreat[]>;
   getRetreat(id: number): Promise<Retreat | undefined>;
   createRetreat(retreat: InsertRetreat): Promise<Retreat>;
@@ -62,6 +71,24 @@ export class DatabaseStorage implements IStorage {
       .values(insertApplication)
       .returning();
     return application;
+  }
+
+  async createExecutiveApplication(data: {
+    firstName: string; lastName: string; email: string; phone: string;
+    location?: string; occupation?: string; role?: string;
+    answers: unknown; fitScore: number; route: string;
+  }): Promise<ExecutiveApplication> {
+    const [created] = await db.insert(executiveApplications).values(data as any).returning();
+    return created;
+  }
+
+  async getExecutiveApplications(): Promise<ExecutiveApplication[]> {
+    return db.select().from(executiveApplications).orderBy(desc(executiveApplications.createdAt));
+  }
+
+  async updateExecutiveApplication(id: number, data: { status?: string; notes?: string }): Promise<ExecutiveApplication | undefined> {
+    const [updated] = await db.update(executiveApplications).set(data).where(eq(executiveApplications.id, id)).returning();
+    return updated;
   }
 
   async getRetreats(): Promise<Retreat[]> {

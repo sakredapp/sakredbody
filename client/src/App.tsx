@@ -12,6 +12,7 @@ import Embody from "@/pages/Embody";
 import Terrain from "@/pages/Terrain";
 import BodyLiteracy from "@/pages/BodyLiteracy";
 import Retreats from "@/pages/Retreats";
+import Executive from "@/pages/Executive";
 import AppPage from "@/pages/AppPage";
 import FoodChart from "@/pages/FoodChart";
 import Mastermind from "@/pages/Mastermind";
@@ -32,6 +33,7 @@ function Router() {
       <Route path="/the-terrain" component={Terrain} />
       <Route path="/body-literacy" component={BodyLiteracy} />
       <Route path="/retreats" component={Retreats} />
+      <Route path="/executive" component={Executive} />
       <Route path="/app" component={AppPage} />
       <Route path="/food-chart" component={FoodChart} />
       <Route path="/mastermind" component={Mastermind} />
