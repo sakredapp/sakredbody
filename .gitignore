@@ -8,3 +8,5 @@ vite.config.ts.*
 .env.local
 .env.production
 .vercel
+# drizzle-kit scratch output (schema is managed via db:push / supabase/*.sql)
+migrations/
