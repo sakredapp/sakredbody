@@ -64,6 +64,7 @@ import { MasterclassTab } from "@/components/MasterclassTab";
 import { ApothecaryTab } from "@/components/ApothecaryTab";
 import { LibraryTab } from "@/components/LibraryTab";
 import { BodyMap } from "@/components/BodyMap";
+import { MastermindsTab } from "@/components/MastermindsTab";
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
 // Icon mapping (UI-only, can't live in shared/)
@@ -166,7 +167,7 @@ export default function MemberDashboard() {
   // Default to coaching tab if coming from /coaching URL
   const defaultSection = location === "/coaching" ? "coaching" : "retreat";
   const [section, setSection] = useState<"retreat" | "coaching" | "masterclass" | "apothecary" | "library" | "body">(defaultSection);
-  const [retreatView, setRetreatView] = useState<"book" | "services" | "my-bookings">("book");
+  const [retreatView, setRetreatView] = useState<"book" | "services" | "my-bookings" | "masterminds">("book");
   const [coachingTab, setCoachingTab] = useState<"today" | "journey" | "routines" | "catalog" | "analytics" | "coach">("today");
   const [showBookingDialog, setShowBookingDialog] = useState(false);
 
@@ -385,6 +386,16 @@ export default function MemberDashboard() {
                 Design Your Retreat
               </button>
               <button
+                onClick={() => setRetreatView("masterminds")}
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-md whitespace-nowrap transition-colors ${
+                  retreatView === "masterminds"
+                    ? "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))] font-medium"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                }`}
+              >
+                Masterminds
+              </button>
+              <button
                 onClick={() => setRetreatView("my-bookings")}
                 className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-md whitespace-nowrap transition-colors ${
                   retreatView === "my-bookings"
@@ -483,6 +494,8 @@ export default function MemberDashboard() {
             transition={{ duration: 0.2 }}
             className="container max-w-6xl mx-auto px-4 py-8"
           >
+
+        {retreatView === "masterminds" && <MastermindsTab />}
 
         {retreatView === "book" && (
           <div className="space-y-8 max-w-3xl">

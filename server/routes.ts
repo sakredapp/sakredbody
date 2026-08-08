@@ -14,6 +14,7 @@ import { registerMasterclassRoutes } from "./masterclass/index.js";
 import { registerShopRoutes } from "./shop/index.js";
 import { registerLibraryRoutes } from "./library/index.js";
 import { registerEnergyRoutes } from "./energy/index.js";
+import { registerCohortRoutes } from "./cohorts/index.js";
 
 function isAdmin(req: Request, res: Response, next: NextFunction) {
   const userId = req.session?.userId;
@@ -443,6 +444,9 @@ export async function registerRoutes(
 
   // ── The Body Map ─────────────────────────────────────────────────────
   registerEnergyRoutes(app);
+
+  // ── Masterminds ──────────────────────────────────────────────────────
+  registerCohortRoutes(app);
 
   return httpServer;
 }
