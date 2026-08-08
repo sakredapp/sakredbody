@@ -228,7 +228,6 @@ export default function LoginPage() {
 
         <div className="pb-6 text-center">
           <p className="text-white/25 text-[10px] tracking-[0.25em] uppercase">
-            Puerto Rico
           </p>
         </div>
       </div>

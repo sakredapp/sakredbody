@@ -93,7 +93,7 @@ const FORMATS = [
 export default function Retreats() {
   usePageMeta(
     "Retreats + Mastermind — Gather | Sakred Body",
-    "The terrain isn't only biological. Restoration, performance, and mastermind retreats in Puerto Rico — small groups, custom dates, concierge-run.",
+    "The terrain isn't only biological. Restoration, performance and mastermind retreats — small groups, custom dates, concierge-run.",
   );
 
   return (
@@ -107,7 +107,7 @@ export default function Retreats() {
         testId="text-retreats-headline"
         image="/images/estate-vineyard.webp"
         imageAlt="A stone estate set among vineyards and low green hills"
-        marks={["Puerto Rico", "Three days to two weeks", "Private or shared", "Application required"]}
+        marks={["Six formats", "Three days to two weeks", "Private or shared", "Application required"]}
       />
 
       {/* ── Told apart from the other two ──────────────────── */}
@@ -202,7 +202,7 @@ export default function Retreats() {
             <SectionHeader
               eyebrow="The Formats"
               title={<>Six Ways In, <span className="text-gold">One Infrastructure</span></>}
-              intro="Puerto Rico. Concierge-managed. Application only."
+              intro="Concierge-managed. Application only."
               testId="text-formats-headline"
             />
           </motion.div>

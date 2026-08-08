@@ -499,9 +499,9 @@ export default function Home() {
               The Mastermind <span className="text-gold">+ Retreats</span>
             </motion.h2>
             <motion.p variants={fadeInUp} className="text-muted-foreground leading-relaxed mb-4">
-              Some of this only lands in person. Our concierge mastermind and retreat experience in Puerto Rico
-              takes the same principles and puts them somewhere with no distractions — small groups, custom
-              dates, morning movement on the beach, breathwork, clean food, and real conversation.
+              Some of this only lands in person. The mastermind and the retreats take the same principles
+              and put them somewhere with no distractions — small groups, custom dates, morning movement,
+              breathwork, clean food, and real conversation.
             </motion.p>
             <motion.p variants={fadeInUp} className="text-muted-foreground leading-relaxed mb-9">
               Application required. Design your own retreat: private or shared, three days to two weeks.

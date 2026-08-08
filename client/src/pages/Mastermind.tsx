@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { ArrowRight, Check } from "lucide-react";
 import { ApplicationModal } from "@/components/ApplicationModal";
@@ -29,8 +30,8 @@ const staggerContainer = {
 
 export default function Mastermind() {
   usePageMeta(
-    "Mastermind + Retreats in Puerto Rico | Sakred Body",
-    "A concierge mastermind and retreat experience in Puerto Rico. Private or shared, three days to two weeks, with essential housing included.",
+    "The Mastermind — The Room and the People In It | Sakred Body",
+    "The membership: cohorts on a real schedule, the portal that runs your practice between them, and retreats at member rates.",
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -57,7 +58,7 @@ export default function Mastermind() {
           <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-background z-10" />
           <img 
             src="/images/hero-ocean.webp"
-            alt="Puerto Rico coastline"
+            alt="A coastline at first light"
             className="w-full h-full object-cover"
           />
         </div>
@@ -71,17 +72,17 @@ export default function Mastermind() {
           >
             <motion.div variants={fadeInUp}>
               <Badge variant="outline" className="mb-6 border-gold-subtle text-gold-light tracking-widest uppercase bg-gold-subtle px-4 py-1 font-normal" data-testid="badge-tagline">
-                Concierge Retreats + Mastermind
+                The Membership
               </Badge>
             </motion.div>
             
             <motion.h1 variants={fadeInUp} className="text-5xl md:text-7xl font-display font-normal leading-[1.1] mb-6 tracking-tight text-white">
-              Grow as a Person.<br />
-              <span className="gold-gradient-text">Become a Better Leader.</span>
+              A Room Worth<br />
+              <span className="gold-gradient-text">Being In.</span>
             </motion.h1>
             
             <motion.p variants={fadeInUp} className="text-base md:text-lg text-white/60 mb-8 max-w-2xl leading-relaxed font-sans font-normal">
-              A concierge-style mastermind and retreat experience in Puerto Rico for entrepreneurs who want real personal growth — not another business workshop dressed up as self-improvement.
+              The room, and the people in it. Cohorts that meet on a real schedule, the portal that runs your practice between them, and retreats at member rates when the work needs a place to go.
             </motion.p>
             
             <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4">
@@ -153,81 +154,24 @@ export default function Mastermind() {
         </div>
       </Section>
 
-      <Section id="housing" tone="light">
-        <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">Housing Options</p>
-        <h2 className="text-3xl md:text-4xl font-display font-normal mb-4" data-testid="text-housing-headline">Pick Your Space. We Handle the Rest.</h2>
-        <p className="text-muted-foreground mb-10 max-w-2xl leading-relaxed">Essential housing is included with every retreat. Upgrade to a five-star resort or a fully staffed private home if you want the top-tier experience.</p>
-
-        <div className="grid md:grid-cols-3 gap-x-12 gap-y-14">
-          {[
-            {
-              tier: "Essential",
-              price: "Included",
-              priceNote: "with membership",
-              desc: "Boutique hotel-style room with shared common spaces. Clean, comfortable, and everything you need to focus on the experience.",
-              img: "/images/housing-essential.webp",
-              features: ["Private hotel-style room", "Shared common areas", "Wi-Fi, A/C, daily housekeeping"]
-            },
-            {
-              tier: "Premium",
-              price: "$450",
-              priceNote: "/night",
-              desc: "Your own suite at a five-star resort. Full resort amenities, pool, spa access, and room service — all coordinated by our concierge team.",
-              img: "/images/housing-premium.webp",
-              features: ["Private suite at 5-star resort", "Pool, spa + fitness center", "Restaurant access + room service"]
-            },
-            {
-              tier: "Elite",
-              price: "$1,500",
-              priceNote: "/night",
-              desc: "A fully private 4-5 bedroom luxury home with your own chef, daily catering, housekeeping, and a personal trainer on call.",
-              img: "/images/housing-elite.webp",
-              features: ["Private luxury home (4-5 bedrooms)", "Private chef + daily catering", "Housekeeping + personal trainer"]
-            }
-          ].map((item, i) => (
-            <Card key={i} className="overflow-visible hover-elevate" data-testid={`card-housing-${i}`}>
-              <img src={item.img} alt={item.tier} className="w-full h-48 object-cover rounded-t-md" />
-              <CardContent className="p-5 space-y-2">
-                <div className="flex items-baseline justify-between gap-2 flex-wrap">
-                  <h3 className="text-base font-sans font-medium text-gold tracking-wide">{item.tier}</h3>
-                  <span className="text-sm font-display font-normal text-foreground">{item.price} <span className="text-xs text-muted-foreground font-sans">{item.priceNote}</span></span>
-                </div>
-                <p className="text-sm text-muted-foreground">{item.desc}</p>
-                <ul className="space-y-1.5 pt-1">
-                  {item.features.map((f, j) => (
-                    <li key={j} className="flex gap-2 text-sm text-muted-foreground">
-                      <Check className="h-4 w-4 text-gold flex-shrink-0 mt-0.5" /> {f}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </Section>
-
-      <Section tone="ink">
-        <div className="grid md:grid-cols-2 gap-12 items-center">
-          <div>
-            <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">The Retreats</p>
-            <h2 className="text-3xl md:text-4xl font-display font-normal mb-6" data-testid="text-retreat-headline">Puerto Rico. Your Dates. <span className="text-gold">Your Way.</span></h2>
-            <div className="space-y-4 text-muted-foreground leading-relaxed">
-              <p>Choose a private 1-on-1 retreat or go shared and overlap dates with other members for a small group experience. Pick 3 days to 2 weeks — whatever fits your life. Morning movement on the beach. Breathwork sessions. Real conversations over clean food. Ocean time. Nature.</p>
-              <p>This isn't a vacation and it isn't a bootcamp. It's a structured reset — designed to pull you out of your routine long enough to see what needs to change and give you the tools to change it.</p>
-            </div>
-            <div className="flex flex-wrap gap-2 mt-6">
-              {["Breathwork", "Ocean + Nature", "Movement", "Clean Food", "Mastermind Sessions", "Recovery Protocols"].map((tag, i) => (
-                <Badge key={i} variant="outline" className="border-gold-subtle text-gold text-xs font-normal">{tag}</Badge>
-              ))}
-            </div>
-          </div>
-          <div>
-            <img 
-              src="/images/tropical-beach.webp" 
-              alt="Puerto Rico beach"
-              className="rounded-md shadow-gold-subtle border border-gold-subtle"
-            />
-          </div>
+      {/* ── Retreats live on their own page now ─────────────── */}
+      <Section tone="ink" className="py-12 md:py-16">
+        <div className="max-w-2xl mx-auto text-center">
+          <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
+            Where It Goes In Person
+          </p>
+          <h2 className="text-3xl md:text-4xl font-display font-normal mb-5">
+            Members Travel at <span className="text-gold">Member Rates</span>
+          </h2>
+          <p className="text-muted-foreground leading-relaxed mb-8">
+            Six formats, three days to two weeks, private or shared, with housing and the whole itinerary
+            handled. Membership is what gets you the rate and the first look at dates.
+          </p>
+          <Link href="/retreats">
+            <Button variant="outline" className="border-gold-subtle text-gold gold-outline-lift px-8" data-testid="button-see-retreats">
+              See the Retreats <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </Link>
         </div>
       </Section>
 
@@ -263,7 +207,7 @@ export default function Mastermind() {
                 <p className="text-xs text-gold mt-2 font-sans font-normal">Retreat included + priority booking</p>
               </div>
               <ul className="space-y-3 mb-8 flex-1">
-                {["Everything in Quarterly", "One Puerto Rico retreat included", "Essential housing included", "Priority upgrade to Premium + Elite", "Direct concierge access + priority scheduling"].map((item, i) => (
+                {["Everything in Quarterly", "One retreat included", "Essential housing included", "Priority upgrade to Premium + Elite", "Direct concierge access + priority scheduling"].map((item, i) => (
                   <li key={i} className="flex gap-2 text-sm text-muted-foreground"><Check className="h-4 w-4 text-gold flex-shrink-0 mt-0.5" /> {item}</li>
                 ))}
               </ul>
