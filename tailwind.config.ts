@@ -81,6 +81,16 @@ export default {
           busy: "rgb(239 68 68)",
           offline: "rgb(156 163 175)",
         },
+        // Gold as a real colour, so `bg-gold/25` and `border-gold/30` resolve.
+        // They were used in twenty-odd places against the hand-written
+        // `.bg-gold` utility, where the opacity modifier silently did nothing.
+        // `.text-gold` stays hand-written in index.css — it tracks
+        // `--gold-text`, which flips between the ink and light tones.
+        gold: {
+          DEFAULT: "hsl(var(--gold) / <alpha-value>)",
+          light: "hsl(var(--gold-light) / <alpha-value>)",
+          dark: "hsl(var(--gold-dark) / <alpha-value>)",
+        },
       },
       fontFamily: {
         sans: ["var(--font-sans)"],

@@ -338,6 +338,65 @@
     background-size: 200% 200%;
     color: hsl(var(--background));
     border: 1px solid hsl(var(--gold-light) / 0.4);
+    /* The plate lifts off the page and the leaf catches the light. */
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    background-position: 0% 50%;
+    box-shadow: 0 1px 0 hsl(var(--gold-light) / 0.5) inset, 0 6px 18px -8px hsl(var(--gold) / 0.55);
+    transition:
+      background-position 0.7s ease,
+      box-shadow 0.35s ease,
+      transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .gold-metallic-btn:hover {
+    background-position: 100% 50%;
+    box-shadow: 0 1px 0 hsl(var(--gold-light) / 0.7) inset, 0 12px 26px -10px hsl(var(--gold) / 0.75);
+    transform: translateY(-1px);
+  }
+  .gold-metallic-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 0 hsl(var(--gold-light) / 0.4) inset, 0 4px 12px -8px hsl(var(--gold) / 0.5);
+  }
+  /* A single specular band, swept across on hover. */
+  .gold-metallic-btn::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(
+      105deg,
+      transparent 35%,
+      hsl(0 0% 100% / 0.42) 50%,
+      transparent 65%
+    );
+    transform: translateX(-120%);
+    transition: transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .gold-metallic-btn:hover::after {
+    transform: translateX(120%);
+  }
+
+  /* Outline buttons get the same lift, in gilt rather than in metal. */
+  .gold-outline-lift {
+    transition:
+      border-color 0.3s ease,
+      box-shadow 0.35s ease,
+      transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .gold-outline-lift:hover {
+    border-color: hsl(var(--gold) / 0.75);
+    box-shadow: 0 10px 24px -14px hsl(var(--gold) / 0.9);
+    transform: translateY(-1px);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .gold-metallic-btn,
+    .gold-metallic-btn::after,
+    .gold-outline-lift {
+      transition: none;
+      transform: none;
+    }
   }
 
   input[type="search"]::-webkit-search-cancel-button {

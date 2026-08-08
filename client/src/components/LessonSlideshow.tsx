@@ -106,9 +106,11 @@ export function LessonSlideshow({ lessons, intervalMs = 7000, className }: Lesso
             onClick={() => goTo(i, i > index ? 1 : -1)}
             aria-label={`Go to lesson ${i + 1}: ${l.title}`}
             aria-current={i === index}
+            // Uniform width: an expanding pill drags the whole centred row
+            // off-axis, which reads as a mistake rather than as progress.
             className={cn(
-              "h-1.5 rounded-full transition-all duration-500",
-              i === index ? "w-10 bg-gold" : "w-1.5 bg-gold/25 hover:bg-gold/50",
+              "h-1 w-7 rounded-full transition-all duration-500",
+              i === index ? "bg-gold" : "bg-gold/20 hover:bg-gold/45",
             )}
             data-testid={`button-lesson-dot-${i}`}
           />

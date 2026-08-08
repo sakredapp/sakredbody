@@ -64,6 +64,10 @@ async function buildBedrock(model: string): Promise<ModelClient | null> {
       "@aws-sdk/client-bedrock-runtime"
     );
 
+    // Credentials come from the ambient AWS chain, in this order: env vars,
+    // then a named profile, then the instance/task role. Preferring the chain
+    // means a developer can use `aws configure --profile sakred` and never
+    // put a secret in a file at all.
     const client = new BedrockRuntimeClient({
       region: process.env.AWS_REGION?.trim() || DEFAULT_REGION,
     });
