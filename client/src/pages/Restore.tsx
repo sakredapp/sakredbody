@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { PageHero, SectionHeader } from "@/components/PageHero";
+import { FlowField } from "@/components/FlowField";
 import { Button } from "@/components/ui/button";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
@@ -65,6 +66,8 @@ export default function Restore() {
         title={<>Restore.</>}
         intro="Healing is not endlessly adding things. It begins by removing what's in the way."
         testId="text-restore-headline"
+        ambient={<FlowField className="absolute inset-0 w-full h-full opacity-70" />}
+        marks={["Drainage before detox", "Four protocols", "14 to 28 days", "The lymph has no pump"]}
       />
 
       {/* ── The burden ───────────────────────────────────────── */}

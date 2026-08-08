@@ -6,6 +6,12 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { YinYang } from "@/components/YinYang";
 import { CelestialField } from "@/components/CelestialField";
+import { JungleCanopy } from "@/components/JungleCanopy";
+import { Constellation } from "@/components/Constellation";
+import { AuroraOrb } from "@/components/AuroraOrb";
+import { ElementOrbit } from "@/components/ElementOrbit";
+import { Tilt3D } from "@/components/Tilt3D";
+import { Magnetic } from "@/components/Magnetic";
 import { ParticleSphere } from "@/components/ParticleSphere";
 import { DiagonalStack } from "@/components/DiagonalStack";
 import { ImageBand } from "@/components/ImageBand";
@@ -96,15 +102,6 @@ const ELEMENTS = [
   },
 ];
 
-const APP_FEATURES = [
-  { title: "Guided protocols", body: "Five multi-day programs — liver, gut, lymph, sleep, digestion — with daily steps, not vague advice." },
-  { title: "Habit tracking", body: "A full habit encyclopedia with streaks, so the practice compounds instead of resetting every Monday." },
-  { title: "The food chart", body: "197 everyday foods rated from strongly anti-inflammatory to highly inflammatory. Awareness, not restriction." },
-  { title: "Wearable sync", body: "Connects to Garmin, Oura, WHOOP, and Fitbit so your sleep and recovery data lands in one place." },
-  { title: "eBook library", body: "A reading library with audio, covering the traditions and the research behind the protocols." },
-  { title: "A real coach", body: "Message a coach directly from inside the app. Ask the question you'd otherwise search badly." },
-];
-
 const PORTAL_LAYERS = [
   {
     title: "The Apothecary",
@@ -154,7 +151,7 @@ export default function Home() {
       {/* ── Hero ─────────────────────────────────────────────── */}
       <section className="tone-ink relative min-h-[92vh] flex items-center pt-20 overflow-hidden bg-background">
         <div className="absolute inset-0 z-0">
-          <img src="/images/retreat-jungle.jpg" alt="" className="w-full h-full object-cover opacity-55" />
+          <img src="/images/retreat-jungle.webp" alt="" className="w-full h-full object-cover opacity-55" />
           {/* Symmetric vignette so centered copy stays legible while the
               foliage still reads as texture at the edges. */}
           <div
@@ -165,7 +162,8 @@ export default function Home() {
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-b from-[hsl(30_10%_8%/0.7)] via-transparent to-[hsl(30_10%_9%)]" />
-          <CelestialField className="absolute inset-0 w-full h-full" />
+          <JungleCanopy className="absolute inset-0 w-full h-full opacity-70" />
+          <CelestialField className="absolute inset-0 w-full h-full opacity-70" />
         </div>
 
         <div className="container max-w-6xl mx-auto px-4 relative z-20">
@@ -211,10 +209,10 @@ export default function Home() {
               <Button
                 size="lg"
                 className="text-base px-8 gold-metallic-btn w-full sm:w-auto"
-                onClick={() => document.getElementById("app")?.scrollIntoView({ behavior: "smooth" })}
+                onClick={() => document.getElementById("portal")?.scrollIntoView({ behavior: "smooth" })}
                 data-testid="button-get-app"
               >
-                Get the App <ArrowRight className="ml-2 h-5 w-5" />
+                Enter the Portal <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
               <Button
                 variant="outline"
@@ -232,7 +230,7 @@ export default function Home() {
 
       {/* ── The Four Territories ─────────────────────────── */}
       <Section id="territories" tone="ink" className="overflow-hidden">
-        <CelestialField className="absolute inset-0 w-full h-full z-0 opacity-80" />
+        <Constellation className="absolute inset-0 w-full h-full z-0 opacity-90" />
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
@@ -247,6 +245,7 @@ export default function Home() {
             {TERRITORIES.map((t, i) => (
               <motion.div variants={fadeInUp} key={t.key}>
                 <Link href={t.href}>
+                  <Tilt3D className="h-full rounded-xl" max={6} lift={12}>
                   <div
                     className="h-full pt-8 border-t border-border text-center flex flex-col hover-elevate transition-colors"
                     data-testid={`card-territory-${t.key}`}
@@ -261,6 +260,7 @@ export default function Home() {
                       Explore <ArrowRight className="h-3.5 w-3.5" />
                     </span>
                   </div>
+                  </Tilt3D>
                 </Link>
               </motion.div>
             ))}
@@ -318,25 +318,9 @@ export default function Home() {
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-x-12 gap-y-14">
-            {ELEMENTS.map((el, i) => (
-              <motion.div variants={fadeInUp} key={el.element}>
-                <div
-                  className="h-full pt-8 border-t border-border text-center flex flex-col"
-                  data-testid={`card-element-${i}`}
-                >
-                  <span
-                    className="h-10 w-10 rounded-full mx-auto mb-4 border border-white/10"
-                    style={{ backgroundColor: `hsl(${el.color})` }}
-                  />
-                  <h3 className="font-display text-2xl leading-none mb-2">{el.element}</h3>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-4">{el.season}</p>
-                  <p className="text-sm text-gold/80 mb-3">{el.organs}</p>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{el.reads}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          <motion.div variants={fadeInUp}>
+            <ElementOrbit elements={ELEMENTS} />
+          </motion.div>
 
           <motion.p
             variants={fadeInUp}
@@ -345,48 +329,6 @@ export default function Home() {
             We present the five-element framework as philosophy and structure — a way of organizing practice.
             It is not a diagnostic system, and nothing here replaces care from a qualified provider.
           </motion.p>
-        </motion.div>
-      </Section>
-
-      {/* ── The App ──────────────────────────────────────────── */}
-      <Section id="app" tone="light">
-        <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
-          <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-12">
-            <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">The App</p>
-            <h2 className="text-4xl md:text-5xl font-display font-normal mb-6 tracking-tight leading-[1.08]" data-testid="text-app-headline">
-              The Practice, <span className="text-gold">In Your Pocket</span>
-            </h2>
-            <p className="text-muted-foreground leading-relaxed">
-              Five guided protocols, habit tracking, the full food chart, and a coach you can message.
-              Free on iOS and Android.
-            </p>
-          </motion.div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-            {APP_FEATURES.map((f, i) => (
-              <motion.div variants={fadeInUp} key={f.title}>
-                <Card className="h-full hover-elevate border-gold-subtle" data-testid={`card-app-feature-${i}`}>
-                  <CardContent className="p-6 text-center">
-                    <h3 className="font-display text-lg mb-2.5 text-gold">{f.title}</h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{f.body}</p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-
-          <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="sm:w-auto">
-              <Button size="lg" className="gold-metallic-btn w-full sm:w-auto px-8" data-testid="button-app-store">
-                <Download className="mr-2 h-5 w-5" /> Download on iOS
-              </Button>
-            </a>
-            <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer" className="sm:w-auto">
-              <Button size="lg" variant="outline" className="w-full sm:w-auto px-8 border-gold-subtle text-gold" data-testid="button-play-store">
-                <Smartphone className="mr-2 h-5 w-5" /> Get it on Android
-              </Button>
-            </a>
-          </motion.div>
         </motion.div>
       </Section>
 
@@ -406,10 +348,12 @@ export default function Home() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-14">
             {PORTAL_LAYERS.map((layer, i) => (
               <motion.div variants={fadeInUp} key={layer.title}>
-                <div className="h-full pt-8 border-t border-border text-center" data-testid={`card-portal-layer-${i}`}>
-                  <h3 className="font-display text-xl mb-3 text-gold">{layer.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{layer.body}</p>
-                </div>
+                <Tilt3D className="h-full rounded-xl" max={6} lift={12}>
+                  <div className="h-full pt-8 border-t border-border text-center" data-testid={`card-portal-layer-${i}`}>
+                    <h3 className="font-display text-xl mb-3 text-gold">{layer.title}</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{layer.body}</p>
+                  </div>
+                </Tilt3D>
               </motion.div>
             ))}
           </div>
@@ -425,7 +369,7 @@ export default function Home() {
       </Section>
 
       <ImageBand
-        image="/images/cliffs-sea.jpg"
+        image="/images/cliffs-sea.webp"
         alt="Cliffs falling into a calm blue sea"
         title={<>Somewhere the noise <span className="text-gold">cannot reach you.</span></>}
         tall
@@ -494,7 +438,7 @@ export default function Home() {
       {/* ── Mastermind teaser ────────────────────────────────── */}
       <Section tone="ink" className="overflow-hidden">
         <div className="absolute inset-0 z-0">
-          <img src="/images/gathering-string-lights.jpg" alt="" className="w-full h-full object-cover opacity-30" />
+          <img src="/images/gathering-string-lights.webp" alt="" loading="lazy" decoding="async" className="w-full h-full object-cover opacity-30" />
           <div
             className="absolute inset-0"
             style={{
@@ -534,11 +478,13 @@ export default function Home() {
               Application required. Design your own retreat: private or shared, three days to two weeks.
             </motion.p>
             <motion.div variants={fadeInUp}>
-              <Link href="/mastermind">
-                <Button size="lg" className="gold-metallic-btn px-8" data-testid="button-explore-mastermind">
-                  Explore the Mastermind <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-              </Link>
+              <Magnetic>
+                <Link href="/mastermind">
+                  <Button size="lg" className="gold-metallic-btn px-8" data-testid="button-explore-mastermind">
+                    Explore the Mastermind <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
+              </Magnetic>
             </motion.div>
           </div>
 
@@ -547,9 +493,9 @@ export default function Home() {
               testId="stack-mastermind"
               className="mx-auto max-w-md lg:max-w-none"
               images={[
-                { src: "/images/terrace-ocean.jpg", alt: "A terrace opening onto the ocean at dusk" },
-                { src: "/images/long-dining-table.jpg", alt: "A long table laid for a shared dinner" },
-                { src: "/images/tropical-villa.jpg", alt: "A villa set back in tropical planting" },
+                { src: "/images/terrace-ocean.webp", alt: "A terrace opening onto the ocean at dusk" },
+                { src: "/images/long-dining-table.webp", alt: "A long table laid for a shared dinner" },
+                { src: "/images/tropical-villa.webp", alt: "A villa set back in tropical planting" },
               ]}
             />
           </motion.div>
@@ -557,13 +503,14 @@ export default function Home() {
       </Section>
 
       {/* ── Final CTA ────────────────────────────────────────── */}
-      <Section tone="light" className="text-center py-12 md:py-16">
+      <Section tone="light" className="text-center py-12 md:py-16 overflow-hidden">
+        <AuroraOrb className="absolute inset-0 w-full h-full z-0 opacity-40" />
         <motion.div
           initial="hidden"
           whileInView="visible"
           viewport={viewportOnce}
           variants={staggerContainer}
-          className="max-w-2xl mx-auto"
+          className="max-w-2xl mx-auto relative z-10"
         >
           <motion.div variants={fadeInUp} className="flex justify-center mb-8">
             <YinYang className="h-12 w-12 text-gold" />
@@ -582,24 +529,27 @@ export default function Home() {
             body show you what changes. Everything else follows from that.
           </motion.p>
           <motion.div variants={fadeInUp}>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer">
-                <Button size="lg" className="text-base px-8 gold-metallic-btn w-full sm:w-auto" data-testid="button-final-cta">
-                  <Download className="mr-2 h-5 w-5" /> Download on iOS
-                </Button>
-              </a>
-              <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="text-base px-8 border-gold-subtle text-gold w-full sm:w-auto"
-                  data-testid="button-final-cta-android"
-                >
-                  <Smartphone className="mr-2 h-5 w-5" /> Get it on Android
-                </Button>
-              </a>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <Magnetic>
+                <Link href="/member">
+                  <Button size="lg" className="text-base px-8 gold-metallic-btn" data-testid="button-final-cta">
+                    Enter the Portal <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
+              </Magnetic>
+              <Magnetic>
+                <Link href="/mastermind">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="text-base px-8 border-gold-subtle text-gold gold-outline-lift"
+                    data-testid="button-final-cta-mastermind"
+                  >
+                    Apply to the Mastermind
+                  </Button>
+                </Link>
+              </Magnetic>
             </div>
-            <p className="text-xs text-muted-foreground mt-5">Free on iOS and Android.</p>
           </motion.div>
         </motion.div>
       </Section>

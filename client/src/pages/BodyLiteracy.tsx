@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { PageHero, SectionHeader } from "@/components/PageHero";
+import { ResonantRing } from "@/components/ResonantRing";
 import { Button } from "@/components/ui/button";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
@@ -72,6 +73,8 @@ export default function BodyLiteracy() {
         title={<>Body Literacy.</>}
         intro="Learn to read the organism you live inside."
         testId="text-literacy-headline"
+        ambient={<ResonantRing className="absolute inset-0 w-full h-full opacity-50" rings={5} />}
+        marks={["Signals, not symptoms", "Read it daily", "Awareness beats restriction"]}
       />
 
       {/* ── Why ──────────────────────────────────────────────── */}

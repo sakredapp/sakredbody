@@ -28,7 +28,7 @@ export function ImageBand({ image, alt, eyebrow, title, children, tall, testId }
       className={`tone-ink bg-background relative overflow-hidden ${tall ? "py-32 md:py-44" : "py-24 md:py-32"}`}
     >
       <div className="absolute inset-0 z-0">
-        <img src={image} alt={alt} className="w-full h-full object-cover" />
+        <img src={image} alt={alt} loading="lazy" decoding="async" className="w-full h-full object-cover" />
         <div
           className="absolute inset-0"
           style={{

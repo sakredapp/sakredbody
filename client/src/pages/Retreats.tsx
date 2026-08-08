@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { PageHero, SectionHeader } from "@/components/PageHero";
+import { JungleCanopy } from "@/components/JungleCanopy";
 import { ImageBand } from "@/components/ImageBand";
 import { DiagonalStack } from "@/components/DiagonalStack";
 import { Button } from "@/components/ui/button";
@@ -93,8 +94,10 @@ export default function Retreats() {
         title={<>Gather.</>}
         intro="The terrain isn't only biological. Who you're around is an input like any other."
         testId="text-retreats-headline"
-        image="/images/estate-vineyard.jpg"
+        image="/images/estate-vineyard.webp"
         imageAlt="A stone estate set among vineyards and low green hills"
+        ambient={<JungleCanopy variant="dawn" className="absolute inset-0 w-full h-full opacity-45" />}
+        marks={["Puerto Rico", "Three days to two weeks", "Private or shared", "Application required"]}
       />
 
       {/* ── The argument ─────────────────────────────────────── */}
@@ -146,9 +149,9 @@ export default function Retreats() {
               testId="stack-places"
               className="mx-auto max-w-md lg:max-w-none"
               images={[
-                { src: "/images/stone-villa.jpg", alt: "A stone villa above the water" },
-                { src: "/images/wooden-pavilion.jpg", alt: "An open wooden pavilion looking out over green" },
-                { src: "/images/zen-sand-garden.jpg", alt: "A raked sand garden in morning light" },
+                { src: "/images/stone-villa.webp", alt: "A stone villa above the water" },
+                { src: "/images/wooden-pavilion.webp", alt: "An open wooden pavilion looking out over green" },
+                { src: "/images/zen-sand-garden.webp", alt: "A raked sand garden in morning light" },
               ]}
             />
           </motion.div>
@@ -226,7 +229,7 @@ export default function Retreats() {
       </Section>
 
       <ImageBand
-        image="/images/table-by-ocean.jpg"
+        image="/images/table-by-ocean.webp"
         alt="A long candlelit table set for dinner beside the ocean"
         eyebrow="The Table"
         title={<>The conversation at dinner <span className="text-gold">is part of the programme.</span></>}

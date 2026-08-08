@@ -66,7 +66,7 @@ export default function LoginPage() {
       {/* Background */}
       <div
         className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: "url('/images/member-login-bg.jpg')" }}
+        style={{ backgroundImage: "url('/images/member-login-bg.webp')" }}
       />
       <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/55 to-black/75" />
 

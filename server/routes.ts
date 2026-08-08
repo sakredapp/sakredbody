@@ -16,6 +16,7 @@ import { registerLibraryRoutes } from "./library/index.js";
 import { registerEnergyRoutes } from "./energy/index.js";
 import { registerCohortRoutes } from "./cohorts/index.js";
 import { registerDailyRoutes } from "./daily/index.js";
+import { registerCommunityRoutes } from "./community/index.js";
 
 function isAdmin(req: Request, res: Response, next: NextFunction) {
   const userId = req.session?.userId;
@@ -451,6 +452,9 @@ export async function registerRoutes(
 
   // ── The daily ritual ─────────────────────────────────────────────────
   registerDailyRoutes(app);
+
+  // ── Community ────────────────────────────────────────────────────────
+  registerCommunityRoutes(app);
 
   return httpServer;
 }

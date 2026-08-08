@@ -76,7 +76,7 @@ export default function Executive() {
         intro="For founders and executives whose responsibilities outgrew the body carrying them."
         note="Application only. Small number of clients at a time."
         testId="text-executive-headline"
-        image="/images/elegant-interior.jpg"
+        image="/images/elegant-interior.webp"
         imageAlt="A quiet, elegant interior opening onto daylight"
       >
         <Button size="lg" className="gold-metallic-btn px-8" onClick={scrollToApply} data-testid="button-apply-hero">

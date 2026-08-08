@@ -53,7 +53,7 @@ export function PageHero({
     <section className="tone-ink bg-background relative overflow-hidden min-h-[80vh] flex flex-col justify-center pt-32 pb-14">
       {image && (
         <div className="absolute inset-0 z-0">
-          <img src={image} alt={imageAlt ?? ""} className="w-full h-full object-cover" />
+          <img src={image} alt={imageAlt ?? ""} fetchPriority="high" decoding="async" className="w-full h-full object-cover" />
           <div
             className="absolute inset-0"
             style={{

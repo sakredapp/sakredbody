@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { PageHero, SectionHeader } from "@/components/PageHero";
+import { EmberField } from "@/components/EmberField";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { usePageMeta } from "@/hooks/use-page-meta";
@@ -60,6 +61,8 @@ export default function Build() {
         title={<>Build.</>}
         intro="A body that can carry weight, produce force, and recover fast enough to do it again."
         testId="text-build-headline"
+        ambient={<EmberField className="absolute inset-0 w-full h-full opacity-80" />}
+        marks={["Muscle is the organ of longevity", "Load, recover, repeat", "No supplement replaces it"]}
       />
 
       {/* ── The argument ─────────────────────────────────────── */}

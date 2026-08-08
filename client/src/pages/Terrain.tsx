@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { PageHero, SectionHeader } from "@/components/PageHero";
+import { ParticleSphere } from "@/components/ParticleSphere";
 import { TerrainWheel } from "@/components/TerrainWheel";
 import { Button } from "@/components/ui/button";
 import { usePageMeta } from "@/hooks/use-page-meta";
@@ -62,6 +63,8 @@ export default function Terrain() {
         title={<>The Terrain.</>}
         intro="Your body is not a collection of parts. It is an environment."
         testId="text-terrain-headline"
+        ambient={<ParticleSphere className="absolute inset-0 w-full h-full opacity-60" />}
+        marks={["Nine stages", "A closed loop", "Elimination feeds digestion"]}
       />
 
       {/* ── The chain ────────────────────────────────────────── */}

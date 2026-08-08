@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { PageHero, SectionHeader } from "@/components/PageHero";
+import { Constellation } from "@/components/Constellation";
 import { ImageBand } from "@/components/ImageBand";
 import { YinYang } from "@/components/YinYang";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,8 @@ export default function Philosophy() {
         title={<>The Philosophy.</>}
         intro="Not a body that avoids illness. One capable of inhabiting its own life."
         testId="text-philosophy-headline"
+        ambient={<Constellation className="absolute inset-0 w-full h-full opacity-80" />}
+        marks={["Four territories", "One sequence", "East and the barbell"]}
       />
 
       {/* ── The definition ───────────────────────────────────── */}
@@ -120,7 +123,7 @@ export default function Philosophy() {
       </Section>
 
       <ImageBand
-        image="/images/zen-sand-garden.jpg"
+        image="/images/zen-sand-garden.webp"
         alt="A single stone at the centre of a raked circular sand garden"
         eyebrow="Older Than the Research"
         title={<>None of this is new. <span className="text-gold">We just stopped doing it.</span></>}

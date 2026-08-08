@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { PageHero, SectionHeader } from "@/components/PageHero";
+import { BreathPacer } from "@/components/BreathPacer";
 import { Button } from "@/components/ui/button";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
@@ -57,6 +58,8 @@ export default function Embody() {
         title={<>Embody.</>}
         intro="The body you inhabit becomes the life you are capable of living."
         testId="text-embody-headline"
+        ambient={<BreathPacer className="absolute inset-0 w-full h-full opacity-40" />}
+        marks={["Four counts in, six out", "Daily, not occasionally", "The practice compounds"]}
       />
 
       {/* ── The argument ─────────────────────────────────────── */}
