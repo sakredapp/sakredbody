@@ -26,6 +26,7 @@
 
 import type { ComponentType } from "react";
 import {
+  Home as HomeIcon,
   Sun,
   Users,
   Award,
@@ -46,6 +47,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export type MemberSection =
+  | "home"
   | "coaching"
   | "community"
   | "wins"
@@ -67,17 +69,23 @@ interface Destination {
  * The four, and the rest.
  *
  * Chosen by what a member does daily rather than by what the business thinks
- * is important: Today is the product, the room is why they stay, wins are why
- * they come back, and what's on is what they pay for.
+ * is important: home is the five doors, today is the product, the room is why
+ * they stay, and wins are why they come back.
+ *
+ * Five is the ceiling, not a target — iOS collapses a sixth into "More" on
+ * its own, and Android's guidance is the same. "What's On" moved into the
+ * More sheet when Home took a slot: it is reachable from the Retreats door on
+ * the home screen, which is where somebody looking for it would go first.
  */
 export const PRIMARY: Destination[] = [
+  { id: "home", label: "Home", icon: HomeIcon },
   { id: "coaching", label: "Today", icon: Sun },
   { id: "community", label: "Room", icon: Users },
   { id: "wins", label: "Wins", icon: Award },
-  { id: "retreat", label: "What's On", icon: CalendarDays },
 ];
 
 export const SECONDARY: Destination[] = [
+  { id: "retreat", label: "What's On", icon: CalendarDays, note: "Retreats, masterminds and talks" },
   { id: "body", label: "The Body", icon: Activity, note: "Nine centres, read in sequence" },
   { id: "apothecary", label: "Apothecary", icon: Leaf, note: "What each protocol asks for" },
   { id: "library", label: "Library", icon: BookOpen, note: "Guides paired to your protocol" },

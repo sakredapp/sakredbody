@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
@@ -78,6 +78,7 @@ import {
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 import { useInkSurface } from "@/hooks/use-ink-surface";
 import { PortalBackdrop } from "@/components/portal/PortalBackdrop";
+import { PillarHome } from "@/components/PillarHome";
 
 // Icon mapping (UI-only, can't live in shared/)
 const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -182,11 +183,15 @@ export default function MemberDashboard() {
   // The server schedules by calendar date and runs in UTC; it needs to know
   // when this member's day actually starts.
   useTimezoneSync(isAuthenticated);
-  const [location] = useLocation();
 
-  // Today is the product, so it is where the portal opens. The old default
-  // was the retreat booking form, which is a thing a member does once.
-  const defaultSection: MemberSection = location === "/app" ? "coaching" : "coaching";
+  // Home, not Today.
+  //
+  // Today is still the product, and it was the right default while it was the
+  // only finished screen. It is the wrong one now: Today opens onto an empty
+  // checklist until a protocol exists, which reads as an app that failed to
+  // load. Home is five doors, and a launcher is meant to be sparse — the same
+  // absence of content reads as a product waiting rather than a broken one.
+  const defaultSection: MemberSection = "home";
   const [section, setSection] = useState<MemberSection>(defaultSection);
   // "What's On" first, not the booking form. The catalogue is the thing a
   // member browses repeatedly; designing a bespoke retreat is something they
@@ -377,6 +382,19 @@ export default function MemberDashboard() {
 
       {/* ─── Content Area ─── */}
       <AnimatePresence mode="wait">
+        {section === "home" && (
+          <motion.div
+            key="home"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="container max-w-3xl mx-auto px-4 py-6"
+          >
+            <PillarHome firstName={user?.firstName} onOpen={setSection} />
+          </motion.div>
+        )}
+
         {section === "coaching" && (
           <motion.div
             key="coaching"
