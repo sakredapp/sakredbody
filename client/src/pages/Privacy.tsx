@@ -31,10 +31,8 @@ const SECTIONS: LegalSection[] = [
     body: (
       <>
         <p>
-          <strong>Sakred Body</strong> is a registered trade name — a DBA — of{" "}
-          <strong>Sakred Health</strong>, the legal entity behind it ("we", "us"). Naming both matters
-          here: the company that holds your data and answers for it is Sakred Health, and the product
-          you signed up to is Sakred Body.
+          <strong>Sakred Body</strong> ("we", "us") is a health education, coaching and retreat
+          service. Sakred Body is a registered trade name of the company that operates it.
         </p>
         <p>
           This policy covers the Sakred Body website, the member portal at app.sakredbody.com, and the

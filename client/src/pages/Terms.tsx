@@ -19,8 +19,8 @@ const SECTIONS: LegalSection[] = [
     body: (
       <>
         <p>
-          <strong>Sakred Body</strong> is a registered trade name — a DBA — of{" "}
-          <strong>Sakred Health</strong> ("we", "us"), which is the contracting party under these terms.
+          <strong>Sakred Body</strong> ("we", "us") is a registered trade name of the company that
+          operates the service, and that company is the contracting party under these terms.
         </p>
         <p>
           They govern your use of the Sakred Body website, the member portal, the mobile applications,
