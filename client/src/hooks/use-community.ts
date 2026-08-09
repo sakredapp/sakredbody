@@ -37,6 +37,16 @@ export interface Message {
   rootId: string | null;
   depth: number;
   body: string;
+
+  /** A voice memo, when there is one. `audioMime` is the real recorded
+
+   *  type — iOS records mp4, Android webm, and iOS cannot play webm. */
+
+  audioUrl?: string | null;
+
+  audioMime?: string | null;
+
+  audioDurationSeconds?: number | null;
   replyCount: number;
   deletedAt: string | null;
   editedAt: string | null;
@@ -130,8 +140,14 @@ function invalidateConversation(channelId: string, rootId?: string | null) {
 
 export function usePostMessage() {
   return useMutation({
-    mutationFn: (input: { channelId: string; parentId?: string | null; body: string }) =>
-      send<Message>("POST", "/api/community/messages", input),
+    mutationFn: (input: {
+      channelId: string;
+      parentId?: string | null;
+      body: string;
+      audioUrl?: string | null;
+      audioMime?: string | null;
+      audioDurationSeconds?: number | null;
+    }) => send<Message>("POST", "/api/community/messages", input),
     onSuccess: (created) => invalidateConversation(created.channelId, created.rootId),
   });
 }

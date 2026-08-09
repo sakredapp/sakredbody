@@ -49,6 +49,7 @@ import {
 } from "../../shared/schema.js";
 import { headlineOptions, segmentHeadline } from "../../shared/utils/highlight.js";
 import { blockedBy } from "../moderation/index.js";
+import { uploadFile } from "../supabaseStorage.js";
 
 function isAdmin(req: Request, res: Response, next: NextFunction) {
   const userId = req.session?.userId;
@@ -339,6 +340,64 @@ export function registerCommunityRoutes(app: Express) {
     }
   });
 
+  /**
+   * Upload a voice memo and get back a URL to attach to a message.
+   *
+   * Separate from posting on purpose. Recording, uploading and sending are
+   * three things that fail differently — a member who records ninety seconds
+   * and then loses signal should not lose the recording because the message
+   * insert failed with it.
+   *
+   * The body arrives as base64 rather than multipart because this app has no
+   * multipart parser and adding one for a single endpoint is more moving parts
+   * than the 33% size overhead costs. A ten-minute memo at 32kbps is about
+   * 2.4MB encoded, comfortably inside the JSON limit.
+   */
+  app.post("/api/community/audio", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      const input = z
+        .object({
+          data: z.string().min(1).max(14_000_000),
+          mime: z.string().min(1).max(80),
+          durationSeconds: z.number().int().min(1).max(600),
+        })
+        .parse(req.body ?? {});
+
+      // Whitelist rather than trust: this string decides the bucket's
+      // content-type and what a browser will later try to decode.
+      const allowed = [
+        "audio/mp4", "audio/m4a", "audio/aac", "audio/mpeg",
+        "audio/webm", "audio/ogg", "audio/wav",
+      ];
+      const base = input.mime.split(";")[0].trim().toLowerCase();
+      if (!allowed.includes(base)) {
+        return res.status(400).json({ message: `Can't accept ${base} recordings.` });
+      }
+
+      const buffer = Buffer.from(input.data, "base64");
+      if (buffer.length === 0) {
+        return res.status(400).json({ message: "That recording came through empty." });
+      }
+      if (buffer.length > 10 * 1024 * 1024) {
+        return res.status(413).json({ message: "That recording is too long to upload." });
+      }
+
+      const ext = base === "audio/mp4" || base === "audio/m4a" ? "m4a"
+        : base === "audio/webm" ? "webm"
+        : base === "audio/ogg" ? "ogg"
+        : base === "audio/wav" ? "wav"
+        : "aac";
+
+      const url = await uploadFile(userId, buffer, `memo.${ext}`, base);
+      if (!url) return res.status(500).json({ message: "Couldn't store that recording." });
+
+      res.status(201).json({ url, mime: base, durationSeconds: input.durationSeconds });
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
   app.post("/api/community/messages", isAuthenticated, async (req, res) => {
     try {
       const userId = req.session!.userId!;
@@ -399,6 +458,9 @@ export function registerCommunityRoutes(app: Express) {
           rootId,
           depth,
           body: input.body.trim(),
+          audioUrl: input.audioUrl ?? null,
+          audioMime: input.audioMime ?? null,
+          audioDurationSeconds: input.audioDurationSeconds ?? null,
         })
         .returning();
 

@@ -38,6 +38,17 @@ export async function ensureStorageBucket(): Promise<void> {
       "application/msword",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "text/plain",
+      // Voice memos. Both spellings of each container are listed because
+      // browsers disagree: iOS Safari labels its recording audio/mp4, Chrome
+      // audio/webm, and some Android builds report audio/aac or audio/mpeg.
+      // A mime the bucket rejects is an upload that 400s with no clue why.
+      "audio/mp4",
+      "audio/m4a",
+      "audio/aac",
+      "audio/mpeg",
+      "audio/webm",
+      "audio/ogg",
+      "audio/wav",
     ],
   });
   // "already exists" is fine

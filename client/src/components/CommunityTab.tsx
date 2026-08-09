@@ -51,6 +51,7 @@ import { cn } from "@/lib/utils";
 import type { Channel } from "@shared/schema";
 import { SectionHeading } from "@/components/portal/Panel";
 import { ReportDialog } from "@/components/ReportDialog";
+import { VoiceRecorderControl, VoiceMemoPlayer } from "@/components/VoiceMemo";
 
 /** Kept short deliberately. A long picker turns a reaction into a decision. */
 const REACTIONS = ["🔥", "🙏", "💛", "👀", "🌙"];
@@ -65,14 +66,17 @@ function Composer({
   pending,
   onSubmit,
   onCancel,
+  allowVoice = false,
 }: {
   placeholder: string;
   submitLabel: string;
   initial?: string;
   autoFocus?: boolean;
   pending: boolean;
-  onSubmit: (body: string) => void;
+  onSubmit: (body: string, audio?: { url: string; mime: string; durationSeconds: number }) => void;
   onCancel?: () => void;
+  /** Off for edits — you can add words to a memo, not re-record it. */
+  allowVoice?: boolean;
 }) {
   const [body, setBody] = useState(initial);
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -137,6 +141,19 @@ function Composer({
           Enter to send · Shift+Enter for a new line
         </span>
       </div>
+
+      {/* A memo sends on its own — it does not wait for the text box, because
+          the whole point is not having to type. Any words already written go
+          with it. */}
+      {allowVoice && (
+        <VoiceRecorderControl
+          disabled={pending}
+          onSend={(audio) => {
+            onSubmit(body.trim(), audio);
+            setBody("");
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -255,6 +272,15 @@ function MessageBody({
             {message.editedAt && !gone && " · edited"}
           </span>
         </div>
+
+        {/* Above the words, because a memo with a caption is a memo first. */}
+        {!gone && message.audioUrl && (
+          <VoiceMemoPlayer
+            url={message.audioUrl}
+            mime={message.audioMime}
+            durationSeconds={message.audioDurationSeconds}
+          />
+        )}
 
         {gone ? (
           <p className="text-sm italic text-muted-foreground/50">This message was deleted.</p>
@@ -416,9 +442,17 @@ function ThreadNode({
               submitLabel="Reply"
               autoFocus
               pending={post.isPending}
-              onSubmit={(body) => {
+              allowVoice
+              onSubmit={(body, audio) => {
                 post.mutate(
-                  { channelId, parentId: m.id, body },
+                  {
+                    channelId,
+                    parentId: m.id,
+                    body,
+                    audioUrl: audio?.url ?? null,
+                    audioMime: audio?.mime ?? null,
+                    audioDurationSeconds: audio?.durationSeconds ?? null,
+                  },
                   { onError: (e) => toast({ title: e.message, variant: "destructive" }) },
                 );
                 setReplying(false);
@@ -540,9 +574,16 @@ function RoomView({
           placeholder={`Say something in ${channel.name}`}
           submitLabel="Post"
           pending={post.isPending}
-          onSubmit={(body) =>
+          allowVoice
+          onSubmit={(body, audio) =>
             post.mutate(
-              { channelId: channel.id, body },
+              {
+                channelId: channel.id,
+                body,
+                audioUrl: audio?.url ?? null,
+                audioMime: audio?.mime ?? null,
+                audioDurationSeconds: audio?.durationSeconds ?? null,
+              },
               { onError: (e) => toast({ title: e.message, variant: "destructive" }) },
             )
           }

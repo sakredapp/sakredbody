@@ -172,7 +172,25 @@ export const communityMessages = pgTable(
     /** How deep. 0 = top level. Capped in the handler, not here. */
     depth: integer("depth").notNull().default(0),
 
+    /**
+     * The words. Empty string for a voice-only message — the column stays NOT
+     * NULL and a database CHECK requires either text or a recording, so a
+     * message that says nothing at all is still impossible.
+     */
     body: text("body").notNull(),
+
+    /**
+     * A voice memo, when there is one.
+     *
+     * `audioMime` is the real recorded type, stored rather than guessed from
+     * the URL. Browsers disagree about what they record — iOS Safari produces
+     * mp4, Android Chrome produces webm — and iOS cannot play webm at all, so
+     * the player needs to know which it has in order to say so honestly
+     * instead of rendering a control that produces silence.
+     */
+    audioUrl: text("audio_url"),
+    audioMime: text("audio_mime"),
+    audioDurationSeconds: integer("audio_duration_seconds"),
 
     /**
      * Deleting a message with replies would orphan the conversation, so a
@@ -197,11 +215,23 @@ export const communityMessages = pgTable(
 
 export type CommunityMessage = typeof communityMessages.$inferSelect;
 
-export const postMessageSchema = z.object({
-  channelId: z.string().uuid(),
-  parentId: z.string().uuid().nullable().optional(),
-  body: z.string().min(1, "Say something").max(8000),
-});
+/**
+ * A message needs words or a recording — the refinement mirrors the database
+ * CHECK exactly, so an empty message is refused with a sentence here rather
+ * than a constraint violation from Postgres.
+ */
+export const postMessageSchema = z
+  .object({
+    channelId: z.string().uuid(),
+    parentId: z.string().uuid().nullable().optional(),
+    body: z.string().max(8000).default(""),
+    audioUrl: z.string().url().nullable().optional(),
+    audioMime: z.string().max(80).nullable().optional(),
+    audioDurationSeconds: z.number().int().min(1).max(600).nullable().optional(),
+  })
+  .refine((v) => v.body.trim().length > 0 || !!v.audioUrl, {
+    message: "Say something, or record it.",
+  });
 
 export const editMessageSchema = z.object({
   body: z.string().min(1).max(8000),
