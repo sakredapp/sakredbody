@@ -80,6 +80,10 @@ export function PortalBackdrop({ variant = "member" }: { variant?: BackdropVaria
         density={density}
         intensity={intensity}
         clearCentre={0.5}
+        // The portal header is sticky and opaque, so anything under it is
+        // simply gone. Less than the login screen needs, because that header
+        // is a floating logo over open space rather than a solid bar.
+        clearTop={0.1}
       />
 
       {/* The reading column runs down the middle. This settles it without

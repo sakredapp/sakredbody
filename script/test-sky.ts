@@ -131,6 +131,59 @@ for (const [name, w, h] of SCREENS) {
   check(`${name}: every drawn joint has a position`, missing.length === 0);
 }
 
+/* ── The options the pages actually pass ─────────────────────────────────── */
+
+section("Under real page constraints");
+
+// The loop above tests bare defaults, which is not what ships. Both real uses
+// pass a reserved top band *and* a clear centre, and those two interact: on a
+// narrow screen they between them once ruled out every position except the
+// strip along the bottom edge, and three figures came out standing in a row
+// down there. Every check above passed while that happened.
+const LOGIN = { density: 1, clearCentre: 0.55, clearTop: 0.15 };
+
+for (const [name, w, h] of SCREENS) {
+  // The squat panel is a degenerate-size probe, not a page anyone loads, and
+  // at 260px tall it is shorter than one figure — there is no vertical room to
+  // spread into and asserting otherwise would be asserting against geometry.
+  if (h < 400) continue;
+
+  const sky = planSky(w, h, LOGIN);
+
+  check(`${name}: still a sky with both bands reserved`, sky.length >= 3, `${sky.length}`);
+
+  const overlapping = [];
+  for (let i = 0; i < sky.length; i++) {
+    for (let j = i + 1; j < sky.length; j++) {
+      const a = sky[i];
+      const b = sky[j];
+      const dx = (a.cx - b.cx) / (((a.h * ASPECT + b.h * ASPECT) / 2) * 0.85);
+      const dy = (a.cy - b.cy) / (((a.h + b.h) / 2) * 0.62);
+      if (dx * dx + dy * dy < 1) overlapping.push(`${i}/${j}`);
+    }
+  }
+  check(`${name}: no overlap under constraints`, overlapping.length === 0, overlapping.join(" "));
+
+  // The one that would have caught the row along the bottom.
+  const ys = sky.map((f: Figure) => f.cy);
+  const spread = Math.max(...ys) - Math.min(...ys);
+  // Measured against the *usable* height, not the canvas. A quarter of the
+  // full height is an unreachable bar once a top band is reserved and the
+  // middle is excluded — on a phone the card spans the screen, so the only
+  // free sky is the strip below it and the honest target is lower.
+  check(
+    `${name}: figures spread down the screen, not lined up`,
+    spread > h * (1 - 0.15) * 0.25,
+    `spread ${Math.round(spread)}px, ${Math.round((spread / (h * 0.85)) * 100)}% of usable`,
+  );
+
+  // The reserved band is capped at 140px: page chrome is a fixed height, so a
+  // pure fraction over-reserves on tall screens. Assert the contract the
+  // component actually implements, not the one it started with.
+  const heads = sky.map((f: Figure) => f.cy - f.h / 2);
+  check(`${name}: nothing under the header`, Math.min(...heads) >= Math.min(h * 0.15, 140) - 1);
+}
+
 /* ── The composition, not just the count ─────────────────────────────────── */
 
 section("Composition");
@@ -207,6 +260,30 @@ section("Density and the clear centre");
 
   // And it must not clear the screen while it's at it.
   check("clearing the centre still leaves a sky", sky.length >= 3, `${sky.length}`);
+}
+
+{
+  // The page floats a header over the top of this canvas. A figure placed in
+  // that band is placed correctly and seen by nobody — which is exactly what
+  // happened to the first one on the login screen, head behind the logo.
+  const w = 1258;
+  const h = 796;
+  const TOP = 0.15;
+  const sky = planSky(w, h, { density: 1, clearCentre: 0.55, clearTop: TOP });
+
+  const underHeader = sky.filter((f: Figure) => f.cy - f.h / 2 < Math.min(h * TOP, 140));
+  check("no figure's head is under the header", underHeader.length === 0, `${underHeader.length} too high`);
+  check("reserving the top still leaves a sky", sky.length >= 3, `${sky.length}`);
+  check("nothing pushed off the bottom", sky.every((f: Figure) => f.cy + f.h / 2 <= h));
+
+  // A band wider than the placeable range must degrade to an unbiased sky
+  // rather than stacking every figure on one line or returning nothing.
+  const squashed = planSky(400, 300, { density: 1, clearTop: 0.9 });
+  check("an oversized top band degrades gracefully", squashed.length >= 3, `${squashed.length}`);
+  check(
+    "and doesn't stack them on one line",
+    new Set(squashed.map((f: Figure) => Math.round(f.cy))).size > 1,
+  );
 }
 
 /* ── Degenerate inputs ───────────────────────────────────────────────────── */

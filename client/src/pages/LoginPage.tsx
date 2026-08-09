@@ -114,9 +114,14 @@ export default function LoginPage() {
         style={{ backgroundImage: "url('/images/member-login-bg.webp')" }}
       />
       <div className="absolute inset-0 bg-[hsl(var(--ink))]/95" />
+      {/* `clearTop` keeps the figures out from under the logo and the back
+          link, which float over the top of this screen. Without it the first
+          figure stood with its head behind the logo — placed correctly on the
+          canvas, and invisible on the page. */}
       <ConstellationSky
         className="absolute inset-0 w-full h-full"
         clearCentre={0.55}
+        clearTop={0.15}
       />
       {/* Settles the middle so the card has something quiet to sit on without
           dimming the corners, where the field is doing its work. */}

@@ -222,7 +222,11 @@ export interface Figure {
 export function planSky(
   w: number,
   h: number,
-  { density = 1, clearCentre = 0 }: { density?: number; clearCentre?: number } = {},
+  {
+    density = 1,
+    clearCentre = 0,
+    clearTop = 0,
+  }: { density?: number; clearCentre?: number; clearTop?: number } = {},
 ): Figure[] {
   if (!(w > 0) || !(h > 0)) return [];
 
@@ -254,8 +258,16 @@ export function planSky(
   const want = Math.max(2, Math.round(base * density));
 
   const placed: Figure[] = [];
+  // The attempt number at which the last figure went down. Everything below
+  // that rejects a candidate does so with `continue`, so measuring staleness
+  // from here catches every rejection path without each one having to
+  // remember to say so.
+  let lastPlaced = 0;
+
   for (let a = 0; a < want * 45 && placed.length < want; a++) {
     const i = placed.length;
+    // Whether this index has been failing long enough to start relaxing.
+    const stalled = a - lastPlaced > 12;
 
     // Fixed by target index, not by draw order, so the mix is guaranteed
     // rather than hoped for: one near, two middle, the rest far.
@@ -281,9 +293,73 @@ export function planSky(
     const my = fh * 0.58;
 
     const cx = mx + hash01(a, 12.9898) * (w - mx * 2);
-    const cy = my + hash01(a, 78.233) * (h - my * 2);
 
-    if (clearCentre > 0 && lod > 0) {
+    // The canvas is the viewport; the *usable* sky is not. A header sits on
+    // top of it — logo one side, a link the other — and a figure placed in
+    // the top band puts its head behind them, which is where the first one
+    // on the login screen ended up. Fitting to the canvas is not the same as
+    // fitting to what anyone can see.
+    //
+    // The fallback matters: on a short canvas the reserved band can swallow
+    // the whole placeable range, and a negative span would put every figure
+    // on one line. Better an unbiased sky than a broken one.
+    // Capped in pixels as well as proportionally. Page chrome is a fixed
+    // height — a logo row is ~90px whether the screen is 667 or 915 tall — so
+    // a pure fraction over-reserves on the tallest phones, and every pixel
+    // reserved at the top is one the figures get pushed down into a pile at
+    // the bottom.
+    const top = my + Math.min(h * clearTop, 140);
+    const span = h - my - top;
+
+    // Vertical position is *stratified*, not sampled.
+    //
+    // With four figures drawn from one uniform distribution, three landing
+    // within a couple of hundred pixels of each other is an ordinary outcome,
+    // not a rare one — and on a tall screen that reads as a band of figures
+    // with empty sky above and below rather than as a sky. Splitting the
+    // usable height into one band per figure and placing each inside its own
+    // band makes the spread a property of the algorithm instead of a thing we
+    // hope the hash gives us.
+    //
+    // Horizontal stays uniform: figures side by side at the same height still
+    // read fine, and constraining both axes makes a grid.
+    // The band is a preference, not a rule, and that distinction is the whole
+    // reason this works. A band can be one the centre exclusion forbids
+    // entirely — on a phone, where the card spans the screen, the top band is
+    // exactly that. Treated as a rule, the index never places, the loop never
+    // advances past it, and the function returns an empty sky: the first
+    // version of this did precisely that and every phone lost its background.
+    // After a dozen failed attempts the band is abandoned for a uniform draw.
+    let cy: number;
+    if (span > 0 && !stalled) {
+      const bandH = span / want;
+      cy = top + (i + hash01(a, 78.233)) * bandH;
+      // A band can be shorter than the figure standing in it. Clamping keeps
+      // it on the canvas; the ordering across bands survives.
+      cy = Math.min(Math.max(cy, my), h - my);
+    } else if (span > 0) {
+      cy = top + hash01(a, 78.233) * span;
+    } else {
+      cy = my + hash01(a, 78.233) * (h - my * 2);
+    }
+
+    // Keep the large figures off whatever sits in the middle of the page.
+    //
+    // On a phone this has to be relaxed, and the reason is geometric. The
+    // login card is 384px wide, which on a 393px screen is the whole screen —
+    // so the horizontal half of the exclusion covers every possible position,
+    // and the rule degenerates from "not behind the card" into "not at this
+    // height at all". Combined with the reserved top band, every figure was
+    // being forced into the strip below the card and came out as three
+    // figures standing in a row along the bottom edge, which reads as a
+    // border rather than as a sky.
+    //
+    // So on a narrow screen only the near figure is held off centre. The card
+    // is backdrop-blurred: a middle-sized figure behind it diffuses into the
+    // glass instead of competing with the text, which was the intended effect
+    // in the first place.
+    const narrow = w < 560;
+    if (clearCentre > 0 && (lod === 2 || (lod === 1 && !narrow))) {
       const band = h * clearCentre * 0.5;
       const wband = Math.min(w * 0.45, 260);
       if (Math.abs(cy - h / 2) < band && Math.abs(cx - w / 2) < wband) continue;
@@ -315,6 +391,7 @@ export function planSky(
       };
     }
 
+    lastPlaced = a;
     placed.push({
       cx,
       cy,
@@ -346,11 +423,17 @@ export function ConstellationSky({
    * legibility problem. 0 disables it.
    */
   clearCentre = 0,
+  /**
+   * Fraction of the canvas height reserved at the top, for whatever chrome
+   * the page floats over it — a header, a logo, a back link.
+   */
+  clearTop = 0,
 }: {
   className?: string;
   density?: number;
   intensity?: number;
   clearCentre?: number;
+  clearTop?: number;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
 
@@ -366,7 +449,7 @@ export function ConstellationSky({
       let heat: number[] = [];
 
       S.onResize = () => {
-        figures = planSky(S.w, S.h, { density, clearCentre });
+        figures = planSky(S.w, S.h, { density, clearCentre, clearTop });
         heat = figures.map(() => 0);
       };
 
@@ -512,7 +595,7 @@ export function ConstellationSky({
         }
       };
     });
-  }, [density, intensity, clearCentre]);
+  }, [density, intensity, clearCentre, clearTop]);
 
   return (
     <canvas
