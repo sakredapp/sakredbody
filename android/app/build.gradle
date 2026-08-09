@@ -26,7 +26,12 @@ android {
         applicationId "com.sakredbody.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
+        // Play refuses a duplicate, and the refusal is indirect: the upload
+        // appears to succeed, the bundle is deduplicated against the existing
+        // one, and the release then reports "does not add or remove any app
+        // bundles". Increment on every upload, including re-uploads of a build
+        // that was never rolled out.
+        versionCode 2
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
