@@ -11,6 +11,7 @@ import { StarDust } from "@/components/StarDust";
 import { ElementOrbit } from "@/components/ElementOrbit";
 import { GemStone, TERRITORY_STONES } from "@/components/GemStone";
 import { Tilt3D } from "@/components/Tilt3D";
+import { Deck } from "@/components/Deck";
 import { Magnetic } from "@/components/Magnetic";
 import { ParticleSphere } from "@/components/ParticleSphere";
 import { DiagonalStack } from "@/components/DiagonalStack";
@@ -336,20 +337,12 @@ export default function Home() {
             />
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-10">
-            {PORTAL_LAYERS.map((layer, i) => (
-              <motion.div variants={fadeInUp} key={layer.title}>
-                <Tilt3D className="h-full rounded-xl" max={6} lift={12} sheen={false}>
-                  <div className="h-full pt-8 border-t border-border text-center" data-testid={`card-portal-layer-${i}`}>
-                    <h3 className="font-display text-xl mb-3 text-gold">{layer.title}</h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{layer.body}</p>
-                  </div>
-                </Tilt3D>
-              </motion.div>
-            ))}
-          </div>
+          {/* The last six-across grid on the site. */}
+          <motion.div variants={fadeInUp}>
+            <Deck testId="deck-portal" autoAdvanceMs={6500} cards={PORTAL_LAYERS} />
+          </motion.div>
 
-          <motion.div variants={fadeInUp} className="text-center mt-14">
+          <motion.div variants={fadeInUp} className="text-center mt-10">
             <Link href="/member">
               <Button variant="outline" className="border-gold-subtle text-gold" data-testid="button-portal">
                 Enter the Portal <ArrowRight className="ml-2 h-4 w-4" />

@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
+import { FlipCards } from "@/components/FlipCards";
 import { PageHero, SectionHeader } from "@/components/PageHero";
 import { ParticleSphere } from "@/components/ParticleSphere";
 import { TerrainWheel } from "@/components/TerrainWheel";
@@ -95,23 +96,13 @@ export default function Terrain() {
             />
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-x-10 gap-y-10 max-w-4xl mx-auto">
-            {IMPLICATIONS.map((im, i) => (
-              <motion.div variants={fadeInUp} key={im.title}>
-                <div
-                  className="h-full pt-8 border-t border-border text-center"
-                  data-testid={`card-implication-${i}`}
-                >
-                  <h3 className="font-display text-xl mb-3">{im.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{im.body}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          <motion.div variants={fadeInUp}>
+            <FlipCards testId="flip-implications" columns={4} cards={IMPLICATIONS} />
+          </motion.div>
 
           <motion.p
             variants={fadeInUp}
-            className="text-center font-display text-xl md:text-2xl mt-14 max-w-2xl mx-auto leading-relaxed"
+            className="text-center font-display text-xl md:text-2xl mt-12 max-w-2xl mx-auto leading-relaxed"
           >
             Ask what condition is receiving the intervention
             <br />
