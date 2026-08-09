@@ -18,6 +18,9 @@ import { CommunityAdmin } from "@/components/admin/CommunityAdmin";
 import { OfferingsAdmin } from "@/components/admin/Offerings";
 import { HostsAdmin } from "@/components/admin/Hosts";
 import { TelemetryAdmin } from "@/components/admin/Telemetry";
+import { MembersAdmin } from "@/components/admin/Members";
+import { LibraryAdmin } from "@/components/admin/Library";
+import { EnergyAdmin } from "@/components/admin/Energy";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -127,6 +130,7 @@ const COACHING_CATEGORIES = [
 ];
 
 type AdminTab =
+  | "members"
   | "partners"
   | "bookings"
   | "executive"
@@ -137,7 +141,9 @@ type AdminTab =
   | "telemetry"
   | "notes"
   | "masterclass"
-  | "apothecary";
+  | "apothecary"
+  | "library"
+  | "energy";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // AUTH GATES
@@ -727,7 +733,9 @@ export default function AdminPortal() {
   const { toast } = useToast();
 
   // ─── Top-level nav ─────────────────────────────────────────────────
-  const [tab, setTab] = useState<AdminTab>("partners");
+  // Members, not partners. It is the leftmost tab, and a portal that opens on
+  // a tab other than its first one reads as having lost your place.
+  const [tab, setTab] = useState<AdminTab>("members");
 
   // ─── Partners state ────────────────────────────────────────────────
   const [selectedPartner, setSelectedPartner] = useState<Partner | null>(null);
@@ -1235,6 +1243,7 @@ export default function AdminPortal() {
       <div className="container max-w-6xl mx-auto px-4 pt-6 pb-2">
         <div className="flex items-center gap-2 overflow-x-auto pb-1">
           {([
+            { key: "members" as AdminTab, label: "Members", badge: null },
             { key: "partners" as AdminTab, label: "Partners", badge: partnerCount > 0 ? partnerCount : null },
             { key: "bookings" as AdminTab, label: "Bookings", badge: bookingCount > 0 ? bookingCount : null },
             { key: "executive" as AdminTab, label: "Executive", badge: execNewCount > 0 ? execNewCount : null },
@@ -1246,6 +1255,8 @@ export default function AdminPortal() {
             { key: "telemetry" as AdminTab, label: "Activity", badge: null },
             { key: "masterclass" as AdminTab, label: "Masterclass", badge: null },
             { key: "apothecary" as AdminTab, label: "Apothecary", badge: null },
+            { key: "library" as AdminTab, label: "Library", badge: null },
+            { key: "energy" as AdminTab, label: "The Body", badge: null },
           ]).map((t) => (
             <Button
               key={t.key}
@@ -1266,6 +1277,14 @@ export default function AdminPortal() {
         {tab === "executive" && <ExecutiveApplications enabled={isAdmin} />}
 
         {/* ═══════════════ APOTHECARY TAB ═══════════════ */}
+        {tab === "members" && <MembersAdmin />}
+
+        {/* ═══════════════ LIBRARY TAB ═══════════════ */}
+        {tab === "library" && <LibraryAdmin />}
+
+        {/* ═══════════════ THE BODY TAB ═══════════════ */}
+        {tab === "energy" && <EnergyAdmin />}
+
         {tab === "apothecary" && <ApothecaryAdmin enabled={isAdmin} />}
 
         {/* ═══════════════ DAILY NOTES TAB ═══════════════ */}

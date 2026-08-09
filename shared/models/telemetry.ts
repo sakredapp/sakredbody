@@ -103,6 +103,10 @@ export const EVENT_NAMES = [
   "auth.register",
   "auth.throttled",
 
+  // Administration. Who changed whose access, and when — the one category
+  // where the audit trail matters more than the aggregate.
+  "member.update",
+
   // Failures worth knowing about, rather than an empty catch.
   "error.client",
   "error.server",
