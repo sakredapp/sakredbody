@@ -41,38 +41,33 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2, ChevronDown, BookOpen, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { Ebook as EbookRow, EbookSection as EbookSectionRow } from "@shared/schema";
 
-interface Ebook {
-  id: string;
-  title: string;
-  subtitle: string | null;
-  author: string | null;
-  description: string | null;
-  coverUrl: string | null;
-  routineId: string | null;
-  priceCents: number | null;
-  accessMode: string;
-  readingMinutes: number | null;
-  isFeatured: boolean;
-  isPublished: boolean;
-  sortOrder: number;
-}
+/**
+ * Derived from the tables, not retyped from them.
+ *
+ * This was a hand-written interface covering thirteen of the ebook table's
+ * columns, and the two it omitted — `audioUrl` and `searchKeywords` — were
+ * both unreachable from the admin as a direct result. A column missing from
+ * the client type cannot be rendered, so the type silently sets the ceiling
+ * on what the back office can do, and nothing anywhere reports it. Same
+ * mechanism found in use-coaching.ts and Training.tsx.
+ */
+type Ebook = Omit<EbookRow, "createdAt" | "updatedAt"> & {
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
 
-interface Section {
-  id: string;
-  ebookId: string;
-  title: string;
-  content: string | null;
-  audioUrl: string | null;
-  orderIndex: number;
-  isFree: boolean;
-}
+type Section = EbookSectionRow;
 
 const ACCESS_MODES = [
   { value: "membership", label: "Included with membership" },
   { value: "purchase", label: "Bought separately" },
   { value: "coaching", label: "Granted by a coach" },
 ];
+
+/** The four the old library sorted by. Nullable — a guide needs no category. */
+const EBOOK_CATEGORIES = ["Mind", "Body", "Nutrition", "Lifestyle"];
 
 const EMPTY = {
   title: "",
@@ -95,6 +90,19 @@ export function LibraryAdmin() {
     queryFn: async () => {
       const res = await fetch("/api/admin/library/ebooks", { credentials: "include" });
       if (!res.ok) throw new Error("Couldn't load the library");
+      return res.json();
+    },
+  });
+
+  /**
+   * For the "unlocks this protocol" picker. Names, so the choice is a protocol
+   * somebody recognises rather than a slug they have to remember.
+   */
+  const routines = useQuery<{ id: string; name: string }[]>({
+    queryKey: ["/api/admin/routines"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/routines", { credentials: "include" });
+      if (!res.ok) throw new Error("Couldn't load the protocols");
       return res.json();
     },
   });
@@ -341,7 +349,203 @@ export function LibraryAdmin() {
                     </div>
                   </div>
 
+                  {/* ── The files ────────────────────────────────────────────
+                      A guide is a document first. `audioUrl` existed before
+                      `fileUrl` did, so a book could carry an audiobook and
+                      nothing to read — the reader had nothing to open unless
+                      every section was written inline.
+
+                      The promo video is the odd one out and is separated on
+                      purpose: it is the only asset here that plays for someone
+                      who has *not* bought. Sitting it next to the gated files
+                      is how it eventually gets gated with them by mistake. */}
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Readable file (PDF, DOCX, EPUB)</Label>
+                      <Input
+                        defaultValue={b.fileUrl ?? ""}
+                        placeholder="https://…/guide.pdf"
+                        onBlur={(e) =>
+                          e.target.value !== (b.fileUrl ?? "") &&
+                          save.mutate({ id: b.id, body: { fileUrl: e.target.value.trim() || null } })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Audiobook — optional</Label>
+                      <Input
+                        defaultValue={b.audioUrl ?? ""}
+                        placeholder="https://…/guide.m4a"
+                        onBlur={(e) =>
+                          e.target.value !== (b.audioUrl ?? "") &&
+                          save.mutate({ id: b.id, body: { audioUrl: e.target.value.trim() || null } })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs flex items-center gap-1.5">
+                      Promo video / VSL
+                      <InfoTip label="About the promo video" title="This one is public">
+                        It plays on the landing page for people who have not bought.
+                        Everything else on this screen is behind an entitlement.
+                      </InfoTip>
+                    </Label>
+                    <Input
+                      defaultValue={b.promoVideoUrl ?? ""}
+                      placeholder="https://…/promo.mp4"
+                      onBlur={(e) =>
+                        e.target.value !== (b.promoVideoUrl ?? "") &&
+                        save.mutate({ id: b.id, body: { promoVideoUrl: e.target.value.trim() || null } })
+                      }
+                    />
+                  </div>
+
+                  <div className="grid sm:grid-cols-3 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Author</Label>
+                      <Input
+                        defaultValue={b.author ?? ""}
+                        placeholder="Sakred Health"
+                        onBlur={(e) =>
+                          e.target.value !== (b.author ?? "") &&
+                          save.mutate({ id: b.id, body: { author: e.target.value.trim() || null } })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs flex items-center gap-1.5">
+                        Slug
+                        <InfoTip label="About the slug" title="The URL, and it is permanent">
+                          Once a guide has been shared or linked anywhere, changing this
+                          breaks those links. Leave it alone after publishing.
+                        </InfoTip>
+                      </Label>
+                      <Input
+                        defaultValue={b.slug ?? ""}
+                        placeholder="foundations-of-health"
+                        onBlur={(e) =>
+                          e.target.value !== (b.slug ?? "") &&
+                          save.mutate({ id: b.id, body: { slug: e.target.value.trim() || null } })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Published date</Label>
+                      <Input
+                        type="date"
+                        defaultValue={b.publishedAt ?? ""}
+                        onBlur={(e) =>
+                          e.target.value !== (b.publishedAt ?? "") &&
+                          save.mutate({ id: b.id, body: { publishedAt: e.target.value || null } })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid sm:grid-cols-3 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Category</Label>
+                      <Select
+                        defaultValue={b.category ?? "_none"}
+                        onValueChange={(v) =>
+                          save.mutate({ id: b.id, body: { category: v === "_none" ? null : v } })
+                        }
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="_none">None</SelectItem>
+                          {EBOOK_CATEGORIES.map((c) => (
+                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs flex items-center gap-1.5">
+                        Price (USD)
+                        <InfoTip label="About price" title="Only for 'bought separately'">
+                          Ignored unless Access is set to bought separately. Empty or 0
+                          means free.
+                        </InfoTip>
+                      </Label>
+                      <Input
+                        type="number"
+                        step="1"
+                        defaultValue={b.priceCents == null ? "" : b.priceCents / 100}
+                        placeholder="29"
+                        onBlur={(e) =>
+                          save.mutate({
+                            id: b.id,
+                            // Stored in cents. Dollars in the box because that
+                            // is what a price is; the conversion happens here
+                            // and nowhere else.
+                            body: { priceCents: e.target.value ? Math.round(Number(e.target.value) * 100) : null },
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Sort order</Label>
+                      <Input
+                        type="number"
+                        defaultValue={b.sortOrder}
+                        onBlur={(e) =>
+                          Number(e.target.value) !== b.sortOrder &&
+                          save.mutate({ id: b.id, body: { sortOrder: Number(e.target.value) || 0 } })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs flex items-center gap-1.5">
+                        Unlocks this protocol
+                        <InfoTip label="About the pairing" title="One guide, one protocol">
+                          Buying or being granted this guide gives access to the paired
+                          protocol. Leave as none for a standalone guide.
+                        </InfoTip>
+                      </Label>
+                      <Select
+                        defaultValue={b.routineId ?? "_none"}
+                        onValueChange={(v) =>
+                          save.mutate({ id: b.id, body: { routineId: v === "_none" ? null : v } })
+                        }
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="_none">None (no paired protocol)</SelectItem>
+                          {(routines.data ?? []).map((r) => (
+                            <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Search keywords</Label>
+                      <Input
+                        defaultValue={(b.searchKeywords ?? []).join(", ")}
+                        placeholder="gut, bloating, digestion"
+                        onBlur={(e) => {
+                          const next = e.target.value.split(",").map((s) => s.trim()).filter(Boolean);
+                          if (next.join(",") !== (b.searchKeywords ?? []).join(","))
+                            save.mutate({ id: b.id, body: { searchKeywords: next.length ? next : null } });
+                        }}
+                      />
+                    </div>
+                  </div>
+
                   <div className="flex flex-wrap items-center gap-6">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={b.unlocksCommunity}
+                        onCheckedChange={(v) => save.mutate({ id: b.id, body: { unlocksCommunity: v } })}
+                        data-testid={`switch-unlocks-community-${b.id}`}
+                      />
+                      <Label className="text-xs">Unlocks community on access</Label>
+                    </div>
                     <div className="flex items-center gap-2">
                       <Switch
                         checked={b.isPublished}

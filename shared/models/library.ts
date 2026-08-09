@@ -22,6 +22,7 @@ import {
   uuid,
   integer,
   boolean,
+  date,
   timestamp,
   index,
   uniqueIndex,
@@ -41,6 +42,34 @@ export const ebooks = pgTable(
     author: text("author"),
     description: text("description"),
     coverUrl: text("cover_url"),
+
+    /** URL id. Unique but nullable — publishable before anyone picks one. */
+    slug: text("slug"),
+
+    /**
+     * The readable book — PDF, DOCX or EPUB, entitlement-gated.
+     *
+     * `audioUrl` existed before this did, so a guide could carry an audiobook
+     * and no book: the reader had nothing to open unless every section was
+     * written inline.
+     */
+    fileUrl: text("file_url"),
+
+    /**
+     * Public, and the only asset here that is. It plays on the landing page
+     * to people who have not bought — the opposite access rule from
+     * everything else in this table, which is why it isn't just another file.
+     */
+    promoVideoUrl: text("promo_video_url"),
+
+    /** Mind | Body | Nutrition | Lifestyle. Nullable — a guide needs none. */
+    category: text("category"),
+
+    /** The publication date shown to a reader, not the row's created_at. */
+    publishedAt: date("published_at"),
+
+    /** Whether buying this grants the community room as well as the guide. */
+    unlocksCommunity: boolean("unlocks_community").notNull().default(false),
 
     // The protocol this guide is the reasoning for. Nullable — some guides are
     // standalone. When set, the reader offers it at the end.
