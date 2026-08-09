@@ -281,7 +281,7 @@ export default function Home() {
             {TERRITORIES.map((t, i) => (
               <motion.div variants={fadeInUp} key={t.key}>
                 <Link href={t.href}>
-                  <Tilt3D className="h-full rounded-xl" max={6} lift={12}>
+                  <Tilt3D className="h-full rounded-xl" max={6} lift={12} sheen={false}>
                   <div
                     className="h-full pt-8 border-t border-border text-center flex flex-col hover-elevate transition-colors"
                     data-testid={`card-territory-${t.key}`}
@@ -379,7 +379,7 @@ export default function Home() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-14">
             {PORTAL_LAYERS.map((layer, i) => (
               <motion.div variants={fadeInUp} key={layer.title}>
-                <Tilt3D className="h-full rounded-xl" max={6} lift={12}>
+                <Tilt3D className="h-full rounded-xl" max={6} lift={12} sheen={false}>
                   <div className="h-full pt-8 border-t border-border text-center" data-testid={`card-portal-layer-${i}`}>
                     <h3 className="font-display text-xl mb-3 text-gold">{layer.title}</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">{layer.body}</p>

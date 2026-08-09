@@ -103,11 +103,10 @@ export default function Retreats() {
       <PageHero
         eyebrow="Territory Four · The Social Terrain"
         title={<>Gather.</>}
-        intro="Where the work is actually done — protocols run properly, in a place with nothing in the way."
         testId="text-retreats-headline"
         image="/images/estate-vineyard.webp"
         imageAlt="A stone estate set among vineyards and low green hills"
-        marks={["Six formats", "Three days to two weeks", "Private or shared", "Application required"]}
+        marks={["Six formats", "Three days to two weeks", "Private or shared", "By application"]}
       />
 
       {/* ── Told apart from the other two ──────────────────── */}

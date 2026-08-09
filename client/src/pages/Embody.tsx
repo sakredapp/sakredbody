@@ -57,7 +57,6 @@ export default function Embody() {
       <PageHero
         eyebrow="Territory Three · Where They Meet"
         title={<>Embody.</>}
-        intro="The body you inhabit becomes the life you are capable of living."
         testId="text-embody-headline"
         ambient={<BreathPacer className="absolute inset-0 w-full h-full opacity-40" />}
         marks={["Four counts in, six out", "Daily, not occasionally", "The practice compounds"]}

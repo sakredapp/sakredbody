@@ -65,7 +65,6 @@ export default function Restore() {
       <PageHero
         eyebrow="Territory One · Yin"
         title={<>Restore.</>}
-        intro="Healing is not endlessly adding things. It begins by removing what's in the way."
         testId="text-restore-headline"
         ambient={<FlowField className="absolute inset-0 w-full h-full opacity-70" />}
         marks={["Drainage before detox", "Four protocols", "14 to 28 days", "The lymph has no pump"]}

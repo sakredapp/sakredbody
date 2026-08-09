@@ -59,7 +59,6 @@ export default function Build() {
       <PageHero
         eyebrow="Territory Two · Yang"
         title={<>Build.</>}
-        intro="A body that can carry weight, produce force, and recover fast enough to do it again."
         testId="text-build-headline"
         ambient={<EmberField className="absolute inset-0 w-full h-full opacity-80" />}
         marks={["Muscle is the organ of longevity", "Load, recover, repeat", "No supplement replaces it"]}

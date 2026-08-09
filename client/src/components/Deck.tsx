@@ -98,8 +98,13 @@ export function Deck({
       }}
       ref={hostRef}
     >
+      {/* The neighbours sit 130–260px off centre and are wider than a phone.
+          Without a clip here they push the document past the viewport, and
+          the whole site scrolls sideways — every page, not just this one.
+          `clip` rather than `hidden` so the vertical axis stays visible and
+          the held card's drop shadow isn't sheared off. */}
       <div
-        className="relative min-h-[24rem] sm:min-h-[22rem] flex items-stretch"
+        className="relative min-h-[24rem] sm:min-h-[22rem] flex items-stretch overflow-x-clip"
         style={{ perspective: "1400px", perspectiveOrigin: "50% 45%" }}
       >
         <motion.div

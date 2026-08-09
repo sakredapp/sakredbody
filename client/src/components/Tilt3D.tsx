@@ -53,6 +53,10 @@ export function Tilt3D({
   const onMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const el = ref.current;
     if (!el || reduced) return;
+    // A finger is not a cursor. On touch, pointerenter fires on tap and never
+    // leaves, so the card holds a lean and the sheen sits there as a lit
+    // rectangle. Tilt is a hover affordance; on touch there is no hover.
+    if (e.pointerType !== "mouse") return;
     const rect = el.getBoundingClientRect();
     px.set((e.clientX - rect.left) / rect.width - 0.5);
     py.set((e.clientY - rect.top) / rect.height - 0.5);
@@ -76,7 +80,9 @@ export function Tilt3D({
     <div ref={ref} className={className} style={{ perspective: 900 }} data-testid={testId}>
       <motion.div
         onPointerMove={onMove}
-        onPointerEnter={() => hover.set(1)}
+        onPointerEnter={(e) => {
+          if (e.pointerType === "mouse") hover.set(1);
+        }}
         onPointerLeave={reset}
         style={{ rotateX, rotateY, z, transformStyle: "preserve-3d" }}
         className="relative h-full rounded-[inherit] will-change-transform"

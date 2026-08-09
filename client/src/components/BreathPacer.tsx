@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { BREATH_IN, breathAt, countdownAt, phaseAt } from "@/lib/breath";
+import { breathAt } from "@/lib/breath";
 import { mountStage } from "@/lib/canvasStage";
 
 /**
@@ -24,7 +24,6 @@ export function BreathPacer({ className }: { className?: string }) {
     return mountStage(canvas, (S) => (t) => {
       const { ctx, w, h } = S;
       const breath = breathAt(t);
-      const phase = phaseAt(t);
       ctx.clearRect(0, 0, w, h);
 
       const cx = w / 2;
@@ -57,18 +56,10 @@ export function BreathPacer({ className }: { className?: string }) {
       ctx.arc(cx, cy, cr * 2.4, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.textAlign = "center";
-      ctx.font = '400 30px "Playfair Display", Georgia, serif';
-      ctx.fillStyle = "rgba(245,242,235,0.95)";
-      ctx.fillText(String(countdownAt(t)), cx, cy + 10);
-
-      ctx.font = "400 10px Menlo, monospace";
-      ctx.fillStyle = "rgba(197,160,89,0.9)";
-      ctx.fillText(
-        `${phase.toUpperCase()} · ${phase === "inhale" ? BREATH_IN : 6}`,
-        cx,
-        cy + base * 2.6 + 26,
-      );
+      // No numerals. Behind the hero title the countdown and the INHALE/EXHALE
+      // label sat directly under the word and over the marks — two competing
+      // pieces of type in the same space, and neither readable. The rings
+      // already pace the breath; a number only asks to be read instead.
     });
   }, []);
 

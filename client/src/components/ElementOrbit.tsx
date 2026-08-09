@@ -52,8 +52,8 @@ export function ElementOrbit({ elements }: { elements: OrbitElement[] }) {
         const x = Math.cos(a);
         const depth = Math.sin(a); // -1 far, 1 near
 
-        const left = 50 + x * 40;
-        const top = 50 + depth * 21;
+        const left = 50 + x * 44;
+        const top = 50 + depth * 30;
         const scale = 0.78 + ((depth + 1) / 2) * 0.34;
         const opacity = 0.45 + ((depth + 1) / 2) * 0.55;
 
@@ -78,22 +78,26 @@ export function ElementOrbit({ elements }: { elements: OrbitElement[] }) {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="relative w-full aspect-[16/10] max-w-[36rem] mx-auto" data-testid="element-orbit">
+      {/* The ring is wider and deeper than it was. At the old radii the centre
+          reading ("Wood · Liver + Gallbladder · Spring") was physically wider
+          than the ellipse it sat inside, and the near and far stations passed
+          straight through the type. The orbit now clears the words. */}
+      <div className="relative w-full aspect-[16/11] max-w-[42rem] mx-auto" data-testid="element-orbit">
         {/* The ring the stations ride, drawn as an ellipse in perspective. */}
-        <svg viewBox="0 0 100 70" className="absolute inset-0 w-full h-full" aria-hidden="true">
+        <svg viewBox="0 0 100 69" className="absolute inset-0 w-full h-full" aria-hidden="true">
           <ellipse
             cx="50"
-            cy="35"
-            rx="40"
-            ry="21"
+            cy="34.5"
+            rx="44"
+            ry="20.7"
             fill="none"
             stroke="hsl(var(--gold) / 0.2)"
             strokeWidth="0.25"
           />
           <ellipse
             cx="50"
-            cy="35"
-            rx="30"
+            cy="34.5"
+            rx="33"
             ry="15.5"
             fill="none"
             stroke="hsl(var(--gold) / 0.08)"
@@ -102,7 +106,7 @@ export function ElementOrbit({ elements }: { elements: OrbitElement[] }) {
         </svg>
 
         {/* The middle of the ring: what is held, and when it rules. */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 px-[26%]">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 px-[24%]">
           <AnimatePresence mode="wait">
             <motion.div
               key={active}
@@ -113,7 +117,7 @@ export function ElementOrbit({ elements }: { elements: OrbitElement[] }) {
               className="text-center"
             >
               <p className="font-display text-3xl sm:text-4xl leading-none mb-2">{current.element}</p>
-              <p className="text-xs sm:text-sm text-muted-foreground">{current.organs}</p>
+              <p className="text-[11px] sm:text-sm text-muted-foreground leading-snug">{current.organs}</p>
               <p className="text-[10px] uppercase tracking-[0.2em] text-gold mt-1.5">{current.season}</p>
             </motion.div>
           </AnimatePresence>
