@@ -65,12 +65,16 @@ export function CelestialField({ className }: { className?: string }) {
 
       const cx = w / 2;
       const cy = h * 0.5;
-      const unit = Math.min(w, h) * 0.78;
+      // Sized to close inside the frame. At 0.78 the widest orbit was half
+      // again wider than the section that clips it, so what you actually saw
+      // was its top arc running edge to edge — flat enough to read as a ruled
+      // line across the page rather than as a ring around anything.
+      const unit = Math.min(w, h) * 0.44;
 
       // Orbits: thin ellipses, each turning at its own slow rate.
       ORBITS.forEach((scale, i) => {
         const rx = unit * scale;
-        const ry = rx * (0.3 + i * 0.06);
+        const ry = rx * (0.42 + i * 0.07);
         const tilt = t * 0.006 * (i % 2 === 0 ? 1 : -1) + i * 0.5;
         ctx.save();
         ctx.translate(cx, cy);

@@ -158,7 +158,9 @@ export default function Home() {
         collection of parts. The figure says that on its own. Nothing else
         belongs on this screen.
       */}
-      <section className="tone-ink bg-background relative overflow-hidden pt-28 pb-20 md:pt-32 md:pb-28">
+      {/* The header is a floating pill roughly 72px tall. pt-28 put the
+          crown of the figure directly under it. */}
+      <section className="tone-ink bg-background relative overflow-hidden pt-40 pb-20 md:pt-44 md:pb-28">
         <div className="absolute inset-0 z-0">
           <CelestialField className="absolute inset-0 w-full h-full opacity-80" />
           <StarDust className="absolute inset-0 w-full h-full" density={1.3} />
