@@ -40,6 +40,7 @@ import {
   messageReactions,
   membershipTiers,
   offeringRegistrations,
+  channelMembers,
   users,
   insertChannelSchema,
   postMessageSchema,
@@ -91,9 +92,21 @@ function present(m: typeof communityMessages.$inferSelect) {
 /**
  * Which channels this member may see, as ids.
  *
- * A tier gate plus an offering exception: a mastermind's or a retreat's room
- * is open to its confirmed registrants whatever tier they hold, because they
- * paid for the room rather than for the tier.
+ * Three ways in, checked in this order:
+ *
+ *   1. An admin sees everything. This bypass is the reason the rule must never
+ *      be reimplemented casually — a copy that forgets it locks out the only
+ *      people who can fix anything, which has already happened once here.
+ *   2. An explicit invitation, from `channel_members`. This is how a room for
+ *      six named people works: a coaching pod, a founders' circle.
+ *   3. Otherwise the open rule — a confirmed registration for an offering's
+ *      room, or enough tier rank for a general one.
+ *
+ * `is_private` cuts off the third path entirely. A private room is the member
+ * list and nothing else, whatever tier somebody holds.
+ *
+ * The same rule is written in SQL as `can_see_channel` — see
+ * supabase/private-rooms.sql. If one changes, change the other.
  */
 export async function visibleChannelIds(userId: string): Promise<string[]> {
   const [me] = await db
@@ -112,11 +125,23 @@ export async function visibleChannelIds(userId: string): Promise<string[]> {
   const admin = me?.isAdmin === "true";
 
   const rows = await db
-    .select({ id: channels.id, minTierRank: channels.minTierRank, offeringId: channels.offeringId })
+    .select({
+      id: channels.id,
+      minTierRank: channels.minTierRank,
+      offeringId: channels.offeringId,
+      isPrivate: channels.isPrivate,
+    })
     .from(channels)
     .where(eq(channels.isActive, true));
 
   if (admin) return rows.map((r) => r.id);
+
+  // Explicit invitations, in one query rather than one per private room.
+  const invited = await db
+    .select({ channelId: channelMembers.channelId })
+    .from(channelMembers)
+    .where(eq(channelMembers.userId, userId));
+  const invitedTo = new Set(invited.map((r) => r.channelId));
 
   // One query for every offering this member is confirmed in, rather than one
   // per gated channel.
@@ -132,7 +157,12 @@ export async function visibleChannelIds(userId: string): Promise<string[]> {
   const mine = new Set(registered.map((r) => r.offeringId));
 
   return rows
-    .filter((c) => (c.offeringId ? mine.has(c.offeringId) : rank >= c.minTierRank))
+    .filter((c) => {
+      if (invitedTo.has(c.id)) return true;
+      // A private room stops here: no tier and no offering opens it.
+      if (c.isPrivate) return false;
+      return c.offeringId ? mine.has(c.offeringId) : rank >= c.minTierRank;
+    })
     .map((c) => c.id);
 }
 
@@ -582,6 +612,74 @@ export function registerCommunityRoutes(app: Express) {
     try {
       const rows = await db.select().from(channels).orderBy(asc(channels.sortOrder));
       res.json(rows);
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
+  /**
+   * Who is in a private room.
+   *
+   * Returns everyone invited, plus enough of the member record to show a name
+   * — the join is here rather than in the client because the client would
+   * otherwise need every member loaded to render six of them.
+   */
+  app.get("/api/admin/community/channels/:id/members", isAdmin, async (req, res) => {
+    try {
+      const rows = await db
+        .select({
+          id: channelMembers.id,
+          userId: channelMembers.userId,
+          createdAt: channelMembers.createdAt,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+        })
+        .from(channelMembers)
+        .leftJoin(users, eq(channelMembers.userId, users.id))
+        .where(eq(channelMembers.channelId, param(req, "id")))
+        .orderBy(asc(users.firstName));
+      res.json(rows);
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
+  app.post("/api/admin/community/channels/:id/members", isAdmin, async (req, res) => {
+    try {
+      const channelId = param(req, "id");
+      const { userId } = z.object({ userId: z.string().min(1) }).parse(req.body ?? {});
+
+      const [channel] = await db.select({ id: channels.id }).from(channels).where(eq(channels.id, channelId));
+      if (!channel) return res.status(404).json({ message: "No such room" });
+
+      const [member] = await db.select({ id: users.id }).from(users).where(eq(users.id, userId));
+      if (!member) return res.status(404).json({ message: "No such member" });
+
+      // Adding somebody twice is the same intent, not an error.
+      const [row] = await db
+        .insert(channelMembers)
+        .values({ channelId, userId, addedBy: req.session!.userId! })
+        .onConflictDoNothing()
+        .returning();
+
+      res.status(201).json(row ?? { channelId, userId, existing: true });
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
+  app.delete("/api/admin/community/channels/:id/members/:userId", isAdmin, async (req, res) => {
+    try {
+      await db
+        .delete(channelMembers)
+        .where(
+          and(
+            eq(channelMembers.channelId, param(req, "id")),
+            eq(channelMembers.userId, param(req, "userId")),
+          ),
+        );
+      res.json({ removed: true });
     } catch (err) {
       fail(res, err);
     }

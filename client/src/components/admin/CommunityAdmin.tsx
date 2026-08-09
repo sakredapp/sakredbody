@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import { InfoTip } from "@/components/ui/info-tip";
 import {
   Select,
   SelectContent,
@@ -26,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Lock, EyeOff } from "lucide-react";
+import { Plus, Trash2, Lock, EyeOff, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TIER_RANKS } from "@shared/schema";
 import type { Channel, Offering } from "@shared/schema";
@@ -51,6 +52,7 @@ interface Draft {
   name: string;
   description: string;
   minTierRank: number;
+  isPrivate: boolean;
   offeringId: string | null;
   isReadOnly: boolean;
   isActive: boolean;
@@ -62,6 +64,7 @@ const EMPTY: Draft = {
   name: "",
   description: "",
   minTierRank: 0,
+  isPrivate: false,
   offeringId: null,
   isReadOnly: false,
   isActive: true,
@@ -141,12 +144,23 @@ function ChannelEditor({
         <div className="space-y-1.5">
           <Label className="text-xs">Who gets in</Label>
           <Select
-            value={draft.offeringId ? "offering" : String(draft.minTierRank)}
+            value={
+              draft.isPrivate
+                ? "invite"
+                : draft.offeringId
+                  ? "offering"
+                  : String(draft.minTierRank)
+            }
             onValueChange={(v) => {
-              if (v === "offering") {
-                setDraft({ ...draft, offeringId: offerings[0]?.id ?? null });
+              if (v === "invite") {
+                // Invite-only overrides everything: rank and offering are both
+                // meaningless once the member list is the only way in, so they
+                // are cleared rather than left to look meaningful.
+                setDraft({ ...draft, isPrivate: true, offeringId: null, minTierRank: 0 });
+              } else if (v === "offering") {
+                setDraft({ ...draft, isPrivate: false, offeringId: offerings[0]?.id ?? null });
               } else {
-                setDraft({ ...draft, minTierRank: Number(v), offeringId: null });
+                setDraft({ ...draft, isPrivate: false, minTierRank: Number(v), offeringId: null });
               }
             }}
           >
@@ -162,11 +176,27 @@ function ChannelEditor({
               {offerings.length > 0 && (
                 <SelectItem value="offering">A specific offering</SelectItem>
               )}
+              <SelectItem value="invite">Invite only — people I pick</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        {draft.offeringId && (
+        {draft.isPrivate && (
+          <div className="space-y-1.5">
+            <Label className="text-xs flex items-center gap-1.5">
+              Invite only
+              <InfoTip label="About invite-only rooms" title="The list is the door">
+                Tier rank is ignored completely — nobody gets in by being senior. Save
+                the room, then add people to it below. Admins always see everything.
+              </InfoTip>
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              Save it, then pick who's in.
+            </p>
+          </div>
+        )}
+
+        {draft.offeringId && !draft.isPrivate && (
           <div className="space-y-1.5">
             <Label className="text-xs">Which offering</Label>
             <Select
@@ -286,6 +316,7 @@ export function CommunityAdmin() {
       description: c.description ?? "",
       minTierRank: c.minTierRank,
       offeringId: c.offeringId,
+      isPrivate: c.isPrivate ?? false,
       isReadOnly: c.isReadOnly,
       isActive: c.isActive,
       sortOrder: c.sortOrder,
@@ -372,6 +403,11 @@ export function CommunityAdmin() {
                         <Lock className="h-2.5 w-2.5" /> announcements
                       </Badge>
                     )}
+                    {c.isPrivate && (
+                      <Badge variant="outline" className="text-[10px] gap-1 border-[hsl(var(--gold))]/40 text-[hsl(var(--gold))]">
+                        <UserPlus className="h-2.5 w-2.5" /> invite only
+                      </Badge>
+                    )}
                     {!c.isActive && (
                       <Badge variant="secondary" className="text-[10px] gap-1">
                         <EyeOff className="h-2.5 w-2.5" /> closed
@@ -379,7 +415,11 @@ export function CommunityAdmin() {
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {c.offeringId ? `Only ${offeringName(c.offeringId)}` : tierLabel(c.minTierRank)}
+                    {c.isPrivate
+                      ? "Only the people you add"
+                      : c.offeringId
+                        ? `Only ${offeringName(c.offeringId)}`
+                        : tierLabel(c.minTierRank)}
                     {c.description ? ` · ${c.description}` : ""}
                   </p>
                 </div>
@@ -407,6 +447,15 @@ export function CommunityAdmin() {
                     <Trash2 className="h-3.5 w-3.5 text-destructive/70" />
                   </Button>
                 </div>
+
+                {/* Only for a saved private room: there is nothing to add
+                    somebody to until the room exists, and a tier-gated room
+                    has no member list to manage. */}
+                {c.isPrivate && (
+                  <div className="w-full">
+                    <ChannelMembers channelId={c.id} channelName={c.name} />
+                  </div>
+                )}
               </div>
             ),
           )}
@@ -416,6 +465,127 @@ export function CommunityAdmin() {
           No rooms yet. The first one should probably be called The General.
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * Who is in an invite-only room.
+ *
+ * Only rendered for a saved private room, because there is nothing to add
+ * somebody to until the room exists — offering the picker on an unsaved draft
+ * would be a control that quietly does nothing.
+ *
+ * Members are loaded from the same endpoint the Members tab uses, so the list
+ * is whoever actually exists rather than a second idea of who a member is.
+ */
+export function ChannelMembers({ channelId, channelName }: { channelId: string; channelName: string }) {
+  const [picked, setPicked] = useState("");
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const key = ["/api/admin/community/channels", channelId, "members"];
+
+  const members = useQuery<Array<{ id: string; userId: string; firstName: string | null; lastName: string | null; email: string | null }>>({
+    queryKey: key,
+    queryFn: async () => {
+      const r = await fetch(`/api/admin/community/channels/${channelId}/members`, { credentials: "include" });
+      if (!r.ok) throw new Error("Couldn't load who's in this room");
+      return r.json();
+    },
+  });
+
+  const everyone = useQuery<Array<{ id: string; firstName: string | null; lastName: string | null; email: string | null }>>({
+    queryKey: ["/api/admin/members", ""],
+    queryFn: async () => {
+      const r = await fetch("/api/admin/members", { credentials: "include" });
+      if (!r.ok) throw new Error("Couldn't load members");
+      return r.json();
+    },
+  });
+
+  const add = useMutation({
+    mutationFn: async () =>
+      apiRequest("POST", `/api/admin/community/channels/${channelId}/members`, { userId: picked }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: key });
+      setPicked("");
+      toast({ title: "Added" });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const remove = useMutation({
+    mutationFn: async (userId: string) =>
+      apiRequest("DELETE", `/api/admin/community/channels/${channelId}/members/${userId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: key });
+      toast({ title: "Removed" });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const inRoom = members.data ?? [];
+  const held = new Set(inRoom.map((m) => m.userId));
+  const available = (everyone.data ?? []).filter((u) => !held.has(u.id));
+  const nameOf = (u: { firstName: string | null; lastName: string | null; email: string | null }) =>
+    [u.firstName, u.lastName].filter(Boolean).join(" ").trim() || u.email || "—";
+
+  return (
+    <div className="space-y-3 pt-3 border-t border-border/60">
+      <div className="flex items-center gap-2">
+        <p className="text-xs uppercase tracking-widest text-muted-foreground">
+          Who's in {channelName}
+        </p>
+        <InfoTip label="About the list" title="The list is the door">
+          Nobody gets into an invite-only room by tier — this list is the only way in.
+          Admins are the exception and always see every room.
+        </InfoTip>
+      </div>
+
+      {members.isLoading ? (
+        <Skeleton className="h-10 w-full" />
+      ) : inRoom.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Nobody yet. Until you add someone, only admins can see this room.
+        </p>
+      ) : (
+        <div className="space-y-1.5">
+          {inRoom.map((m) => (
+            <div key={m.id} className="flex items-center gap-2 border border-border/50 rounded-md px-3 py-2">
+              <span className="text-sm flex-1 truncate">{nameOf(m)}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
+                onClick={() => remove.mutate(m.userId)}
+                data-testid={`button-remove-member-${m.userId}`}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <Select value={picked} onValueChange={setPicked}>
+          <SelectTrigger className="flex-1" data-testid="select-add-room-member">
+            <SelectValue placeholder="Add someone" />
+          </SelectTrigger>
+          <SelectContent>
+            {available.length === 0 ? (
+              <div className="px-2 py-3 text-sm text-muted-foreground">Everyone's already in.</div>
+            ) : (
+              available.map((u) => (
+                <SelectItem key={u.id} value={u.id}>{nameOf(u)}</SelectItem>
+              ))
+            )}
+          </SelectContent>
+        </Select>
+        <Button variant="outline" disabled={!picked || add.isPending} onClick={() => add.mutate()}>
+          <Plus className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 }

@@ -94,6 +94,12 @@ export const channels = pgTable(
      * recurring webinar gets its own space.
      */
     offeringId: uuid("offering_id"),
+    /**
+     * Invite-only. The explicit member list in `channelMembers` becomes the
+     * only way in — tier rank is ignored entirely, so a private room stays
+     * private however senior somebody is. Admins still see everything.
+     */
+    isPrivate: boolean("is_private").notNull().default(false),
     /** Read-only for members — announcements. */
     isReadOnly: boolean("is_read_only").notNull().default(false),
     isActive: boolean("is_active").notNull().default(true),
@@ -105,6 +111,30 @@ export const channels = pgTable(
     index("idx_channels_offering").on(t.offeringId),
   ]
 );
+
+/**
+ * Who is explicitly invited to a room.
+ *
+ * The third way into a channel, alongside tier rank and offering registration.
+ * `channels.isPrivate` makes this list the only way in.
+ */
+export const channelMembers = pgTable(
+  "channel_members",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    channelId: uuid("channel_id").notNull(),
+    userId: varchar("user_id").notNull(),
+    /** Useful a year later when nobody remembers why this person is here. */
+    addedBy: varchar("added_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_channel_members").on(t.channelId, t.userId),
+    index("idx_channel_members_user").on(t.userId),
+  ],
+);
+
+export type ChannelMember = typeof channelMembers.$inferSelect;
 
 export type Channel = typeof channels.$inferSelect;
 export const insertChannelSchema = createInsertSchema(channels).omit({
