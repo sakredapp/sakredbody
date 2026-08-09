@@ -38,6 +38,24 @@ export const users = pgTable("users", {
   currentStreak: integer("current_streak").default(0),
   longestStreak: integer("longest_streak").default(0),
   membershipTier: varchar("membership_tier").default("free"), // 'free' | 'premium'
+  /**
+   * When this account was confirmed to belong to an adult.
+   *
+   * The App Store questionnaire ties Social Media, User-Generated Content and
+   * Age Assurance together — the community channels make the first two true,
+   * so the third has to be true as well.
+   *
+   * Only the result is kept, never the date of birth. Storing the date would
+   * add a category of personal data to every privacy disclosure on both
+   * stores in exchange for something we would never query; the timestamp
+   * answers the only question that matters. Members who want numerology enter
+   * their birth date separately, into user_cosmology, which stays opt-in the
+   * way it was designed to be.
+   *
+   * Null means "joined before the gate existed", not "failed it" — never
+   * treat it as a reason to deny access.
+   */
+  ageVerifiedAt: timestamp("age_verified_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

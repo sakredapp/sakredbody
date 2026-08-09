@@ -60,7 +60,7 @@ export interface IStorage {
   // User methods (unified — used by both auth and business logic)
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
-  upsertUser(user: { email: string; password?: string; firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null }): Promise<User>;
+  upsertUser(user: { email: string; password?: string; firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null; ageVerifiedAt?: Date | null }): Promise<User>;
   setUserAdmin(id: string, isAdmin: boolean): Promise<User | undefined>;
 }
 
@@ -214,7 +214,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async upsertUser(userData: { email: string; password?: string; firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null }): Promise<User> {
+  async upsertUser(userData: { email: string; password?: string; firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null; ageVerifiedAt?: Date | null }): Promise<User> {
     const [user] = await db
       .insert(users)
       .values(userData)

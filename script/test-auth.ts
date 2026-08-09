@@ -13,6 +13,7 @@
 
 import { hashPassword, verifyPassword } from "../server/auth/password.js";
 import { THROTTLE } from "../shared/models/security.js";
+import { isAdult } from "../server/auth/age.js";
 
 let passed = 0;
 let failed = 0;
@@ -86,6 +87,30 @@ async function main() {
   check("few enough to stop guessing", THROTTLE.emailMax <= 10);
   check("the window is long enough to be a window", THROTTLE.windowMs >= 60_000);
   check("a lockout ends on its own", THROTTLE.lockMs > 0 && THROTTLE.lockMs <= 60 * 60 * 1000);
+
+  console.log("\nThe age gate counts years, not year numbers\n");
+
+  // Fixed "now" so these assertions mean the same thing in 2027.
+  const now = new Date("2026-08-09T12:00:00Z");
+
+  // The case a year subtraction gets wrong. 2026 - 2008 is 18, and this
+  // person is seventeen for another four months.
+  check("birthday not yet reached this year is under 18", !isAdult("2008-12-25", now));
+  check("birthday already passed this year is 18", isAdult("2008-03-01", now));
+  check("exactly 18 today is allowed", isAdult("2008-08-09", now));
+  check("one day short of 18 is refused", !isAdult("2008-08-10", now));
+
+  check("plainly old enough", isAdult("1985-06-14", now));
+  check("plainly too young", !isAdult("2015-01-01", now));
+
+  // A future date is a broken form, not a very young member.
+  check("a birth date in the future is refused", !isAdult("2030-01-01", now));
+
+  // new Date("2026-02-31") rolls forward to March rather than throwing, so
+  // the check has to round-trip the string rather than trust the parse.
+  check("an impossible date is refused", !isAdult("2008-02-31", now));
+  check("a malformed date is refused", !isAdult("09/08/2008", now));
+  check("an empty date is refused", !isAdult("", now));
 
   console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);
   if (failed > 0) process.exit(1);

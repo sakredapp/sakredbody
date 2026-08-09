@@ -19,6 +19,16 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+
+  // Eighteen years ago today, as the picker's upper bound. Computed once per
+  // render rather than stored — a session left open across midnight on a
+  // birthday would otherwise hold a stale limit.
+  const maxBirthDate = (() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 18);
+    return d.toISOString().slice(0, 10);
+  })();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -37,7 +47,7 @@ export default function LoginPage() {
     const body =
       mode === "login"
         ? { email, password }
-        : { email, password, firstName, lastName };
+        : { email, password, firstName, lastName, dateOfBirth };
 
     try {
       const res = await apiFetch(endpoint, {
@@ -130,6 +140,30 @@ export default function LoginPage() {
                       required
                       className="bg-white/10 border-white/20 text-white placeholder:text-white/40"
                     />
+                  </div>
+                )}
+                {mode === "register" && (
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="dateOfBirth"
+                      className="text-xs uppercase tracking-[0.18em] text-white/50"
+                    >
+                      Date of birth
+                    </label>
+                    <Input
+                      id="dateOfBirth"
+                      type="date"
+                      value={dateOfBirth}
+                      onChange={(e) => setDateOfBirth(e.target.value)}
+                      required
+                      // The server enforces this; max is only so the picker
+                      // doesn't invite a date it will then refuse.
+                      max={maxBirthDate}
+                      className="bg-white/10 border-white/20 text-white placeholder:text-white/40 [color-scheme:dark]"
+                    />
+                    <p className="text-xs text-white/40">
+                      Sakred Body is for adults. We check your age and don't keep the date.
+                    </p>
                   </div>
                 )}
                 <Input

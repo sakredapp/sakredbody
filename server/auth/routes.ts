@@ -24,6 +24,7 @@ import { track, trackError } from "../telemetry/index.js";
 import { z } from "zod";
 import { hashPassword, verifyPassword, burnTime } from "./password.js";
 import { issueToken, revokeToken, bearerFrom } from "./bearerAuth.js";
+import { isAdult } from "./age.js";
 
 // ─── What we accept ────────────────────────────────────────────────────────
 
@@ -41,7 +42,20 @@ const registerSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters").max(1024),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
+  /**
+   * Date of birth, checked and then discarded — see users.ageVerifiedAt.
+   *
+   * Validated on the server rather than trusted from the form. A client-side
+   * check is a suggestion; this is the gate, and it is the reason the App
+   * Store age-assurance answer is true rather than aspirational.
+   */
+  dateOfBirth: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Enter your date of birth as YYYY-MM-DD")
+    .refine((value) => !Number.isNaN(Date.parse(value)), "That isn't a real date")
+    .refine(isAdult, "You must be 18 or older to join"),
 });
+
 
 // ─── Throttling ────────────────────────────────────────────────────────────
 
@@ -262,6 +276,9 @@ export function registerAuthRoutes(app: Express): void {
         password: hashedPassword,
         firstName: parsed.firstName,
         lastName: parsed.lastName,
+        // The date itself is deliberately not stored — parsed.dateOfBirth
+        // goes out of scope here and only the fact of the check survives.
+        ageVerifiedAt: new Date(),
       });
 
       // Registration authenticates, so it fixes a session exactly the same
