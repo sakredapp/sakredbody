@@ -56,6 +56,9 @@ const initPromise = (async () => {
     const { registerRoutes } = await import("../server/routes.js");
     const { registerNotificationRoutes } = await import("../server/notifications/routes.js");
     const { registerSupportRoutes } = await import("../server/support/routes.js");
+    const { registerApplicationRoutes } = await import("../server/applications/routes.js");
+    const { registerRetreatAdminRoutes } = await import("../server/retreats/routes.js");
+    const { registerCohortRoutes } = await import("../server/cohorts/routes.js");
 
     setupAuth(app);
     // After setupAuth because it writes to req.session, and before every route
@@ -64,6 +67,13 @@ const initPromise = (async () => {
     registerAuthRoutes(app);
     registerNotificationRoutes(app);
     registerSupportRoutes(app);
+    // This file is the production entry point, not server/index.ts — that one
+    // only runs locally. A route module registered there and not here builds,
+    // typechecks, passes tests, and 404s in production. Every module has to be
+    // in both lists.
+    registerApplicationRoutes(app);
+    registerRetreatAdminRoutes(app);
+    registerCohortRoutes(app);
     await registerRoutes(httpServer, app);
     
     // Error handler (must be added after routes)
