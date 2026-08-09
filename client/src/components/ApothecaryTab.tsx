@@ -33,6 +33,7 @@ import {
 import { Search, Check, ExternalLink, Leaf } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { track, trackBuyClick } from "@/lib/track";
+import { SectionHeading } from "@/components/portal/Panel";
 
 const PHASE_LABEL: Record<string, string> = {
   prepare: "Prepare",
@@ -239,10 +240,15 @@ export function ApothecaryTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <h2 className="font-display text-2xl" data-testid="text-apothecary-heading">
-          The Apothecary
-        </h2>
+      <div className="flex items-end justify-between gap-4 flex-wrap">
+        <SectionHeading
+          title="The Apothecary"
+          subtitle={
+            remaining > 0
+              ? `${remaining} still to get for your protocol.`
+              : "What the protocols actually call for."
+          }
+        />
         <div className="flex items-center bg-muted/60 rounded-full p-1 gap-0.5">
           {([
             { id: "supply" as const, label: "Your Supply" },

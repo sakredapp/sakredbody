@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { track } from "@/lib/track";
 import { renderWinCard, shareOrDownloadWinCard } from "@/lib/winCard";
 import { WIN_IMAGES, type Win, type WinKind } from "@shared/models/wins";
+import { SectionHeading, Panel, StatTile } from "@/components/portal/Panel";
 
 async function get<T>(url: string, label: string): Promise<T> {
   const res = await fetch(url, { credentials: "include" });
@@ -231,26 +232,55 @@ export function WinsTab() {
     );
   }
 
+  // The heading stays on the empty state.
+  //
+  // Every screen in this app is empty until there is content, so the empty
+  // state is the design most of the time — and a bare centred paragraph with
+  // no title reads as a screen that failed to load rather than one waiting
+  // for you. The heading is what says "you're in the right place, there is
+  // nothing here yet".
   if (!wins.data || wins.data.length === 0) {
     return (
-      <div className="py-20 text-center space-y-3">
-        <Award className="h-10 w-10 mx-auto text-muted-foreground/30" />
-        <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-          Finish a day and the first one appears. They're for the things that
-          actually took something.
-        </p>
+      <div className="space-y-6">
+        <SectionHeading
+          title="What you've finished"
+          subtitle="Take the picture. Tell the room."
+        />
+        <Panel>
+          <div className="py-12 text-center space-y-3">
+            <Award className="h-10 w-10 mx-auto text-muted-foreground/30" />
+            <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+              Finish a day and the first one appears. They're for the things that
+              actually took something.
+            </p>
+          </div>
+        </Panel>
       </div>
     );
   }
 
+  // Counted here rather than on the server: it is two numbers off a list
+  // already in memory, and an endpoint for it would be a second place the
+  // definition of "shared" could drift from.
+  const shared = wins.data.filter((w) => w.sharedAt).length;
+
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h2 className="font-display text-2xl">What you've finished</h2>
-        <p className="text-sm text-muted-foreground">
-          Take the picture. Tell the room.
-        </p>
-      </div>
+      <SectionHeading
+        title="What you've finished"
+        subtitle="Take the picture. Tell the room."
+      />
+
+      <Panel title="The count">
+        <div className="grid grid-cols-2 gap-3">
+          <StatTile label="Earned" value={wins.data.length} />
+          <StatTile
+            label="Shared"
+            value={shared}
+            sub={shared === 0 ? "None yet" : undefined}
+          />
+        </div>
+      </Panel>
 
       <div className="grid sm:grid-cols-2 gap-4">
         {wins.data.map((w) => (

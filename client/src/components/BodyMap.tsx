@@ -23,6 +23,7 @@ import type { CentreState } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { SectionHeading } from "@/components/portal/Panel";
 
 const STATES: { id: CentreState; label: string }[] = [
   { id: "blocked", label: "Blocked" },
@@ -263,19 +264,29 @@ export function BodyMap() {
     );
   }
 
+  // Heading kept on the empty state — see WinsTab for why: while the app has
+  // no content, the empty state is the screen most of the time, and a bare
+  // sentence with no title reads as a failure rather than as waiting.
   if (centres.length === 0) {
     return (
-      <p className="py-20 text-center text-sm text-muted-foreground">
-        The map hasn't been drawn yet.
-      </p>
+      <div className="space-y-6">
+        <SectionHeading
+          title="The Body"
+          subtitle="Where things sit, and what you notice when they move."
+        />
+        <p className="py-12 text-center text-sm text-muted-foreground">
+          The map hasn't been drawn yet.
+        </p>
+      </div>
     );
   }
 
   return (
     <div className="space-y-8">
-      <h2 className="font-display text-2xl" data-testid="text-bodymap-heading">
-        The Body
-      </h2>
+      <SectionHeading
+        title="The Body"
+        subtitle="Where things sit, and what you notice when they move."
+      />
 
       <div className="grid md:grid-cols-[220px_1fr] gap-12">
         <Axis

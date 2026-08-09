@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Channel } from "@shared/schema";
+import { SectionHeading } from "@/components/portal/Panel";
 
 /** Kept short deliberately. A long picker turns a reaction into a decision. */
 const REACTIONS = ["🔥", "🙏", "💛", "👀", "🌙"];
@@ -680,6 +681,11 @@ export function CommunityTab() {
 
   return (
     <div className="space-y-6">
+      <SectionHeading
+        title="The Room"
+        subtitle="What people are working through, and what they've finished."
+      />
+
       {/* Rooms + search. Rooms scroll horizontally so the header never wraps
           on a phone, however many cohort rooms someone belongs to. */}
       <div className="space-y-3">

@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Lock, BookOpen, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SectionHeading } from "@/components/portal/Panel";
 
 function readingLabel(entry: ShelfEntry) {
   if (entry.progress?.completedAt) return "Finished";
@@ -282,10 +283,13 @@ export function LibraryTab() {
 
   return (
     <div className="space-y-6">
+      {/* Only on the shelf. Inside a guide the heading is the guide's own
+          title, and two display headings stacked would compete. */}
       {!open && (
-        <h2 className="font-display text-2xl" data-testid="text-library-heading">
-          The Library
-        </h2>
+        <SectionHeading
+          title="The Library"
+          subtitle="The reasoning behind the protocols, long enough to be worth reading."
+        />
       )}
       {open ? (
         <Reader ebookId={open} onBack={() => setOpen(null)} />

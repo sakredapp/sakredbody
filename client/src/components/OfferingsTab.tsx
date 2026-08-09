@@ -37,6 +37,7 @@ import {
   Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SectionHeading } from "@/components/portal/Panel";
 import {
   OFFERING_KIND_LABELS,
   OFFERING_FORMAT_LABELS,
@@ -629,12 +630,10 @@ export function OfferingsTab() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h2 className="font-display text-2xl">What's on</h2>
-        <p className="text-sm text-muted-foreground">
-          Retreats, masterminds, and the people we bring in to talk.
-        </p>
-      </div>
+      <SectionHeading
+        title="What's on"
+        subtitle="Retreats, masterminds, and the people we bring in to talk."
+      />
 
       <div className="flex gap-1 overflow-x-auto scrollbar-thin">
         {VIEWS.map((v) => (
