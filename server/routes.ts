@@ -23,23 +23,28 @@ import { registerWinRoutes } from "./wins/index.js";
 import { registerMemberRoutes } from "./members/index.js";
 import { registerTrainingRoutes } from "./training/index.js";
 import { registerModerationRoutes } from "./moderation/index.js";
+import { requireRole } from "./auth/roles.js";
+import {
+  atLeast,
+  can,
+  effectiveRole,
+  CAPABILITIES,
+  type Capability,
+} from "../shared/models/access.js";
 
-// Exported so the support routes can reuse the same guard rather than
-// reimplementing an admin check that could drift from this one.
-export function isAdmin(req: Request, res: Response, next: NextFunction) {
-  const userId = req.session?.userId;
-  if (!userId) {
-    return res.status(401).json({ message: "Not authenticated" });
-  }
-  storage.getUser(userId).then((user) => {
-    if (!user || user.isAdmin !== "true") {
-      return res.status(403).json({ message: "Admin access required" });
-    }
-    next();
-  }).catch(() => {
-    res.status(500).json({ message: "Internal Server Error" });
-  });
-}
+/**
+ * The original gate, kept because roughly thirty routes import it.
+ *
+ * It no longer reads the `isAdmin` varchar directly: it delegates to the role
+ * ladder in shared/models/access.ts, which trusts whichever of `role` and the
+ * legacy bit is higher. Behaviour for existing accounts is identical — an
+ * `isAdmin: "true"` row resolves to the `admin` role — but a route gated this
+ * way now also admits `owner`, which the string comparison did not.
+ *
+ * New routes should use `requireCapability` from ./auth/roles.js and say what
+ * they need rather than how senior the caller has to be.
+ */
+export const isAdmin = requireRole("admin");
 
 export async function registerRoutes(
   httpServer: Server,
@@ -253,7 +258,19 @@ export async function registerRoutes(
     try {
       const userId = req.session.userId;
       const user = await storage.getUser(userId);
-      res.json({ isAdmin: user?.isAdmin === "true" });
+      const role = user ? effectiveRole(user) : "member";
+      // `isAdmin` stays in the response — the admin portal reads it and this
+      // route is not the place to break it. `role` and `capabilities` are
+      // what new UI should gate on: the client asks "can I answer support",
+      // not "am I senior enough", so re-levelling a capability moves the UI
+      // without a client release.
+      res.json({
+        isAdmin: atLeast(role, "admin"),
+        role,
+        capabilities: Object.fromEntries(
+          (Object.keys(CAPABILITIES) as Capability[]).map((c) => [c, can(role, c)]),
+        ),
+      });
     } catch (err) {
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });

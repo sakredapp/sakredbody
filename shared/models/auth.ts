@@ -20,7 +20,17 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  /**
+   * Legacy staff bit — a boolean stored as the string "true"/"false".
+   *
+   * Kept because `public.is_sakred_admin()` reads it and every RLS policy in
+   * the schema calls that function. `role` below is what new code asks. The
+   * app writes both and trusts whichever is higher; see
+   * shared/models/access.ts.
+   */
   isAdmin: varchar("is_admin").default("false"),
+  /** 'member' | 'coach' | 'moderator' | 'admin' | 'owner' — see access.ts. */
+  role: varchar("role").notNull().default("member"),
   // IANA zone, e.g. "America/Los_Angeles". The server has no other way to know
   // when this member's day starts, and every habit is scheduled by calendar
   // date — get this wrong and completions land on the wrong day.

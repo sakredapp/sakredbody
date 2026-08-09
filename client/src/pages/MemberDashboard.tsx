@@ -79,6 +79,7 @@ import {
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 import { useInkSurface } from "@/hooks/use-ink-surface";
 import { PORTAL_COLUMN } from "@/lib/layout";
+import { useAccess } from "@/hooks/use-access";
 import { PortalBackdrop } from "@/components/portal/PortalBackdrop";
 import { PillarHome } from "@/components/PillarHome";
 import { BuildTab } from "@/components/BuildTab";
@@ -182,6 +183,7 @@ export default function MemberDashboard() {
   useInkSurface();
 
   const { user, isLoading: authLoading, isAuthenticated, logout } = useAuth();
+  const access = useAccess();
   const { toast } = useToast();
 
   // The server schedules by calendar date and runs in UTC; it needs to know
@@ -344,12 +346,15 @@ export default function MemberDashboard() {
           <MemberTopNav section={section} onChange={setSection} />
 
           <div className="flex items-center gap-3 flex-wrap">
-            {/* An admin is a member who can also do more, not a separate
-                account with its own door. Signing in once and finding the
-                back office here is the whole point — /admin used to greet
-                you with a second "Admin Portal — Sign In" screen even though
-                you were already signed in as an admin. */}
-            {user?.isAdmin === "true" && (
+            {/* Staff are members who can also do more, not separate accounts
+                with their own door. Signing in once and finding the back
+                office here is the whole point.
+
+                `isStaff` rather than `isAdmin === "true"`: the moment there
+                is a coach who sees their cohort and nothing else, this link
+                still needs to appear for them, and a string comparison
+                against a two-state field can't express that. */}
+            {access.isStaff && (
               <Link
                 href="/admin"
                 className="tap inline-flex items-center gap-1.5 px-3 rounded-full border border-gold/35 text-gold text-xs uppercase tracking-widest hover:border-gold/70 transition-colors"
