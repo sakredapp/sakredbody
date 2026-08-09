@@ -42,6 +42,7 @@ import {
   Map,
   Compass,
   BarChart3,
+  ShieldCheck,
 } from "lucide-react";
 import type { Retreat, BookingRequest, Partner, PartnerService } from "@shared/schema";
 import {
@@ -77,6 +78,7 @@ import {
 } from "@/components/MemberNav";
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 import { useInkSurface } from "@/hooks/use-ink-surface";
+import { PORTAL_COLUMN } from "@/lib/layout";
 import { PortalBackdrop } from "@/components/portal/PortalBackdrop";
 import { PillarHome } from "@/components/PillarHome";
 import { BuildTab } from "@/components/BuildTab";
@@ -334,7 +336,7 @@ export default function MemberDashboard() {
 
       {/* ─── Header ─── */}
       <header className="sticky top-0 pt-safe border-b border-border/50 bg-background/90 backdrop-blur-md" style={{ zIndex: 9999 }}>
-        <div className="container max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+        <div className={`${PORTAL_COLUMN} h-16 flex items-center justify-between gap-4`}>
           <Link href="/" className="flex items-center gap-2" data-testid="link-home-dashboard">
             <img src={sakredLogo} alt="Sakred Body" className="h-9 w-9 object-contain" />
           </Link>
@@ -342,6 +344,21 @@ export default function MemberDashboard() {
           <MemberTopNav section={section} onChange={setSection} />
 
           <div className="flex items-center gap-3 flex-wrap">
+            {/* An admin is a member who can also do more, not a separate
+                account with its own door. Signing in once and finding the
+                back office here is the whole point — /admin used to greet
+                you with a second "Admin Portal — Sign In" screen even though
+                you were already signed in as an admin. */}
+            {user?.isAdmin === "true" && (
+              <Link
+                href="/admin"
+                className="tap inline-flex items-center gap-1.5 px-3 rounded-full border border-gold/35 text-gold text-xs uppercase tracking-widest hover:border-gold/70 transition-colors"
+                data-testid="link-admin"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Admin</span>
+              </Link>
+            )}
             <Avatar className="w-8 h-8">
               {user?.profileImageUrl && <AvatarImage src={user.profileImageUrl} alt={user.firstName || "Member"} />}
               <AvatarFallback className="text-xs">{initials}</AvatarFallback>
@@ -391,7 +408,7 @@ export default function MemberDashboard() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
-            className="container max-w-3xl mx-auto px-4 py-6"
+            className={`${PORTAL_COLUMN} py-6`}
           >
             <PillarHome firstName={user?.firstName} onOpen={setSection} />
           </motion.div>
@@ -404,7 +421,7 @@ export default function MemberDashboard() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
-            className="container max-w-3xl mx-auto px-4 py-6"
+            className={`${PORTAL_COLUMN} py-6`}
           >
             <SettingsTab weightUnit={user?.weightUnit} onLogout={() => logout()} />
           </motion.div>
@@ -417,7 +434,7 @@ export default function MemberDashboard() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
-            className="container max-w-3xl mx-auto px-4 py-6"
+            className={`${PORTAL_COLUMN} py-6`}
           >
             <BuildTab />
           </motion.div>
@@ -430,7 +447,7 @@ export default function MemberDashboard() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
-            className="container max-w-3xl mx-auto px-4 py-6"
+            className={`${PORTAL_COLUMN} py-6`}
           >
             {coachingTab === "today" && <TodayTab />}
             {coachingTab === "journey" && <JourneyMap />}
@@ -448,7 +465,7 @@ export default function MemberDashboard() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
-            className="container max-w-3xl mx-auto px-4 py-8"
+            className={`${PORTAL_COLUMN} py-8`}
           >
             <CommunityTab />
           </motion.div>
@@ -461,7 +478,7 @@ export default function MemberDashboard() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
-            className="container max-w-3xl mx-auto px-4 py-8"
+            className={`${PORTAL_COLUMN} py-8`}
           >
             <WinsTab />
           </motion.div>
@@ -474,7 +491,7 @@ export default function MemberDashboard() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
-            className="container max-w-3xl mx-auto px-4 py-8"
+            className={`${PORTAL_COLUMN} py-8`}
           >
             <ApothecaryTab />
           </motion.div>
@@ -487,7 +504,7 @@ export default function MemberDashboard() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
-            className="container max-w-4xl mx-auto px-4 py-8"
+            className={`${PORTAL_COLUMN} py-8`}
           >
             <BodyMap />
           </motion.div>
@@ -500,7 +517,7 @@ export default function MemberDashboard() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
-            className="container max-w-4xl mx-auto px-4 py-8"
+            className={`${PORTAL_COLUMN} py-8`}
           >
             <LibraryTab />
           </motion.div>
@@ -513,7 +530,7 @@ export default function MemberDashboard() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
-            className="container max-w-6xl mx-auto px-4 py-6"
+            className={`${PORTAL_COLUMN} py-6`}
           >
             <MasterclassTab />
           </motion.div>
@@ -526,7 +543,7 @@ export default function MemberDashboard() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
-            className="container max-w-6xl mx-auto px-4 py-8"
+            className={`${PORTAL_COLUMN} py-8`}
           >
 
         {retreatView === "masterminds" && <OfferingsTab />}

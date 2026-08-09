@@ -16,6 +16,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { PORTAL_COLUMN } from "@/lib/layout";
 
 export interface SubNavItem<T extends string> {
   id: T;
@@ -80,7 +81,10 @@ export function SubNav<T extends string>({
       )}
       style={{ zIndex: 9998 }}
     >
-      <div className="container max-w-6xl mx-auto px-4 relative">
+      {/* Same column as the header and the panes — see lib/layout.ts. When
+          this was 6xl and the pane under it was 3xl, the tabs started an inch
+          to the left of the content they switched. */}
+      <div className={`${PORTAL_COLUMN} relative`}>
         <div
           ref={scroller}
           className="flex gap-1 overflow-x-auto scrollbar-thin scroll-touch py-1"
