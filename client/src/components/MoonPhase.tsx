@@ -66,12 +66,25 @@ export function MoonPhase({
       const cy = h / 2;
       const R = Math.min(w, h) * 0.3 * (1 + breath * 0.015);
 
-      // The halo. Wider on the exhale, like breath on cold glass.
-      const halo = ctx.createRadialGradient(cx, cy, R * 0.8, cx, cy, R * (2.4 + breath * 0.5));
-      halo.addColorStop(0, `rgba(235,211,162,${0.14 + breath * 0.08})`);
+      // The halo, filled into a circle rather than across the canvas.
+      //
+      // It used to be a radial gradient painted with fillRect, and at these
+      // sizes the gradient's outer stop sat past the canvas corner — so every
+      // pixel of the square carried some tint and the corners carried the most.
+      // The moon sat in a visible box. Same fault the gemstones had.
+      //
+      // Now the outer stop lands just inside the nearest edge and the fill is
+      // an arc, so the halo reaches zero before it reaches anything with a
+      // corner. The breath moves its brightness instead of its radius, which
+      // keeps that guarantee true on every frame.
+      const haloR = Math.min(w, h) * 0.48;
+      const halo = ctx.createRadialGradient(cx, cy, R * 0.8, cx, cy, haloR);
+      halo.addColorStop(0, `rgba(235,211,162,${0.16 + breath * 0.1})`);
       halo.addColorStop(1, "rgba(235,211,162,0)");
       ctx.fillStyle = halo;
-      ctx.fillRect(0, 0, w, h);
+      ctx.beginPath();
+      ctx.arc(cx, cy, haloR, 0, Math.PI * 2);
+      ctx.fill();
 
       // The unlit disc, so the dark limb still reads as a body.
       ctx.beginPath();
