@@ -76,6 +76,7 @@ import {
   type MemberSection,
 } from "@/components/MemberNav";
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
+import { useInkSurface } from "@/hooks/use-ink-surface";
 
 // Icon mapping (UI-only, can't live in shared/)
 const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -170,6 +171,10 @@ function BookingRequestCard({ booking }: { booking: BookingRequest }) {
 }
 
 export default function MemberDashboard() {
+  // First, and above every early return below — this file has had a
+  // hooks-after-return bug before, and an effect is a hook like any other.
+  useInkSurface();
+
   const { user, isLoading: authLoading, isAuthenticated, logout } = useAuth();
   const { toast } = useToast();
 

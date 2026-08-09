@@ -107,6 +107,7 @@ import {
   getCategoryLabel,
   type ServiceCategoryValue,
 } from "@shared/constants";
+import { useInkSurface } from "@/hooks/use-ink-surface";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SHARED HELPERS
@@ -729,6 +730,10 @@ function MemberSnapshotPanel({ userId }: { userId: string }) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 export default function AdminPortal() {
+  // First, and above the three early returns below. Putting a hook under one
+  // of those is exactly the bug that white-screened this portal once already.
+  useInkSurface();
+
   const { user, isLoading: authLoading, isAuthenticated, logout } = useAuth();
   const { toast } = useToast();
 
