@@ -15,8 +15,18 @@ Every file here is idempotent. Paste into the SQL editor and run, in this order
 | 5 | `library.sql` | `ebooks`, `ebook_sections`, `ebook_entitlements`, `ebook_progress` | **run 2026-08-08** |
 | 6 | `energy.sql` | `energy_centres` (+ nine seeded), `centre_habits`, `centre_routines`, `user_centre_readings`, `user_cosmology` | **run 2026-08-08** |
 | 7 | `cohorts.sql` | `cohorts`, `cohort_members`, `cohort_sessions`, `cohort_attendance` | **run 2026-08-08** |
+| 8 | `native-tokens.sql` | `auth_tokens`, `push_tokens` | **run 2026-08-09** |
+| 9 | `support-requests.sql` | `support_requests` | **run 2026-08-09** |
 
-All seven are applied to `zcvanbozvtojmnyuzsjh`, verified by table, policy and index.
+All nine are applied to `zcvanbozvtojmnyuzsjh`, verified by table, policy and index.
+
+`native-tokens.sql` is the only file that deliberately leaves a table with RLS
+enabled and **zero** policies. The database linter reports that as
+`rls_enabled_no_policy` at INFO level and it is not a misconfiguration here:
+both tables hold credentials rather than member content, the Express backend
+reaches them as the service role and bypasses RLS anyway, and deny-all is the
+correct posture for everything else. Do not "fix" it by adding a permissive
+policy.
 
 **Order matters** for 3–7: `habit-integrity.sql` de-duplicates `habits` before
 adding the unique index, and `apothecary.sql` / `energy.sql` both take foreign

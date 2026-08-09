@@ -15,6 +15,7 @@ export * from "./models/wins.js";
 export * from "./models/daily.js";
 export * from "./models/community.js";
 export * from "./models/security.js";
+export * from "./models/support.js";
 export * from "./models/training.js";
 export * from "./models/moderation.js";
 

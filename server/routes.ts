@@ -23,7 +23,9 @@ import { registerMemberRoutes } from "./members/index.js";
 import { registerTrainingRoutes } from "./training/index.js";
 import { registerModerationRoutes } from "./moderation/index.js";
 
-function isAdmin(req: Request, res: Response, next: NextFunction) {
+// Exported so the support routes can reuse the same guard rather than
+// reimplementing an admin check that could drift from this one.
+export function isAdmin(req: Request, res: Response, next: NextFunction) {
   const userId = req.session?.userId;
   if (!userId) {
     return res.status(401).json({ message: "Not authenticated" });

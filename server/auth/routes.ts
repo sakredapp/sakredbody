@@ -23,6 +23,7 @@ import { loginAttempts, THROTTLE } from "../../shared/models/security.js";
 import { track, trackError } from "../telemetry/index.js";
 import { z } from "zod";
 import { hashPassword, verifyPassword, burnTime } from "./password.js";
+import { issueToken, revokeToken, bearerFrom } from "./bearerAuth.js";
 
 // ─── What we accept ────────────────────────────────────────────────────────
 
@@ -176,6 +177,24 @@ async function establishSession(req: Request, userId: string): Promise<void> {
   );
 }
 
+/**
+ * Which native shell is calling, if any.
+ *
+ * The app sends `X-Client-Platform: ios | android`; browsers send nothing.
+ * Only these two values are honoured, so the header cannot be used to smuggle
+ * anything into the token row.
+ *
+ * Note that the session is still established for native callers even though
+ * they cannot hold the cookie. Branching the session logic on a client-
+ * supplied header would put a spoofable value in the middle of the one code
+ * path that must not have one — a wasted Set-Cookie is the cheaper mistake.
+ */
+function nativePlatform(req: Request): string | null {
+  const raw = req.headers["x-client-platform"];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return value === "ios" || value === "android" ? value : null;
+}
+
 // ─── Routes ────────────────────────────────────────────────────────────────
 
 export function registerAuthRoutes(app: Express): void {
@@ -211,8 +230,13 @@ export function registerAuthRoutes(app: Express): void {
 
       track("auth.login", { userId: user.id, surface: "login" });
 
+      const platform = nativePlatform(req);
+      const token = platform ? await issueToken(user.id, platform) : null;
+
       const { password: _, ...safeUser } = user;
-      res.json(safeUser);
+      // `token` is present only for native callers, so the web response shape
+      // is byte-for-byte what it was.
+      res.json(token ? { ...safeUser, token } : safeUser);
     } catch (error: unknown) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: error.errors[0].message });
@@ -246,8 +270,11 @@ export function registerAuthRoutes(app: Express): void {
 
       track("auth.register", { userId: user.id, surface: "register" });
 
+      const platform = nativePlatform(req);
+      const token = platform ? await issueToken(user.id, platform) : null;
+
       const { password: _, ...safeUser } = user;
-      res.status(201).json(safeUser);
+      res.status(201).json(token ? { ...safeUser, token } : safeUser);
     } catch (error: unknown) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: error.errors[0].message });
@@ -272,7 +299,14 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
-  app.post("/api/logout", (req: Request, res: Response) => {
+  app.post("/api/logout", async (req: Request, res: Response) => {
+    // Destroying the session does nothing for a native caller — its
+    // credential is the bearer token, and leaving it live would mean "log
+    // out" signed the member out of a browser they were never using while the
+    // phone stayed authenticated for another ninety days.
+    const raw = bearerFrom(req.headers.authorization);
+    if (raw) await revokeToken(raw);
+
     req.session.destroy((err: Error | null) => {
       if (err) {
         return res.status(500).json({ message: "Logout failed" });

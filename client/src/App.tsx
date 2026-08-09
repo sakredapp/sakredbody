@@ -23,6 +23,8 @@ const MemberDashboard = lazyRoute("MemberDashboard", () => import("@/pages/Membe
 const AdminPortal = lazyRoute("AdminPortal", () => import("@/pages/AdminPortal"));
 const Privacy = lazyRoute("Privacy", () => import("@/pages/Privacy"));
 const Terms = lazyRoute("Terms", () => import("@/pages/Terms"));
+const DeleteAccount = lazyRoute("DeleteAccount", () => import("@/pages/DeleteAccount"));
+const Support = lazyRoute("Support", () => import("@/pages/Support"));
 const NotFound = lazyRoute("NotFound", () => import("@/pages/not-found"));
 
 /**
@@ -63,6 +65,13 @@ function Router() {
       <Route path="/privacy-policy">{() => <Redirect to="/privacy" />}</Route>
       <Route path="/terms" component={Terms} />
       <Route path="/terms-of-service">{() => <Redirect to="/terms" />}</Route>
+      {/* Play requires this at a public URL, reachable without signing in. */}
+      <Route path="/delete-account" component={DeleteAccount} />
+      <Route path="/delete-my-account">{() => <Redirect to="/delete-account" />}</Route>
+      {/* Both stores require a support URL, and both open it signed out. */}
+      <Route path="/support" component={Support} />
+      <Route path="/help">{() => <Redirect to="/support" />}</Route>
+      <Route path="/contact">{() => <Redirect to="/support" />}</Route>
 
       {/* Members + admin */}
       <Route path="/login" component={LoginPage} />

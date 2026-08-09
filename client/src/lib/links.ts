@@ -47,8 +47,12 @@ export const LEGAL_LINKS = [
   // On this domain, not sakredhealth.com. The app stores require a policy at a
   // public URL for *this* product, and a reviewer following a link to another
   // brand's policy is a rejection.
+  { label: "Support", href: "/support" },
   { label: "Privacy Policy", href: "/privacy" },
   { label: "Terms of Service", href: "/terms" },
+  // Linked in the footer, not only from the Play listing: Play wants the route
+  // discoverable from the product itself, not just from the console field.
+  { label: "Delete Account", href: "/delete-account" },
   { label: "AI Privacy", href: "https://www.sakredhealth.com/ai-privacy" },
   { label: "Opt-In", href: "https://www.sakredhealth.com/opt-in" },
 ] as const;

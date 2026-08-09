@@ -5,12 +5,17 @@ import { serveStatic } from "./static.js";
 import { createServer } from "http";
 import { ensureStorageBucket } from "./supabaseStorage.js";
 import { securityHeaders } from "./security/headers.js";
+import { cors } from "./security/cors.js";
+import { bearerAuth } from "./auth/bearerAuth.js";
+import { registerNotificationRoutes } from "./notifications/routes.js";
+import { registerSupportRoutes } from "./support/routes.js";
 
 const app = express();
 const httpServer = createServer(app);
 
 // First middleware, so it applies to static assets and error responses too.
 app.use(securityHeaders);
+app.use(cors);
 
 declare module "http" {
   interface IncomingMessage {
@@ -67,7 +72,10 @@ app.use((req, res, next) => {
 
 (async () => {
   setupAuth(app);
+  app.use(bearerAuth);
   registerAuthRoutes(app);
+  registerNotificationRoutes(app);
+  registerSupportRoutes(app);
   await registerRoutes(httpServer, app);
 
   // Ensure Supabase Storage bucket exists (idempotent)

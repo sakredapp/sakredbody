@@ -2,6 +2,7 @@ import express, { type Request, type Response, type NextFunction } from "express
 import type { IncomingMessage, ServerResponse } from "http";
 import { createServer } from "http";
 import { securityHeaders } from "../server/security/headers.js";
+import { cors } from "../server/security/cors.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -15,6 +16,11 @@ const httpServer = createServer(app);
 // to fail at, and deferring it would mean the health check and any init-error
 // response went out bare.
 app.use(securityHeaders);
+
+// Immediately after the headers and before anything that can fail: a CORS
+// preflight is answered here and never reaches the deferred init below, so
+// the native app gets a straight 204 even while the database is waking up.
+app.use(cors);
 
 app.use(
   express.json({
@@ -46,10 +52,18 @@ let initError: Error | null = null;
 const initPromise = (async () => {
   try {
     const { setupAuth, registerAuthRoutes } = await import("../server/auth/index.js");
+    const { bearerAuth } = await import("../server/auth/bearerAuth.js");
     const { registerRoutes } = await import("../server/routes.js");
-    
+    const { registerNotificationRoutes } = await import("../server/notifications/routes.js");
+    const { registerSupportRoutes } = await import("../server/support/routes.js");
+
     setupAuth(app);
+    // After setupAuth because it writes to req.session, and before every route
+    // because they all read req.session.userId.
+    app.use(bearerAuth);
     registerAuthRoutes(app);
+    registerNotificationRoutes(app);
+    registerSupportRoutes(app);
     await registerRoutes(httpServer, app);
     
     // Error handler (must be added after routes)

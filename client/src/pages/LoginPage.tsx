@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Download, Loader2, Smartphone } from "lucide-react";
 import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/links";
+import { apiFetch, setAuthToken } from "@/lib/apiFetch";
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
 type Mode = "login" | "register";
@@ -39,10 +40,9 @@ export default function LoginPage() {
         : { email, password, firstName, lastName };
 
     try {
-      const res = await fetch(endpoint, {
+      const res = await apiFetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify(body),
       });
 
@@ -52,6 +52,12 @@ export default function LoginPage() {
         setError(data.message || "Something went wrong");
         return;
       }
+
+      // Present only for the native shells, which cannot hold the session
+      // cookie. Storing it before the redirect matters: the member portal
+      // fires /api/auth/user immediately on load, and without the token that
+      // request is anonymous and bounces straight back to this page.
+      if (data.token) await setAuthToken(data.token);
 
       // Auth successful — redirect to member portal
       window.location.href = "/member";

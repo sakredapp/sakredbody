@@ -116,6 +116,11 @@ export const EVENT_NAMES = [
   "training.session_start",
   "training.session_finish",
 
+  // Support. Worth counting because the category breakdown says where the
+  // product is confusing, and a spike in "technical" usually arrives before
+  // the error events do.
+  "support.submitted",
+
   // Failures worth knowing about, rather than an empty catch.
   "error.client",
   "error.server",

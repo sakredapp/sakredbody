@@ -1,10 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@shared/models/auth";
+import { apiFetch, clearAuthToken } from "@/lib/apiFetch";
 
 async function fetchUser(): Promise<User | null> {
-  const response = await fetch("/api/auth/user", {
-    credentials: "include",
-  });
+  const response = await apiFetch("/api/auth/user");
 
   if (response.status === 401) {
     return null;
@@ -18,7 +17,11 @@ async function fetchUser(): Promise<User | null> {
 }
 
 async function logout(): Promise<void> {
-  await fetch("/api/logout", { method: "POST", credentials: "include" });
+  // Sent while the token is still attached — the server revokes the bearer
+  // row it was presented with, so the device is signed out server-side rather
+  // than merely forgetting its credential locally.
+  await apiFetch("/api/logout", { method: "POST" });
+  await clearAuthToken();
   window.location.href = "/";
 }
 
