@@ -92,6 +92,7 @@ export default function Executive() {
           either side. The panel fits the form instead. */}
       <Section
         tone="raised"
+        width="max-w-3xl"
         id="apply"
         className="scroll-mt-28 py-12 md:py-14"
         containerClassName="max-w-3xl"

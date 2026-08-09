@@ -13,6 +13,16 @@ interface SectionProps extends React.HTMLAttributes<HTMLElement> {
    */
   tone?: SectionTone;
   containerClassName?: string;
+  /**
+   * How wide the raised panel itself is drawn — a Tailwind `max-w-*`.
+   *
+   * A panel is a card, and a card should be the size of what's on it. This
+   * used to stretch to the viewport with the content capped at max-w-6xl
+   * inside it, which on a wide monitor meant a slab most of a screen across
+   * with a narrow column of type down the middle and nothing either side of
+   * it. Sections whose content is a centred column pass a narrower value.
+   */
+  width?: string;
 }
 
 export function Section({
@@ -21,6 +31,7 @@ export function Section({
   dark = false,
   tone,
   containerClassName,
+  width = "max-w-6xl",
   ...props
 }: SectionProps) {
   const resolvedTone: SectionTone = tone ?? (dark ? "raised" : "raised");
@@ -35,7 +46,8 @@ export function Section({
       <div className="tone-ink bg-background px-4 sm:px-8 lg:px-14 py-3 sm:py-4">
         <section
           className={cn(
-            "tone-raised rounded-2xl sm:rounded-[1.75rem] py-10 md:py-14 relative overflow-hidden",
+            "tone-raised mx-auto w-full rounded-2xl sm:rounded-[1.75rem] py-10 md:py-14 relative overflow-hidden",
+            width,
             // Lit from above, like a slab under a low light. The gradient is
             // only four points of lightness end to end — enough to give the
             // panel a top and a bottom, not enough to read as a gradient.

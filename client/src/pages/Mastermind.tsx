@@ -288,7 +288,7 @@ export default function Mastermind() {
         </div>
       </Section>
 
-      <Section tone="raised" className="text-center py-12 md:py-16">
+      <Section tone="raised" width="max-w-3xl" className="text-center py-12 md:py-16">
         <div className="max-w-2xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-display font-normal mb-6" data-testid="text-final-cta-headline">You've invested in your business.<br/><span className="text-gold">Now invest in yourself.</span></h2>
           <p className="text-muted-foreground text-lg mb-10 leading-relaxed">

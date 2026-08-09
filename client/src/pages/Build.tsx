@@ -66,7 +66,7 @@ export default function Build() {
       />
 
       {/* ── The argument ─────────────────────────────────────── */}
-      <Section tone="raised">
+      <Section tone="raised" width="max-w-4xl">
         <motion.div
           initial="hidden"
           whileInView="visible"
@@ -121,7 +121,7 @@ export default function Build() {
       </Section>
 
       {/* ── Mistakes ─────────────────────────────────────────── */}
-      <Section tone="raised">
+      <Section tone="raised" width="max-w-4xl">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
