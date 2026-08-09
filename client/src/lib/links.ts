@@ -44,8 +44,11 @@ export const SITE_NAV: NavEntry[] = [
 
 /** Legal pages are shared across the brands and live on the Sakred Health domain. */
 export const LEGAL_LINKS = [
-  { label: "Privacy Policy", href: "https://www.sakredhealth.com/privacy-policy" },
-  { label: "Terms of Service", href: "https://www.sakredhealth.com/terms-of-service" },
+  // On this domain, not sakredhealth.com. The app stores require a policy at a
+  // public URL for *this* product, and a reviewer following a link to another
+  // brand's policy is a rejection.
+  { label: "Privacy Policy", href: "/privacy" },
+  { label: "Terms of Service", href: "/terms" },
   { label: "AI Privacy", href: "https://www.sakredhealth.com/ai-privacy" },
   { label: "Opt-In", href: "https://www.sakredhealth.com/opt-in" },
 ] as const;

@@ -141,18 +141,29 @@ export function SiteFooter() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-xs text-muted-foreground">
             <span>Copyright {new Date().getFullYear()} Sakred Body. All rights reserved.</span>
             <div className="flex flex-wrap gap-x-6 gap-y-2">
-              {LEGAL_LINKS.map((l) => (
-                <a
-                  key={l.href}
-                  href={l.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-gold transition-colors"
-                  data-testid={`link-${l.label.toLowerCase().replace(/\s+/g, "-")}`}
-                >
-                  {l.label}
-                </a>
-              ))}
+              {/* Privacy and Terms live on this site now, so they route
+                  in-app rather than opening a tab. The remaining entries still
+                  point at sakredhealth.com and keep the external treatment. */}
+              {LEGAL_LINKS.map((l) => {
+                const testId = `link-${l.label.toLowerCase().replace(/\s+/g, "-")}`;
+                const className = "hover:text-gold transition-colors";
+                return l.href.startsWith("/") ? (
+                  <Link key={l.href} href={l.href} className={className} data-testid={testId}>
+                    {l.label}
+                  </Link>
+                ) : (
+                  <a
+                    key={l.href}
+                    href={l.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={className}
+                    data-testid={testId}
+                  >
+                    {l.label}
+                  </a>
+                );
+              })}
             </div>
           </div>
         </div>

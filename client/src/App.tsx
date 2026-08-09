@@ -21,6 +21,8 @@ const Mastermind = lazyRoute("Mastermind", () => import("@/pages/Mastermind"));
 const LoginPage = lazyRoute("LoginPage", () => import("@/pages/LoginPage"));
 const MemberDashboard = lazyRoute("MemberDashboard", () => import("@/pages/MemberDashboard"));
 const AdminPortal = lazyRoute("AdminPortal", () => import("@/pages/AdminPortal"));
+const Privacy = lazyRoute("Privacy", () => import("@/pages/Privacy"));
+const Terms = lazyRoute("Terms", () => import("@/pages/Terms"));
 const NotFound = lazyRoute("NotFound", () => import("@/pages/not-found"));
 
 /**
@@ -52,6 +54,15 @@ function Router() {
       <Route path="/app">{() => <Redirect to="/member" />}</Route>
       <Route path="/food-chart" component={FoodChart} />
       <Route path="/mastermind" component={Mastermind} />
+
+      {/* Legal. /privacy and /terms are the canonical URLs — both app
+          stores want a policy at a stable public address, and these are the
+          ones registered with them. The longer spellings are kept as
+          redirects because they are what the old footer linked to. */}
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/privacy-policy">{() => <Redirect to="/privacy" />}</Route>
+      <Route path="/terms" component={Terms} />
+      <Route path="/terms-of-service">{() => <Redirect to="/terms" />}</Route>
 
       {/* Members + admin */}
       <Route path="/login" component={LoginPage} />
