@@ -21,6 +21,7 @@ import { TelemetryAdmin } from "@/components/admin/Telemetry";
 import { MembersAdmin } from "@/components/admin/Members";
 import { LibraryAdmin } from "@/components/admin/Library";
 import { EnergyAdmin } from "@/components/admin/Energy";
+import { TrainingAdmin } from "@/components/admin/Training";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -144,7 +145,8 @@ type AdminTab =
   | "masterclass"
   | "apothecary"
   | "library"
-  | "energy";
+  | "energy"
+  | "training";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // AUTH GATES
@@ -1262,6 +1264,7 @@ export default function AdminPortal() {
             { key: "apothecary" as AdminTab, label: "Apothecary", badge: null },
             { key: "library" as AdminTab, label: "Library", badge: null },
             { key: "energy" as AdminTab, label: "The Body", badge: null },
+            { key: "training" as AdminTab, label: "Build", badge: null },
           ]).map((t) => (
             <Button
               key={t.key}
@@ -1289,6 +1292,9 @@ export default function AdminPortal() {
 
         {/* ═══════════════ THE BODY TAB ═══════════════ */}
         {tab === "energy" && <EnergyAdmin />}
+
+        {/* ═══════════════ BUILD TAB ═══════════════ */}
+        {tab === "training" && <TrainingAdmin />}
 
         {tab === "apothecary" && <ApothecaryAdmin enabled={isAdmin} />}
 
