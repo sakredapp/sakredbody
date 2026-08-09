@@ -192,15 +192,8 @@ export default function Home() {
               <span className="gold-gradient-text">Embody the Life.</span>
             </motion.h1>
 
-            <motion.p
-              variants={fadeInUp}
-              className="text-base md:text-lg text-white/60 mt-7 max-w-2xl mx-auto leading-relaxed"
-            >
-              Not wellness. Not fitness. Not detox. Human capacity — because the body is the terrain you
-              have to live your whole life through. Clear it, restore it, build it, and then actually use
-              it for something.
-            </motion.p>
-
+            {/* No paragraph. The three lines already say it, and the figure
+                above them says it before any of the words do. */}
             <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
               <Magnetic>
                 <Button
