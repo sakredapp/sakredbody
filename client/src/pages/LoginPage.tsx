@@ -89,37 +89,33 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen relative flex flex-col">
       {/* ── Background ──────────────────────────────────────────────────────
-          Three layers, and the order is the whole point.
+          The ground, then the sky. Nothing else.
 
-          The photograph used to be the background, at roughly a third
-          brightness. It is now nearly out — held at 25% under a heavier wash —
-          because a star chart drawn over a legible photograph reads as an
-          overlay on a picture, not as a sky. What the photograph still does at
-          this strength is keep the screen from being flat black, which is what
-          a constellation needs behind it to have any depth at all.
+          There was a photograph of water under here — first as the background
+          proper, then dimmed to 25% and held under a 95% wash on the argument
+          that it kept the screen from being flat black. At that strength it
+          contributed a bit over one percent of what you were looking at: a
+          131KB download nobody could see, on the one screen a person hits
+          before they have any reason to trust the app is fast. If a layer has
+          to be argued for, it isn't doing anything.
 
-          The sky sits above the wash rather than under it, or the wash would
-          be doing to the constellation exactly what it is there to do to the
-          photograph.
+          The sky has its own depth and doesn't need help faking it.
 
-          The wash is `--ink`, the token, and not a hex. The first version of
-          this screen used #05060a — a cold near-black that looked right on its
-          own and was wrong the moment you signed in, because every other
-          surface in the product is hsl(30 10% 10%), which is warm. Two greys
-          three points apart in lightness and thirty degrees apart in hue read
-          as two different apps when you cross between them. Anything that has
-          to match the app has to name the same variable the app names. */}
-      <div
-        className="absolute inset-0 bg-cover bg-center opacity-25"
-        style={{ backgroundImage: "url('/images/member-login-bg.webp')" }}
-      />
-      <div className="absolute inset-0 bg-[hsl(var(--ink))]/95" />
+          `--ink`, the token, not a hex. An earlier pass used #05060a — a cold
+          near-black that looked right alone and was wrong the moment you
+          signed in, because every other surface in the product is warm. Two
+          greys three points apart in lightness and thirty degrees apart in
+          hue read as two different apps when you cross between them. */}
+      <div className="absolute inset-0 bg-[hsl(var(--ink))]" />
       {/* `clearTop` keeps the figures out from under the logo and the back
           link, which float over the top of this screen. Without it the first
           figure stood with its head behind the logo — placed correctly on the
           canvas, and invisible on the page. */}
       <ConstellationSky
         className="absolute inset-0 w-full h-full"
+        // A login screen is a door, not a gallery. Three figures at most, so
+        // the dark between them is doing as much work as they are.
+        density={0.7}
         clearCentre={0.55}
         clearTop={0.15}
       />

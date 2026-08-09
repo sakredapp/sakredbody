@@ -41,6 +41,12 @@ export function mountStage(
 
   const resize = () => {
     const rect = canvas.getBoundingClientRect();
+    // A canvas laid out at zero — inside a collapsed parent, or before the
+    // first layout — must not latch a 1×1 backing store and then draw a whole
+    // scene into it. Skip; the observer fires again when it has a size.
+    if (rect.width < 1 || rect.height < 1) return;
+    if (rect.width === stage.w && rect.height === stage.h) return;
+
     stage.w = rect.width;
     stage.h = rect.height;
     canvas.width = Math.max(1, Math.round(rect.width * dpr));
@@ -64,7 +70,29 @@ export function mountStage(
   const draw = init(stage);
   resize();
 
+  /**
+   * The canvas is watched directly, not via `window.resize`.
+   *
+   * This is the fix for the stretched animations in the native shells. A
+   * canvas has two sizes — the CSS box it occupies and the pixel buffer it
+   * owns — and they are only kept in step by this function running. In a
+   * browser `window.resize` is a decent proxy. In an iOS WebView it is not:
+   * the box changes when the safe-area insets resolve after first paint, when
+   * the keyboard opens, when the status bar overlays. None of those reliably
+   * fire `resize`. The element grows, the buffer doesn't, and the browser
+   * scales the old bitmap to the new box — non-uniformly, because the aspect
+   * ratio changed. That is exactly what "stretching the animations out"
+   * looks like, and it affects every canvas in the product.
+   *
+   * ResizeObserver watches the thing that actually matters. `window.resize`
+   * stays as a belt-and-braces for browsers where an orientation change
+   * resizes the viewport without resizing this element.
+   */
+  const observer = new ResizeObserver(resize);
+  observer.observe(canvas);
+
   window.addEventListener("resize", resize);
+  window.addEventListener("orientationchange", resize);
   canvas.addEventListener("pointermove", onMove);
   canvas.addEventListener("pointerleave", onLeave);
 
@@ -100,7 +128,9 @@ export function mountStage(
     visible = false;
     cancelAnimationFrame(raf);
     io.disconnect();
+    observer.disconnect();
     window.removeEventListener("resize", resize);
+    window.removeEventListener("orientationchange", resize);
     canvas.removeEventListener("pointermove", onMove);
     canvas.removeEventListener("pointerleave", onLeave);
   };

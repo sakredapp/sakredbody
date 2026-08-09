@@ -368,10 +368,20 @@ export function planSky(
     // Keep them apart. A tall narrow figure is badly modelled by a circle, so
     // the test is elliptical — figures may stand shoulder to shoulder more
     // closely than they may stand head to foot.
+    //
+    // The y term was 0.62, which let two figures share nearly forty percent
+    // of their height — and two overlapping constellations don't read as two
+    // people standing near each other, they read as one person drawn wrong.
+    //
+    // 1.0 is the exact no-overlap threshold: the keep-out ellipse is the full
+    // half-sum of the two heights, so bodies may just touch and never cross.
+    // Going past it to 1.15 did look cleaner on a laptop and starved a phone
+    // — the candidates all got rejected and portrait fell to two bunched
+    // figures. This is the tightest value that still fills a 390px screen.
     let clash = false;
     for (const p of placed) {
-      const dx = (cx - p.cx) / (((fw + p.h * (FIG_W / FIG_H)) / 2) * 0.85);
-      const dy = (cy - p.cy) / (((fh + p.h) / 2) * 0.62);
+      const dx = (cx - p.cx) / (((fw + p.h * (FIG_W / FIG_H)) / 2) * 0.9);
+      const dy = (cy - p.cy) / (((fh + p.h) / 2) * 1.0);
       if (dx * dx + dy * dy < 1) {
         clash = true;
         break;
@@ -379,14 +389,23 @@ export function planSky(
     }
     if (clash) continue;
 
-    // Jitter the skeleton. ±2 units on a 100-wide figure is enough to break
-    // the stamp and not enough to dislocate a shoulder.
+    // Jitter, but far less of it than there was.
+    //
+    // ±4 units on a 100-wide figure, applied to x and y independently at every
+    // joint, is enough to move a shoulder a tenth of the body's width — and
+    // once mirroring and tilt are stacked on top, the figures stop reading as
+    // the same species as the one on the landing page. They looked like
+    // different creatures rather than the same constellation seen from
+    // further away, which is the opposite of what a shared motif is for.
+    //
+    // ±1.2 still breaks the stamp — no two are pixel-identical — while every
+    // figure keeps the proportions of the hero's.
     const pts: Record<string, Joint> = {};
     for (const [name, j] of Object.entries(J)) {
       const k = name.length + name.charCodeAt(0);
       pts[name] = {
-        x: j.x + (hash01(a * 97 + k, 17.3) - 0.5) * 4,
-        y: j.y + (hash01(a * 97 + k, 51.7) - 0.5) * 4,
+        x: j.x + (hash01(a * 97 + k, 17.3) - 0.5) * 1.2,
+        y: j.y + (hash01(a * 97 + k, 51.7) - 0.5) * 1.2,
         mag: j.mag,
       };
     }
@@ -399,7 +418,9 @@ export function planSky(
       lod,
       depth: lod === 2 ? 1 : lod === 1 ? 0.72 : 0.44,
       mirror: hash01(a, 5.31) > 0.5,
-      tilt: (hash01(a, 9.17) - 0.5) * 0.16,
+      // Tilt halved. A few degrees says "hung by hand"; nine degrees says
+      // "falling over", and next to an upright hero it looks like a mistake.
+      tilt: (hash01(a, 9.17) - 0.5) * 0.08,
       rate: 0.16 + hash01(a, 31.9) * 0.22,
       offset: hash01(a, 66.3) * Math.PI * 2,
       seed: a,
