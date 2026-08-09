@@ -24,6 +24,10 @@ import { EnergyAdmin } from "@/components/admin/Energy";
 import { TrainingAdmin } from "@/components/admin/Training";
 import { ModerationAdmin } from "@/components/admin/Moderation";
 import { WinsAdmin } from "@/components/admin/Wins";
+import { ApplicationsAdmin } from "@/components/admin/Applications";
+import { SupportAdmin } from "@/components/admin/Support";
+import { RetreatsAdmin } from "@/components/admin/Retreats";
+import { MastermindsAdmin } from "@/components/admin/Masterminds";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -150,7 +154,11 @@ type AdminTab =
   | "energy"
   | "training"
   | "moderation"
-  | "wins";
+  | "wins"
+  | "applications"
+  | "support"
+  | "retreats"
+  | "masterminds";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // AUTH GATES
@@ -822,6 +830,24 @@ export default function AdminPortal() {
     enabled: isAdmin,
   });
 
+  // Same reason as the notes query above: an inbox that only announces itself
+  // once you open it is an inbox nobody opens. Both of these went unread for
+  // months because there was no surface at all — the badge is the point.
+  const applicationsQuery = useQuery<{ status: string }[]>({
+    queryKey: ["/api/admin/applications"],
+    enabled: isAdmin,
+  });
+
+  const supportQuery = useQuery<{ status: string }[]>({
+    queryKey: ["/api/admin/support"],
+    enabled: isAdmin,
+  });
+
+  const cohortsBadgeQuery = useQuery<{ pendingApplications: number }[]>({
+    queryKey: ["/api/admin/cohorts"],
+    enabled: isAdmin,
+  });
+
   // Partner mutations
   const createPartnerMut = useMutation({
     mutationFn: async (data: PartnerFormData) => {
@@ -1125,6 +1151,11 @@ export default function AdminPortal() {
   const execNewCount = execAppsQuery.data?.filter((a) => a.status === "new").length || 0;
   const unreadNoteCount =
     unreadNotesQuery.data?.filter((r) => !r.note.reviewedAt).length || 0;
+  const newApplicationCount =
+    applicationsQuery.data?.filter((a) => a.status === "new").length || 0;
+  const openSupportCount = supportQuery.data?.filter((r) => r.status === "open").length || 0;
+  const cohortReviewCount =
+    cohortsBadgeQuery.data?.reduce((n, c) => n + (c.pendingApplications || 0), 0) || 0;
 
   // Partners
   const openAddPartner = () => { setEditingPartner(null); setPartnerForm(emptyPartnerForm); setShowPartnerDialog(true); };
@@ -1258,6 +1289,10 @@ export default function AdminPortal() {
             { key: "partners" as AdminTab, label: "Partners", badge: partnerCount > 0 ? partnerCount : null },
             { key: "bookings" as AdminTab, label: "Bookings", badge: bookingCount > 0 ? bookingCount : null },
             { key: "executive" as AdminTab, label: "Executive", badge: execNewCount > 0 ? execNewCount : null },
+            { key: "applications" as AdminTab, label: "Applications", badge: newApplicationCount > 0 ? newApplicationCount : null },
+            { key: "support" as AdminTab, label: "Support", badge: openSupportCount > 0 ? openSupportCount : null },
+            { key: "masterminds" as AdminTab, label: "Masterminds", badge: cohortReviewCount > 0 ? cohortReviewCount : null },
+            { key: "retreats" as AdminTab, label: "Retreats", badge: null },
             { key: "coaching" as AdminTab, label: "Coaching", badge: null },
             { key: "notes" as AdminTab, label: "Daily Notes", badge: unreadNoteCount > 0 ? unreadNoteCount : null },
             { key: "offerings" as AdminTab, label: "What's On", badge: null },
@@ -1307,6 +1342,18 @@ export default function AdminPortal() {
 
         {/* ═══════════════ WINS TAB ═══════════════ */}
         {tab === "wins" && <WinsAdmin />}
+
+        {/* ═══════════════ APPLICATIONS TAB ═══════════════ */}
+        {tab === "applications" && <ApplicationsAdmin enabled={isAdmin} />}
+
+        {/* ═══════════════ SUPPORT TAB ═══════════════ */}
+        {tab === "support" && <SupportAdmin enabled={isAdmin} />}
+
+        {/* ═══════════════ RETREATS TAB ═══════════════ */}
+        {tab === "retreats" && <RetreatsAdmin enabled={isAdmin} />}
+
+        {/* ═══════════════ MASTERMINDS TAB ═══════════════ */}
+        {tab === "masterminds" && <MastermindsAdmin enabled={isAdmin} />}
 
         {tab === "apothecary" && <ApothecaryAdmin enabled={isAdmin} />}
 

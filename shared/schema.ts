@@ -18,7 +18,15 @@ export * from "./models/security.js";
 export * from "./models/support.js";
 export * from "./models/training.js";
 export * from "./models/moderation.js";
+export * from "./models/cohorts.js";
 
+/**
+ * The intake form behind ApplicationModal, on the Mastermind page.
+ *
+ * This table was insert-only for its whole life: a row went in and nothing
+ * ever read one back. The triage columns below and the admin routes that go
+ * with them are what turn it into an inbox. See supabase/applications-triage.sql.
+ */
 export const applications = pgTable("applications", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
@@ -28,11 +36,29 @@ export const applications = pgTable("applications", {
   willingness: text("willingness").notNull(),
   constraints: text("constraints").notNull(),
   whyNow: text("why_now").notNull(),
+  /** 'new' | 'contacted' | 'call booked' | 'accepted' | 'declined' | 'archived' */
+  status: text("status").notNull().default("new"),
+  /** Internal only. Never returned to the applicant — they have no session. */
+  notes: text("notes"),
+  reviewedAt: timestamp("reviewed_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+/** Kept here so the form, the route and the admin filter cannot drift apart. */
+export const APPLICATION_STATUSES = [
+  "new",
+  "contacted",
+  "call booked",
+  "accepted",
+  "declined",
+  "archived",
+] as const;
+
 export const insertApplicationSchema = createInsertSchema(applications).omit({
   id: true,
+  status: true,
+  notes: true,
+  reviewedAt: true,
   createdAt: true,
 });
 

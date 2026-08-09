@@ -9,6 +9,9 @@ import { cors } from "./security/cors.js";
 import { bearerAuth } from "./auth/bearerAuth.js";
 import { registerNotificationRoutes } from "./notifications/routes.js";
 import { registerSupportRoutes } from "./support/routes.js";
+import { registerApplicationRoutes } from "./applications/routes.js";
+import { registerRetreatAdminRoutes } from "./retreats/routes.js";
+import { registerCohortRoutes } from "./cohorts/routes.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -76,6 +79,11 @@ app.use((req, res, next) => {
   registerAuthRoutes(app);
   registerNotificationRoutes(app);
   registerSupportRoutes(app);
+  // The back office for the three things that had tables but no routes:
+  // the intake inbox, retreats, and masterminds.
+  registerApplicationRoutes(app);
+  registerRetreatAdminRoutes(app);
+  registerCohortRoutes(app);
   await registerRoutes(httpServer, app);
 
   // Ensure Supabase Storage bucket exists (idempotent)

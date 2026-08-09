@@ -27,6 +27,8 @@ import {
 
 export interface IStorage {
   createApplication(application: InsertApplication): Promise<Application>;
+  getApplications(): Promise<Application[]>;
+  updateApplication(id: number, data: { status?: string; notes?: string }): Promise<Application | undefined>;
   createExecutiveApplication(data: {
     firstName: string; lastName: string; email: string; phone: string;
     location?: string; occupation?: string; role?: string;
@@ -35,11 +37,18 @@ export interface IStorage {
   getExecutiveApplications(): Promise<ExecutiveApplication[]>;
   updateExecutiveApplication(id: number, data: { status?: string; notes?: string }): Promise<ExecutiveApplication | undefined>;
   getRetreats(): Promise<Retreat[]>;
+  /** Every retreat, including the inactive ones. Admin only. */
+  getAllRetreats(): Promise<Retreat[]>;
   getRetreat(id: number): Promise<Retreat | undefined>;
   createRetreat(retreat: InsertRetreat): Promise<Retreat>;
+  updateRetreat(id: number, data: Partial<InsertRetreat>): Promise<Retreat | undefined>;
+  deleteRetreat(id: number): Promise<boolean>;
   getPropertiesByRetreat(retreatId: number): Promise<Property[]>;
+  getAllProperties(): Promise<Property[]>;
   getProperty(id: number): Promise<Property | undefined>;
   createProperty(property: InsertProperty): Promise<Property>;
+  updateProperty(id: number, data: Partial<InsertProperty>): Promise<Property | undefined>;
+  deleteProperty(id: number): Promise<boolean>;
   createBookingRequest(request: InsertBookingRequest): Promise<BookingRequest>;
   getBookingRequestsByUser(userId: string): Promise<BookingRequest[]>;
   getAllBookingRequests(): Promise<BookingRequest[]>;
@@ -73,6 +82,29 @@ export class DatabaseStorage implements IStorage {
     return application;
   }
 
+  async getApplications(): Promise<Application[]> {
+    return db.select().from(applications).orderBy(desc(applications.createdAt));
+  }
+
+  /**
+   * Stamps `reviewedAt` the first time a status moves off 'new', so the
+   * inbox can show how long someone waited rather than only where they
+   * ended up.
+   */
+  async updateApplication(
+    id: number,
+    data: { status?: string; notes?: string },
+  ): Promise<Application | undefined> {
+    const patch: Record<string, unknown> = { ...data };
+    if (data.status && data.status !== "new") patch.reviewedAt = new Date();
+    const [updated] = await db
+      .update(applications)
+      .set(patch)
+      .where(eq(applications.id, id))
+      .returning();
+    return updated;
+  }
+
   async createExecutiveApplication(data: {
     firstName: string; lastName: string; email: string; phone: string;
     location?: string; occupation?: string; role?: string;
@@ -100,18 +132,53 @@ export class DatabaseStorage implements IStorage {
     return retreat;
   }
 
+  /** Admin view: drafts and retired retreats included. */
+  async getAllRetreats(): Promise<Retreat[]> {
+    return db.select().from(retreats).orderBy(desc(retreats.id));
+  }
+
   async createRetreat(retreat: InsertRetreat): Promise<Retreat> {
     const [created] = await db.insert(retreats).values(retreat).returning();
     return created;
+  }
+
+  async updateRetreat(id: number, data: Partial<InsertRetreat>): Promise<Retreat | undefined> {
+    const [updated] = await db.update(retreats).set(data).where(eq(retreats.id, id)).returning();
+    return updated;
+  }
+
+  /**
+   * Properties reference a retreat by plain integer, not a foreign key, so
+   * nothing at the database level would stop this orphaning them. The
+   * children go first, deliberately.
+   */
+  async deleteRetreat(id: number): Promise<boolean> {
+    await db.delete(properties).where(eq(properties.retreatId, id));
+    const deleted = await db.delete(retreats).where(eq(retreats.id, id)).returning({ id: retreats.id });
+    return deleted.length > 0;
   }
 
   async getPropertiesByRetreat(retreatId: number): Promise<Property[]> {
     return db.select().from(properties).where(eq(properties.retreatId, retreatId));
   }
 
+  async getAllProperties(): Promise<Property[]> {
+    return db.select().from(properties).orderBy(desc(properties.id));
+  }
+
   async getProperty(id: number): Promise<Property | undefined> {
     const [property] = await db.select().from(properties).where(eq(properties.id, id));
     return property;
+  }
+
+  async updateProperty(id: number, data: Partial<InsertProperty>): Promise<Property | undefined> {
+    const [updated] = await db.update(properties).set(data).where(eq(properties.id, id)).returning();
+    return updated;
+  }
+
+  async deleteProperty(id: number): Promise<boolean> {
+    const deleted = await db.delete(properties).where(eq(properties.id, id)).returning({ id: properties.id });
+    return deleted.length > 0;
   }
 
   async createProperty(property: InsertProperty): Promise<Property> {

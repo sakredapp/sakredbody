@@ -100,6 +100,12 @@ export const EVENT_NAMES = [
   "win.share",
   "win.export_image",
 
+  // Masterminds. Applications are the demand signal for a cohort — the gap
+  // between `applied` and the seats actually confirmed is what says whether
+  // the next one should be bigger or the bar should be higher.
+  "cohort.created",
+  "cohort.applied",
+
   // Getting in. `auth.throttled` is the one to watch: a spike on it is
   // somebody guessing passwords, and it is the only signal we get.
   "auth.login",
