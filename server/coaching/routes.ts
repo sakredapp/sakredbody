@@ -351,10 +351,34 @@ export function registerCoachingRoutes(app: Express): void {
       const today = await memberToday(userId);
       await settleRoutines(userId, today);
 
-      const todayHabits = await db
-        .select()
+      // Joined to the template for `recommendedTime` and `durationMinutes`.
+      //
+      // Those live on routine_habits, not on the materialised row — the daily
+      // row deliberately carries only what changes per day, so a template edit
+      // doesn't require rewriting every future day. But the day can't be laid
+      // out as a rhythm without knowing whether something belongs to the
+      // morning or the evening, so the read joins them back.
+      //
+      // LEFT join, not inner: routineHabitId is null for a custom habit
+      // somebody added themselves, and an inner join would silently drop every
+      // one of those from their own day.
+      const rows = await db
+        .select({
+          habit: habits,
+          recommendedTime: routineHabits.recommendedTime,
+          durationMinutes: routineHabits.durationMinutes,
+          icon: routineHabits.icon,
+        })
         .from(habits)
+        .leftJoin(routineHabits, eq(habits.routineHabitId, routineHabits.id))
         .where(and(eq(habits.userId, userId), eq(habits.scheduledDate, today)));
+
+      const todayHabits = rows.map((r) => ({
+        ...r.habit,
+        recommendedTime: r.recommendedTime,
+        durationMinutes: r.durationMinutes,
+        icon: r.icon,
+      }));
 
       // Group by cadence
       const grouped = {

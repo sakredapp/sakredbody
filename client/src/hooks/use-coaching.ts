@@ -67,6 +67,14 @@ export interface Habit {
   dayNumber: number | null;
   isFromRoutine: boolean;
   completedAt: string | null;
+
+  // Joined from the habit's template by GET /api/habits/today, not stored on
+  // the daily row — see the join there for why. All three are optional
+  // because a custom habit somebody added themselves has no template, and
+  // `/api/habits/date/:date` doesn't join them.
+  recommendedTime?: string | null;
+  durationMinutes?: number | null;
+  icon?: string | null;
 }
 
 export interface TodayResponse {

@@ -86,6 +86,9 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DailyRitual } from "@/components/DailyRitual";
 import { InfoTip, LabelWithInfo } from "@/components/ui/info-tip";
+import { Panel } from "@/components/portal/Panel";
+import { Dial } from "@/components/portal/Dial";
+import { groupByBand } from "@/components/portal/dayBands";
 import { WinMoment } from "@/components/WinMoment";
 import type { Win } from "@shared/models/wins";
 
@@ -312,33 +315,45 @@ function TodayHabits() {
     );
   }
 
-  const { grouped, date } = todayData;
+  const { date } = todayData;
   const totalCount = todayData.habits.length;
   const completedCount = todayData.habits.filter((h) => h.completed).length;
 
-  const sections = [
-    { label: "Daily", habits: grouped.daily },
-    { label: "Weekly", habits: grouped.weekly },
-    { label: "As Needed", habits: grouped["as-needed"] },
-  ].filter((s) => s.habits.length > 0);
+  // Banded by part of day rather than by cadence.
+  //
+  // Cadence — daily / weekly / as-needed — is how the *engine* thinks about a
+  // habit, not how a morning does. "Daily" as a heading tells a member
+  // something they already know and nothing about when to do it; "Morning"
+  // tells them what the next hour looks like. The cadence is still on the card
+  // for anything that isn't daily.
+  const sections = groupByBand(todayData.habits);
 
   return (
-    <div className="space-y-6">
-      {/* Progress summary */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h3 className="font-display text-lg">
-            {formatShortDate(date)}
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            {completedCount} of {totalCount} completed
+    <Panel
+      title={formatShortDate(date)}
+      data-testid="panel-today-rhythm"
+      className="space-y-6"
+    >
+      <div className="flex items-center gap-5">
+        <Dial
+          value={totalCount > 0 ? completedCount / totalCount : 0}
+          label={`${completedCount}/${totalCount}`}
+          size={104}
+          data-testid="dial-today"
+        />
+        <div className="min-w-0">
+          <p className="font-display text-lg leading-tight">
+            {completedCount === 0
+              ? "Nothing ticked yet."
+              : completedCount >= totalCount
+                ? "That's the whole day."
+                : `${totalCount - completedCount} left.`}
           </p>
-        </div>
-        <div className="h-2 w-32 bg-muted rounded-full overflow-hidden">
-          <div
-            className="h-full bg-[hsl(var(--gold))] rounded-full transition-all duration-500"
-            style={{ width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%` }}
-          />
+          <p className="text-sm text-muted-foreground mt-1">
+            {completedCount >= totalCount && totalCount > 0
+              ? "Every one of them. Come back tomorrow."
+              : "Small steps, in the order the day happens."}
+          </p>
         </div>
       </div>
 
@@ -346,23 +361,32 @@ function TodayHabits() {
         <WinMoment wins={earnedWins} onClose={() => toggleMutation.reset()} />
       )}
 
-      {/* Habit sections */}
-      {sections.map((section) => (
-        <div key={section.label} className="space-y-2">
-          <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            {section.label}
-          </h4>
-          {section.habits.map((habit) => (
-            <HabitCard
-              key={habit.id}
-              habit={habit}
-              onToggle={(id, completed) => toggleMutation.mutate({ habitId: id, completed })}
-              isPending={toggleMutation.isPending}
-            />
-          ))}
-        </div>
-      ))}
-    </div>
+      <div className="space-y-6">
+        {sections.map((section) => {
+          const done = section.items.filter((h) => h.completed).length;
+          return (
+            <div key={section.key} className="space-y-2">
+              <div className="flex items-baseline gap-2">
+                <h4 className="text-[11px] uppercase tracking-[0.18em] text-[hsl(var(--gold))]">
+                  {section.label}
+                </h4>
+                <span className="text-[11px] text-muted-foreground/60">
+                  {done}/{section.items.length}
+                </span>
+              </div>
+              {section.items.map((habit) => (
+                <HabitCard
+                  key={habit.id}
+                  habit={habit}
+                  onToggle={(id, completed) => toggleMutation.mutate({ habitId: id, completed })}
+                  isPending={toggleMutation.isPending}
+                />
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </Panel>
   );
 }
 

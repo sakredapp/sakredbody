@@ -77,6 +77,7 @@ import {
 } from "@/components/MemberNav";
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 import { useInkSurface } from "@/hooks/use-ink-surface";
+import { PortalBackdrop } from "@/components/portal/PortalBackdrop";
 
 // Icon mapping (UI-only, can't live in shared/)
 const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -317,7 +318,13 @@ export default function MemberDashboard() {
   const minDateStr = minDate.toISOString().split("T")[0];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative isolate">
+      {/* The star chart the marketing site uses, held far back. Fixed, so it
+          behaves like the room the content is in rather than scrolling with
+          it. `isolate` here is what lets it sit at a negative z-index without
+          disappearing behind the page background — see PortalBackdrop. */}
+      <PortalBackdrop />
+
       {/* ─── Header ─── */}
       <header className="sticky top-0 pt-safe border-b border-border/50 bg-background/90 backdrop-blur-md" style={{ zIndex: 9999 }}>
         <div className="container max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
