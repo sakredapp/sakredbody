@@ -169,22 +169,16 @@ export default function Home() {
 
         <div className="container max-w-4xl mx-auto px-4 relative z-20">
           <motion.div initial="hidden" animate="visible" variants={staggerContainer} className="text-center">
-            {/* The name, and only the name. "The Sakred Body." at display
-                size read as a title card for a film; the brand is two words
-                without an article or a full stop. Set quietly, because the
-                figure underneath is what this screen is for. */}
-            <motion.h1
-              variants={fadeInUp}
-              className="font-display font-normal text-xl sm:text-2xl leading-none tracking-[0.02em] text-white/90"
-              data-testid="text-hero-headline"
-            >
+            {/* The name is in the header, the tab title and the logo already.
+                Printing it a fourth time above the figure was the site
+                introducing itself to someone who just typed its address.
+                Kept as the document's h1 for screen readers and search, and
+                taken off the screen. */}
+            <h1 className="sr-only" data-testid="text-hero-headline">
               Sakred Body
-            </motion.h1>
+            </h1>
 
-            {/* No negative margins. They pulled the crown of the figure up
-                into the name and its feet down onto the buttons. The figure
-                is the subject of the screen — it gets room on both sides. */}
-            <motion.div variants={fadeInUp} className="mt-16 sm:mt-20">
+            <motion.div variants={fadeInUp}>
               <ConstellationBody />
             </motion.div>
 

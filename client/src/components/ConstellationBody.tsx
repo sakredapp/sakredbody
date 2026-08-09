@@ -134,7 +134,7 @@ export function ConstellationBody({ className }: { className?: string }) {
         const FIG_H = 152;
         const FIG_CX = 50;
         const FIG_CY = 84;
-        const scale = Math.min((w * 0.82) / FIG_W, (h * 0.88) / FIG_H);
+        const scale = Math.min((w * 0.9) / FIG_W, (h * 0.94) / FIG_H);
         const ox = w / 2 - FIG_CX * scale;
         const oy = h / 2 - FIG_CY * scale;
         const P = (s: Star) => ({ x: ox + s.x * scale, y: oy + s.y * scale });
@@ -169,8 +169,8 @@ export function ConstellationBody({ className }: { className?: string }) {
           ctx.beginPath();
           ctx.moveTo(pa.x, pa.y);
           ctx.lineTo(pb.x, pb.y);
-          ctx.strokeStyle = `rgba(197,160,89,${0.07 + heat * 0.32 + breath * 0.03})`;
-          ctx.lineWidth = 0.6 + heat * 0.8;
+          ctx.strokeStyle = `rgba(214,178,104,${0.16 + heat * 0.46 + breath * 0.05})`;
+          ctx.lineWidth = 0.9 + heat * 1.1;
           ctx.stroke();
 
           // A charge travelling the line, away from the lit region.
@@ -183,7 +183,7 @@ export function ConstellationBody({ className }: { className?: string }) {
             const fade = Math.sin(k * Math.PI);
             ctx.beginPath();
             ctx.arc(cx, cy, 1.5 * scale * 0.5 + 0.8, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(247,236,206,${heat * fade * 0.85})`;
+            ctx.fillStyle = `rgba(255,247,224,${heat * fade})`;
             ctx.fill();
           }
         }
@@ -193,18 +193,17 @@ export function ConstellationBody({ className }: { className?: string }) {
           const p = P(s);
           const heat = level[s.region] ?? 0;
           const twinkle = 0.5 + 0.5 * Math.sin(t * 1.1 + hash01(i, 31.7) * 12);
-          const r = (s.mag * 1.5 + heat * 2.2) * (0.85 + twinkle * 0.15) * Math.max(0.6, scale / 3);
-          const alpha = 0.25 + heat * 0.7 + breath * 0.08;
+          const r = (s.mag * 1.9 + heat * 2.6) * (0.85 + twinkle * 0.15) * Math.max(0.7, scale / 3);
+          const alpha = 0.5 + heat * 0.5 + breath * 0.1;
 
-          if (heat > 0.05) {
-            const halo = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 7);
-            halo.addColorStop(0, `rgba(235,211,162,${heat * 0.3})`);
-            halo.addColorStop(1, "rgba(235,211,162,0)");
-            ctx.fillStyle = halo;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, r * 7, 0, Math.PI * 2);
-            ctx.fill();
-          }
+          const glow = 0.16 + heat * 0.36;
+          const halo = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 7);
+          halo.addColorStop(0, `rgba(235,211,162,${glow})`);
+          halo.addColorStop(1, "rgba(235,211,162,0)");
+          ctx.fillStyle = halo;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, r * 7, 0, Math.PI * 2);
+          ctx.fill();
 
           ctx.beginPath();
           ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
@@ -212,10 +211,10 @@ export function ConstellationBody({ className }: { className?: string }) {
           ctx.fill();
 
           // The anchor stars flare four-pointed when their region is lit.
-          if (s.mag > 1.2 && heat > 0.3) {
-            const arm = r * (3.4 + heat * 2);
-            ctx.strokeStyle = `rgba(235,211,162,${heat * 0.55})`;
-            ctx.lineWidth = 0.8;
+          if (s.mag > 1.2 && heat > 0.15) {
+            const arm = r * (4 + heat * 2.6);
+            ctx.strokeStyle = `rgba(240,219,175,${heat * 0.75})`;
+            ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(p.x - arm, p.y);
             ctx.lineTo(p.x + arm, p.y);
@@ -232,7 +231,7 @@ export function ConstellationBody({ className }: { className?: string }) {
     <div className="relative">
       <canvas
         ref={ref}
-        className={`w-full h-[30rem] sm:h-[42rem] ${className ?? ""}`}
+        className={`w-full h-[34rem] sm:h-[46rem] lg:h-[52rem] ${className ?? ""}`}
         aria-hidden="true"
         data-testid="constellation-body"
       />
