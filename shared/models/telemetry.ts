@@ -107,6 +107,12 @@ export const EVENT_NAMES = [
   // where the audit trail matters more than the aggregate.
   "member.update",
 
+  // Build. Starting and finishing are separate on purpose: the gap between
+  // them is the abandonment rate, which is the number that decides whether
+  // prescribed logging actually works.
+  "training.session_start",
+  "training.session_finish",
+
   // Failures worth knowing about, rather than an empty catch.
   "error.client",
   "error.server",

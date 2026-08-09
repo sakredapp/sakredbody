@@ -20,6 +20,7 @@ import { registerCommunityRoutes } from "./community/index.js";
 import { registerTelemetryRoutes } from "./telemetry/index.js";
 import { registerWinRoutes } from "./wins/index.js";
 import { registerMemberRoutes } from "./members/index.js";
+import { registerTrainingRoutes } from "./training/index.js";
 
 function isAdmin(req: Request, res: Response, next: NextFunction) {
   const userId = req.session?.userId;
@@ -463,6 +464,9 @@ export async function registerRoutes(
 
   // Members and tiers — who is in, and what that lets them see.
   registerMemberRoutes(app);
+
+  // Build — the prescription and what was actually lifted against it.
+  registerTrainingRoutes(app);
 
   // Telemetry last: it observes the app, so nothing else should depend on it.
   registerTelemetryRoutes(app);

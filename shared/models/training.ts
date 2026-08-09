@@ -441,8 +441,7 @@ export const logSetSchema = z
     { message: "A set needs reps, a duration or a distance." },
   );
 
-export const prescribeExerciseSchema = z
-  .object({
+const prescribeExerciseFields = z.object({
     exerciseId: z.string().min(1),
     orderIndex: z.number().int().min(0).default(0),
     targetSets: z.number().int().min(1).max(20).default(3),
@@ -450,15 +449,33 @@ export const prescribeExerciseSchema = z
     targetRepsHigh: z.number().int().min(1).max(100).nullable().optional(),
     targetPercent1rm: z.number().min(1).max(150).nullable().optional(),
     restSeconds: z.number().int().min(0).max(3600).nullable().optional(),
-    note: z.string().max(500).nullable().optional(),
-  })
-  .refine(
-    (v) =>
-      v.targetRepsLow == null ||
-      v.targetRepsHigh == null ||
-      v.targetRepsLow <= v.targetRepsHigh,
-    { message: "The low rep target has to be at or below the high one." },
-  );
+  note: z.string().max(500).nullable().optional(),
+});
+
+const repRangeMakesSense = (v: {
+  targetRepsLow?: number | null;
+  targetRepsHigh?: number | null;
+}) => v.targetRepsLow == null || v.targetRepsHigh == null || v.targetRepsLow <= v.targetRepsHigh;
+
+const REP_RANGE_MESSAGE = {
+  message: "The low rep target has to be at or below the high one.",
+};
+
+export const prescribeExerciseSchema = prescribeExerciseFields.refine(
+  repRangeMakesSense,
+  REP_RANGE_MESSAGE,
+);
+
+/**
+ * The same rules for a partial edit.
+ *
+ * `.partial()` cannot be called on a refined schema — refining returns a
+ * ZodEffects, which has no such method — so the fields are declared once and
+ * the refinement is applied to both shapes rather than duplicated.
+ */
+export const prescribeExercisePatchSchema = prescribeExerciseFields
+  .partial()
+  .refine(repRangeMakesSense, REP_RANGE_MESSAGE);
 
 export const startSessionSchema = z.object({
   habitId: z.string().uuid().nullable().optional(),
