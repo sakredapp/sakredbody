@@ -30,8 +30,13 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import type {
+  Exercise as ExerciseRow,
+  HabitExercise as HabitExerciseRow,
+} from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { InfoTip } from "@/components/ui/info-tip";
 import { SectionHeading, Panel } from "@/components/portal/Panel";
@@ -42,36 +47,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, ChevronDown, Dumbbell, GripVertical } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronUp, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface Exercise {
-  id: string;
-  name: string;
-  pattern: string;
-  equipment: string;
-  trackingType: string;
-  bodyweightFactor: number;
-  muscleGroups: string[] | null;
-  aliases: string[] | null;
-  tracksOneRepMax: boolean;
-  isActive: boolean;
-}
+/**
+ * Derived from the table, not retyped from it.
+ *
+ * This was a hand-written interface listing ten of the exercise table's
+ * fourteen columns, and the four it left out were exactly the four with no
+ * editor: `demoUrl`, `cues`, `sortOrder`, and the tracking fields it did have
+ * but only on create. That is not a coincidence — a column absent from the
+ * client type cannot be rendered, so the type quietly decides what the admin
+ * is capable of, and nothing anywhere reports the omission.
+ *
+ * `$inferSelect` makes the table the source. A new column shows up here for
+ * free and a removed one breaks the build instead of production.
+ */
+type Exercise = Omit<ExerciseRow, "createdAt"> & { createdAt?: string | null };
 
-interface Prescribed {
-  id: string;
-  exerciseId: string;
+/** The prescription row joined with the movement it points at. */
+type Prescribed = Omit<HabitExerciseRow, "createdAt"> & {
+  createdAt?: string | null;
   name: string;
   equipment: string;
   trackingType: string;
-  orderIndex: number;
-  targetSets: number;
-  targetRepsLow: number | null;
-  targetRepsHigh: number | null;
-  targetPercent1rm: number | null;
-  restSeconds: number | null;
-  note: string | null;
-}
+};
 
 const PATTERNS = ["squat", "hinge", "push", "pull", "carry", "core", "conditioning", "mobility"];
 const EQUIPMENT = [
@@ -263,6 +263,28 @@ function Prescription({ habitId }: { habitId: string }) {
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
+  /**
+   * Swap two lifts.
+   *
+   * Writes both rows, then invalidates once. Renumbering the whole list would
+   * be tidier and is worse here: it is N requests where two will do, and a
+   * failure halfway through leaves the session in an order nobody chose. A
+   * swap touches exactly the two rows whose positions changed.
+   */
+  const reorder = useMutation({
+    mutationFn: async ({ from, to }: { from: number; to: number }) => {
+      const a = list[from];
+      const b = list[to];
+      if (!a || !b) return;
+      await Promise.all([
+        apiRequest("PUT", `/api/admin/habit-exercises/${a.id}`, { orderIndex: b.orderIndex }),
+        apiRequest("PUT", `/api/admin/habit-exercises/${b.id}`, { orderIndex: a.orderIndex }),
+      ]);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: key }),
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
   const remove = useMutation({
     mutationFn: async (id: string) => apiRequest("DELETE", `/api/admin/habit-exercises/${id}`),
     onSuccess: () => {
@@ -288,8 +310,35 @@ function Prescription({ habitId }: { habitId: string }) {
         <div className="space-y-3 mb-4">
           {list.map((p, i) => (
             <div key={p.id} className="border border-border/50 rounded-lg p-3 space-y-3">
+              {/* Order is editable.
+                  There was a grip handle here that looked draggable and was
+                  decorative — nothing was wired to it, so the order of a
+                  session was fixed at whatever order the lifts happened to be
+                  added in. Squats after curls is a different session.
+                  Buttons rather than drag: this is edited on a phone as often
+                  as a desktop, and a four-item list does not need a drag
+                  library to reorder. */}
               <div className="flex items-center gap-2">
-                <GripVertical className="h-4 w-4 text-muted-foreground/40 shrink-0" />
+                <div className="flex flex-col shrink-0">
+                  <Button
+                    variant="ghost" size="icon" className="h-4 w-5"
+                    disabled={i === 0 || reorder.isPending}
+                    onClick={() => reorder.mutate({ from: i, to: i - 1 })}
+                    aria-label={`Move ${p.name} up`}
+                    data-testid={`button-lift-up-${p.id}`}
+                  >
+                    <ChevronUp className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost" size="icon" className="h-4 w-5"
+                    disabled={i === list.length - 1 || reorder.isPending}
+                    onClick={() => reorder.mutate({ from: i, to: i + 1 })}
+                    aria-label={`Move ${p.name} down`}
+                    data-testid={`button-lift-down-${p.id}`}
+                  >
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                </div>
                 <span className="text-xs text-muted-foreground w-4">{i + 1}</span>
                 <span className="text-sm flex-1 truncate">{p.name}</span>
                 <Badge variant="outline" className="text-[10px] shrink-0">{p.equipment}</Badge>
@@ -371,6 +420,26 @@ function Prescription({ habitId }: { habitId: string }) {
                       save.mutate({
                         id: p.id,
                         body: { targetPercent1rm: e.target.value ? Number(e.target.value) : null },
+                      })
+                    }
+                  />
+                </div>
+
+                {/* Rest. The column existed and nothing could set it, which on
+                    heavy work is not a detail — three minutes between sets of
+                    triples and sixty seconds are two different sessions with
+                    the same numbers written down. */}
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Rest (sec)</Label>
+                  <Input
+                    type="number"
+                    defaultValue={p.restSeconds ?? ""}
+                    placeholder="—"
+                    className="h-8"
+                    onBlur={(e) =>
+                      save.mutate({
+                        id: p.id,
+                        body: { restSeconds: e.target.value ? Number(e.target.value) : null },
                       })
                     }
                   />
@@ -609,6 +678,106 @@ function Catalogue() {
                         }}
                       />
                     </div>
+                  </div>
+
+                  {/* ── The three that were create-only ──────────────────────
+                      Pattern, equipment and how the movement is measured could
+                      be chosen once and never corrected. That is survivable for
+                      the first two and not for the third: `trackingType` decides
+                      what the member is asked for at the end of a set, so a
+                      carry saved as "reps" prompts for a rep count it doesn't
+                      have, and the only remedy was editing the row by hand. */}
+                  <div className="grid sm:grid-cols-3 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Pattern</Label>
+                      <Select
+                        value={e.pattern}
+                        onValueChange={(v) => v !== e.pattern && save.mutate({ id: e.id, body: { pattern: v } })}
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {PATTERNS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Equipment</Label>
+                      <Select
+                        value={e.equipment}
+                        onValueChange={(v) => v !== e.equipment && save.mutate({ id: e.id, body: { equipment: v } })}
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {EQUIPMENT.map((q) => <SelectItem key={q} value={q}>{q.replace("_", " ")}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs flex items-center gap-1.5">
+                        Measured in
+                        <InfoTip label="About tracking" title="Changing this later">
+                          Safe to correct. It changes what the member is asked for on
+                          the next set; sets already logged keep the numbers they were
+                          recorded with.
+                        </InfoTip>
+                      </Label>
+                      <Select
+                        value={e.trackingType}
+                        onValueChange={(v) => v !== e.trackingType && save.mutate({ id: e.id, body: { trackingType: v } })}
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {TRACKING.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs flex items-center gap-1.5">
+                        Muscle groups
+                        <InfoTip label="About muscle groups" title="First one is primary">
+                          Shown to the member because "chest, triceps" means something
+                          to them and "horizontal push" does not. The row above already
+                          displayed these — there was simply nowhere to set them.
+                        </InfoTip>
+                      </Label>
+                      <Input
+                        defaultValue={(e.muscleGroups ?? []).join(", ")}
+                        placeholder="chest, triceps, front delt"
+                        onBlur={(ev) => {
+                          const next = ev.target.value.split(",").map((s) => s.trim()).filter(Boolean);
+                          if (next.join(",") !== (e.muscleGroups ?? []).join(","))
+                            save.mutate({ id: e.id, body: { muscleGroups: next.length ? next : null } });
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Demo video URL</Label>
+                      <Input
+                        defaultValue={e.demoUrl ?? ""}
+                        placeholder="https://…"
+                        onBlur={(ev) =>
+                          ev.target.value !== (e.demoUrl ?? "") &&
+                          save.mutate({ id: e.id, body: { demoUrl: ev.target.value.trim() || null } })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Coaching cues</Label>
+                    <Textarea
+                      defaultValue={e.cues ?? ""}
+                      rows={2}
+                      className="resize-none"
+                      placeholder="Brace before you unrack. Elbows under the bar, not flared."
+                      onBlur={(ev) =>
+                        ev.target.value !== (e.cues ?? "") &&
+                        save.mutate({ id: e.id, body: { cues: ev.target.value.trim() || null } })
+                      }
+                    />
                   </div>
 
                   <div className="flex flex-wrap items-center gap-6">
