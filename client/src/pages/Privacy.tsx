@@ -22,7 +22,7 @@ import { usePageMeta } from "@/hooks/use-page-meta";
  *      model host, and that it isn't training anything.
  */
 
-const CONTACT = "team@sakredhealth.com";
+const CONTACT = "team@sakredbody.com";
 
 const SECTIONS: LegalSection[] = [
   {

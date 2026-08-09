@@ -10,7 +10,7 @@ import { usePageMeta } from "@/hooks/use-page-meta";
  * kept short so the load-bearing parts are findable.
  */
 
-const CONTACT = "team@sakredhealth.com";
+const CONTACT = "team@sakredbody.com";
 
 const SECTIONS: LegalSection[] = [
   {
