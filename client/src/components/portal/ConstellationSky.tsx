@@ -449,12 +449,20 @@ export function ConstellationSky({
    * the page floats over it — a header, a logo, a back link.
    */
   clearTop = 0,
+  /**
+   * Cap the redraw rate. Left off on the login screen, where the sky is the
+   * only thing on the page; set for the portal backdrop, which never leaves
+   * the viewport and would otherwise redraw sixty times a second behind
+   * somebody's habit list for as long as the app is open.
+   */
+  fps,
 }: {
   className?: string;
   density?: number;
   intensity?: number;
   clearCentre?: number;
   clearTop?: number;
+  fps?: number;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
 
@@ -615,8 +623,8 @@ export function ConstellationSky({
           ctx.restore();
         }
       };
-    });
-  }, [density, intensity, clearCentre, clearTop]);
+    }, { fps });
+  }, [density, intensity, clearCentre, clearTop, fps]);
 
   return (
     <canvas

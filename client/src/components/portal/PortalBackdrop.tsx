@@ -84,6 +84,16 @@ export function PortalBackdrop({ variant = "member" }: { variant?: BackdropVaria
         // simply gone. Less than the login screen needs, because that header
         // is a floating logo over open space rather than a solid bar.
         clearTop={0.1}
+        // 30, not 60.
+        //
+        // This canvas is `fixed`, so it never leaves the viewport and the
+        // offscreen pause in `mountStage` never fires: without a cap it
+        // redraws sixty times a second, full-viewport, for as long as anyone
+        // has the app open. The figures drift a few pixels per second and
+        // breathe on a slow cycle — at 30 the motion is identical to look at
+        // and the work is halved. On the back office, slower still: nothing
+        // there is being watched.
+        fps={variant === "desk" ? 20 : 30}
       />
 
       {/* The reading column runs down the middle. This settles it without

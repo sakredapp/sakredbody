@@ -30,6 +30,20 @@ export interface Stage {
 export function mountStage(
   canvas: HTMLCanvasElement,
   init: (stage: Stage) => (t: number) => void,
+  options: {
+    /**
+     * Cap the redraw rate. Omit for every frame the display offers.
+     *
+     * Worth setting for anything ambient. A hero the eye is on wants 60; a
+     * star field drifting a few pixels a second behind a habit list does not
+     * — at 30 the motion is identical to look at and the work is halved.
+     * That matters most exactly where it is hardest to see: a `fixed`
+     * full-viewport backdrop never leaves the screen, so the IntersectionObserver
+     * below never pauses it, and it will happily redraw sixty times a second
+     * for as long as somebody keeps the app open.
+     */
+    fps?: number;
+  } = {},
 ): () => void {
   const ctx = canvas.getContext("2d");
   if (!ctx) return () => {};
@@ -99,9 +113,18 @@ export function mountStage(
   let raf = 0;
   let visible = false;
 
+  // The rAF loop still runs at display rate — it has to, to stay in step with
+  // the compositor — but the draw is skipped between slots. Skipping the draw
+  // is where the cost is; the callback itself is free.
+  const minGap = options.fps ? 1 / options.fps : 0;
+  let lastDraw = -Infinity;
+
   const frame = (now: number) => {
     stage.t = elapsed(now);
-    draw(stage.t);
+    if (stage.t - lastDraw >= minGap) {
+      lastDraw = stage.t;
+      draw(stage.t);
+    }
     if (visible && !reduced) raf = requestAnimationFrame(frame);
   };
 
