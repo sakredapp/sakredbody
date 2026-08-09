@@ -30,7 +30,6 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { MemberSection } from "@/components/MemberNav";
-import { apiUrl } from "@/lib/apiBase";
 
 interface Pillar {
   key: string;
@@ -103,15 +102,23 @@ const PILLARS: Pillar[] = [
 /**
  * One shared fetch per door, so five cards don't become fifteen requests.
  *
- * Through `apiUrl` rather than a bare relative path: the native shells serve
- * this bundle from `https://localhost`, where `/api/...` resolves against the
- * device instead of the server. See lib/apiBase.ts.
+ * Relative paths, deliberately, for now.
+ *
+ * These briefly went through an `apiUrl` helper so they would resolve inside
+ * the Capacitor shell, where the bundle is served from `https://localhost` and
+ * a bare `/api/...` hits the device rather than the server. That helper is
+ * real but is not committed yet, and neither is `@capacitor/core` — importing
+ * it broke the production build, since the file exists on one laptop and
+ * nowhere else.
+ *
+ * When the native wrapper lands properly, every relative fetch in the client
+ * needs that treatment in one sweep, not this component alone.
  */
 function useCounts() {
   const today = useQuery<{ habits: Array<{ completed: boolean }> }>({
     queryKey: ["/api/habits/today"],
     queryFn: async () => {
-      const r = await fetch(apiUrl("/api/habits/today"), { credentials: "include" });
+      const r = await fetch("/api/habits/today", { credentials: "include" });
       if (!r.ok) throw new Error("no");
       return r.json();
     },
@@ -120,7 +127,7 @@ function useCounts() {
   const offerings = useQuery<Array<unknown>>({
     queryKey: ["/api/offerings"],
     queryFn: async () => {
-      const r = await fetch(apiUrl("/api/offerings"), { credentials: "include" });
+      const r = await fetch("/api/offerings", { credentials: "include" });
       if (!r.ok) throw new Error("no");
       return r.json();
     },
@@ -129,13 +136,22 @@ function useCounts() {
   const ebooks = useQuery<Array<unknown>>({
     queryKey: ["/api/library/ebooks"],
     queryFn: async () => {
-      const r = await fetch(apiUrl("/api/library/ebooks"), { credentials: "include" });
+      const r = await fetch("/api/library/ebooks", { credentials: "include" });
       if (!r.ok) throw new Error("no");
       return r.json();
     },
   });
 
-  return { today, offerings, ebooks };
+  const centres = useQuery<Array<{ reading?: unknown | null }>>({
+    queryKey: ["/api/energy/centres"],
+    queryFn: async () => {
+      const r = await fetch("/api/energy/centres", { credentials: "include" });
+      if (!r.ok) throw new Error("no");
+      return r.json();
+    },
+  });
+
+  return { today, offerings, ebooks, centres };
 }
 
 export function PillarHome({
@@ -145,7 +161,7 @@ export function PillarHome({
   firstName?: string | null;
   onOpen: (section: MemberSection) => void;
 }) {
-  const { today, offerings, ebooks } = useCounts();
+  const { today, offerings, ebooks, centres } = useCounts();
 
   /**
    * The live line under each title.
@@ -165,8 +181,16 @@ export function PillarHome({
       }
       case "build":
         return "Not open yet";
-      case "executive":
-        return "Speak to your coach";
+      case "embody": {
+        if (centres.isLoading) return undefined;
+        const all = centres.data ?? [];
+        if (all.length === 0) return undefined;
+        // Centres carry their latest reading, not today's, so this counts how
+        // much of the map has ever been read rather than claiming a daily
+        // figure the data can't support.
+        const read = all.filter((c) => c.reading).length;
+        return read === 0 ? "Not read yet" : `${read} of ${all.length} read`;
+      }
       case "retreats": {
         if (offerings.isLoading) return undefined;
         const n = offerings.data?.length ?? 0;
