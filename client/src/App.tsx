@@ -1,5 +1,6 @@
 import { Suspense, useEffect } from "react";
 import { Switch, Route, Redirect } from "wouter";
+import { Capacitor } from "@capacitor/core";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -36,8 +37,26 @@ const NotFound = lazyRoute("NotFound", () => import("@/pages/not-found"));
  * about the philosophy. Every other path resolves the same on both hosts, so
  * a link shared from either one still works.
  */
+/**
+ * ── And the native shells are app hosts too ──────────────────────────────
+ *
+ * This check used to be the hostname alone, and that is why the iOS and
+ * Android apps opened on the marketing landing page. The web bundle is
+ * *inside* the app — it is not fetched from sakredbody.com — so the shells
+ * serve it from `capacitor://localhost` (iOS) and `https://localhost`
+ * (Android). Neither hostname starts with "app.", so both apps fell through
+ * to `<Home />` and someone who had just installed a members-only app was
+ * shown the page that tries to sell it to them.
+ *
+ * Nothing about it looked broken from the web, which is the whole problem:
+ * the hostname rule is correct for the two real domains and silently wrong
+ * for the only two clients that don't have one.
+ */
+const isNativeShell = Capacitor.isNativePlatform();
+
 const isAppHost =
-  typeof window !== "undefined" && window.location.hostname.startsWith("app.");
+  isNativeShell ||
+  (typeof window !== "undefined" && window.location.hostname.startsWith("app."));
 
 function Router() {
   return (

@@ -22,10 +22,21 @@ const PORTAL_PATHS = ["/member", "/coaching", "/admin", "/app"];
 
 /**
  * `app.sakredbody.com` serves the portal at its root, because someone typing
- * that hostname did not arrive to read the philosophy. Same rule as App.tsx.
+ * that hostname did not arrive to read the philosophy. Same rule as App.tsx —
+ * including the native shells, which serve the bundled build from
+ * `capacitor://localhost` and `https://localhost` and so match no hostname
+ * rule at all. Left out, the apps boot onto the light palette for one frame
+ * on their way to a dark portal.
+ *
+ * Read off `window` rather than imported from @capacitor/core: this module is
+ * called from main.tsx before render, and it must not pull a dependency into
+ * the entry chunk purely to answer one boolean.
  */
 function isAppHost(): boolean {
-  return typeof window !== "undefined" && window.location.hostname.startsWith("app.");
+  if (typeof window === "undefined") return false;
+  const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
+  if (cap?.isNativePlatform?.()) return true;
+  return window.location.hostname.startsWith("app.");
 }
 
 export function isPortalPath(pathname: string): boolean {
