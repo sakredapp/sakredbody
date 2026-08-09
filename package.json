@@ -15,6 +15,7 @@
     "cap:sync": "npm run build:client && cap sync",
     "cap:android": "npm run cap:sync && cap open android",
     "cap:ios": "npm run cap:sync && cap open ios",
+    "android:aab": "bash script/build-aab.sh",
     "test": "tsx script/test-engine.ts && tsx script/test-almanac.ts && tsx script/test-voice.ts && tsx script/test-community.ts && tsx script/test-auth.ts && tsx script/test-headers.ts && tsx script/test-training.ts",
     "test:bedrock": "tsx script/test-bedrock.ts"
   },
