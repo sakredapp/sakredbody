@@ -169,27 +169,29 @@ export default function Home() {
 
         <div className="container max-w-4xl mx-auto px-4 relative z-20">
           <motion.div initial="hidden" animate="visible" variants={staggerContainer} className="text-center">
-            {/* The name is the header, at header size. It was set as a small
-                gilt eyebrow — correct for a section three screens down,
-                wrong for the first thing anyone sees. The three-beat promise
-                below the figure steps down from it rather than competing:
-                one h1, one supporting line, in that order. */}
+            {/* The name, and only the name. "The Sakred Body." at display
+                size read as a title card for a film; the brand is two words
+                without an article or a full stop. Set quietly, because the
+                figure underneath is what this screen is for. */}
             <motion.h1
               variants={fadeInUp}
-              className="font-display font-normal text-5xl sm:text-6xl md:text-7xl lg:text-[5.25rem] leading-[0.98] tracking-[-0.035em] text-white"
+              className="font-display font-normal text-xl sm:text-2xl leading-none tracking-[0.02em] text-white/90"
               data-testid="text-hero-headline"
             >
-              The <span className="gold-gradient-text">Sakred Body.</span>
+              Sakred Body
             </motion.h1>
 
-            <motion.div variants={fadeInUp} className="-mt-4 -mb-6 sm:-mt-6 sm:-mb-10">
+            {/* No negative margins. They pulled the crown of the figure up
+                into the name and its feet down onto the buttons. The figure
+                is the subject of the screen — it gets room on both sides. */}
+            <motion.div variants={fadeInUp} className="mt-16 sm:mt-20">
               <ConstellationBody />
             </motion.div>
 
             {/* Three things and nothing else: the name, the figure, the way
                 in. Every line that used to sit here was the figure's argument
                 restated in words, underneath the figure. */}
-            <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4 justify-center">
+            <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4 justify-center mt-16 sm:mt-20">
               <Magnetic>
                 <Button
                   size="lg"
