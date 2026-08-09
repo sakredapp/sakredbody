@@ -271,7 +271,7 @@ export default function Home() {
           <motion.div variants={fadeInUp}>
             <SectionHeader
               eyebrow="The Architecture"
-              title={<>Four Territories. <span className="text-gold">One Sequence.</span></>}
+              title={<><span className="text-gold">Four Territories.</span></>}
               intro="An order of operations, not a menu."
               testId="text-territories-headline"
             />
