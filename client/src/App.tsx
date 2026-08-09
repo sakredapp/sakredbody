@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -6,21 +6,22 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { lazyRoute, clearChunkReloadGuards } from "@/lib/lazyRoute";
 import Home from "@/pages/Home";
-const Philosophy = lazy(() => import("@/pages/Philosophy"));
-const Restore = lazy(() => import("@/pages/Restore"));
-const Build = lazy(() => import("@/pages/Build"));
-const Embody = lazy(() => import("@/pages/Embody"));
-const Terrain = lazy(() => import("@/pages/Terrain"));
-const BodyLiteracy = lazy(() => import("@/pages/BodyLiteracy"));
-const Retreats = lazy(() => import("@/pages/Retreats"));
-const Executive = lazy(() => import("@/pages/Executive"));
-const FoodChart = lazy(() => import("@/pages/FoodChart"));
-const Mastermind = lazy(() => import("@/pages/Mastermind"));
-const LoginPage = lazy(() => import("@/pages/LoginPage"));
-const MemberDashboard = lazy(() => import("@/pages/MemberDashboard"));
-const AdminPortal = lazy(() => import("@/pages/AdminPortal"));
-const NotFound = lazy(() => import("@/pages/not-found"));
+const Philosophy = lazyRoute("Philosophy", () => import("@/pages/Philosophy"));
+const Restore = lazyRoute("Restore", () => import("@/pages/Restore"));
+const Build = lazyRoute("Build", () => import("@/pages/Build"));
+const Embody = lazyRoute("Embody", () => import("@/pages/Embody"));
+const Terrain = lazyRoute("Terrain", () => import("@/pages/Terrain"));
+const BodyLiteracy = lazyRoute("BodyLiteracy", () => import("@/pages/BodyLiteracy"));
+const Retreats = lazyRoute("Retreats", () => import("@/pages/Retreats"));
+const Executive = lazyRoute("Executive", () => import("@/pages/Executive"));
+const FoodChart = lazyRoute("FoodChart", () => import("@/pages/FoodChart"));
+const Mastermind = lazyRoute("Mastermind", () => import("@/pages/Mastermind"));
+const LoginPage = lazyRoute("LoginPage", () => import("@/pages/LoginPage"));
+const MemberDashboard = lazyRoute("MemberDashboard", () => import("@/pages/MemberDashboard"));
+const AdminPortal = lazyRoute("AdminPortal", () => import("@/pages/AdminPortal"));
+const NotFound = lazyRoute("NotFound", () => import("@/pages/not-found"));
 
 /**
  * app.sakredbody.com and sakredbody.com are one deployment.
@@ -71,6 +72,8 @@ function RouteFallback() {
 }
 
 function App() {
+  useEffect(clearChunkReloadGuards, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
