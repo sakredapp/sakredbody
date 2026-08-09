@@ -99,7 +99,10 @@ for (const [name, w, h] of SCREENS) {
 
   // The bug this whole file exists for.
   check(`${name}: not empty`, sky.length > 0, `${sky.length} figures`);
-  check(`${name}: enough to read as a sky`, sky.length >= 5, `${sky.length} figures`);
+  // Three to five is the whole design. Two is the floor the density knob
+  // bottoms out at, and it only applies to the dimmed backdrop uses.
+  check(`${name}: enough to read as a sky`, sky.length >= 3, `${sky.length} figures`);
+  check(`${name}: not a crowd`, sky.length <= 5, `${sky.length} figures`);
 
   // Every figure whole. A beheaded constellation is worse than none.
   const clipped = sky.filter((f: Figure) => {
@@ -186,7 +189,7 @@ section("Density and the clear centre");
   const desk = planSky(1440, 900, { density: 0.34 });
   check("density thins the field", half.length < full.length, `${half.length} vs ${full.length}`);
   check("the back office is thinner still", desk.length <= half.length, `${desk.length} vs ${half.length}`);
-  check("even the thinnest still has a sky", desk.length >= 5, `${desk.length}`);
+  check("even the thinnest still has a sky", desk.length >= 2, `${desk.length}`);
 }
 
 {
@@ -203,7 +206,7 @@ section("Density and the clear centre");
   check("no large figure stands behind the card", intruders.length === 0, `${intruders.length} intruders`);
 
   // And it must not clear the screen while it's at it.
-  check("clearing the centre still leaves a sky", sky.length >= 5, `${sky.length}`);
+  check("clearing the centre still leaves a sky", sky.length >= 3, `${sky.length}`);
 }
 
 /* ── Degenerate inputs ───────────────────────────────────────────────────── */

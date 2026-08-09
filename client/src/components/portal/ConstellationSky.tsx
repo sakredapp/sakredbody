@@ -138,8 +138,16 @@ export const LOD: { joints: string[]; edges: [string, string][] }[] = [
 let HALO: HTMLCanvasElement | null = null;
 let CORE: HTMLCanvasElement | null = null;
 
-/** Halo radius as a multiple of the core radius. Fixes the sprite geometry. */
-const HALO_SCALE = 7;
+/**
+ * Halo radius as a multiple of the core radius. Fixes the sprite geometry.
+ *
+ * Was 7, matching the hero figure. The hero is one object on an empty screen;
+ * here, a halo seven times the core on a figure large enough to anchor a
+ * viewport overlapped its neighbours' halos and the whole constellation
+ * dissolved into one cloud with no lines visible inside it. Five is the point
+ * where a star still glows and the fascia still reads through it.
+ */
+const HALO_SCALE = 5;
 const HALO_PX = 48;
 
 function sprites() {
@@ -223,18 +231,40 @@ export function planSky(
   // Three sizes and a deliberate ratio between them. Two near figures anchor
   // the composition, a handful of middles carry it, and the rest are far
   // enough back to be texture.
-  const LARGE = Math.max(180, Math.min(min * 0.58, 460));
-  const SIZES = [LARGE * 0.24, LARGE * 0.46, LARGE];
+  //
+  // The near size was 0.58 of the short edge, capped at 460 — which on a
+  // laptop is a figure taking up nearly three-fifths of the screen. At that
+  // size it stops being a constellation in a sky and becomes an illustration
+  // the login form is sitting on top of, and its glow swallows everything
+  // near it. 0.40 capped at 260 is roughly what the middle tier used to be,
+  // which is the size that was already working.
+  const LARGE = Math.max(150, Math.min(min * 0.4, 260));
+  const SIZES = [LARGE * 0.38, LARGE * 0.62, LARGE];
 
-  const want = Math.round(Math.max(6, Math.min(20, ((w * h) / 42000) * density)));
+  // Three to five, and on most screens four.
+  //
+  // This started at twenty on a laptop, which is not a sky — it is a crowd.
+  // Empty dark is most of what makes the occupied parts read as constellations
+  // rather than as a pattern, and at twenty there was none left. The count is
+  // now low enough that each figure is something you notice individually,
+  // which is the entire point of drawing a person in the stars.
+  const base = Math.max(3, Math.min(5, Math.round((w * h) / 280000)));
+  // Density can only take it down, never up, and never below two — one lone
+  // figure reads as a mistake rather than as restraint.
+  const want = Math.max(2, Math.round(base * density));
 
   const placed: Figure[] = [];
   for (let a = 0; a < want * 45 && placed.length < want; a++) {
     const i = placed.length;
 
     // Fixed by target index, not by draw order, so the mix is guaranteed
-    // rather than hoped for: two near, a third middle, the rest far.
-    const lod = i < 2 ? 2 : i < 2 + Math.ceil(want * 0.3) ? 1 : 0;
+    // rather than hoped for: one near, two middle, the rest far.
+    //
+    // This used to reserve the first two for the near tier and a further 30%
+    // for the middle, which was sized for a field of twenty. At four figures
+    // that formula spends every slot before it reaches the far tier, and a sky
+    // with no distance in it is flat.
+    const lod = i === 0 ? 2 : i <= 2 ? 1 : 0;
     const jitterH = 0.85 + hash01(a * 3 + 1, 24.11) * 0.3;
 
     // Shrunk to fit rather than skipped. A container short enough that the
@@ -365,10 +395,14 @@ export function ConstellationSky({
           const lod = LOD[f.lod];
 
           // Each figure breathes on its own slow cycle. Raised to a power so
-          // it spends most of its time dim and only occasionally blooms —
-          // fourteen things pulsing evenly is a Christmas tree.
+          // it spends most of its time dim and only occasionally blooms — a
+          // handful of things pulsing evenly is a Christmas tree. Fifth power
+          // rather than third: with four figures on screen instead of twenty,
+          // any one of them being lit is a much larger share of the picture,
+          // so each needs to spend correspondingly longer dark.
           const wave = 0.5 + 0.5 * Math.sin(t * f.rate + f.offset);
-          const own = wave * wave * wave;
+          const w2 = wave * wave;
+          const own = w2 * w2 * wave;
           const target = near === i ? 1 : own;
           heat[i] += (target - heat[i]) * (near === i ? 0.12 : 0.06);
           const lit = heat[i];
@@ -389,7 +423,7 @@ export function ConstellationSky({
           };
 
           // ── Fascia ──────────────────────────────────────────────
-          const lineA = (0.1 + lit * 0.4 + breath * 0.05) * f.depth * intensity;
+          const lineA = (0.09 + lit * 0.3 + breath * 0.04) * f.depth * intensity;
           ctx.strokeStyle = `rgba(214,178,104,${lineA})`;
           ctx.lineWidth = Math.max(0.5, (0.5 + lit * 0.7) * Math.min(1.6, scale * 2.2));
           ctx.beginPath();
@@ -427,32 +461,45 @@ export function ConstellationSky({
             const p = P(name);
 
             const twinkle = 0.5 + 0.5 * Math.sin(t * 1.1 + hash01(f.seed * 17 + n, 31.7) * 12);
-            const r =
-              (j.mag * 1.5 + lit * 1.8) *
-              (0.85 + twinkle * 0.15) *
-              Math.max(0.42, scale * 1.5);
 
-            const glow = (0.13 + lit * 0.32) * f.depth * intensity;
+            // The star size is *capped*, not proportional.
+            //
+            // It used to scale straight off the figure, so a near figure got
+            // stars three times the radius of a far one and a halo three
+            // times that again — which is what turned the large figures into
+            // single blobs with no anatomy visible inside them. A nearer
+            // constellation should be *wider*, not made of fatter stars; the
+            // limbs get longer and the points stay points. That is also what
+            // the sky actually does.
+            const r =
+              (j.mag * 1.3 + lit * 1.1) *
+              (0.85 + twinkle * 0.15) *
+              Math.max(0.5, Math.min(1.45, scale * 0.85));
+
+            const glow = (0.09 + lit * 0.2) * f.depth * intensity;
             const hr = r * HALO_SCALE;
             ctx.globalAlpha = Math.min(1, glow);
             ctx.drawImage(halo, p.x - hr, p.y - hr, hr * 2, hr * 2);
 
-            ctx.globalAlpha = Math.min(1, (0.42 + lit * 0.5 + breath * 0.08) * f.depth * intensity);
+            ctx.globalAlpha = Math.min(1, (0.34 + lit * 0.4 + breath * 0.06) * f.depth * intensity);
             ctx.drawImage(core, p.x - r, p.y - r, r * 2, r * 2);
           }
           ctx.globalAlpha = 1;
 
           // Anchor stars flare four-pointed when the figure is lit. Skipped on
           // the far ones, where the arms would be longer than the figure.
-          if (f.lod > 0 && lit > 0.22) {
-            ctx.strokeStyle = `rgba(240,219,175,${lit * 0.6 * f.depth * intensity})`;
-            ctx.lineWidth = Math.min(1.1, Math.max(0.5, scale * 1.6));
+          if (f.lod > 0 && lit > 0.3) {
+            ctx.strokeStyle = `rgba(240,219,175,${lit * 0.4 * f.depth * intensity})`;
+            ctx.lineWidth = Math.min(1, Math.max(0.5, scale * 1.2));
             ctx.beginPath();
             for (const name of lod.joints) {
               const j = f.pts[name];
               if (j.mag < 1.3) continue;
               const p = P(name);
-              const arm = j.mag * scale * 9 * lit;
+              // Off the star's own radius rather than off the figure scale,
+              // for the same reason the radius is capped: arms that grew with
+              // the figure reached its neighbours.
+              const arm = (j.mag * 1.3 * Math.max(0.5, Math.min(1.45, scale * 0.85))) * 4 * lit;
               ctx.moveTo(p.x - arm, p.y);
               ctx.lineTo(p.x + arm, p.y);
               ctx.moveTo(p.x, p.y - arm);
