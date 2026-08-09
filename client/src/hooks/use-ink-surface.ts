@@ -31,16 +31,17 @@ import { useEffect } from "react";
 export function useInkSurface() {
   useEffect(() => {
     const root = document.documentElement;
-
-    // Remember whether it was already there. If two portal screens are ever
-    // mounted at once — or a future page nests one inside another — the inner
-    // one unmounting must not strip the class from the outer one still using
-    // it.
-    const wasSet = root.classList.contains("dark");
     root.classList.add("dark");
 
-    return () => {
-      if (!wasSet) root.classList.remove("dark");
-    };
+    // Always removed on unmount, never conditionally.
+    //
+    // The first version remembered whether the class was already present and
+    // left it alone if so, to protect a hypothetical nested portal screen.
+    // That was wrong once `applyInkSurfaceAtBoot` started setting it from the
+    // URL: landing directly on /member meant the class was already there, so
+    // the guard declined to remove it, and navigating to a marketing page
+    // left the whole site dark. Nothing nests here — wouter's Switch renders
+    // exactly one page — so the guard protected nothing and broke something.
+    return () => root.classList.remove("dark");
   }, []);
 }
