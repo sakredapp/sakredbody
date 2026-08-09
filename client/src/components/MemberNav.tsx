@@ -27,6 +27,7 @@
 import type { ComponentType } from "react";
 import {
   Home as HomeIcon,
+  Dumbbell,
   Sun,
   Users,
   Award,
@@ -49,6 +50,7 @@ import { cn } from "@/lib/utils";
 export type MemberSection =
   | "home"
   | "coaching"
+  | "build"
   | "community"
   | "wins"
   | "retreat"
@@ -86,6 +88,7 @@ export const PRIMARY: Destination[] = [
 
 export const SECONDARY: Destination[] = [
   { id: "retreat", label: "What's On", icon: CalendarDays, note: "Retreats, masterminds and talks" },
+  { id: "build", label: "Build", icon: Dumbbell, note: "Today's lifts, and what you hit" },
   { id: "body", label: "The Body", icon: Activity, note: "Nine centres, read in sequence" },
   { id: "apothecary", label: "Apothecary", icon: Leaf, note: "What each protocol asks for" },
   { id: "library", label: "Library", icon: BookOpen, note: "Guides paired to your protocol" },

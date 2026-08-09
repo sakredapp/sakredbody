@@ -70,7 +70,7 @@ const PILLARS: Pillar[] = [
     title: "Build",
     blurb: "Strength, movement and resilience.",
     image: "/images/training-focus.webp",
-    section: null,
+    section: "build",
   },
   {
     key: "embody",
@@ -142,6 +142,15 @@ function useCounts() {
     },
   });
 
+  const build = useQuery<{ sessions: Array<{ exercises: unknown[] }> }>({
+    queryKey: ["/api/training/today"],
+    queryFn: async () => {
+      const r = await fetch("/api/training/today", { credentials: "include" });
+      if (!r.ok) throw new Error("no");
+      return r.json();
+    },
+  });
+
   const centres = useQuery<Array<{ reading?: unknown | null }>>({
     queryKey: ["/api/energy/centres"],
     queryFn: async () => {
@@ -151,7 +160,7 @@ function useCounts() {
     },
   });
 
-  return { today, offerings, ebooks, centres };
+  return { today, offerings, ebooks, centres, build };
 }
 
 export function PillarHome({
@@ -161,7 +170,7 @@ export function PillarHome({
   firstName?: string | null;
   onOpen: (section: MemberSection) => void;
 }) {
-  const { today, offerings, ebooks, centres } = useCounts();
+  const { today, offerings, ebooks, centres, build } = useCounts();
 
   /**
    * The live line under each title.
@@ -179,8 +188,13 @@ export function PillarHome({
         const done = list.filter((h) => h.completed).length;
         return `${done} of ${list.length} done today`;
       }
-      case "build":
-        return "Not open yet";
+      case "build": {
+        if (build.isLoading) return undefined;
+        const n = build.data?.sessions?.length ?? 0;
+        if (n === 0) return "Nothing prescribed today";
+        const lifts = build.data!.sessions.reduce((t, s) => t + s.exercises.length, 0);
+        return `${lifts} ${lifts === 1 ? "lift" : "lifts"} today`;
+      }
       case "embody": {
         if (centres.isLoading) return undefined;
         const all = centres.data ?? [];
