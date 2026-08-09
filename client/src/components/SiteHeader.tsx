@@ -64,12 +64,21 @@ export function SiteHeader({ navItems = SITE_NAV, cta, overHero = true }: SiteHe
           className={cn(
             // Floating pill: the page shows above it and down both sides, so it
             // reads as an object on the page rather than a bar bolted to the top.
-            "pointer-events-auto rounded-full border backdrop-blur-xl transition-all duration-300",
+            //
+            // At rest over a hero it is nothing at all — no fill, no border, no
+            // blur. It used to sit there as a 60%-opaque bordered slab a
+            // thousand pixels wide, which over the star field on the homepage
+            // read as a hard rule straight across the page above the
+            // constellation's head. The pill assembles itself on scroll, when
+            // there is content underneath it that it actually needs to sit on.
+            "pointer-events-auto rounded-full border transition-all duration-300",
             "h-14 pl-5 pr-3 flex items-center justify-between gap-4",
-            solid ? "border-white/12 shadow-lg shadow-black/30" : "border-white/8",
+            solid
+              ? "border-white/12 shadow-lg shadow-black/30 backdrop-blur-xl"
+              : "border-transparent shadow-none",
           )}
           style={{
-            background: solid ? "hsl(30 10% 9% / 0.88)" : "hsl(30 10% 9% / 0.6)",
+            background: solid ? "hsl(30 10% 9% / 0.88)" : "transparent",
           }}
         >
         <Link href="/" className="flex items-center shrink-0" data-testid="link-home">

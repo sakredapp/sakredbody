@@ -149,7 +149,7 @@ export default function Build() {
       </Section>
 
       {/* ── Next ─────────────────────────────────────────────── */}
-      <Section tone="ink" className="text-center py-20">
+      <Section tone="ink" className="text-center py-14">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.h2 variants={fadeInUp} className="text-3xl md:text-4xl font-display font-normal mb-6">
             Capacity you never use

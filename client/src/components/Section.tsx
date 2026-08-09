@@ -32,10 +32,10 @@ export function Section({
 
   if (resolvedTone === "raised") {
     return (
-      <div className="tone-ink bg-background px-4 sm:px-8 lg:px-14 py-4 sm:py-6">
+      <div className="tone-ink bg-background px-4 sm:px-8 lg:px-14 py-3 sm:py-4">
         <section
           className={cn(
-            "tone-raised rounded-2xl sm:rounded-[1.75rem] py-12 md:py-16 relative overflow-hidden",
+            "tone-raised rounded-2xl sm:rounded-[1.75rem] py-10 md:py-14 relative overflow-hidden",
             // Lit from above, like a slab under a low light. The gradient is
             // only four points of lightness end to end — enough to give the
             // panel a top and a bottom, not enough to read as a gradient.
@@ -58,7 +58,7 @@ export function Section({
 
   return (
     <section
-      className={cn("py-20 md:py-28 relative", resolvedTone === "ink" ? "tone-ink bg-background" : "", className)}
+      className={cn("py-12 md:py-20 relative", resolvedTone === "ink" ? "tone-ink bg-background" : "", className)}
       {...props}
     >
       {/* Ink sections often carry a canvas. Fading both edges into the page

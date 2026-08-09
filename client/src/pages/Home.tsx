@@ -226,7 +226,7 @@ export default function Home() {
             />
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-12 gap-y-14">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-10 gap-y-10">
             {TERRITORIES.map((t, i) => (
               <motion.div variants={fadeInUp} key={t.key}>
                 <Link href={t.href}>
@@ -330,7 +330,7 @@ export default function Home() {
             />
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-14">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-10">
             {PORTAL_LAYERS.map((layer, i) => (
               <motion.div variants={fadeInUp} key={layer.title}>
                 <Tilt3D className="h-full rounded-xl" max={6} lift={12} sheen={false}>

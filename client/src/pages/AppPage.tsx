@@ -270,7 +270,7 @@ export default function AppPage() {
             </h2>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-14">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-10">
             {FEATURES.map((f, i) => (
               <motion.div variants={fadeInUp} key={f.title}>
                 <div

@@ -54,7 +54,7 @@ export function PageHero({
   marks,
 }: PageHeroProps) {
   return (
-    <section className="tone-ink bg-background relative overflow-hidden min-h-[68vh] flex flex-col justify-center pt-32 pb-16">
+    <section className="tone-ink bg-background relative overflow-hidden min-h-[52vh] flex flex-col justify-center pt-32 pb-14">
       {image && (
         <div className="absolute inset-0 z-0">
           <img src={image} alt={imageAlt ?? ""} fetchPriority="high" decoding="async" className="w-full h-full object-cover" />
@@ -143,7 +143,7 @@ interface SectionHeaderProps {
 /** Centered eyebrow + headline + intro used at the top of most sections. */
 export function SectionHeader({ eyebrow, title, intro, onInk, className, testId }: SectionHeaderProps) {
   return (
-    <div className={`text-center max-w-2xl mx-auto ${className ?? "mb-14"}`}>
+    <div className={`text-center max-w-2xl mx-auto ${className ?? "mb-10"}`}>
       {eyebrow && (
         <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
           {eyebrow}

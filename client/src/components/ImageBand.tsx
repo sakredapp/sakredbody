@@ -25,7 +25,7 @@ interface ImageBandProps {
 export function ImageBand({ image, alt, eyebrow, title, children, tall, testId }: ImageBandProps) {
   return (
     <section
-      className={`tone-ink bg-background relative overflow-hidden ${tall ? "py-32 md:py-44" : "py-24 md:py-32"}`}
+      className={`tone-ink bg-background relative overflow-hidden ${tall ? "py-24 md:py-32" : "py-16 md:py-24"}`}
     >
       <div className="absolute inset-0 z-0">
         <img src={image} alt={alt} loading="lazy" decoding="async" className="w-full h-full object-cover" />

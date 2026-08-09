@@ -95,7 +95,7 @@ export default function Terrain() {
             />
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-x-12 gap-y-14 max-w-4xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-x-10 gap-y-10 max-w-4xl mx-auto">
             {IMPLICATIONS.map((im, i) => (
               <motion.div variants={fadeInUp} key={im.title}>
                 <div

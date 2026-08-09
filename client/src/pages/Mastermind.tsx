@@ -57,7 +57,7 @@ export default function Mastermind() {
           :root — which is the light palette. That is why this hero faded the
           ocean out to white and then met the next section on a hard black
           line. It now resolves to the page ink and hands off cleanly. */}
-      <section className="tone-ink bg-background relative min-h-[90vh] flex items-center pt-20 overflow-hidden">
+      <section className="tone-ink bg-background relative min-h-[72vh] flex items-center pt-20 overflow-hidden">
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/65 to-black/40 z-10" />
           <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-background z-10" />
