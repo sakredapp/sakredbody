@@ -43,34 +43,30 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2, ChevronDown, Music } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type {
+  EnergyCentre as EnergyCentreRow,
+  Frequency as FrequencyRow,
+} from "@shared/schema";
 
-interface Centre {
-  id: string;
-  name: string;
-  aspect: string | null;
-  bodyRegion: string | null;
-  element: string | null;
-  colorHex: string | null;
-  description: string | null;
-  whenBlocked: string | null;
-  whenFlowing: string | null;
-  axisPosition: number;
-  sortOrder: number;
-  isActive?: boolean;
-}
+/**
+ * Derived from the tables, not retyped from them.
+ *
+ * The hand-written version had `isActive?: boolean` on a centre. The column
+ * is `is_published`; there has never been an `is_active` on energy_centres.
+ * It was harmless only because nothing read it — a switch bound to it would
+ * have posted a key the server drops, and the toggle would have flipped in
+ * the UI and changed nothing in the database. That is the exact shape of the
+ * complaint this whole pass is about, sitting one line away from happening.
+ *
+ * Frequencies genuinely do have `is_active`, which is why the two looked
+ * consistent enough to pass a read-through.
+ */
+type Centre = Omit<EnergyCentreRow, "createdAt" | "updatedAt"> & {
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
 
-interface Frequency {
-  id: string;
-  name: string;
-  hz: number | null;
-  description: string | null;
-  audioUrl: string;
-  durationSeconds: number | null;
-  moment: string;
-  centreId: string | null;
-  sortOrder: number;
-  isActive?: boolean;
-}
+type Frequency = Omit<FrequencyRow, "createdAt"> & { createdAt?: string | null };
 
 const ELEMENTS = ["earth", "water", "fire", "air", "ether"];
 const MOMENTS = [
@@ -324,6 +320,31 @@ function Centres() {
                       save.mutate({ id: c.id, body: { axisPosition: Number(e.target.value) } })
                     }
                   />
+                </div>
+                {/* Sort order and publishing had no control at all. Nine
+                    centres are seeded and a tenth could be written but never
+                    hidden while it was being written, which is the only time
+                    hiding one matters. */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Sort order</Label>
+                  <Input
+                    type="number"
+                    defaultValue={c.sortOrder}
+                    onBlur={(e) =>
+                      Number(e.target.value) !== c.sortOrder &&
+                      save.mutate({ id: c.id, body: { sortOrder: Number(e.target.value) || 0 } })
+                    }
+                  />
+                </div>
+                <div className="flex items-end pb-1">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={c.isPublished}
+                      onCheckedChange={(v) => save.mutate({ id: c.id, body: { isPublished: v } })}
+                      data-testid={`switch-centre-published-${c.id}`}
+                    />
+                    <Label className="text-xs">Published</Label>
+                  </div>
                 </div>
               </div>
 
@@ -591,6 +612,48 @@ function Frequencies() {
                     save.mutate({ id: f.id, body: { audioUrl: e.target.value } })
                   }
                 />
+              </div>
+
+              {/* Length, order and the on/off switch — all three columns
+                  existed and none of them could be set. Duration is the one
+                  the member sees: it is printed beside the track before they
+                  commit to playing it. */}
+              <div className="grid sm:grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Length (seconds)</Label>
+                  <Input
+                    type="number"
+                    defaultValue={f.durationSeconds ?? ""}
+                    placeholder="600"
+                    onBlur={(e) =>
+                      save.mutate({
+                        id: f.id,
+                        body: { durationSeconds: e.target.value ? Number(e.target.value) : null },
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Sort order</Label>
+                  <Input
+                    type="number"
+                    defaultValue={f.sortOrder}
+                    onBlur={(e) =>
+                      Number(e.target.value) !== f.sortOrder &&
+                      save.mutate({ id: f.id, body: { sortOrder: Number(e.target.value) || 0 } })
+                    }
+                  />
+                </div>
+                <div className="flex items-end pb-1">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={f.isActive}
+                      onCheckedChange={(v) => save.mutate({ id: f.id, body: { isActive: v } })}
+                      data-testid={`switch-frequency-active-${f.id}`}
+                    />
+                    <Label className="text-xs">Active</Label>
+                  </div>
+                </div>
               </div>
 
               <div className="flex justify-end">
