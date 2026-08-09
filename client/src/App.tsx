@@ -58,23 +58,50 @@ const isAppHost =
   isNativeShell ||
   (typeof window !== "undefined" && window.location.hostname.startsWith("app."));
 
+/**
+ * Every marketing page, in one list.
+ *
+ * Listed rather than written out as routes so that "is this page part of the
+ * website?" has exactly one answer, and so the native shells can turn all of
+ * them off in a single place. A page added here is automatically excluded
+ * from the app; a page added as its own `<Route>` below is not, which is the
+ * mistake this list exists to prevent.
+ */
+const MARKETING_PATHS: [string, React.ComponentType][] = [
+  ["/philosophy", Philosophy],
+  ["/restore", Restore],
+  ["/build", Build],
+  ["/embody", Embody],
+  ["/the-terrain", Terrain],
+  ["/body-literacy", BodyLiteracy],
+  ["/retreats", Retreats],
+  ["/executive", Executive],
+  ["/food-chart", FoodChart],
+  ["/mastermind", Mastermind],
+];
+
 function Router() {
   return (
     <Switch>
-      {/* Marketing */}
+      {/* Marketing.
+          None of it is routed in the native shells. The app is the portal,
+          not a wrapper around the website — and a native build that can
+          navigate to a landing page with a "Book a call" button is the
+          textbook shape of an App Store 4.2 rejection ("minimum
+          functionality / repackaged website"). It is also just wrong: the
+          person holding the app has already bought.
+
+          `isAppHost` covers native and the app.* hostname both. Every
+          marketing path resolves to the portal there rather than 404ing,
+          so an old link in an email still lands somewhere sensible. */}
       <Route path="/">{() => (isAppHost ? <Redirect to="/member" /> : <Home />)}</Route>
-      <Route path="/philosophy" component={Philosophy} />
-      <Route path="/restore" component={Restore} />
-      <Route path="/build" component={Build} />
-      <Route path="/embody" component={Embody} />
-      <Route path="/the-terrain" component={Terrain} />
-      <Route path="/body-literacy" component={BodyLiteracy} />
-      <Route path="/retreats" component={Retreats} />
-      <Route path="/executive" component={Executive} />
+      {MARKETING_PATHS.map(([path, Page]) => (
+        <Route key={path} path={path}>
+          {() => (isAppHost ? <Redirect to="/member" /> : <Page />)}
+        </Route>
+      ))}
       {/* The app and the portal are the same product. Old /app links land there. */}
       <Route path="/app">{() => <Redirect to="/member" />}</Route>
-      <Route path="/food-chart" component={FoodChart} />
-      <Route path="/mastermind" component={Mastermind} />
 
       {/* Legal. /privacy and /terms are the canonical URLs — both app
           stores want a policy at a stable public address, and these are the

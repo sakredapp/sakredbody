@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
+import { Capacitor } from "@capacitor/core";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,9 @@ import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/links";
 import { apiFetch, setAuthToken } from "@/lib/apiFetch";
 import { ConstellationSky } from "@/components/portal/ConstellationSky";
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
+
+/** The app has no website to return to, and no store badges to offer. */
+const isNative = Capacitor.isNativePlatform();
 
 type Mode = "login" | "register";
 
@@ -119,27 +123,50 @@ export default function LoginPage() {
         clearCentre={0.55}
         clearTop={0.15}
       />
-      {/* Settles the middle so the card has something quiet to sit on without
-          dimming the corners, where the field is doing its work. */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,hsl(var(--ink)/0.78)_0%,hsl(var(--ink)/0.3)_45%,transparent_75%)]" />
+      {/* A whisper, not a scrim.
+          This was an ellipse running from 78% ink at the centre to nothing at
+          75% — three stops across a short distance, which on a near-black
+          ground makes its own edge visible: a brown ring floating in the
+          middle of the screen with nothing to explain it. The card already
+          has a blur and a border and does not need to be sat on. Half the
+          strength, pushed right out to the corners, so it reads as depth
+          rather than as a shape. */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,hsl(var(--ink)/0.35)_0%,hsl(var(--ink)/0.18)_55%,transparent_100%)]" />
 
       <div className="relative flex-1 flex flex-col" style={{ zIndex: 10 }}>
-        {/* Top bar */}
-        <div className="pt-6 pb-2 px-6 flex items-center justify-between gap-4">
-          <Link href="/">
-            <img src={sakredLogo} alt="Sakred Body" className="h-12 w-12 object-contain drop-shadow-lg" />
-          </Link>
-          <Link
-            href="/"
-            className="text-white/50 text-xs uppercase tracking-widest hover:text-white/70 transition-colors"
-          >
-            Back to Site
-          </Link>
+        {/* Top bar.
+            One logo per screen. There were two — this one and the card's,
+            forty pixels apart on a phone — and the second one doesn't say
+            anything the first hasn't. The card keeps its own, because that
+            is the thing you are actually looking at.
+
+            "Back to site" is web-only. In the app there is no site to go
+            back to: the marketing pages aren't routed on native, and a link
+            that either dead-ends or throws the user out to Safari is worse
+            than no link. `pt-safe` so the row clears the notch. */}
+        <div className="pt-safe px-6 flex items-center justify-end gap-4 min-h-[3.5rem]">
+          {!isNative && (
+            <Link
+              href="/"
+              className="tap flex items-center text-white/50 text-xs uppercase tracking-widest hover:text-white/70 transition-colors"
+            >
+              Back to Site
+            </Link>
+          )}
         </div>
 
-        {/* Form */}
-        <div className="flex-1 flex items-center justify-center p-4">
-          <Card className="w-full max-w-sm bg-white/5 border-white/10 backdrop-blur-xl">
+        {/* Form.
+            Scrolls, and is centred only while it fits. Register mode is five
+            fields plus a date picker taller than login, and on a 667px phone
+            it ran past the bottom of a screen that could not scroll — the
+            create-account button was simply unreachable. `flex-col` with
+            `my-auto` on the card is what gives both behaviours: centred when
+            there's room, scrolled from the top when there isn't. Plain
+            `items-center` with overflow clips the top instead.
+
+            `pb-safe` keeps the last control off the home indicator. */}
+        <div className="flex-1 overflow-y-auto scroll-touch flex flex-col items-center p-4 pb-safe">
+          <Card className="w-full max-w-sm my-auto bg-white/5 border-white/10 backdrop-blur-xl">
             <CardContent className="pt-6 space-y-6">
               <div className="text-center space-y-3">
                 <img
@@ -239,7 +266,13 @@ export default function LoginPage() {
               </form>
 
               {/* The portal and the app are the same product — the web is
-                  simply one of the doors into it. */}
+                  simply one of the doors into it.
+
+                  Web only. Offering someone a download of the app they are
+                  currently holding is absurd on its own terms, and the
+                  Android button inside an iOS build is a link to a competing
+                  store, which is a review rejection rather than a quirk. */}
+              {!isNative && (
               <div className="pt-1">
                 <p className="text-white/35 text-[10px] uppercase tracking-[0.18em] text-center mb-3">
                   Or take it with you
@@ -275,6 +308,7 @@ export default function LoginPage() {
                   </a>
                 </div>
               </div>
+              )}
 
               <div className="text-center">
                 <button
