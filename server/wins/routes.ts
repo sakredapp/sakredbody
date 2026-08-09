@@ -17,8 +17,10 @@ import { db } from "../db.js";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { isAuthenticated } from "../auth/index.js";
+import { storage } from "../storage.js";
 import {
   wins,
+  users,
   channels,
   communityMessages,
   shareWinSchema,
@@ -31,6 +33,19 @@ import { visibleChannelIds } from "../community/index.js";
 function param(req: Request, name: string): string {
   const v = req.params[name];
   return Array.isArray(v) ? v[0] : v;
+}
+
+function isAdmin(req: Request, res: Response, next: () => void) {
+  const userId = req.session?.userId;
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+  storage
+    .getUser(userId)
+    .then((user) => {
+      if (!user || user.isAdmin !== "true")
+        return res.status(403).json({ message: "Admin access required" });
+      next();
+    })
+    .catch(() => res.status(500).json({ message: "Internal Server Error" }));
 }
 
 function fail(res: Response, err: unknown) {
@@ -185,6 +200,48 @@ export function registerWinRoutes(app: Express) {
       }
       trackError("win.share", err, { userId: req.session?.userId });
       res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // ─── ADMIN ───────────────────────────────────────────────────────────────
+
+  /**
+   * What members are actually finishing.
+   *
+   * Read-only, and that is the whole design: you do not administer somebody's
+   * achievements. A win is a record of something they did, so there is no edit
+   * and no delete — the only honest operations on it are looking and counting.
+   *
+   * Useful to a coach for one specific reason: a member earning nothing for
+   * three weeks is the earliest visible sign that a protocol is not landing,
+   * and it shows up here before it shows up in a cancelled membership.
+   */
+  app.get("/api/admin/wins", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const kind = String((req.query.kind as string) ?? "").trim();
+
+      const rows = await db
+        .select({
+          id: wins.id,
+          kind: wins.kind,
+          title: wins.title,
+          subtitle: wins.subtitle,
+          earnedAt: wins.earnedAt,
+          sharedAt: wins.sharedAt,
+          userId: wins.userId,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+        })
+        .from(wins)
+        .leftJoin(users, eq(wins.userId, users.id))
+        .where(kind && kind !== "all" ? eq(wins.kind, kind) : undefined)
+        .orderBy(desc(wins.earnedAt))
+        .limit(200);
+
+      res.json(rows);
+    } catch (err) {
+      fail(res, err);
     }
   });
 

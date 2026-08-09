@@ -37,6 +37,7 @@ import {
   BookOpen,
   Activity,
   GraduationCap,
+  Settings,
 } from "lucide-react";
 import {
   Sheet,
@@ -57,7 +58,8 @@ export type MemberSection =
   | "body"
   | "apothecary"
   | "library"
-  | "masterclass";
+  | "masterclass"
+  | "settings";
 
 interface Destination {
   id: MemberSection;
@@ -93,6 +95,7 @@ export const SECONDARY: Destination[] = [
   { id: "apothecary", label: "Apothecary", icon: Leaf, note: "What each protocol asks for" },
   { id: "library", label: "Library", icon: BookOpen, note: "Guides paired to your protocol" },
   { id: "masterclass", label: "Masterclass", icon: GraduationCap, note: "Lessons, on your own time" },
+  { id: "settings", label: "Settings", icon: Settings, note: "Blocked people, units, your account" },
 ];
 
 const ALL = [...PRIMARY, ...SECONDARY];

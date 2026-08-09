@@ -80,6 +80,7 @@ import { useInkSurface } from "@/hooks/use-ink-surface";
 import { PortalBackdrop } from "@/components/portal/PortalBackdrop";
 import { PillarHome } from "@/components/PillarHome";
 import { BuildTab } from "@/components/BuildTab";
+import { SettingsTab } from "@/components/SettingsTab";
 
 // Icon mapping (UI-only, can't live in shared/)
 const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -393,6 +394,19 @@ export default function MemberDashboard() {
             className="container max-w-3xl mx-auto px-4 py-6"
           >
             <PillarHome firstName={user?.firstName} onOpen={setSection} />
+          </motion.div>
+        )}
+
+        {section === "settings" && (
+          <motion.div
+            key="settings"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="container max-w-3xl mx-auto px-4 py-6"
+          >
+            <SettingsTab weightUnit={user?.weightUnit} onLogout={() => logout()} />
           </motion.div>
         )}
 
