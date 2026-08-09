@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Download, Loader2, Smartphone } from "lucide-react";
 import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/links";
 import { apiFetch, setAuthToken } from "@/lib/apiFetch";
+import { ConstellationSky } from "@/components/portal/ConstellationSky";
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
 type Mode = "login" | "register";
@@ -70,7 +71,14 @@ export default function LoginPage() {
       if (data.token) await setAuthToken(data.token);
 
       // Auth successful — redirect to member portal
-      window.location.href = "/member";
+      // `?next=` is set when something bounced you here — /admin does it
+      // rather than showing a second sign-in screen of its own. Same-origin
+      // paths only: an open redirect is how a login page becomes a phishing
+      // relay, and "starts with a single slash" is the check that rules out
+      // both absolute URLs and protocol-relative `//evil.com`.
+      const next = new URLSearchParams(window.location.search).get("next");
+      const safe = next && /^\/(?!\/)/.test(next) ? next : "/member";
+      window.location.href = safe;
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -80,12 +88,39 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen relative flex flex-col">
-      {/* Background */}
+      {/* ── Background ──────────────────────────────────────────────────────
+          Three layers, and the order is the whole point.
+
+          The photograph used to be the background, at roughly a third
+          brightness. It is now nearly out — held at 25% under a heavier wash —
+          because a star chart drawn over a legible photograph reads as an
+          overlay on a picture, not as a sky. What the photograph still does at
+          this strength is keep the screen from being flat black, which is what
+          a constellation needs behind it to have any depth at all.
+
+          The sky sits above the wash rather than under it, or the wash would
+          be doing to the constellation exactly what it is there to do to the
+          photograph.
+
+          The wash is `--ink`, the token, and not a hex. The first version of
+          this screen used #05060a — a cold near-black that looked right on its
+          own and was wrong the moment you signed in, because every other
+          surface in the product is hsl(30 10% 10%), which is warm. Two greys
+          three points apart in lightness and thirty degrees apart in hue read
+          as two different apps when you cross between them. Anything that has
+          to match the app has to name the same variable the app names. */}
       <div
-        className="absolute inset-0 bg-cover bg-center"
+        className="absolute inset-0 bg-cover bg-center opacity-25"
         style={{ backgroundImage: "url('/images/member-login-bg.webp')" }}
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/55 to-black/75" />
+      <div className="absolute inset-0 bg-[hsl(var(--ink))]/95" />
+      <ConstellationSky
+        className="absolute inset-0 w-full h-full"
+        clearCentre={0.55}
+      />
+      {/* Settles the middle so the card has something quiet to sit on without
+          dimming the corners, where the field is doing its work. */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,hsl(var(--ink)/0.78)_0%,hsl(var(--ink)/0.3)_45%,transparent_75%)]" />
 
       <div className="relative flex-1 flex flex-col" style={{ zIndex: 10 }}>
         {/* Top bar */}

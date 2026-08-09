@@ -21,9 +21,17 @@ const config: CapacitorConfig = {
   appName: "Sakred Body",
   webDir: "dist/public",
 
-  // Matches <meta name="theme-color"> and the manifest's background_color, so
-  // the native background behind the WebView doesn't flash white on launch.
-  backgroundColor: "#1a1a1a",
+  // `--ink` from client/src/index.css — hsl(30 10% 10%) — and the same value
+  // as <meta name="theme-color">, the manifest's background_color, Android's
+  // @color/sakredInk and the iOS launch storyboard. Five places, one colour,
+  // because they all paint the same few hundred milliseconds of launch and
+  // any one of them being different is a visible flash.
+  //
+  // It was #1a1a1a: a neutral grey, close enough to look deliberate and wrong
+  // in a way that reads as cheap — the app's ink is warm, and a cold grey
+  // sliding into a warm one at launch is the seam you notice without being
+  // able to name.
+  backgroundColor: "#1C1A17",
 
   android: {
     // https://localhost rather than the legacy http:// scheme: it makes the
@@ -41,7 +49,7 @@ const config: CapacitorConfig = {
   plugins: {
     SplashScreen: {
       launchShowDuration: 0,
-      backgroundColor: "#1a1a1a",
+      backgroundColor: "#1C1A17",
     },
   },
 };

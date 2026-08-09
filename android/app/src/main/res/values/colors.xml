@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The app's ground, for the native side of the launch.
+
+    hsl(30 10% 10%) is the ink token in client/src/index.css, the ground
+    under every surface in the product. The splash PNGs Capacitor generated
+    are already this colour; this exists so the *window* underneath them is
+    too. Between the splash drawable being torn down and the WebView painting
+    its first frame there is a window with its own background, and on a
+    light-mode device that background was white.
+-->
+<resources>
+    <color name="sakredInk">#1C1A17</color>
+</resources>

@@ -88,6 +88,7 @@ import { DailyRitual } from "@/components/DailyRitual";
 import { InfoTip, LabelWithInfo } from "@/components/ui/info-tip";
 import { Panel } from "@/components/portal/Panel";
 import { Dial } from "@/components/portal/Dial";
+import { PortalBackdrop } from "@/components/portal/PortalBackdrop";
 import { groupByBand } from "@/components/portal/dayBands";
 import { WinMoment } from "@/components/WinMoment";
 import type { Win } from "@shared/models/wins";
@@ -1695,7 +1696,10 @@ export default function CoachingDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative isolate">
+      {/* Same sky as the member app, held further back — see PortalBackdrop. */}
+      <PortalBackdrop variant="desk" />
+
       {/* Header */}
       <header
         className="sticky top-0 border-b border-border/50 bg-background/90 backdrop-blur-md"
