@@ -61,7 +61,6 @@ export default function Terrain() {
       <PageHero
         eyebrow="The Signature Concept"
         title={<>The Terrain.</>}
-        intro="Your body is not a collection of parts. It is an environment."
         testId="text-terrain-headline"
         ambient={<ParticleSphere className="absolute inset-0 w-full h-full opacity-60" />}
         marks={["Nine stages", "A closed loop", "Elimination feeds digestion"]}

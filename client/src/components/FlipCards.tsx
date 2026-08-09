@@ -80,18 +80,21 @@ export function FlipCards({
     );
   }
 
-  const width =
-    columns === 2
-      ? "w-[84%] sm:w-[calc(50%-0.625rem)]"
-      : columns === 4
-        ? "w-[84%] sm:w-[calc(50%-0.625rem)] lg:w-[calc(25%-0.94rem)]"
-        : "w-[84%] sm:w-[calc(50%-0.625rem)] lg:w-[calc(33.333%-0.834rem)]";
+  // A card is the size of a card, not a fraction of whatever container it was
+  // dropped into. Sized as a percentage, four short titles in a max-w-6xl
+  // section became four 17rem-wide slabs of mostly nothing, and the same four
+  // in a narrower section became something else again. One comfortable reading
+  // width, everywhere; the rail scrolls when they don't all fit.
+  const width = "w-[78vw] max-w-[19rem] sm:w-[17.5rem] lg:w-[19rem]";
 
   return (
     <div className={cn("relative", className)} data-testid={testId}>
       <div
         ref={railRef}
-        className="flex items-stretch gap-5 overflow-x-auto snap-x snap-mandatory scrollbar-none pb-1 -mx-4 px-4 sm:mx-0 sm:px-0"
+        // `safe center` centres the rail when the cards fit and falls back to
+        // start-alignment when they overflow — plain `center` would push the
+        // first card off the left edge with no way to scroll back to it.
+        className="flex items-stretch gap-5 overflow-x-auto snap-x snap-mandatory scrollbar-none pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 [justify-content:safe_center]"
         style={{ perspective: "1800px" }}
       >
         {cards.map((card, i) => {
@@ -117,7 +120,7 @@ export function FlipCards({
                 {/* Both faces share one grid cell, so the card is as tall as
                     the taller of them and nothing is ever clipped. */}
                 <span
-                  className="[grid-area:1/1] rounded-2xl border bg-card flex flex-col items-center text-center gap-5 p-6 min-h-[13rem]"
+                  className="[grid-area:1/1] rounded-2xl border bg-card flex flex-col items-center text-center gap-5 p-6 min-h-[11rem]"
                   style={{
                     backfaceVisibility: "hidden",
                     borderColor: edge,

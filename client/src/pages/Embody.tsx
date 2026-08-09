@@ -108,7 +108,6 @@ export default function Embody() {
             <SectionHeader
               eyebrow="The Practice"
               title={<>Six Things That <span className="text-gold">Actually Hold</span></>}
-              intro="Not motivation. Structure."
               testId="text-practices-headline"
             />
           </motion.div>

@@ -46,7 +46,6 @@ export default function Philosophy() {
       <PageHero
         eyebrow="The Philosophy"
         title={<>The Philosophy.</>}
-        intro="Not a body that avoids illness. One capable of inhabiting its own life."
         testId="text-philosophy-headline"
         ambient={<Constellation className="absolute inset-0 w-full h-full opacity-80" />}
         marks={["Four territories", "One sequence", "East and the barbell"]}
@@ -188,7 +187,6 @@ export default function Philosophy() {
             <SectionHeader
               eyebrow="The Operating Loop"
               title={<>Clear. Nourish. <span className="text-gold">Challenge. Recover.</span></>}
-              intro="Health, training, work. The same four beats."
               testId="text-loop-headline"
             />
           </motion.div>

@@ -133,7 +133,6 @@ export default function Restore() {
             <SectionHeader
               eyebrow="In Practice"
               title={<>Where to Start</>}
-              intro="A few of them. More over time."
               testId="text-protocols-headline"
             />
           </motion.div>

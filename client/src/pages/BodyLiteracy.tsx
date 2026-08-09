@@ -57,7 +57,6 @@ export default function BodyLiteracy() {
       <PageHero
         eyebrow="The Skill"
         title={<>Body Literacy.</>}
-        intro="Learn to read the organism you live inside."
         testId="text-literacy-headline"
         ambient={<ResonantRing className="absolute inset-0 w-full h-full opacity-50" rings={5} />}
         marks={["Signals, not symptoms", "Read it daily", "Awareness beats restriction"]}
