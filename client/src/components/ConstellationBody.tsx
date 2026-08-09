@@ -134,7 +134,14 @@ export function ConstellationBody({ className }: { className?: string }) {
         const FIG_H = 152;
         const FIG_CX = 50;
         const FIG_CY = 84;
-        const scale = Math.min((w * 0.9) / FIG_W, (h * 0.94) / FIG_H);
+        // 0.82/0.84, not 0.9/0.94 — the figure has to leave room for its own
+        // light. Every star now paints a halo of radius r*7 and the anchor
+        // stars throw flare arms of up to 6.6r; around the crown that is some
+        // forty pixels of glow above the topmost point of the figure. Filling
+        // 94% of the height put the crown ~25px from the canvas edge, so the
+        // halo was clipped by the canvas and ended on a dead straight line
+        // right above the head. The margin is now wider than the glow.
+        const scale = Math.min((w * 0.82) / FIG_W, (h * 0.84) / FIG_H);
         const ox = w / 2 - FIG_CX * scale;
         const oy = h / 2 - FIG_CY * scale;
         const P = (s: Star) => ({ x: ox + s.x * scale, y: oy + s.y * scale });

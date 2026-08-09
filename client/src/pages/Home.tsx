@@ -5,7 +5,6 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { YinYang } from "@/components/YinYang";
-import { CelestialField } from "@/components/CelestialField";
 import { Constellation } from "@/components/Constellation";
 import { ConstellationBody } from "@/components/ConstellationBody";
 import { StarDust } from "@/components/StarDust";
@@ -161,9 +160,16 @@ export default function Home() {
       {/* The header is a floating pill roughly 72px tall. pt-28 put the
           crown of the figure directly under it. */}
       <section className="tone-ink bg-background relative overflow-hidden pt-40 pb-20 md:pt-44 md:pb-28">
+        {/* StarDust only.
+
+            CelestialField draws four orbit rings sized off the frame, and in a
+            section this wide they came out wider than the section that clips
+            them — so what actually rendered was the top arc of an ellipse
+            running edge to edge, flat enough to read as a ruled line straight
+            across the page above the figure's head. Shrinking them made the
+            line shorter, not absent. Dust has no geometry to clip. */}
         <div className="absolute inset-0 z-0">
-          <CelestialField className="absolute inset-0 w-full h-full opacity-80" />
-          <StarDust className="absolute inset-0 w-full h-full" density={1.3} />
+          <StarDust className="absolute inset-0 w-full h-full" density={1.4} />
         </div>
 
         {/* The hero resolves into the ink below it instead of stopping. */}
