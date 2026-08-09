@@ -90,7 +90,7 @@ export default function Restore() {
       </Section>
 
       {/* ── The order ────────────────────────────────────────── */}
-      <Section tone="light">
+      <Section tone="raised">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
@@ -165,7 +165,7 @@ export default function Restore() {
       </Section>
 
       {/* ── Next ─────────────────────────────────────────────── */}
-      <Section tone="light" className="text-center py-12 md:py-16">
+      <Section tone="raised" className="text-center py-12 md:py-16">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.h2 variants={fadeInUp} className="text-3xl md:text-4xl font-display font-normal mb-6">
             Restoration isn't <span className="text-gold">the destination.</span>

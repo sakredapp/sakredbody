@@ -1890,7 +1890,7 @@ export default function AdminPortal() {
                 <SelectContent>{SERVICE_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-2"><label className="text-sm font-medium">Location *</label><Input value={partnerForm.location} onChange={(e) => setPartnerForm({ ...partnerForm, location: e.target.value })} placeholder="Dorado, Puerto Rico" /></div>
+            <div className="space-y-2"><label className="text-sm font-medium">Location *</label><Input value={partnerForm.location} onChange={(e) => setPartnerForm({ ...partnerForm, location: e.target.value })} placeholder="Rincón, west coast" /></div>
             <div className="space-y-2"><label className="text-sm font-medium">Description *</label><Textarea value={partnerForm.description} onChange={(e) => setPartnerForm({ ...partnerForm, description: e.target.value })} className="resize-none" /></div>
             <Separator />
             <div className="grid grid-cols-2 gap-4">

@@ -123,7 +123,7 @@ export const MEMBERSHIP_PRICING = {
     period: "year",
     features: [
       "Everything in Quarterly",
-      "One Puerto Rico retreat included",
+      "One retreat included",
       "Essential housing included",
       "Priority upgrade to Premium + Elite",
       "Direct concierge access + priority scheduling",

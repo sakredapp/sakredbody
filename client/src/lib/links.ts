@@ -37,7 +37,7 @@ export const SITE_NAV: NavEntry[] = [
     children: [
       { label: "Sakred Executive", href: "/executive", note: "Private coaching · application only" },
       { label: "Mastermind", href: "/mastermind", note: "Membership + retreats" },
-      { label: "Retreats", href: "/retreats", note: "Puerto Rico, six formats" },
+      { label: "Retreats", href: "/retreats", note: "Six formats, three days to two weeks" },
     ],
   },
 ];

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { FlipCards } from "@/components/FlipCards";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
 const fadeInUp = {
@@ -52,7 +53,11 @@ export default function Mastermind() {
         }
       />
 
-      <section className="relative min-h-[90vh] flex items-center pt-20 overflow-hidden">
+      {/* tone-ink, or `to-background` in the scrim below resolves against
+          :root — which is the light palette. That is why this hero faded the
+          ocean out to white and then met the next section on a hard black
+          line. It now resolves to the page ink and hands off cleanly. */}
+      <section className="tone-ink bg-background relative min-h-[90vh] flex items-center pt-20 overflow-hidden">
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/65 to-black/40 z-10" />
           <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-background z-10" />
@@ -97,7 +102,7 @@ export default function Mastermind() {
         </div>
       </section>
 
-      <Section id="what-we-do" tone="light">
+      <Section id="what-we-do" tone="raised">
         <div className="grid md:grid-cols-2 gap-12 md:gap-24 items-center">
           <div>
             <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">What This Actually Is</p>
@@ -176,7 +181,7 @@ export default function Mastermind() {
         </div>
       </Section>
 
-      <Section tone="light">
+      <Section tone="raised">
         <div className="text-center mb-10">
           <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">Investment</p>
           <h2 className="text-3xl md:text-4xl font-display font-normal mb-4" data-testid="text-pricing-headline">Two Ways to Join</h2>
@@ -224,50 +229,39 @@ export default function Mastermind() {
           <h2 className="text-3xl md:text-4xl font-display font-normal mb-4" data-testid="text-who-headline">Built for People Who Build Things</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">Entrepreneurs, founders, and high-performing professionals who are ready to invest in themselves — not just their business.</p>
         </div>
-        <div className="max-w-3xl mx-auto">
-          <Accordion type="single" collapsible className="w-full">
-            {[
-              { q: "You're successful but running on fumes", a: "You've built something real, but your sleep is off, your energy dips, and you know your body is paying for your output." },
-              { q: "You want growth that actually sticks", a: "You've done conferences and courses. You want something deeper — real changes in how you feel, think, and show up daily." },
-              { q: "You're tired of surface-level wellness", a: "You're not looking for crystals and mantras. You want practical, grounded work on your health, mindset, and nervous system." },
-              { q: "You want community without the fluff", a: "You want to be around other serious people working on themselves. Real conversations, not networking pitches." },
-              { q: "You value experiences over information", a: "You don't need more content. You need an environment that pulls the best version of you forward." }
-            ].map((item, i) => (
-              <AccordionItem key={i} value={`who-${i}`} data-testid={`who-item-${i}`}>
-                <AccordionTrigger className="text-center justify-center gap-3 font-display text-base font-normal">{item.q}</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground leading-relaxed text-sm">
-                  {item.a}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </div>
+        {/* Not an accordion. Three of these in a row turned the page into a
+            filing cabinet, and only the last one — the FAQ — is genuinely a
+            list of questions somebody asks one at a time. */}
+        <FlipCards
+          testId="flip-who"
+          columns={3}
+          cards={[
+            { title: "You're successful but running on fumes", body: "You've built something real, but your sleep is off, your energy dips, and you know your body is paying for your output." },
+            { title: "You want growth that actually sticks", body: "You've done conferences and courses. You want something deeper — real changes in how you feel, think, and show up daily." },
+            { title: "You're tired of surface-level wellness", body: "You're not looking for crystals and mantras. You want practical, grounded work on your health, mindset, and nervous system." },
+            { title: "You want community without the fluff", body: "You want to be around other serious people working on themselves. Real conversations, not networking pitches." },
+            { title: "You value experiences over information", body: "You don't need more content. You need an environment that pulls the best version of you forward." },
+          ]}
+        />
       </Section>
 
-      <Section tone="light">
+      <Section tone="raised">
         <div className="text-center mb-10">
           <p className="text-xs font-sans font-normal uppercase tracking-widest text-gold mb-4">What You Get</p>
           <h2 className="text-3xl md:text-4xl font-display font-normal mb-4" data-testid="text-deliverables-headline">Your Membership Includes</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">Everything is designed to support you between retreats — so the growth doesn't stop when you go home.</p>
         </div>
-        <div className="max-w-3xl mx-auto">
-          <Accordion type="single" collapsible className="w-full">
-            {[
-              { q: "Customizable Retreats", a: "Design your own retreat — private or shared, 3 days to 2 weeks. Pick your dates, housing tier, and let our concierge handle the rest." },
-              { q: "Concierge Booking", a: "Choose private or shared, pick your dates and housing in your member portal. Submit a request — our team schedules a call to finalize everything." },
-              { q: "Health Protocols", a: "Practical daily routines for hydration, digestion, sleep, and stress management. Built for busy, mobile lives." },
-              { q: "Community + Coaching", a: "Live calls, a private member community, accountability without pressure, and optional 1:1 sessions." },
-              { q: "The Method: Stabilize, Clear, Build", a: "Our approach works in three phases. First, stabilize your foundation — hydration, sleep, gut health. Then clear what's dragging you down. Then build real capacity — nutrition, movement, breath, mental clarity. Systems that keep you strong long-term." }
-            ].map((item, i) => (
-              <AccordionItem key={i} value={`get-${i}`} data-testid={`deliverable-item-${i}`}>
-                <AccordionTrigger className="text-center justify-center gap-3 font-display text-base font-normal">{item.q}</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground leading-relaxed text-sm">
-                  {item.a}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </div>
+        <FlipCards
+          testId="flip-includes"
+          columns={3}
+          cards={[
+            { title: "Customizable retreats", body: "Design your own — private or shared, three days to two weeks. Pick your dates and housing tier; the concierge handles the rest." },
+            { title: "Concierge booking", body: "Choose private or shared, pick dates and housing in the portal, submit the request. Our team schedules a call to finalise it." },
+            { title: "Health protocols", body: "Daily routines for hydration, digestion, sleep and stress. Built for busy, mobile lives." },
+            { title: "Community and coaching", body: "Live calls, a private member community, accountability without pressure, and optional one-to-one sessions." },
+            { title: "The method", body: "Three phases. Stabilise the foundation — hydration, sleep, gut. Clear what's dragging you down. Then build real capacity: nutrition, movement, breath, clarity." },
+          ]}
+        />
       </Section>
 
       <Section tone="ink" className="py-16">
@@ -294,7 +288,7 @@ export default function Mastermind() {
         </div>
       </Section>
 
-      <Section tone="light" className="text-center py-12 md:py-16">
+      <Section tone="raised" className="text-center py-12 md:py-16">
         <div className="max-w-2xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-display font-normal mb-6" data-testid="text-final-cta-headline">You've invested in your business.<br/><span className="text-gold">Now invest in yourself.</span></h2>
           <p className="text-muted-foreground text-lg mb-10 leading-relaxed">

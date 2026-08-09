@@ -122,7 +122,7 @@ export default function Terrain() {
       </Section>
 
       {/* ── CTA ──────────────────────────────────────────────── */}
-      <Section tone="light" className="text-center py-12 md:py-16">
+      <Section tone="raised" className="text-center py-12 md:py-16">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.h2 variants={fadeInUp} className="text-3xl md:text-4xl font-display font-normal mb-6">
             A map is only useful

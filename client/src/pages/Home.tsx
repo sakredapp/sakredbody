@@ -327,7 +327,7 @@ export default function Home() {
       </Section>
 
       {/* ── Core lessons ─────────────────────────────────────── */}
-      <Section id="lessons" tone="light" className="py-10 md:py-12">
+      <Section id="lessons" tone="raised" className="py-10 md:py-12">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.p
             variants={fadeInUp}
@@ -413,7 +413,7 @@ export default function Home() {
       />
 
       {/* ── Food ─────────────────────────────────────────────── */}
-      <Section tone="light">
+      <Section tone="raised">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-10">
             <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">Food</p>
@@ -542,7 +542,7 @@ export default function Home() {
       {/* No orb behind this one. The aurora is built for an ink ground — its
           blooms are additive, and clipped to a sphere they read as a grey
           disc sitting behind the headline on a cream panel. */}
-      <Section tone="light" className="text-center py-12 md:py-16 overflow-hidden">
+      <Section tone="raised" className="text-center py-12 md:py-16 overflow-hidden">
         <motion.div
           initial="hidden"
           whileInView="visible"

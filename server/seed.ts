@@ -7,17 +7,17 @@ async function seed() {
   const insertedRetreats = await db.insert(retreats).values([
     {
       name: "Spring Reset — Rincón",
-      location: "Rincón, Puerto Rico",
+      location: "Oceanfront — west coast",
       description: "Five-day immersive reset in oceanfront Rincón. Morning cold plunges, breath-work sessions on the beach, personalized nutrition protocols, and evening recovery workshops. Limited to 12 members for deep, focused transformation.",
       startDate: "2026-04-15",
       endDate: "2026-04-20",
       capacity: 12,
-      imageUrl: "/images/puerto-rico-coast.jpg",
+      imageUrl: "/images/coast-cliffs.jpg",
       active: true,
     },
     {
       name: "Summer Forge — Dorado",
-      location: "Dorado, Puerto Rico",
+      location: "A private estate on the coast",
       description: "Seven-day intensive at a private estate in Dorado. Advanced biohacking labs, functional movement training, sauna/ice protocols, and one-on-one coaching sessions. Build the systems that sustain elite performance year-round.",
       startDate: "2026-07-10",
       endDate: "2026-07-17",
@@ -27,7 +27,7 @@ async function seed() {
     },
     {
       name: "Fall Elevation — Yunque",
-      location: "El Yunque, Puerto Rico",
+      location: "Rainforest, in the mountains",
       description: "Four-day mountain retreat in the rainforest. Altitude-adapted breathwork, jungle hikes, plant medicine-informed nutrition workshops, and deep recovery work surrounded by nature. Reconnect with your terrain.",
       startDate: "2026-10-05",
       endDate: "2026-10-09",

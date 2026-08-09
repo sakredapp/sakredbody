@@ -791,7 +791,7 @@ export default function AdminDashboard() {
               <Input
                 value={partnerForm.location}
                 onChange={(e) => setPartnerForm({ ...partnerForm, location: e.target.value })}
-                placeholder="e.g. Dorado, Puerto Rico"
+                placeholder="e.g. Rincón, west coast"
                 data-testid="input-partner-location"
               />
             </div>

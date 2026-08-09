@@ -259,7 +259,7 @@ export default function AppPage() {
       </Section>
 
       {/* ── Features ─────────────────────────────────────────── */}
-      <Section tone="light">
+      <Section tone="raised">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-12">
             <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
@@ -314,7 +314,7 @@ export default function AppPage() {
       </Section>
 
       {/* ── CTA ──────────────────────────────────────────────── */}
-      <Section tone="light" className="text-center py-12 md:py-16">
+      <Section tone="raised" className="text-center py-12 md:py-16">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.h2 variants={fadeInUp} className="text-3xl md:text-4xl font-display font-normal mb-6">
             Pick one. <span className="text-gold">Run it to the end.</span>

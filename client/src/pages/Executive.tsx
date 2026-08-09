@@ -91,7 +91,7 @@ export default function Executive() {
           sat in a field of white with a quarter of the panel empty on
           either side. The panel fits the form instead. */}
       <Section
-        tone="light"
+        tone="raised"
         id="apply"
         className="scroll-mt-28 py-12 md:py-14"
         containerClassName="max-w-3xl"
@@ -159,7 +159,7 @@ export default function Executive() {
       </Section>
 
       {/* ── Capacity debt ────────────────────────────────────── */}
-      <Section tone="light">
+      <Section tone="raised">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
@@ -216,7 +216,7 @@ export default function Executive() {
       </Section>
 
       {/* ── Who ──────────────────────────────────────────────── */}
-      <Section tone="light">
+      <Section tone="raised">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader

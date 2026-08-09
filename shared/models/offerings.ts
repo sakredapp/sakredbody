@@ -130,7 +130,7 @@ export const offerings = pgTable(
 
     format: text("format").notNull().default("hybrid"),
 
-    /** Where, if it's in the world. "Rincón, Puerto Rico". */
+    /** Where, if it's in the world. "Rincón, on the west coast". */
     location: text("location"),
 
     /**

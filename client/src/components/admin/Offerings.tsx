@@ -275,7 +275,7 @@ function Editor({
           <Input
             value={d.location}
             onChange={(e) => setD({ ...d, location: e.target.value })}
-            placeholder="Rincón, Puerto Rico"
+            placeholder="Rincón, west coast"
           />
         </div>
       )}

@@ -208,33 +208,39 @@
   }
 
   /**
-   * Resets the theme tokens back to the light palette. Needed because light
-   * panels now nest inside an ink-toned gutter, and would otherwise inherit
-   * the dark values from .tone-ink above.
+   * The raised tone. Formerly the light tone, and the reason is worth keeping.
+   *
+   * Alternating cream panels with ink bands is the standard way to give a long
+   * page rhythm, and on this site it never worked: the identity is gold on
+   * warm black — stone, gem, night sky — and a cream panel is not a quieter
+   * part of that world, it is a different world. Every one of them read as a
+   * hole punched through the page to a white one behind. Softening the cream
+   * only made it a dimmer hole.
+   *
+   * So the rhythm stays and the world doesn't change. A section is now either
+   * recessed into the page ink or raised above it: same warm black, lifted
+   * three or four points of lightness, top-lit, on a gilt hairline. Contrast
+   * comes from depth and from gold — which is what the dark sections were
+   * already doing well, and what the light ones were fighting.
    */
-  /* Not white. The panels sat at 96% lightness against an ink page, which on a
-     phone at full brightness reads as a lamp switched on between two dark
-     rooms. Dropped to a warm stone around 91% and given more of the gold's
-     hue, so the light bands read as paper in the same world as the dark ones
-     rather than a hole punched through them. */
-  .tone-light {
-    --background: 40 17% 91%;
-    --foreground: 30 10% 12%;
-    --muted-foreground: 30 8% 38%;
-    --card: 40 20% 95%;
-    --card-foreground: 30 10% 12%;
-    --card-border: 35 12% 84%;
-    --popover: 40 20% 95%;
-    --popover-foreground: 30 10% 12%;
-    --border: 35 12% 82%;
-    --input: 35 12% 78%;
-    --secondary: 40 14% 87%;
-    --secondary-foreground: 30 10% 12%;
-    --muted: 40 14% 87%;
-    --gold-text: 39 56% 34%;
-    --elevate-1: rgba(0, 0, 0, 0.03);
-    --elevate-2: rgba(0, 0, 0, 0.08);
-    --button-outline: rgba(0, 0, 0, 0.1);
+  .tone-raised {
+    --background: 32 9% 15%;
+    --foreground: 45 20% 96%;
+    --muted-foreground: 40 10% 62%;
+    --card: 32 9% 19%;
+    --card-foreground: 45 20% 96%;
+    --card-border: 34 10% 26%;
+    --popover: 32 9% 19%;
+    --popover-foreground: 45 20% 96%;
+    --border: 34 10% 25%;
+    --input: 34 10% 30%;
+    --secondary: 32 9% 22%;
+    --secondary-foreground: 45 15% 90%;
+    --muted: 32 9% 21%;
+    --gold-text: 42 70% 76%;
+    --elevate-1: rgba(255, 255, 255, 0.04);
+    --elevate-2: rgba(255, 255, 255, 0.09);
+    --button-outline: rgba(255, 255, 255, 0.1);
     color: hsl(var(--foreground));
   }
 
