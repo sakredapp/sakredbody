@@ -6,7 +6,6 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { YinYang } from "@/components/YinYang";
 import { CelestialField } from "@/components/CelestialField";
-import { JungleCanopy } from "@/components/JungleCanopy";
 import { Constellation } from "@/components/Constellation";
 import { ConstellationBody } from "@/components/ConstellationBody";
 import { StarDust } from "@/components/StarDust";
@@ -20,7 +19,6 @@ import { ImageBand } from "@/components/ImageBand";
 import { LessonSlideshow, type Lesson } from "@/components/LessonSlideshow";
 import { SectionHeader } from "@/components/PageHero";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/links";
 import { TOTAL_FOODS } from "@/data/foodCount";
@@ -150,51 +148,41 @@ export default function Home() {
     <div className="min-h-screen bg-background text-foreground font-sans">
       <SiteHeader />
 
-      {/* ── Hero ─────────────────────────────────────────────── */}
-      <section className="tone-ink relative min-h-[92vh] flex items-center pt-20 overflow-hidden bg-background">
+      {/*
+        The landing.
+
+        This used to open on a photograph of a jungle with a badge, a
+        headline, a paragraph and two buttons stacked over it — a good
+        stock image doing the work the site's own object should be doing.
+        The constellation body IS the argument: the same eye that reads a
+        body reads a sky, and neither is a collection of parts. So it opens
+        the site, at full height, and the words arrive underneath it.
+      */}
+      <section className="tone-ink bg-background relative overflow-hidden pt-28 pb-20 md:pt-32 md:pb-28">
         <div className="absolute inset-0 z-0">
-          <img src="/images/retreat-jungle.webp" alt="" className="w-full h-full object-cover opacity-55" />
-          {/* Symmetric vignette so centered copy stays legible while the
-              foliage still reads as texture at the edges. */}
-          <div
-            className="absolute inset-0"
-            style={{
-              background:
-                "radial-gradient(ellipse 70% 60% at 50% 50%, hsl(30 10% 8% / 0.82), hsl(30 10% 7% / 0.96))",
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-[hsl(30_10%_8%/0.7)] via-transparent to-background" />
-          <JungleCanopy className="absolute inset-0 w-full h-full opacity-70" />
-          <CelestialField className="absolute inset-0 w-full h-full opacity-70" />
+          <CelestialField className="absolute inset-0 w-full h-full opacity-80" />
+          <StarDust className="absolute inset-0 w-full h-full" density={1.3} />
         </div>
 
         {/* The hero resolves into the ink below it instead of stopping. */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 z-10 bg-gradient-to-t from-background to-transparent" />
 
-        <div className="container max-w-6xl mx-auto px-4 relative z-20">
-          <motion.div
-            initial="hidden"
-            animate="visible"
-            variants={staggerContainer}
-            className="max-w-3xl mx-auto text-center"
-          >
-            <motion.div variants={fadeInUp} className="flex items-center justify-center mb-8">
-              {/* The yin-yang is the separator. It was standing outside the
-                  badge doing the same job a middle dot was already doing. */}
-              <Badge
-                variant="outline"
-                className="border-gold-subtle text-gold-light tracking-widest uppercase bg-gold-subtle pl-4 pr-4 py-1 font-normal inline-flex items-center gap-3"
-                data-testid="badge-tagline"
-              >
-                Holistic Health
-                <YinYang className="h-4 w-4 shrink-0 text-gold" voidColor="hsl(30 10% 9%)" />
-                Traditional Medicine
-              </Badge>
+        <div className="container max-w-4xl mx-auto px-4 relative z-20">
+          <motion.div initial="hidden" animate="visible" variants={staggerContainer} className="text-center">
+            <motion.p
+              variants={fadeInUp}
+              className="text-xs uppercase tracking-[0.28em] text-gold rule-gold rule-gold-center"
+            >
+              The Sakred Body
+            </motion.p>
+
+            <motion.div variants={fadeInUp} className="-mt-2 -mb-6 sm:-mb-10">
+              <ConstellationBody />
             </motion.div>
 
             <motion.h1
               variants={fadeInUp}
-              className="text-5xl md:text-7xl lg:text-[5.5rem] font-display font-normal leading-[1.02] mb-8 tracking-[-0.03em] text-white"
+              className="text-4xl sm:text-5xl md:text-6xl font-display font-normal leading-[1.06] tracking-[-0.03em] text-white"
               data-testid="text-hero-headline"
             >
               Restore the Body.
@@ -206,66 +194,42 @@ export default function Home() {
 
             <motion.p
               variants={fadeInUp}
-              className="text-base md:text-lg text-white/60 mb-9 max-w-2xl mx-auto leading-relaxed font-normal"
+              className="text-base md:text-lg text-white/60 mt-7 max-w-2xl mx-auto leading-relaxed"
             >
               Not wellness. Not fitness. Not detox. Human capacity — because the body is the terrain you
               have to live your whole life through. Clear it, restore it, build it, and then actually use
               it for something.
             </motion.p>
 
-            <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button
-                size="lg"
-                className="text-base px-8 gold-metallic-btn w-full sm:w-auto"
-                onClick={() => document.getElementById("portal")?.scrollIntoView({ behavior: "smooth" })}
-                data-testid="button-get-app"
-              >
-                Enter the Portal <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                className="text-base px-8 border-white/20 text-white backdrop-blur-sm bg-white/5"
-                onClick={() => document.getElementById("territories")?.scrollIntoView({ behavior: "smooth" })}
-                data-testid="button-philosophy"
-              >
-                What We Believe
-              </Button>
+            <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
+              <Magnetic>
+                <Button
+                  size="lg"
+                  className="text-base px-8 gold-metallic-btn w-full sm:w-auto"
+                  onClick={() => document.getElementById("portal")?.scrollIntoView({ behavior: "smooth" })}
+                  data-testid="button-get-app"
+                >
+                  Enter the Portal <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Magnetic>
+              <Magnetic>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="text-base px-8 border-white/20 text-white backdrop-blur-sm bg-white/5"
+                  onClick={() => document.getElementById("territories")?.scrollIntoView({ behavior: "smooth" })}
+                  data-testid="button-philosophy"
+                >
+                  What We Believe
+                </Button>
+              </Magnetic>
             </motion.div>
           </motion.div>
         </div>
       </section>
 
-      {/* ── The body, as a constellation ─────────────────────── */}
-      <Section tone="ink" className="overflow-hidden pt-10 pb-0 md:pt-14 md:pb-0">
-        <StarDust className="absolute inset-0 w-full h-full z-0" density={1.1} />
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={viewportOnce}
-          variants={staggerContainer}
-          className="relative z-10"
-        >
-          <motion.div variants={fadeInUp} className="text-center max-w-xl mx-auto mb-4">
-            <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
-              The Sakred Body
-            </p>
-            <h2
-              className="text-3xl md:text-5xl font-display font-normal tracking-tight leading-[1.08]"
-              data-testid="text-body-headline"
-            >
-              You are an <span className="text-gold">energetic being.</span>
-            </h2>
-          </motion.div>
-
-          <motion.div variants={fadeInUp}>
-            <ConstellationBody />
-          </motion.div>
-        </motion.div>
-      </Section>
-
       {/* ── The Four Territories ─────────────────────────── */}
-      <Section id="territories" tone="ink" className="overflow-hidden pt-4 md:pt-6">
+      <Section id="territories" tone="ink" className="overflow-hidden pt-16 md:pt-24">
         <Constellation className="absolute inset-0 w-full h-full z-0 opacity-90" />
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.div variants={fadeInUp}>
