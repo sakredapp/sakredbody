@@ -1,5 +1,24 @@
 apply plugin: 'com.android.application'
 
+/**
+ * Upload-key signing.
+ *
+ * The credentials live in android/keystore.properties, which is gitignored,
+ * and the keystore itself sits outside the repo entirely (~/Library/Keystores)
+ * so there is no path by which it reaches a commit. Losing both means you
+ * cannot ship an update to the existing listing without asking Google to reset
+ * the upload key — back them up somewhere that is not this machine.
+ *
+ * The file is deliberately optional. A checkout without it still builds debug
+ * and still assembles an unsigned release, so CI and a fresh clone are not
+ * broken by its absence; only `bundleRelease` needs it.
+ */
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.sakredbody.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,8 +35,24 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (keystoreProperties['storeFile']) {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
+            // Signed only when the properties file is present — see the note
+            // at the top. Without it the release build is unsigned rather than
+            // failing, which keeps a fresh clone buildable.
+            if (keystoreProperties['storeFile']) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
