@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { motion, useReducedMotion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { responsive, SIZES_CARD } from "@/lib/img";
 
 export interface DeckCard {
   title: string;
@@ -160,7 +161,7 @@ export function Deck({
                   {card.image && (
                     <div className="relative h-40 shrink-0 overflow-hidden">
                       <img
-                        src={card.image}
+                        {...responsive(card.image, SIZES_CARD)}
                         alt={card.imageAlt ?? ""}
                         loading="lazy"
                         decoding="async"

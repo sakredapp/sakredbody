@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { motion } from "framer-motion";
+import { responsive, SIZES_FULL_BLEED } from "@/lib/img";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 26 },
@@ -28,7 +29,13 @@ export function ImageBand({ image, alt, eyebrow, title, children, tall, testId }
       className={`tone-ink bg-background relative overflow-hidden ${tall ? "py-24 md:py-32" : "py-16 md:py-24"}`}
     >
       <div className="absolute inset-0 z-0">
-        <img src={image} alt={alt} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+        <img
+          {...responsive(image, SIZES_FULL_BLEED)}
+          alt={alt}
+          loading="lazy"
+          decoding="async"
+          className="w-full h-full object-cover"
+        />
         <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-background to-transparent" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-background to-transparent" />
         {/* Two scrims, not one. The vertical gradient sets the band into the

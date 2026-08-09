@@ -23,6 +23,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/links";
 import { TOTAL_FOODS } from "@/data/foodCount";
 import { TERRITORIES } from "@/data/territories";
+import { responsive, SIZES_FULL_BLEED } from "@/lib/img";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
 const fadeInUp = {
@@ -422,7 +423,13 @@ export default function Home() {
       {/* ── Mastermind teaser ────────────────────────────────── */}
       <Section tone="ink" className="overflow-hidden">
         <div className="absolute inset-0 z-0">
-          <img src="/images/gathering-string-lights.webp" alt="" loading="lazy" decoding="async" className="w-full h-full object-cover opacity-30" />
+          <img
+            {...responsive("/images/gathering-string-lights.webp", SIZES_FULL_BLEED)}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="w-full h-full object-cover opacity-30"
+          />
           <div
             className="absolute inset-0"
             style={{

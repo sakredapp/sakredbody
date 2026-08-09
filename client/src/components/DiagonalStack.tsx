@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
+import { responsive, SIZES_HALF } from "@/lib/img";
 
 export interface StackImage {
   src: string;
@@ -78,9 +79,10 @@ export function DiagonalStack({
               style={{ aspectRatio: plate.ratio }}
             >
               <img
-                src={image.src}
+                {...responsive(image.src, SIZES_HALF)}
                 alt={image.alt}
                 loading="lazy"
+                decoding="async"
                 className="h-full w-full object-cover"
               />
             </div>

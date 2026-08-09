@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { FlipCards } from "@/components/FlipCards";
+import { responsive, SIZES_FULL_BLEED, SIZES_HALF } from "@/lib/img";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
 const fadeInUp = {
@@ -61,9 +62,11 @@ export default function Mastermind() {
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/65 to-black/40 z-10" />
           <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-background z-10" />
-          <img 
-            src="/images/hero-ocean.webp"
+          <img
+            {...responsive("/images/hero-ocean.webp", SIZES_FULL_BLEED)}
             alt="A coastline at first light"
+            fetchPriority="high"
+            decoding="async"
             className="w-full h-full object-cover"
           />
         </div>
@@ -117,9 +120,11 @@ export default function Mastermind() {
           </div>
           <div className="relative">
             <div className="absolute -inset-4 bg-gold/10 blur-3xl rounded-full opacity-30"></div>
-            <img 
-              src="/images/group-wellness.webp" 
-              alt="Beachside wellness space"
+            <img
+              {...responsive("/images/group-wellness.webp", SIZES_HALF)}
+              alt="An open pavilion looking out to the sea"
+              loading="lazy"
+              decoding="async"
               className="relative rounded-md shadow-gold-subtle border border-gold-subtle"
             />
           </div>
@@ -140,9 +145,11 @@ export default function Mastermind() {
       <Section tone="ink">
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div className="order-2 md:order-1">
-            <img 
-              src="/images/tropical-villa.webp" 
-              alt="Caribbean beachside property"
+            <img
+              {...responsive("/images/tropical-villa.webp", SIZES_HALF)}
+              alt="A villa set back in tropical planting"
+              loading="lazy"
+              decoding="async"
               className="rounded-md shadow-gold-subtle border border-gold-subtle"
             />
           </div>

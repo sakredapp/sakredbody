@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { motion } from "framer-motion";
+import { responsive, SIZES_FULL_BLEED } from "@/lib/img";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 26 },
@@ -57,7 +58,16 @@ export function PageHero({
     <section className="tone-ink bg-background relative overflow-hidden min-h-[52vh] flex flex-col justify-center pt-32 pb-14">
       {image && (
         <div className="absolute inset-0 z-0">
-          <img src={image} alt={imageAlt ?? ""} fetchPriority="high" decoding="async" className="w-full h-full object-cover" />
+          {/* The hero photograph is the largest contentful paint on every
+              page that has one, so it is fetched at high priority and
+              never lazily. */}
+          <img
+            {...responsive(image, SIZES_FULL_BLEED)}
+            alt={imageAlt ?? ""}
+            fetchPriority="high"
+            decoding="async"
+            className="w-full h-full object-cover"
+          />
           <div
             className="absolute inset-0"
             style={{
