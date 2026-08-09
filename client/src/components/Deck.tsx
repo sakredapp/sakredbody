@@ -149,7 +149,7 @@ export function Deck({
                   className={cn(
                     "h-full rounded-2xl border overflow-hidden flex flex-col",
                     "bg-gradient-to-b from-[hsl(30_9%_14%)] to-[hsl(30_10%_9%)]",
-                    off === 0 ? "shadow-[0_40px_80px_-30px_rgba(0,0,0,0.95)]" : "shadow-none",
+                    off === 0 ? "shadow-lift" : "shadow-none",
                   )}
                   style={{
                     borderColor: card.accent

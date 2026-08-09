@@ -74,7 +74,7 @@ export function DiagonalStack({
             }}
           >
             <div
-              className="overflow-hidden rounded-xl sm:rounded-2xl border border-gold-subtle shadow-[0_28px_60px_-24px_rgba(0,0,0,0.85)]"
+              className="overflow-hidden rounded-xl sm:rounded-2xl border border-gold-subtle shadow-lift-sm"
               style={{ aspectRatio: plate.ratio }}
             >
               <img

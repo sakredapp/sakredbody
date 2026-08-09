@@ -307,6 +307,30 @@
   .shadow-gold-strong {
     box-shadow: 0px 6px 24px hsl(var(--gold) / 0.35);
   }
+
+  /*
+   * The shadow under a card, faded out rather than stopped.
+   *
+   * Every card on the site used a single shadow with a large negative spread
+   * — `0 30px 70px -40px` and friends. A spread that negative shrinks the
+   * shadow back to a narrow band directly under the element, so instead of
+   * light falling away it reads as a dark bar with an edge on it. Three
+   * layers at increasing blur and decreasing opacity give a falloff with no
+   * boundary anywhere in it: contact at the top, ambient at the bottom.
+   */
+  .shadow-lift {
+    box-shadow:
+      0 2px 6px -3px rgb(0 0 0 / 0.3),
+      0 10px 24px -10px rgb(0 0 0 / 0.32),
+      0 28px 56px -22px rgb(0 0 0 / 0.34),
+      0 60px 110px -50px rgb(0 0 0 / 0.4);
+  }
+  .shadow-lift-sm {
+    box-shadow:
+      0 2px 6px -3px rgb(0 0 0 / 0.28),
+      0 8px 20px -10px rgb(0 0 0 / 0.3),
+      0 22px 46px -24px rgb(0 0 0 / 0.34);
+  }
   .gold-gradient {
     background: linear-gradient(135deg, hsl(var(--gold)), hsl(var(--gold-light)));
   }

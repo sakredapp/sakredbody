@@ -53,7 +53,7 @@ export function Section({
             // panel a top and a bottom, not enough to read as a gradient.
             "bg-gradient-to-b from-[hsl(32_9%_17%)] via-[hsl(32_9%_15%)] to-[hsl(32_10%_12.5%)]",
             "border border-gold/[0.13]",
-            "shadow-[0_2px_0_0_hsl(45_30%_80%_/_0.05)_inset,0_30px_70px_-40px_rgb(0_0_0_/_0.9)]",
+            "shadow-lift",
             className,
           )}
           {...props}
