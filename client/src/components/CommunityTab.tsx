@@ -37,6 +37,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
+  Flag,
   ArrowLeft,
   MessageSquare,
   Search,
@@ -49,6 +50,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { Channel } from "@shared/schema";
 import { SectionHeading } from "@/components/portal/Panel";
+import { ReportDialog } from "@/components/ReportDialog";
 
 /** Kept short deliberately. A long picker turns a reaction into a decision. */
 const REACTIONS = ["🔥", "🙏", "💛", "👀", "🌙"];
@@ -213,6 +215,7 @@ function MessageBody({
   onToggleReaction,
   onEdit,
   onDelete,
+  onReport,
   editing,
   onStartEdit,
   onCancelEdit,
@@ -225,6 +228,7 @@ function MessageBody({
   onToggleReaction: (emoji: string) => void;
   onEdit: (body: string) => void;
   onDelete: () => void;
+  onReport?: () => void;
   editing: boolean;
   onStartEdit: () => void;
   onCancelEdit: () => void;
@@ -297,6 +301,19 @@ function MessageBody({
               </button>
             )}
 
+            {/* On other people's messages only. Reporting your own is not a
+                thing, and the API refuses it — you can delete it instead. */}
+            {!mine && !gone && onReport && (
+              <button
+                onClick={onReport}
+                className="text-xs text-muted-foreground/40 hover:text-foreground inline-flex items-center gap-1"
+                aria-label="Report or block"
+                data-testid="button-report-message"
+              >
+                <Flag className="h-3 w-3" />
+              </button>
+            )}
+
             {mine && (
               <>
                 <button
@@ -340,6 +357,7 @@ function ThreadNode({
 }) {
   const [replying, setReplying] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [reporting, setReporting] = useState(false);
 
   const post = usePostMessage();
   const edit = useEditMessage();
@@ -375,10 +393,21 @@ function ThreadNode({
           }}
           onDelete={() => remove.mutate({ id: m.id, channelId, rootId })}
           editing={editing}
+          onReport={() => setReporting(true)}
           onStartEdit={() => setEditing(true)}
           onCancelEdit={() => setEditing(false)}
           editPending={edit.isPending}
         />
+
+        {reporting && (
+          <ReportDialog
+            messageId={m.id}
+            authorId={m.userId}
+            authorName={displayName(m.author)}
+            open
+            onClose={() => setReporting(false)}
+          />
+        )}
 
         {replying && (
           <div className="mt-3 pl-10">
@@ -482,6 +511,7 @@ function RoomView({
   const { user } = useAuth();
   const { toast } = useToast();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [reportingId, setReportingId] = useState<string | null>(null);
 
   const readOnly = channel.isReadOnly && user?.isAdmin !== "true";
 
@@ -548,6 +578,7 @@ function RoomView({
                   remove.mutate({ id: m.id, channelId: channel.id, rootId: null })
                 }
                 editing={editingId === m.id}
+                onReport={() => setReportingId(m.id)}
                 onStartEdit={() => setEditingId(m.id)}
                 onCancelEdit={() => setEditingId(null)}
                 editPending={edit.isPending}
@@ -560,6 +591,23 @@ function RoomView({
           Nothing here yet. Start it.
         </p>
       )}
+
+      {/* One dialog for the room, driven by which message is being reported,
+          rather than one mounted per message — a room of forty posts would
+          otherwise mount forty dialogs to show none of them. */}
+      {reportingId && (() => {
+        const target = room.data?.find((m) => m.id === reportingId);
+        if (!target) return null;
+        return (
+          <ReportDialog
+            messageId={target.id}
+            authorId={target.userId}
+            authorName={displayName(target.author)}
+            open
+            onClose={() => setReportingId(null)}
+          />
+        );
+      })()}
     </div>
   );
 }

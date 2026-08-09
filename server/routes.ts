@@ -21,6 +21,7 @@ import { registerTelemetryRoutes } from "./telemetry/index.js";
 import { registerWinRoutes } from "./wins/index.js";
 import { registerMemberRoutes } from "./members/index.js";
 import { registerTrainingRoutes } from "./training/index.js";
+import { registerModerationRoutes } from "./moderation/index.js";
 
 function isAdmin(req: Request, res: Response, next: NextFunction) {
   const userId = req.session?.userId;
@@ -467,6 +468,9 @@ export async function registerRoutes(
 
   // Build — the prescription and what was actually lifted against it.
   registerTrainingRoutes(app);
+
+  // Reporting and blocking — required by both app stores for UGC.
+  registerModerationRoutes(app);
 
   // Telemetry last: it observes the app, so nothing else should depend on it.
   registerTelemetryRoutes(app);

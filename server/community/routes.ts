@@ -30,7 +30,7 @@
 
 import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "../db.js";
-import { eq, and, or, isNull, inArray, desc, asc, sql, lt } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lt, notInArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { isAuthenticated } from "../auth/index.js";
 import { storage } from "../storage.js";
@@ -47,6 +47,7 @@ import {
   MAX_THREAD_DEPTH,
 } from "../../shared/schema.js";
 import { headlineOptions, segmentHeadline } from "../../shared/utils/highlight.js";
+import { blockedBy } from "../moderation/index.js";
 
 function isAdmin(req: Request, res: Response, next: NextFunction) {
   const userId = req.session?.userId;
@@ -221,6 +222,11 @@ export function registerCommunityRoutes(app: Express) {
 
       const before = (req.query.before as string | undefined)?.trim();
 
+      // Blocked authors vanish from the room. `notInArray` on an empty list is
+      // `not in ()`, which Postgres rejects as a syntax error, so the filter is
+      // omitted entirely when nobody is blocked — which is the common case.
+      const hidden = await blockedBy(userId);
+
       const rows = await db
         .select()
         .from(communityMessages)
@@ -228,6 +234,7 @@ export function registerCommunityRoutes(app: Express) {
           and(
             eq(communityMessages.channelId, channelId),
             isNull(communityMessages.parentId),
+            ...(hidden.length ? [notInArray(communityMessages.userId, hidden)] : []),
             ...(before ? [lt(communityMessages.createdAt, new Date(before))] : []),
           ),
         )
@@ -271,11 +278,19 @@ export function registerCommunityRoutes(app: Express) {
         return res.status(404).json({ message: "Not found" });
       }
 
+      // Blocked replies disappear from the thread too. The root is filtered
+      // by the same rule: opening a thread whose author you blocked, from a
+      // link, should not be the one place they reappear.
+      const hidden = await blockedBy(userId);
+
       const rows = await db
         .select()
         .from(communityMessages)
         .where(
-          or(eq(communityMessages.rootId, rootId), eq(communityMessages.id, rootId)),
+          and(
+            or(eq(communityMessages.rootId, rootId), eq(communityMessages.id, rootId)),
+            ...(hidden.length ? [notInArray(communityMessages.userId, hidden)] : []),
+          ),
         )
         .orderBy(asc(communityMessages.createdAt));
 
@@ -525,6 +540,18 @@ export function registerCommunityRoutes(app: Express) {
         FROM community_messages m
         WHERE m.channel_id IN (${channelFilter})
           AND m.deleted_at IS NULL
+          -- Blocked authors are absent from search too. A NOT EXISTS rather
+          -- than a NOT IN over an array: drizzle flattens a JS array into one
+          -- bind parameter per element, which is what turned an ANY(...)
+          -- comparison into a syntax error and took every login to a 500
+          -- earlier. One scalar parameter cannot go wrong that way.
+          --
+          -- No backticks in this comment, deliberately: it lives inside a
+          -- tagged template literal, and a backtick here closes the string.
+          AND NOT EXISTS (
+            SELECT 1 FROM user_blocks b
+            WHERE b.blocker_id = ${userId} AND b.blocked_id = m.user_id
+          )
           AND m.search_vector @@ websearch_to_tsquery('english', ${q})
         ORDER BY rank DESC, m.created_at DESC
         LIMIT 40

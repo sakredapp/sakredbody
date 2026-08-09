@@ -91,6 +91,9 @@ export const EVENT_NAMES = [
   "community.reply",
   "community.react",
   "community.search",
+  // Moderation. A spike on either is a community problem, not a metric.
+  "community.report",
+  "community.block",
 
   // Wins.
   "win.earned",

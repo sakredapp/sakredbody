@@ -22,6 +22,7 @@ import { MembersAdmin } from "@/components/admin/Members";
 import { LibraryAdmin } from "@/components/admin/Library";
 import { EnergyAdmin } from "@/components/admin/Energy";
 import { TrainingAdmin } from "@/components/admin/Training";
+import { ModerationAdmin } from "@/components/admin/Moderation";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -146,7 +147,8 @@ type AdminTab =
   | "apothecary"
   | "library"
   | "energy"
-  | "training";
+  | "training"
+  | "moderation";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // AUTH GATES
@@ -1259,6 +1261,7 @@ export default function AdminPortal() {
             { key: "offerings" as AdminTab, label: "What's On", badge: null },
             { key: "hosts" as AdminTab, label: "Hosts", badge: null },
             { key: "community" as AdminTab, label: "Rooms", badge: null },
+            { key: "moderation" as AdminTab, label: "Reports", badge: null },
             { key: "telemetry" as AdminTab, label: "Activity", badge: null },
             { key: "masterclass" as AdminTab, label: "Masterclass", badge: null },
             { key: "apothecary" as AdminTab, label: "Apothecary", badge: null },
@@ -1295,6 +1298,9 @@ export default function AdminPortal() {
 
         {/* ═══════════════ BUILD TAB ═══════════════ */}
         {tab === "training" && <TrainingAdmin />}
+
+        {/* ═══════════════ REPORTS TAB ═══════════════ */}
+        {tab === "moderation" && <ModerationAdmin />}
 
         {tab === "apothecary" && <ApothecaryAdmin enabled={isAdmin} />}
 
