@@ -282,8 +282,13 @@ export default function Home() {
               <motion.div variants={fadeInUp} key={t.key}>
                 <Link href={t.href}>
                   <Tilt3D className="h-full rounded-xl" max={6} lift={12} sheen={false}>
+                  {/* No hover-elevate. It paints a ::after at inset 0 with
+                      border-radius: inherit, and this card has no radius — so
+                      hovering drew a hard-cornered rectangle over the whole
+                      thing. The rule above the card lighting to gold is the
+                      hover state; that's enough. */}
                   <div
-                    className="h-full pt-8 border-t border-border text-center flex flex-col hover-elevate transition-colors"
+                    className="group h-full pt-8 border-t border-border hover:border-gold/45 text-center flex flex-col transition-colors duration-300"
                     data-testid={`card-territory-${t.key}`}
                   >
                     <GemStone
