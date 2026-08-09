@@ -32,7 +32,7 @@ const SECTIONS: LegalSection[] = [
       <>
         <p>
           <strong>Sakred Body</strong> ("we", "us") is a health education, coaching and retreat
-          service. Sakred Body is a registered trade name of the company that operates it.
+          service.
         </p>
         <p>
           This policy covers the Sakred Body website, the member portal at app.sakredbody.com, and the
