@@ -240,32 +240,67 @@ const emptyServiceForm: ServiceFormData = {
   imageUrl: "", maxCapacity: "", available: true,
 };
 
+/* ── Tag fields ───────────────────────────────────────────────────────────
+   `terrain_tags` and `search_keywords` are Postgres text[]. They are typed
+   here as comma-separated strings because that is what a person types, and
+   converted at the boundary — see `csv()` and `tags()` below. Getting this
+   backwards is the classic version of the bug: the form holds a string, the
+   column wants an array, the insert throws or silently stores nothing, and
+   the field looks saved until you reload. */
+
+/** "a, b,, c" → ["a","b","c"]. Empty in, null out — not an empty array, which
+ *  would overwrite existing tags with a row that reads as "no tags set". */
+function tags(s: string): string[] | null {
+  const out = s.split(",").map((t) => t.trim()).filter(Boolean);
+  return out.length ? out : null;
+}
+
+/** The inverse, for loading a row back into the form. */
+function csv(a: string[] | null | undefined): string {
+  return (a ?? []).join(", ");
+}
+
 interface RoutineFormData {
-  name: string; description: string; goal: string; goalDescription: string;
+  name: string; description: string; coverImageUrl: string;
+  goal: string; goalDescription: string;
   durationDays: number; icon: string; color: string; tier: string;
   category: string; whoIsThisFor: string; whatToExpect: string;
   expectedResults: string; isFeatured: boolean; sortOrder: number;
+  routineType: string; terrainTags: string; searchKeywords: string;
 }
 const emptyRoutineForm: RoutineFormData = {
-  name: "", description: "", goal: "", goalDescription: "",
+  name: "", description: "", coverImageUrl: "", goal: "", goalDescription: "",
   durationDays: 14, icon: "🌙", color: "#D4A574", tier: "free",
   category: "Sleep", whoIsThisFor: "", whatToExpect: "",
   expectedResults: "", isFeatured: false, sortOrder: 0,
+  routineType: "", terrainTags: "", searchKeywords: "",
 };
 
+/**
+ * No `intensity`.
+ *
+ * The old admin asked for lite-or-intense on every habit and every routine.
+ * Nothing downstream reads it — there is no lite version of a protocol to
+ * serve — so it was a required choice with no consequence, which is the worst
+ * kind of field: it costs the author a decision every single time and buys
+ * nothing. The column stays (NOT NULL DEFAULT 'lite') so existing rows and
+ * inserts are unaffected; it is simply no longer asked for.
+ */
 interface HabitFormData {
   title: string; shortDescription: string; detailedDescription: string;
   instructions: string; scienceExplanation: string; tips: string;
   expectToNotice: string; cadence: string; recommendedTime: string;
   durationMinutes: number | null; dayStart: number | null; dayEnd: number | null;
-  orderIndex: number; intensity: string; icon: string; routineId: string;
+  orderIndex: number; icon: string; routineId: string;
+  terrainTags: string; searchKeywords: string;
 }
 const emptyHabitForm: HabitFormData = {
   title: "", shortDescription: "", detailedDescription: "",
   instructions: "", scienceExplanation: "", tips: "",
   expectToNotice: "", cadence: "daily", recommendedTime: "Morning",
   durationMinutes: null, dayStart: 1, dayEnd: null,
-  orderIndex: 0, intensity: "lite", icon: "", routineId: "",
+  orderIndex: 0, icon: "", routineId: "",
+  terrainTags: "", searchKeywords: "",
 };
 
 interface MCCategoryFormData {
@@ -317,6 +352,11 @@ function RoutineFormDialog({
             <div className="space-y-1 col-span-2">
               <label className="text-sm font-medium">Description</label>
               <Textarea value={form.description} onChange={(e) => set("description", e.target.value)} className="resize-none" rows={3} />
+            </div>
+            <div className="space-y-1 col-span-2">
+              <label className="text-sm font-medium">Cover image URL</label>
+              <Input value={form.coverImageUrl} onChange={(e) => set("coverImageUrl", e.target.value)} placeholder="https://…/cover.webp" />
+              <p className="text-[11px] text-muted-foreground">Wide banner, roughly 1200×600. Optional.</p>
             </div>
             <div className="space-y-1">
               <label className="text-sm font-medium">Category</label>
@@ -374,6 +414,22 @@ function RoutineFormDialog({
           <div className="space-y-1">
             <label className="text-sm font-medium">Expected results</label>
             <Textarea value={form.expectedResults} onChange={(e) => set("expectedResults", e.target.value)} className="resize-none" rows={2} />
+          </div>
+          <Separator />
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Routine type</label>
+            <Input value={form.routineType} onChange={(e) => set("routineType", e.target.value)} placeholder="reset, build, maintain…" />
+            <p className="text-[11px] text-muted-foreground">Optional sub-category, free text.</p>
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Terrain tags</label>
+            <Input value={form.terrainTags} onChange={(e) => set("terrainTags", e.target.value)} placeholder="sleep, gut, energy" />
+            <p className="text-[11px] text-muted-foreground">Comma separated. Which territories this touches.</p>
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Search keywords</label>
+            <Input value={form.searchKeywords} onChange={(e) => set("searchKeywords", e.target.value)} placeholder="brain fog, focus, memory" />
+            <p className="text-[11px] text-muted-foreground">Comma separated. What a member might type looking for this.</p>
           </div>
           <div className="flex items-center gap-2">
             <input type="checkbox" checked={form.isFeatured} onChange={(e) => set("isFeatured", e.target.checked)} className="rounded" />
@@ -436,16 +492,6 @@ function HabitFormDialog({
               </Select>
             </div>
             <div className="space-y-1">
-              <label className="text-sm font-medium">Intensity</label>
-              <Select value={form.intensity} onValueChange={(v) => set("intensity", v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="lite">Lite</SelectItem>
-                  <SelectItem value="intense">Intense</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
               <label className="text-sm font-medium">Recommended Time</label>
               <Select value={form.recommendedTime} onValueChange={(v) => set("recommendedTime", v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -454,6 +500,11 @@ function HabitFormDialog({
                   <SelectItem value="Afternoon">Afternoon</SelectItem>
                   <SelectItem value="Evening">Evening</SelectItem>
                   <SelectItem value="Anytime">Anytime</SelectItem>
+                  {/* The two the old admin had that this one didn't. A habit
+                      pinned to a meal is a different instruction from one
+                      pinned to a clock, and several of these are. */}
+                  <SelectItem value="Pre-meal">Pre-meal</SelectItem>
+                  <SelectItem value="Post-meal">Post-meal</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -490,6 +541,17 @@ function HabitFormDialog({
           <div className="space-y-1">
             <label className="text-sm font-medium">Expect to Notice</label>
             <Textarea value={form.expectToNotice} onChange={(e) => set("expectToNotice", e.target.value)} className="resize-none" rows={2} />
+          </div>
+          <Separator />
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Terrain tags</label>
+            <Input value={form.terrainTags} onChange={(e) => set("terrainTags", e.target.value)} placeholder="sleep, energy, gut" />
+            <p className="text-[11px] text-muted-foreground">Comma separated. Optional.</p>
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Search keywords</label>
+            <Input value={form.searchKeywords} onChange={(e) => set("searchKeywords", e.target.value)} placeholder="cold, plunge, recovery" />
+            <p className="text-[11px] text-muted-foreground">Comma separated. Optional.</p>
           </div>
           <div className="space-y-1">
             <label className="text-sm font-medium">Primary Routine (FK)</label>
@@ -1199,24 +1261,48 @@ export default function AdminPortal() {
   };
 
   // Coaching
+  /**
+   * The form holds tags as typed text; the columns are text[]. Converting
+   * here rather than in the dialog keeps one place where the shape changes,
+   * and it is the place a missing conversion actually shows up — a string
+   * sent to a text[] column is rejected by the insert schema, so the save
+   * fails loudly instead of storing nothing and looking fine until reload.
+   */
+  const routinePayload = (d: RoutineFormData): Record<string, unknown> => ({
+    ...d,
+    terrainTags: tags(d.terrainTags),
+    searchKeywords: tags(d.searchKeywords),
+    // Empty text inputs mean "not set", not "set to empty string". Stored as
+    // NULL so `coalesce` and `is null` checks downstream behave.
+    coverImageUrl: d.coverImageUrl.trim() || null,
+    routineType: d.routineType.trim() || null,
+  });
+
   const handleCreateRoutine = (d: RoutineFormData) => {
-    createRoutineMut.mutate(d as unknown as Record<string, unknown>, { onSuccess: () => setRoutineDialogOpen(false) });
+    createRoutineMut.mutate(routinePayload(d), { onSuccess: () => setRoutineDialogOpen(false) });
   };
   const handleUpdateRoutine = (d: RoutineFormData) => {
     if (!editingRoutine) return;
-    updateRoutineMut.mutate({ id: editingRoutine.id, data: d as unknown as Record<string, unknown> }, { onSuccess: () => { setRoutineDialogOpen(false); setEditingRoutine(null); } });
+    updateRoutineMut.mutate({ id: editingRoutine.id, data: routinePayload(d) }, { onSuccess: () => { setRoutineDialogOpen(false); setEditingRoutine(null); } });
   };
   const handleDeleteRoutine = (id: string) => { if (confirm("Delete this routine and all its habits?")) deleteRoutineMut.mutate(id); };
-  const handleCreateHabit = (d: HabitFormData) => {
-    const payload: Record<string, unknown> = { ...d };
+  const habitPayload = (d: HabitFormData): Record<string, unknown> => {
+    const payload: Record<string, unknown> = {
+      ...d,
+      terrainTags: tags(d.terrainTags),
+      searchKeywords: tags(d.searchKeywords),
+      icon: d.icon.trim() || null,
+    };
     if (!d.routineId) delete payload.routineId;
-    createHabitMut.mutate(payload, { onSuccess: () => setHabitDialogOpen(false) });
+    return payload;
+  };
+
+  const handleCreateHabit = (d: HabitFormData) => {
+    createHabitMut.mutate(habitPayload(d), { onSuccess: () => setHabitDialogOpen(false) });
   };
   const handleUpdateHabit = (d: HabitFormData) => {
     if (!editingHabit) return;
-    const payload: Record<string, unknown> = { ...d };
-    if (!d.routineId) delete payload.routineId;
-    updateHabitMut.mutate({ id: editingHabit.id, data: payload }, { onSuccess: () => { setHabitDialogOpen(false); setEditingHabit(null); } });
+    updateHabitMut.mutate({ id: editingHabit.id, data: habitPayload(d) }, { onSuccess: () => { setHabitDialogOpen(false); setEditingHabit(null); } });
   };
   const handleDeleteHabit = (id: string) => { if (confirm("Delete this habit template?")) deleteHabitMut.mutate(id); };
 
@@ -1567,8 +1653,13 @@ export default function AdminPortal() {
                 <RoutineFormDialog
                   open={routineDialogOpen}
                   onClose={() => { setRoutineDialogOpen(false); setEditingRoutine(null); }}
+                  // Every field the form can write, it must also read. A field
+                  // present on save and absent here loads as "" on the next
+                  // edit and is then written back as empty — the save works,
+                  // and opening the record and pressing Save wipes it.
                   initial={editingRoutine ? {
                     name: editingRoutine.name, description: editingRoutine.description,
+                    coverImageUrl: editingRoutine.coverImageUrl || "",
                     goal: editingRoutine.goal || "", goalDescription: editingRoutine.goalDescription || "",
                     durationDays: editingRoutine.durationDays, icon: editingRoutine.icon || "",
                     color: editingRoutine.color || "", tier: editingRoutine.tier,
@@ -1576,6 +1667,9 @@ export default function AdminPortal() {
                     whatToExpect: editingRoutine.whatToExpect || "",
                     expectedResults: editingRoutine.expectedResults || "",
                     isFeatured: editingRoutine.isFeatured, sortOrder: editingRoutine.sortOrder,
+                    routineType: editingRoutine.routineType || "",
+                    terrainTags: csv(editingRoutine.terrainTags),
+                    searchKeywords: csv(editingRoutine.searchKeywords),
                   } : emptyRoutineForm}
                   onSubmit={editingRoutine ? handleUpdateRoutine : handleCreateRoutine}
                   isPending={createRoutineMut.isPending || updateRoutineMut.isPending}
@@ -1652,8 +1746,10 @@ export default function AdminPortal() {
                     cadence: editingHabit.cadence, recommendedTime: editingHabit.recommendedTime || "Morning",
                     durationMinutes: editingHabit.durationMinutes, dayStart: editingHabit.dayStart,
                     dayEnd: editingHabit.dayEnd, orderIndex: editingHabit.orderIndex,
-                    intensity: editingHabit.intensity, icon: editingHabit.icon || "",
+                    icon: editingHabit.icon || "",
                     routineId: editingHabit.routineId || "",
+                    terrainTags: csv(editingHabit.terrainTags),
+                    searchKeywords: csv(editingHabit.searchKeywords),
                   } : { ...emptyHabitForm, routineId: selectedRoutineId || "" }}
                   onSubmit={editingHabit ? handleUpdateHabit : handleCreateHabit}
                   isPending={createHabitMut.isPending || updateHabitMut.isPending}

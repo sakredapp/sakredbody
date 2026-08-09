@@ -29,6 +29,8 @@ export const wellnessRoutines = pgTable("wellness_routines", {
   id: text("id").primaryKey(), // human-readable slug e.g. "sleep_mastery_lite"
   name: text("name").notNull(),
   description: text("description").notNull(),
+  /** Wide banner, roughly 1200×600. Nullable — a protocol ships without one. */
+  coverImageUrl: text("cover_image_url"),
   goal: text("goal"),
   goalDescription: text("goal_description"),
   durationDays: integer("duration_days").notNull().default(14),

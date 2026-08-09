@@ -9,50 +9,42 @@ import { useToast } from "@/hooks/use-toast";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
-export interface WellnessRoutine {
-  id: string;
-  name: string;
-  description: string;
-  goal: string | null;
-  goalDescription: string | null;
-  durationDays: number;
-  icon: string | null;
-  color: string | null;
-  tier: string;
-  category: string;
-  terrainTags: string[] | null;
-  searchKeywords: string[] | null;
-  whoIsThisFor: string | null;
-  whatToExpect: string | null;
-  expectedResults: string | null;
-  isFeatured: boolean;
-  sortOrder: number;
-  routineType: string | null;
-}
+/**
+ * ── Derived from the table, not retyped from it ───────────────────────────
+ *
+ * These two were hand-written interfaces that listed every column again, and
+ * that is the mechanism behind the oldest complaint about this admin: a field
+ * you can fill in that never reaches the database.
+ *
+ * The failure is completely silent and runs in either direction. Add a column
+ * and forget to add it here, and the admin form can't read it back — you
+ * save, reopen, the box is empty, and pressing Save again writes the blank
+ * over your work. Remove a column and leave the line here, and the form
+ * happily collects a value the server drops on the floor. Nothing throws in
+ * either case; TypeScript is satisfied, because the lie is internally
+ * consistent.
+ *
+ * `$inferSelect` on the Drizzle table makes the column list the single source
+ * of it. A column added to shared/models/coaching.ts appears here for free,
+ * and one removed becomes a compile error at every place that reads it —
+ * which is the difference between a bug you find in production and one the
+ * build refuses to ship. `date`/`timestamp` come back over JSON as strings,
+ * so those are remapped; the rest carry through exactly.
+ */
+import type {
+  WellnessRoutine as WellnessRoutineRow,
+  RoutineHabit as RoutineHabitRow,
+} from "@shared/schema";
 
-export interface RoutineHabitTemplate {
-  id: string;
-  routineId: string | null;
-  title: string;
-  shortDescription: string | null;
-  detailedDescription: string | null;
-  description: string | null;
-  instructions: string | null;
-  scienceExplanation: string | null;
-  tips: string | null;
-  expectToNotice: string | null;
-  cadence: string;
-  recommendedTime: string | null;
-  durationMinutes: number | null;
-  dayStart: number | null;
-  dayEnd: number | null;
-  orderIndex: number;
-  intensity: string;
-  icon: string | null;
-  terrainTags: string[] | null;
-  searchKeywords: string[] | null;
-  isFree: boolean;
-}
+export type WellnessRoutine = Omit<WellnessRoutineRow, "createdAt" | "updatedAt"> & {
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+export type RoutineHabitTemplate = Omit<RoutineHabitRow, "createdAt" | "updatedAt"> & {
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
 
 export interface Habit {
   id: string;
