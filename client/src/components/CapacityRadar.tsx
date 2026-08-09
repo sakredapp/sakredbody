@@ -37,6 +37,7 @@ export function CapacityRadar({ qualities }: { qualities: Quality[] }) {
   useEffect(() => {
     let raf = 0;
     let running = true;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     const frame = (now: number) => {
       const t = elapsed(now);
@@ -51,8 +52,11 @@ export function CapacityRadar({ qualities }: { qualities: Quality[] }) {
         pts.push(`${p.x.toFixed(2)},${p.y.toFixed(2)}`);
       }
       if (shapeRef.current) shapeRef.current.setAttribute("points", pts.join(" "));
-      if (running) raf = requestAnimationFrame(frame);
+      if (running && !reduced) raf = requestAnimationFrame(frame);
     };
+    // One frame regardless, so a reduced-motion visitor still gets the shape —
+    // it simply holds still instead of breathing. The canvas surfaces do the
+    // same thing through `mountStage`; this one drives its own loop.
     raf = requestAnimationFrame(frame);
 
     return () => {

@@ -194,8 +194,11 @@ export function Deck({
         </motion.div>
       </div>
 
-      {/* Controls: one rail, uniform marks, so the row never sits off-centre. */}
-      <div className="flex items-center justify-center gap-5 mt-7">
+      {/* Controls: one rail, uniform marks, so the row never sits off-centre.
+          Every control here carries a 44px hit box while the mark inside it
+          stays the size the design wants — a 4px-tall bar is a coin-flip for
+          a thumb, and both stores look at this in review. */}
+      <div className="flex items-center justify-center gap-2 mt-4">
         <button
           type="button"
           onClick={() => {
@@ -203,12 +206,14 @@ export function Deck({
             go(active - 1);
           }}
           aria-label="Previous"
-          className="h-9 w-9 rounded-full border border-gold/30 text-gold flex items-center justify-center hover-elevate gold-outline-lift"
+          className="tap grid place-items-center rounded-full"
         >
-          <ChevronLeft className="h-4 w-4" />
+          <span className="h-9 w-9 rounded-full border border-gold/30 text-gold flex items-center justify-center hover-elevate gold-outline-lift">
+            <ChevronLeft className="h-4 w-4" />
+          </span>
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center">
           {cards.map((c, i) => (
             <button
               key={c.title}
@@ -219,11 +224,15 @@ export function Deck({
               }}
               aria-label={`Show ${c.title}`}
               aria-current={i === active}
-              className={cn(
-                "h-1 w-6 rounded-full transition-all duration-500",
-                i === active ? "bg-gold" : "bg-gold/20 hover:bg-gold/45",
-              )}
-            />
+              className="group tap grid place-items-center px-1 rounded-md"
+            >
+              <span
+                className={cn(
+                  "h-1 w-6 rounded-full transition-all duration-500",
+                  i === active ? "bg-gold" : "bg-gold/20 group-hover:bg-gold/45",
+                )}
+              />
+            </button>
           ))}
         </div>
 
@@ -234,9 +243,11 @@ export function Deck({
             go(active + 1);
           }}
           aria-label="Next"
-          className="h-9 w-9 rounded-full border border-gold/30 text-gold flex items-center justify-center hover-elevate gold-outline-lift"
+          className="tap grid place-items-center rounded-full"
         >
-          <ChevronRight className="h-4 w-4" />
+          <span className="h-9 w-9 rounded-full border border-gold/30 text-gold flex items-center justify-center hover-elevate gold-outline-lift">
+            <ChevronRight className="h-4 w-4" />
+          </span>
         </button>
       </div>
 

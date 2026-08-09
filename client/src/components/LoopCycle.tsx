@@ -44,6 +44,7 @@ export function LoopCycle({ beats }: { beats: LoopBeat[] }) {
   useEffect(() => {
     let raf = 0;
     let running = true;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     const frame = (now: number) => {
       const t = elapsed(now);
@@ -55,8 +56,10 @@ export function LoopCycle({ beats }: { beats: LoopBeat[] }) {
         markRef.current.setAttribute("cx", p.x.toFixed(2));
         markRef.current.setAttribute("cy", p.y.toFixed(2));
       }
-      if (running) raf = requestAnimationFrame(frame);
+      if (running && !reduced) raf = requestAnimationFrame(frame);
     };
+    // One frame regardless: the mark is placed, then holds. A ring with no
+    // mark on it would read as a rendering fault rather than a preference.
     raf = requestAnimationFrame(frame);
 
     return () => {

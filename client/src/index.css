@@ -665,6 +665,23 @@
   }
 
   /*
+   * A visible keyboard focus ring, in gilt rather than in the browser's blue.
+   *
+   * The shadcn primitives ship their own `focus-visible:ring`, but every
+   * hand-built control on the marketing side — the deck, the flip rail, the
+   * nav, the legal contents — had nothing but the user-agent default, which
+   * on a near-black ground is a thin dark line you have to hunt for. This is
+   * the floor, not a per-component decision: anything focusable gets a ring
+   * that clears the surface it sits on.
+   *
+   * `:focus-visible` rather than `:focus`, so a mouse click never draws it.
+   */
+  :where(button, a, [role="button"], [tabindex]):focus-visible {
+    outline: 2px solid hsl(var(--gold) / 0.85);
+    outline-offset: 2px;
+  }
+
+  /*
    * iOS zooms the page when a focused input's font-size is under 16px. Every
    * `text-sm` field in this app is 14px, so every tap on a form was a zoom the
    * member then had to pinch back out of.

@@ -181,25 +181,29 @@ export function FlipCards({
       {/* One rail of controls, mirroring the deck. Hidden once every card
           fits — a scroller with nowhere to scroll is a lie about the content. */}
       {cards.length > columns && (
-        <div className="flex items-center justify-center gap-4 mt-7">
+        <div className="flex items-center justify-center gap-2 mt-4">
           <button
             type="button"
             onClick={() => nudge(-1)}
             aria-label="Previous"
-            className="h-9 w-9 rounded-full border border-gold/30 text-gold flex items-center justify-center gold-outline-lift"
+            className="tap grid place-items-center rounded-full"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <span className="h-9 w-9 rounded-full border border-gold/30 text-gold flex items-center justify-center gold-outline-lift">
+              <ChevronLeft className="h-4 w-4" />
+            </span>
           </button>
-          <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          <p className="px-2 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
             {cards.length} cards · turn any
           </p>
           <button
             type="button"
             onClick={() => nudge(1)}
             aria-label="Next"
-            className="h-9 w-9 rounded-full border border-gold/30 text-gold flex items-center justify-center gold-outline-lift"
+            className="tap grid place-items-center rounded-full"
           >
-            <ChevronRight className="h-4 w-4" />
+            <span className="h-9 w-9 rounded-full border border-gold/30 text-gold flex items-center justify-center gold-outline-lift">
+              <ChevronRight className="h-4 w-4" />
+            </span>
           </button>
         </div>
       )}

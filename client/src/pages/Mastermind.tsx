@@ -123,6 +123,8 @@ export default function Mastermind() {
             <img
               {...responsive("/images/group-wellness.webp", SIZES_HALF)}
               alt="An open pavilion looking out to the sea"
+              width={1500}
+              height={1050}
               loading="lazy"
               decoding="async"
               className="relative rounded-md shadow-gold-subtle border border-gold-subtle"
@@ -148,6 +150,8 @@ export default function Mastermind() {
             <img
               {...responsive("/images/tropical-villa.webp", SIZES_HALF)}
               alt="A villa set back in tropical planting"
+              width={1500}
+              height={1050}
               loading="lazy"
               decoding="async"
               className="rounded-md shadow-gold-subtle border border-gold-subtle"

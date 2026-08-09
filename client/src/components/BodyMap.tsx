@@ -75,7 +75,7 @@ function Axis({
           <button
             key={c.id}
             onClick={() => onSelect(c.id)}
-            className="absolute left-0 right-0 flex items-center gap-4 text-left group"
+            className="absolute left-0 right-0 min-h-[44px] flex items-center gap-4 text-left group"
             style={{ top: `${top}px` }}
             aria-pressed={selected}
             data-testid={`centre-node-${c.id}`}
