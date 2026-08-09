@@ -33,25 +33,33 @@ export function DiagonalStack({
   });
 
   // Different rates per plate: the group separates in depth as it passes.
+  // Kept small — enough to read as depth, not enough to open a gap the layout
+  // was tuned to close.
   const drift = [
-    useTransform(scrollYProgress, [0, 1], [-34, 26]),
-    useTransform(scrollYProgress, [0, 1], [30, -30]),
-    useTransform(scrollYProgress, [0, 1], [-14, 40]),
+    useTransform(scrollYProgress, [0, 1], [-22, 18]),
+    useTransform(scrollYProgress, [0, 1], [20, -20]),
+    useTransform(scrollYProgress, [0, 1], [-10, 24]),
   ];
 
   // A falling diagonal: top-left, middle-right, bottom-centre. Each plate
   // stacks above the one before it, so the last is never buried under the
   // first — which is exactly what a tall opening plate used to do.
+  //
+  // The widths and the frame ratio are set together. At the previous numbers
+  // the first plate bottomed out around half the frame and the last one didn't
+  // begin until two thirds down, leaving a band of nothing across the middle
+  // and a wide margin under the last plate. Now every plate overlaps its
+  // neighbour and the third reaches the floor of the frame.
   const PLATES = [
-    { pos: "left-0 top-0 w-[50%]", ratio: "4 / 5", rotate: -3.2, z: "z-10" },
-    { pos: "right-0 top-[13%] w-[45%]", ratio: "4 / 3", rotate: 2.4, z: "z-20" },
-    { pos: "left-[19%] bottom-0 w-[43%]", ratio: "1 / 1", rotate: -1.4, z: "z-30" },
+    { pos: "left-0 top-0 w-[52%]", ratio: "4 / 5", rotate: -3.2, z: "z-10" },
+    { pos: "right-0 top-[8%] w-[46%]", ratio: "4 / 3", rotate: 2.4, z: "z-20" },
+    { pos: "left-[14%] bottom-0 w-[48%]", ratio: "1 / 1", rotate: -1.4, z: "z-30" },
   ];
 
   return (
     <div
       ref={ref}
-      className={`relative aspect-[4/5] sm:aspect-[5/4] ${className ?? ""}`}
+      className={`relative aspect-[1/1] sm:aspect-[5/4] ${className ?? ""}`}
       data-testid={testId}
     >
       {images.map((image, i) => {

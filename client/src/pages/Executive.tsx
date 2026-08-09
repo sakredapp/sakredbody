@@ -78,8 +78,8 @@ export default function Executive() {
         intro="For founders and executives whose responsibilities outgrew the body carrying them."
         note="Application only. Small number of clients at a time."
         testId="text-executive-headline"
-        image="/images/elegant-interior.webp"
-        imageAlt="A quiet, elegant interior opening onto daylight"
+        image="/images/stone-villa.webp"
+        imageAlt="A stone villa in late afternoon light, its arched door open"
       >
         <Button size="lg" className="gold-metallic-btn px-8" onClick={scrollToApply} data-testid="button-apply-hero">
           Apply <ArrowRight className="ml-2 h-5 w-5" />

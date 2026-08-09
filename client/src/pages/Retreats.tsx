@@ -10,7 +10,6 @@ import { DiagonalStack } from "@/components/DiagonalStack";
 import { Deck } from "@/components/Deck";
 import { WaysToWork } from "@/components/WaysToWork";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
 const fadeInUp = {
@@ -39,6 +38,16 @@ const SOCIAL_IMAGES = [
   "/images/stone-villa.webp",
 ];
 
+/** One photograph per format, so the deck reads as six places, not six boxes. */
+const FORMAT_IMAGES: Record<string, string> = {
+  "Sakred Reset": "/images/tropical-beach.webp",
+  "Sakred Performance": "/images/training-focus.webp",
+  "Founder's Reset": "/images/stone-villa.webp",
+  "Executive Reset": "/images/terrace-ocean.webp",
+  "Private Team Retreat": "/images/gathering-string-lights.webp",
+  "Sakred Immersion": "/images/retreat-jungle.webp",
+};
+
 const FORMATS = [
   {
     name: "Sakred Reset",
@@ -46,7 +55,6 @@ const FORMATS = [
     focus: "Restore",
     flagship: true,
     body: "The restoration retreat. Clean food, sleep, drainage work, breathwork, ocean, and enough silence that the nervous system finally believes it. Built for people arriving depleted.",
-    includes: ["Daily movement and breathwork", "Protocol-aligned meals", "Sleep and circadian reset", "Ocean, nature, and unstructured time"],
   },
   {
     name: "Sakred Performance",
@@ -54,7 +62,6 @@ const FORMATS = [
     focus: "Build",
     flagship: true,
     body: "The training retreat. Strength work, conditioning, mobility, and recovery run properly for a week — with the nutrition and sleep actually handled so the training does something.",
-    includes: ["Structured strength + conditioning", "Recovery protocols and contrast work", "Performance nutrition", "Movement assessment"],
   },
   {
     name: "Founder's Reset",
@@ -62,7 +69,6 @@ const FORMATS = [
     focus: "Restore + Build",
     flagship: false,
     body: "For people carrying a company. The same restoration and training work, run around a body that has been running on caffeine and five hours for years — and a small group in the same position.",
-    includes: ["Drainage and sleep repair", "Daily physical practice", "Nervous-system downshift work", "A small group carrying the same load"],
   },
   {
     name: "Executive Reset",
@@ -70,7 +76,6 @@ const FORMATS = [
     focus: "Restore",
     flagship: false,
     body: "For high-performing people who are running on empty and would never book something called a detox retreat. Same restoration work, framed for someone who has to be back on Monday.",
-    includes: ["Private or small group", "Discreet, concierge-run", "Sleep and stress-capacity focus", "Flexible around a working schedule"],
   },
   {
     name: "Private Team Retreat",
@@ -78,7 +83,6 @@ const FORMATS = [
     focus: "Gather",
     flagship: false,
     body: "A company or team, taken out of the environment that's grinding them down and put into one that rebuilds. Custom-built around what the team actually needs.",
-    includes: ["Fully custom itinerary", "Whole-team accommodation", "Facilitated sessions", "Shared physical practice"],
   },
   {
     name: "Sakred Immersion",
@@ -86,7 +90,6 @@ const FORMATS = [
     focus: "All four",
     flagship: false,
     body: "The full arc, in one stay. Restoration into training into practice design, inside a group holding the same standard. The most complete version of everything on this site.",
-    includes: ["Full protocol run, start to finish", "Strength and conditioning block", "Practice and environment design", "The group you run it with"],
   },
 ];
 
@@ -125,7 +128,7 @@ export default function Retreats() {
           <motion.div variants={fadeInUp}>
             <SectionHeader
               eyebrow="Why Environment"
-              title={<>You Cannot Out-Discipline <span className="text-gold">Your Surroundings</span></>}
+              title={<>Your Surroundings <span className="text-gold">Are an Input</span></>}
               testId="text-environment-headline"
             />
           </motion.div>
@@ -145,11 +148,17 @@ export default function Retreats() {
 
           <motion.p
             variants={fadeInUp}
-            className="text-center font-display text-xl md:text-2xl mt-12 max-w-2xl mx-auto leading-relaxed"
+            className="text-center font-display text-xl md:text-2xl mt-12 max-w-lg mx-auto leading-[1.6]"
           >
-            Restore the organism. Build its capacity. Embody a way of living.
+            {/* One clause to a line. Run together they wrapped mid-sentence on
+                a phone and the last line landed as an orphan. */}
+            Restore the organism.
             <br />
-            <span className="text-gold">Then put it somewhere that reinforces all three.</span>
+            Build its capacity.
+            <br />
+            Embody a way of living.
+            <br />
+            <span className="text-gold">Then put it somewhere that holds all three.</span>
           </motion.p>
         </motion.div>
       </Section>
@@ -206,39 +215,23 @@ export default function Retreats() {
             />
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-x-12 gap-y-14">
-            {FORMATS.map((f, i) => (
-              <motion.div variants={fadeInUp} key={f.name}>
-                <div
-                  className={`h-full rounded-lg p-7 text-center flex flex-col border ${
-                    f.flagship ? "bg-card border-gold/30 shadow-gold-subtle" : "bg-card border-border"
-                  }`}
-                  data-testid={`card-format-${i}`}
-                >
-                  {f.flagship && (
-                    <Badge
-                      variant="outline"
-                      className="mx-auto mb-4 border-gold-subtle text-gold text-[10px] uppercase tracking-wider font-normal"
-                    >
-                      Flagship
-                    </Badge>
-                  )}
-                  <h3 className="font-display text-2xl mb-2">{f.name}</h3>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-5">
-                    {f.length} · {f.focus}
-                  </p>
-                  <p className="text-sm text-muted-foreground leading-relaxed flex-1">{f.body}</p>
-                  <ul className="mt-6 pt-5 border-t border-border space-y-2">
-                    {f.includes.map((inc) => (
-                      <li key={inc} className="text-xs text-foreground/80">
-                        {inc}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          {/* No "what's included" lists. Four bullets under each of six cards
+              is twenty-four lines of near-identical phrasing that nobody reads
+              and that make every format look like every other one. What tells
+              them apart is the length, the territory and the paragraph. */}
+          <motion.div variants={fadeInUp}>
+            <Deck
+              testId="deck-formats"
+              cards={FORMATS.map((f) => ({
+                title: f.name,
+                body: f.body,
+                meta: `${f.length} · ${f.focus}`,
+                accent: f.flagship ? "var(--gold)" : undefined,
+                image: FORMAT_IMAGES[f.name],
+                imageAlt: "",
+              }))}
+            />
+          </motion.div>
 
           <motion.p variants={fadeInUp} className="text-xs text-muted-foreground text-center mt-8 max-w-2xl mx-auto">
             Reset and Performance run on a regular schedule. The remaining formats are built to request —

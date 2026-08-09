@@ -31,11 +31,22 @@ export function ImageBand({ image, alt, eyebrow, title, children, tall, testId }
         <img src={image} alt={alt} loading="lazy" decoding="async" className="w-full h-full object-cover" />
         <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-background to-transparent" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-background to-transparent" />
+        {/* Two scrims, not one. The vertical gradient sets the band into the
+            page; the centred radial darkens exactly where the copy sits, so a
+            busy photograph — a candlelit table, a lit interior — can't eat the
+            headline while the edges of the picture stay visible. */}
         <div
           className="absolute inset-0"
           style={{
             background:
-              "linear-gradient(to bottom, hsl(30 10% 10%) 0%, hsl(30 10% 10% / 0.66) 16%, hsl(30 10% 10% / 0.45) 50%, hsl(30 10% 10% / 0.72) 84%, hsl(30 10% 10%) 100%)",
+              "linear-gradient(to bottom, hsl(30 10% 10%) 0%, hsl(30 10% 10% / 0.72) 16%, hsl(30 10% 10% / 0.55) 50%, hsl(30 10% 10% / 0.78) 84%, hsl(30 10% 10%) 100%)",
+          }}
+        />
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(75% 62% at 50% 50%, hsl(30 10% 8% / 0.62), transparent 72%)",
           }}
         />
       </div>
