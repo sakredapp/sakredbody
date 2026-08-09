@@ -361,6 +361,8 @@ export function LibraryAdmin() {
 
                   <Sections ebookId={b.id} />
 
+                  <Grants ebookId={b.id} accessMode={b.accessMode} />
+
                   <div className="pt-3 border-t border-border/60">
                     <Button
                       variant="ghost"
@@ -541,6 +543,167 @@ function Sections({ ebookId }: { ebookId: string }) {
           variant="outline"
           disabled={!title.trim() || add.isPending}
           onClick={() => add.mutate()}
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Who has been given this guide.
+ *
+ * An entitlement is a row saying a specific member may read a specific guide.
+ * It exists separately from their tier on purpose — the schema comment puts it
+ * best: revoking a membership shouldn't take back a coach's gift.
+ *
+ * ── The list stores ids, so the names are joined here ─────────────────────
+ *
+ * `GET /api/admin/library/grants/:ebookId` returns entitlement rows, which
+ * carry a `userId` and nothing else. Rendering that directly would be a list
+ * of UUIDs, which is not a list of people. The members endpoint is already
+ * loaded elsewhere in this portal and cached by React Query under the same
+ * key, so resolving names costs nothing and the join happens once, here,
+ * rather than becoming a second shape the API has to maintain.
+ */
+function Grants({ ebookId, accessMode }: { ebookId: string; accessMode: string }) {
+  const [picked, setPicked] = useState("");
+  const [source, setSource] = useState("coaching");
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const key = ["/api/admin/library/grants", ebookId];
+
+  const grants = useQuery<Array<{ id: string; userId: string; source: string; grantedAt: string | null }>>({
+    queryKey: key,
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/library/grants/${ebookId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Couldn't load who has this");
+      return res.json();
+    },
+  });
+
+  const members = useQuery<Array<{ id: string; email: string | null; firstName: string | null; lastName: string | null }>>({
+    queryKey: ["/api/admin/members", ""],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/members", { credentials: "include" });
+      if (!res.ok) throw new Error("Couldn't load members");
+      return res.json();
+    },
+  });
+
+  const nameOf = (userId: string) => {
+    const m = members.data?.find((x) => x.id === userId);
+    if (!m) return userId.slice(0, 8);
+    return [m.firstName, m.lastName].filter(Boolean).join(" ").trim() || m.email || userId.slice(0, 8);
+  };
+
+  const grant = useMutation({
+    mutationFn: async () =>
+      apiRequest("POST", "/api/admin/library/grants", { userId: picked, ebookId, source }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: key });
+      setPicked("");
+      toast({ title: "Granted" });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const revoke = useMutation({
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/admin/library/grants/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: key });
+      toast({ title: "Revoked" });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const list = grants.data ?? [];
+  // Somebody who already holds it shouldn't be offerable again — the endpoint
+  // treats a repeat grant as success rather than an error, so the only way to
+  // avoid a confusing no-op is to not offer it.
+  const held = new Set(list.map((g) => g.userId));
+  const available = (members.data ?? []).filter((m) => !held.has(m.id));
+
+  return (
+    <div className="space-y-3 pt-3 border-t border-border/60">
+      <div className="flex items-center gap-2">
+        <p className="text-xs uppercase tracking-widest text-muted-foreground">Who has it</p>
+        <InfoTip label="About grants" title="Separate from their tier">
+          A grant is one member, one guide. It survives a tier change on purpose —
+          revoking a membership shouldn't take back something a coach gave. For a
+          guide included with membership this is only needed as an exception.
+        </InfoTip>
+      </div>
+
+      {accessMode === "membership" && (
+        <p className="text-xs text-muted-foreground">
+          This guide is included with membership, so most people can already read it
+          without appearing here.
+        </p>
+      )}
+
+      {grants.isLoading ? (
+        <Skeleton className="h-10 w-full" />
+      ) : list.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Nobody has been granted this yet.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {list.map((g) => (
+            <div
+              key={g.id}
+              className="flex items-center gap-2 border border-border/50 rounded-md px-3 py-2"
+            >
+              <span className="text-sm flex-1 truncate">{nameOf(g.userId)}</span>
+              <Badge variant="outline" className="text-[10px] shrink-0">{g.source}</Badge>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
+                onClick={() => revoke.mutate(g.id)}
+                data-testid={`button-revoke-${g.id}`}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        <Select value={picked} onValueChange={setPicked}>
+          <SelectTrigger className="flex-1 min-w-[180px]" data-testid="select-grant-member">
+            <SelectValue placeholder="Give it to someone" />
+          </SelectTrigger>
+          <SelectContent>
+            {available.length === 0 ? (
+              <div className="px-2 py-3 text-sm text-muted-foreground">
+                Everyone already has it.
+              </div>
+            ) : (
+              available.map((m) => (
+                <SelectItem key={m.id} value={m.id}>
+                  {[m.firstName, m.lastName].filter(Boolean).join(" ") || m.email}
+                </SelectItem>
+              ))
+            )}
+          </SelectContent>
+        </Select>
+
+        <Select value={source} onValueChange={setSource}>
+          <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {["coaching", "gift", "purchase", "membership"].map((s) => (
+              <SelectItem key={s} value={s}>{s}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Button
+          variant="outline"
+          disabled={!picked || grant.isPending}
+          onClick={() => grant.mutate()}
+          data-testid="button-grant"
         >
           <Plus className="h-4 w-4" />
         </Button>

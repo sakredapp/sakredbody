@@ -116,6 +116,8 @@ export function EnergyAdmin() {
 
 function Centres() {
   const [open, setOpen] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [draft, setDraft] = useState({ id: "", name: "", aspect: "", axisPosition: 50 });
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -138,6 +140,24 @@ function Centres() {
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
+  const create = useMutation({
+    mutationFn: async () =>
+      apiRequest("POST", "/api/admin/energy/centres", {
+        ...draft,
+        // Slug from the name unless one was typed. These ids are referenced by
+        // hand in content and appear in URLs, so they stay legible rather than
+        // becoming a uuid.
+        id: (draft.id || draft.name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/energy/centres"] });
+      setDraft({ id: "", name: "", aspect: "", axisPosition: 50 });
+      setCreating(false);
+      toast({ title: "Centre added" });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
   const list = centres.data ?? [];
 
   if (centres.isLoading) {
@@ -146,6 +166,62 @@ function Centres() {
 
   return (
     <div className="space-y-2">
+      <div className="flex justify-end">
+        <Button onClick={() => setCreating(!creating)} data-testid="button-new-centre">
+          <Plus className="h-4 w-4 mr-1.5" />
+          New centre
+        </Button>
+      </div>
+
+      {creating && (
+        <div className="border border-border/60 rounded-lg p-4 space-y-3 mb-2">
+          <div className="grid sm:grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Name</Label>
+              <Input
+                value={draft.name}
+                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                placeholder="Sacral"
+                data-testid="input-centre-name"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Aspect</Label>
+              <Input
+                value={draft.aspect}
+                onChange={(e) => setDraft({ ...draft, aspect: e.target.value })}
+                placeholder="Flow"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs flex items-center gap-1.5">
+                Axis position
+                <InfoTip label="About axis position" title="Down the figure">
+                  A percentage from the top: 0 is the crown, 100 the feet. It is what
+                  orders the centres on the body map, so a new one slots in by this
+                  number rather than by when it was created.
+                </InfoTip>
+              </Label>
+              <Input
+                type="number"
+                value={draft.axisPosition}
+                onChange={(e) => setDraft({ ...draft, axisPosition: Number(e.target.value) })}
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => create.mutate()}
+              disabled={!draft.name.trim() || create.isPending}
+              className="bg-gold border-gold-border text-white"
+            >
+              Create
+            </Button>
+            <Button variant="outline" onClick={() => setCreating(false)}>Cancel</Button>
+          </div>
+        </div>
+      )}
+
       {list.map((c) => (
         <div key={c.id} className="border border-border/60 rounded-lg overflow-hidden">
           <button
@@ -315,6 +391,8 @@ function Centres() {
                   />
                 </div>
               </div>
+
+              <CentreLinks centreId={c.id} centreName={c.name} />
             </div>
           )}
         </div>
@@ -530,6 +608,291 @@ function Frequencies() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * What a centre is connected to.
+ *
+ * A centre on its own is a description. The links are what make it a working
+ * part of the app: they are how "your diaphragm is held" becomes "here is the
+ * breathwork that opens it" instead of a sentence a member can do nothing
+ * with.
+ *
+ * ── Habits are reached through their protocol ─────────────────────────────
+ *
+ * There is a flat `/api/catalog/habits`, and it is the wrong endpoint for
+ * this: it deduplicates by title and merges the matches, so two protocols
+ * with a "Morning sun" step collapse into one row carrying one arbitrary id.
+ * Linking against that would silently attach the wrong template. Choosing the
+ * protocol first costs one extra click and links the thing you actually
+ * pointed at.
+ */
+function CentreLinks({ centreId, centreName }: { centreId: string; centreName: string }) {
+  const [routineForHabits, setRoutineForHabits] = useState("");
+  const [habitToAdd, setHabitToAdd] = useState("");
+  const [action, setAction] = useState("moves");
+  const [routineToAdd, setRoutineToAdd] = useState("");
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const key = ["/api/admin/energy/centres", centreId, "links"];
+
+  const links = useQuery<{
+    habits: Array<{ id: string; habitId: string; action: string; title: string }>;
+    routines: Array<{ id: string; routineId: string; isPrimary: boolean; name: string }>;
+  }>({
+    queryKey: key,
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/energy/centres/${centreId}/links`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Couldn't load what's linked");
+      return res.json();
+    },
+  });
+
+  const routines = useQuery<Array<{ id: string; name: string }>>({
+    queryKey: ["/api/admin/routines"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/routines", { credentials: "include" });
+      if (!res.ok) throw new Error("Couldn't load protocols");
+      return res.json();
+    },
+  });
+
+  // Only fetched once a protocol is chosen — there is no flat list worth
+  // loading, and loading every protocol's habits up front to fill one select
+  // would be most of the catalogue for one click.
+  const habits = useQuery<Array<{ id: string; title: string }>>({
+    queryKey: ["/api/admin/routines", routineForHabits, "habits"],
+    enabled: !!routineForHabits,
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/routines/${routineForHabits}/habits`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Couldn't load that protocol's habits");
+      return res.json();
+    },
+  });
+
+  const linkHabit = useMutation({
+    mutationFn: async () =>
+      apiRequest("POST", "/api/admin/energy/centre-habits", {
+        centreId,
+        habitId: habitToAdd,
+        action,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: key });
+      setHabitToAdd("");
+      toast({ title: "Linked" });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const linkRoutine = useMutation({
+    mutationFn: async () =>
+      apiRequest("POST", "/api/admin/energy/centre-routines", {
+        centreId,
+        routineId: routineToAdd,
+        isPrimary: false,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: key });
+      setRoutineToAdd("");
+      toast({ title: "Linked" });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const setPrimary = useMutation({
+    mutationFn: async ({ routineId, isPrimary }: { routineId: string; isPrimary: boolean }) =>
+      apiRequest("POST", "/api/admin/energy/centre-routines", { centreId, routineId, isPrimary }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key }),
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const unlinkHabit = useMutation({
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/admin/energy/centre-habits/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: key });
+      toast({ title: "Unlinked" });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const unlinkRoutine = useMutation({
+    mutationFn: async (id: string) =>
+      apiRequest("DELETE", `/api/admin/energy/centre-routines/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: key });
+      toast({ title: "Unlinked" });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const linkedHabits = links.data?.habits ?? [];
+  const linkedRoutines = links.data?.routines ?? [];
+  const routineList = routines.data ?? [];
+
+  const alreadyLinkedHabit = new Set(linkedHabits.map((h) => h.habitId));
+  const alreadyLinkedRoutine = new Set(linkedRoutines.map((r) => r.routineId));
+
+  if (routineList.length === 0) {
+    return (
+      <div className="pt-3 border-t border-border/60">
+        <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
+          Practices and protocols
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Nothing to link yet — there are no protocols. Build one in{" "}
+          <span className="text-foreground">Coaching → Routines</span> and it can be
+          attached to {centreName} here.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 pt-3 border-t border-border/60">
+      {/* ── Practices ─────────────────────────────────────────────────────── */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <p className="text-xs uppercase tracking-widest text-muted-foreground">Practices</p>
+          <InfoTip label="About practices" title="How it acts">
+            The verb is the point. "Breathwork opens the diaphragm" reads as
+            guidance; "breathwork → diaphragm" reads as a database row. It is what
+            the member sees on the centre.
+          </InfoTip>
+        </div>
+
+        {links.isLoading ? (
+          <Skeleton className="h-9 w-full" />
+        ) : linkedHabits.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No practices linked.</p>
+        ) : (
+          <div className="space-y-1.5">
+            {linkedHabits.map((h) => (
+              <div key={h.id} className="flex items-center gap-2 border border-border/50 rounded-md px-3 py-1.5">
+                <span className="text-sm flex-1 truncate">{h.title}</span>
+                <Badge variant="outline" className="text-[10px] shrink-0">{h.action}</Badge>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
+                  onClick={() => unlinkHabit.mutate(h.id)}
+                  data-testid={`button-unlink-habit-${h.id}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <Select value={routineForHabits} onValueChange={(v) => { setRoutineForHabits(v); setHabitToAdd(""); }}>
+            <SelectTrigger className="flex-1 min-w-[140px]" data-testid="select-habit-routine">
+              <SelectValue placeholder="From protocol…" />
+            </SelectTrigger>
+            <SelectContent>
+              {routineList.map((r) => (
+                <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={habitToAdd} onValueChange={setHabitToAdd} disabled={!routineForHabits}>
+            <SelectTrigger className="flex-1 min-w-[140px]" data-testid="select-habit">
+              <SelectValue placeholder={routineForHabits ? "Pick a practice" : "Protocol first"} />
+            </SelectTrigger>
+            <SelectContent>
+              {(habits.data ?? []).filter((h) => !alreadyLinkedHabit.has(h.id)).map((h) => (
+                <SelectItem key={h.id} value={h.id}>{h.title}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={action} onValueChange={setAction}>
+            <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {["moves", "opens", "grounds", "clears"].map((a) => (
+                <SelectItem key={a} value={a}>{a}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Button
+            variant="outline"
+            disabled={!habitToAdd || linkHabit.isPending}
+            onClick={() => linkHabit.mutate()}
+            data-testid="button-link-habit"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* ── Protocols ─────────────────────────────────────────────────────── */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <p className="text-xs uppercase tracking-widest text-muted-foreground">Protocols</p>
+          <InfoTip label="About primary" title="The one it's really about">
+            A protocol usually has one centre it is genuinely about and others it
+            brushes. Primary is the one the body map highlights.
+          </InfoTip>
+        </div>
+
+        {linkedRoutines.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No protocols linked.</p>
+        ) : (
+          <div className="space-y-1.5">
+            {linkedRoutines.map((r) => (
+              <div key={r.id} className="flex items-center gap-2 border border-border/50 rounded-md px-3 py-1.5">
+                <span className="text-sm flex-1 truncate">{r.name}</span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Switch
+                    checked={r.isPrimary}
+                    onCheckedChange={(v) => setPrimary.mutate({ routineId: r.routineId, isPrimary: v })}
+                    data-testid={`switch-primary-${r.id}`}
+                  />
+                  <Label className="text-[10px] text-muted-foreground">Primary</Label>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
+                  onClick={() => unlinkRoutine.mutate(r.id)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <Select value={routineToAdd} onValueChange={setRoutineToAdd}>
+            <SelectTrigger className="flex-1" data-testid="select-link-routine">
+              <SelectValue placeholder="Link a protocol" />
+            </SelectTrigger>
+            <SelectContent>
+              {routineList.filter((r) => !alreadyLinkedRoutine.has(r.id)).map((r) => (
+                <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            disabled={!routineToAdd || linkRoutine.isPending}
+            onClick={() => linkRoutine.mutate()}
+            data-testid="button-link-routine"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -369,6 +369,82 @@ export function registerEnergyRoutes(app: Express) {
     }
   });
 
+  /**
+   * What is linked to a centre, for the admin screen.
+   *
+   * The member-facing `GET /api/energy/centres/:id` already joins these, but
+   * it is not usable here: it refuses unpublished centres, which are exactly
+   * the ones being built, and it returns the member's shape rather than the
+   * link rows. An editor needs the link's own id so it can be removed.
+   */
+  app.get("/api/admin/energy/centres/:id/links", isAdmin, async (req, res) => {
+    try {
+      const centreId = param(req, "id");
+
+      const [habits, routines] = await Promise.all([
+        db
+          .select({
+            id: centreHabits.id,
+            habitId: centreHabits.habitId,
+            action: centreHabits.action,
+            title: routineHabits.title,
+          })
+          .from(centreHabits)
+          .innerJoin(routineHabits, eq(centreHabits.habitId, routineHabits.id))
+          .where(eq(centreHabits.centreId, centreId))
+          .orderBy(asc(routineHabits.title)),
+        db
+          .select({
+            id: centreRoutines.id,
+            routineId: centreRoutines.routineId,
+            isPrimary: centreRoutines.isPrimary,
+            name: wellnessRoutines.name,
+          })
+          .from(centreRoutines)
+          .innerJoin(wellnessRoutines, eq(centreRoutines.routineId, wellnessRoutines.id))
+          .where(eq(centreRoutines.centreId, centreId))
+          .orderBy(asc(wellnessRoutines.name)),
+      ]);
+
+      res.json({ habits, routines });
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
+  /**
+   * Unlink.
+   *
+   * By the link row's own id rather than the (centre, habit) pair. Both tables
+   * carry a real primary key, and a two-segment path would have to be parsed
+   * and validated in an order nothing else here uses.
+   */
+  app.delete("/api/admin/energy/centre-habits/:id", isAdmin, async (req, res) => {
+    try {
+      const [gone] = await db
+        .delete(centreHabits)
+        .where(eq(centreHabits.id, param(req, "id")))
+        .returning({ id: centreHabits.id });
+      if (!gone) return res.status(404).json({ message: "Not found" });
+      res.json({ id: gone.id });
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
+  app.delete("/api/admin/energy/centre-routines/:id", isAdmin, async (req, res) => {
+    try {
+      const [gone] = await db
+        .delete(centreRoutines)
+        .where(eq(centreRoutines.id, param(req, "id")))
+        .returning({ id: centreRoutines.id });
+      if (!gone) return res.status(404).json({ message: "Not found" });
+      res.json({ id: gone.id });
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
   app.get("/api/admin/energy/member/:userId", isAdmin, async (req, res) => {
     try {
       const userId = param(req, "userId");
