@@ -7,7 +7,7 @@
  * Auth gates render below the hooks via conditional JSX.
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
@@ -87,6 +87,7 @@ import {
   ChevronRight,
   X,
   ShieldCheck,
+  Loader2,
   ClipboardList,
   ArrowLeft,
   ArrowRight,
@@ -115,6 +116,7 @@ import {
   type ServiceCategoryValue,
 } from "@shared/constants";
 import { useInkSurface } from "@/hooks/use-ink-surface";
+import { PortalBackdrop } from "@/components/portal/PortalBackdrop";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SHARED HELPERS
@@ -164,26 +166,27 @@ type AdminTab =
 // AUTH GATES
 // ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * There is one login, and this is not it.
+ *
+ * This used to be a full screen reading "Admin Portal — Sign in with an admin
+ * account", with a button whose only job was to send you to /login. Two doors
+ * for one key: an admin is a member who can also do more, not a separate
+ * account. Anyone landing here signed-out now goes straight to the single
+ * login and is returned afterwards.
+ *
+ * Signed-in admins never see this at all — they reach the back office from
+ * the Admin link in the member header.
+ */
 function LoginGate() {
+  useEffect(() => {
+    const back = encodeURIComponent(window.location.pathname + window.location.search);
+    window.location.replace(`/login?next=${back}`);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <header className="border-b border-border/50 bg-background/80 backdrop-blur-md" style={{ zIndex: 9999 }}>
-        <div className="container max-w-6xl mx-auto px-4 h-16 flex items-center">
-          <Link href="/" className="font-display text-xl tracking-tight">Sakred Body</Link>
-        </div>
-      </header>
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className="max-w-md w-full text-center space-y-6">
-          <ShieldCheck className="w-12 h-12 mx-auto text-muted-foreground" />
-          <h1 className="font-display text-3xl">Admin Portal</h1>
-          <p className="text-muted-foreground">Sign in with an admin account to manage content.</p>
-          <Link href="/login">
-            <Button size="lg" className="w-full bg-gold border-gold-border text-white">
-              Sign In <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          </Link>
-        </div>
-      </div>
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
     </div>
   );
 }
@@ -1262,7 +1265,12 @@ export default function AdminPortal() {
   // ═══════════════════════════════════════════════════════════════════
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative isolate">
+      {/* Same sky as the member app, held further back — see PortalBackdrop.
+          `isolate` is what lets it sit at a negative z-index without falling
+          behind the page background entirely. */}
+      <PortalBackdrop variant="desk" />
+
       {/* Header */}
       <header className="sticky top-0 border-b border-border/50 bg-background/80 backdrop-blur-md" style={{ zIndex: 9999 }}>
         <div className="container max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
