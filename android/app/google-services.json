@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "739229950259",
+    "project_id": "sakredbody",
+    "storage_bucket": "sakredbody.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:739229950259:android:0b58a85108ab826bea5e46",
+        "android_client_info": {
+          "package_name": "com.sakredbody.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCD57HuxBTurtyFADd3sJI9F-QVrbXUunc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
