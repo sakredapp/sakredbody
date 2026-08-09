@@ -24,6 +24,7 @@
  */
 
 import type { Express, Request, Response, NextFunction } from "express";
+import { zodMessage } from "../../shared/utils/zodMessage.js";
 import { db } from "../db.js";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -73,7 +74,7 @@ export function registerTelemetryRoutes(app: Express) {
       res.status(202).json({ accepted: true });
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message });
+        return res.status(400).json({ message: zodMessage(err) });
       }
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });

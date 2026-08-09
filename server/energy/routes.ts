@@ -23,6 +23,7 @@
  */
 
 import type { Express, Request, Response, NextFunction } from "express";
+import { zodMessage } from "../../shared/utils/zodMessage.js";
 import { db } from "../db.js";
 import { eq, and, desc, asc, inArray, sql } from "drizzle-orm";
 import { isAuthenticated } from "../auth/index.js";
@@ -65,7 +66,7 @@ function param(req: Request, name: string): string {
 function fail(res: Response, err: unknown) {
   if (err instanceof z.ZodError) {
     return res.status(400).json({
-      message: err.errors[0].message,
+      message: zodMessage(err),
       field: err.errors[0].path.join("."),
     });
   }

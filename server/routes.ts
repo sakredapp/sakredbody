@@ -1,4 +1,5 @@
 import type { Express, Request, Response, NextFunction } from "express";
+import { zodMessage } from "../shared/utils/zodMessage.js";
 import type { Server } from "http";
 import { storage } from "./storage.js";
 import { db } from "./db.js";
@@ -53,7 +54,7 @@ export async function registerRoutes(
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({
-          message: err.errors[0].message,
+          message: zodMessage(err),
           field: err.errors[0].path.join('.'),
         });
       }
@@ -104,7 +105,7 @@ export async function registerRoutes(
       res.status(201).json({ id: created.id, route });
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join(".") });
+        return res.status(400).json({ message: zodMessage(err), field: err.errors[0].path.join(".") });
       }
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });
@@ -209,7 +210,7 @@ export async function registerRoutes(
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({
-          message: err.errors[0].message,
+          message: zodMessage(err),
           field: err.errors[0].path.join('.'),
         });
       }
@@ -276,7 +277,7 @@ export async function registerRoutes(
       res.status(201).json(partner);
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+        return res.status(400).json({ message: zodMessage(err), field: err.errors[0].path.join('.') });
       }
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });
@@ -292,7 +293,7 @@ export async function registerRoutes(
       res.json(updated);
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+        return res.status(400).json({ message: zodMessage(err), field: err.errors[0].path.join('.') });
       }
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });
@@ -328,7 +329,7 @@ export async function registerRoutes(
       res.status(201).json(service);
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+        return res.status(400).json({ message: zodMessage(err), field: err.errors[0].path.join('.') });
       }
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });
@@ -344,7 +345,7 @@ export async function registerRoutes(
       res.json(updated);
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+        return res.status(400).json({ message: zodMessage(err), field: err.errors[0].path.join('.') });
       }
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });
@@ -401,7 +402,7 @@ export async function registerRoutes(
       res.json(updated);
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+        return res.status(400).json({ message: zodMessage(err), field: err.errors[0].path.join('.') });
       }
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });

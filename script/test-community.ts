@@ -15,6 +15,8 @@ import {
   headlineOptions,
   segmentHeadline,
 } from "../shared/utils/highlight.js";
+import { z as _z } from "zod";
+import { zodMessage } from "../shared/utils/zodMessage.js";
 
 let passed = 0;
 let failed = 0;
@@ -275,6 +277,54 @@ check(
 );
 
 // ─── Result ────────────────────────────────────────────────────────────────
+
+
+// ─── Validation messages a person can act on ───────────────────────────────
+
+
+console.log("\nA validation error names the field\n");
+
+function issueFor(schema: _z.ZodTypeAny, value: unknown): string {
+  const r = schema.safeParse(value);
+  return r.success ? "" : zodMessage(r.error);
+}
+
+// `.min()` does not fire for a missing field — only `required_error` does.
+// That is the whole reason this case is here: a friendly message attached to
+// `.min()` is dead code for the most common failure.
+const authored = _z.object({
+  routineId: _z.string({ required_error: "Which protocol? routineId is required." }),
+});
+const minOnly = _z.object({
+  routineId: _z.string().min(1, "Never shown when the field is absent."),
+});
+
+check(
+  "a missing field is named, not just 'Required'",
+  issueFor(_z.object({ startDate: _z.string() }), {}) === "start date is required.",
+  issueFor(_z.object({ startDate: _z.string() }), {}),
+);
+check(
+  "camelCase becomes words",
+  issueFor(_z.object({ dateOfBirth: _z.string() }), {}) === "date of birth is required.",
+  issueFor(_z.object({ dateOfBirth: _z.string() }), {}),
+);
+// A message somebody wrote deliberately already reads as prose; prefixing it
+// with a field name would make it worse, so it is passed through untouched.
+check(
+  "an authored required_error is left alone",
+  issueFor(authored, {}) === "Which protocol? routineId is required.",
+  issueFor(authored, {}),
+);
+check(
+  "a .min() message can't rescue a missing field, so the field is named",
+  issueFor(minOnly, {}) === "routine id is required.",
+  issueFor(minOnly, {}),
+);
+check(
+  "an empty error object still says something",
+  zodMessage(new _z.ZodError([])) === "That request wasn't valid.",
+);
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

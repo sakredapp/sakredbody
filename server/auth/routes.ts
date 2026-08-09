@@ -15,6 +15,7 @@
  */
 
 import type { Express, Request, Response } from "express";
+import { zodMessage } from "../../shared/utils/zodMessage.js";
 import { storage } from "../storage.js";
 import { isAuthenticated } from "./sessionAuth.js";
 import { db } from "../db.js";
@@ -253,7 +254,7 @@ export function registerAuthRoutes(app: Express): void {
       res.json(token ? { ...safeUser, token } : safeUser);
     } catch (error: unknown) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: error.errors[0].message });
+        return res.status(400).json({ message: zodMessage(error) });
       }
       trackError("auth.login", error);
       res.status(500).json({ message: "Internal server error" });
@@ -294,7 +295,7 @@ export function registerAuthRoutes(app: Express): void {
       res.status(201).json(token ? { ...safeUser, token } : safeUser);
     } catch (error: unknown) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: error.errors[0].message });
+        return res.status(400).json({ message: zodMessage(error) });
       }
       trackError("auth.register", error);
       res.status(500).json({ message: "Internal server error" });

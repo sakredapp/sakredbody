@@ -36,6 +36,7 @@
  */
 
 import type { Express, Request, Response, NextFunction } from "express";
+import { zodMessage } from "../../shared/utils/zodMessage.js";
 import multer from "multer";
 import { db } from "../db.js";
 import { eq, and, desc, count, sql, gte, lte } from "drizzle-orm";
@@ -132,9 +133,28 @@ async function uniqueSlug(name: string): Promise<string> {
 
 // ─── Input Schemas ────────────────────────────────────────────────────────
 
+/**
+ * Starting a protocol.
+ *
+ * `startDate` is optional and defaults to the member's own today — which is
+ * what somebody pressing "start" almost always means. It was required, and a
+ * caller who omitted it got a 400 reading only "Required", with no field name
+ * and no hint that today was an option. That is a bad answer to the most
+ * common request the endpoint receives.
+ *
+ * It stays settable because a coach scheduling a cleanse to begin on a Monday
+ * is a real thing.
+ */
 const enrollInputSchema = z.object({
-  routineId: z.string().min(1, "Routine ID is required"),
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Start date must be YYYY-MM-DD"),
+  // `required_error`, not `.min()` — .min only fires once a string is
+  // present, so its message never appears for a field that was omitted.
+  routineId: z
+    .string({ required_error: "Which protocol? routineId is required." })
+    .min(1, "Which protocol? routineId is required."),
+  startDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Start date must be YYYY-MM-DD")
+    .optional(),
   intensity: z.enum(["lite", "intense"]).default("lite"),
 });
 
@@ -184,7 +204,7 @@ export function registerCoachingRoutes(app: Express): void {
 
       res.json({ timezone: updated?.timezone ?? timezone });
     } catch (err) {
-      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      if (err instanceof z.ZodError) return res.status(400).json({ message: zodMessage(err) });
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -268,7 +288,11 @@ export function registerCoachingRoutes(app: Express): void {
     try {
       const userId = req.session.userId!;
       const { routineId, startDate, intensity } = enrollInputSchema.parse(req.body);
-      const result = await enrollInRoutine({ userId, routineId, startDate, intensity });
+      // The member's today, not the server's. On Vercel the process runs in
+      // UTC, so defaulting to the server date would start somebody in Los
+      // Angeles a day early from 5pm onward.
+      const begins = startDate ?? (await memberToday(userId));
+      const result = await enrollInRoutine({ userId, routineId, startDate: begins, intensity });
 
       if (result.alreadyEnrolled) {
         return res.status(200).json({
@@ -283,7 +307,7 @@ export function registerCoachingRoutes(app: Express): void {
         habitsScheduled: result.habitsScheduled,
       });
     } catch (err) {
-      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      if (err instanceof z.ZodError) return res.status(400).json({ message: zodMessage(err) });
       if (err instanceof Error && err.message.startsWith("Routine not found"))
         return res.status(404).json({ message: err.message });
       console.error("Enrollment error:", err);
@@ -322,7 +346,7 @@ export function registerCoachingRoutes(app: Express): void {
         habitsScheduled: result.habitsScheduled,
       });
     } catch (err) {
-      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      if (err instanceof z.ZodError) return res.status(400).json({ message: zodMessage(err) });
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -503,7 +527,7 @@ export function registerCoachingRoutes(app: Express): void {
       // round trip on the one interaction that happens most.
       res.json({ ...updated, earnedWins: earned });
     } catch (err) {
-      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      if (err instanceof z.ZodError) return res.status(400).json({ message: zodMessage(err) });
       trackError("habit.toggle", err, { userId: req.session.userId });
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -537,7 +561,7 @@ export function registerCoachingRoutes(app: Express): void {
 
       res.json(result);
     } catch (err) {
-      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      if (err instanceof z.ZodError) return res.status(400).json({ message: zodMessage(err) });
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -559,7 +583,7 @@ export function registerCoachingRoutes(app: Express): void {
       const result = await restoreHabitSeries(req.session.userId!, input);
       res.json(result);
     } catch (err) {
-      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      if (err instanceof z.ZodError) return res.status(400).json({ message: zodMessage(err) });
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -838,7 +862,7 @@ export function registerCoachingRoutes(app: Express): void {
 
       res.status(201).json({ assignment, habitsScheduled: scheduled });
     } catch (err) {
-      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      if (err instanceof z.ZodError) return res.status(400).json({ message: zodMessage(err) });
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -880,7 +904,7 @@ export function registerCoachingRoutes(app: Express): void {
 
       res.status(201).json({ assignment, habitsScheduled: scheduled });
     } catch (err) {
-      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      if (err instanceof z.ZodError) return res.status(400).json({ message: zodMessage(err) });
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -940,7 +964,7 @@ export function registerCoachingRoutes(app: Express): void {
       const [created] = await db.insert(wellnessRoutines).values(input).returning();
       res.status(201).json(created);
     } catch (err) {
-      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      if (err instanceof z.ZodError) return res.status(400).json({ message: zodMessage(err) });
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -962,7 +986,7 @@ export function registerCoachingRoutes(app: Express): void {
       if (!updated) return res.status(404).json({ message: "Routine not found" });
       res.json(updated);
     } catch (err) {
-      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      if (err instanceof z.ZodError) return res.status(400).json({ message: zodMessage(err) });
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -1037,7 +1061,7 @@ export function registerCoachingRoutes(app: Express): void {
 
       res.status(201).json(created);
     } catch (err) {
-      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      if (err instanceof z.ZodError) return res.status(400).json({ message: zodMessage(err) });
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -1070,7 +1094,7 @@ export function registerCoachingRoutes(app: Express): void {
 
       res.json(updated);
     } catch (err) {
-      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      if (err instanceof z.ZodError) return res.status(400).json({ message: zodMessage(err) });
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -1132,7 +1156,7 @@ export function registerCoachingRoutes(app: Express): void {
       res.status(201).json(msg);
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message });
+        return res.status(400).json({ message: zodMessage(err) });
       }
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });
@@ -1216,7 +1240,7 @@ export function registerCoachingRoutes(app: Express): void {
       res.status(201).json(msg);
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message });
+        return res.status(400).json({ message: zodMessage(err) });
       }
       console.error(err);
       res.status(500).json({ message: "Internal Server Error" });

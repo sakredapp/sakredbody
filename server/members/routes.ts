@@ -34,6 +34,7 @@
  */
 
 import type { Express, Request, Response } from "express";
+import { zodMessage } from "../../shared/utils/zodMessage.js";
 import { db } from "../db.js";
 import { and, asc, count, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { isAuthenticated } from "../auth/index.js";
@@ -119,7 +120,7 @@ const tierSchema = z.object({
 
 function fail(res: Response, err: unknown) {
   if (err instanceof z.ZodError) {
-    return res.status(400).json({ message: err.errors[0].message });
+    return res.status(400).json({ message: zodMessage(err) });
   }
   console.error(err);
   res.status(500).json({ message: "Internal Server Error" });
@@ -279,7 +280,7 @@ export function registerMemberRoutes(app: Express) {
       res.json(updated);
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message });
+        return res.status(400).json({ message: zodMessage(err) });
       }
       trackError("member.update", err, { userId: req.session?.userId });
       res.status(500).json({ message: "Internal Server Error" });

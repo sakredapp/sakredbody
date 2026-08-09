@@ -13,6 +13,7 @@
  */
 
 import type { Express, Request, Response } from "express";
+import { zodMessage } from "../../shared/utils/zodMessage.js";
 import { db } from "../db.js";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
@@ -50,7 +51,7 @@ function isAdmin(req: Request, res: Response, next: () => void) {
 
 function fail(res: Response, err: unknown) {
   if (err instanceof z.ZodError) {
-    return res.status(400).json({ message: err.errors[0].message });
+    return res.status(400).json({ message: zodMessage(err) });
   }
   console.error(err);
   res.status(500).json({ message: "Internal Server Error" });
@@ -196,7 +197,7 @@ export function registerWinRoutes(app: Express) {
       res.status(201).json({ messageId: message.id, channelId: target.id });
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message });
+        return res.status(400).json({ message: zodMessage(err) });
       }
       trackError("win.share", err, { userId: req.session?.userId });
       res.status(500).json({ message: "Internal Server Error" });

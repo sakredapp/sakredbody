@@ -16,6 +16,7 @@
  */
 
 import type { Express, Request, Response } from "express";
+import { zodMessage } from "../../shared/utils/zodMessage.js";
 import { db } from "../db.js";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -38,7 +39,7 @@ function param(req: Request, name: string): string {
 
 function fail(res: Response, err: unknown) {
   if (err instanceof z.ZodError) {
-    return res.status(400).json({ message: err.errors[0].message });
+    return res.status(400).json({ message: zodMessage(err) });
   }
   console.error(err);
   res.status(500).json({ message: "Internal Server Error" });
@@ -110,7 +111,7 @@ export function registerModerationRoutes(app: Express) {
       res.status(201).json({ reported: true, id: row?.id ?? null });
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message });
+        return res.status(400).json({ message: zodMessage(err) });
       }
       trackError("community.report", err, { userId: req.session?.userId });
       res.status(500).json({ message: "Internal Server Error" });
