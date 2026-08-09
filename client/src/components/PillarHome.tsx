@@ -43,12 +43,20 @@ interface Pillar {
 }
 
 /**
- * The five pillars, in one place on purpose.
+ * The five doors, in one place on purpose.
  *
- * The marketing site currently runs Restore / Build / Embody / Terrain and
- * these mockups run Restore / Build / Executive / Retreats / Knowledge. That
- * is an unsettled brand decision, not a code one, so it lives as a single
- * array — swapping a pillar is one edit here rather than a refactor.
+ * ── Embody, not Executive ─────────────────────────────────────────────────
+ *
+ * A round of mockups proposed Restore / Build / Executive / Retreats /
+ * Knowledge. The brand already had an answer and it wasn't that: the meta
+ * description reads "Restore the Body. Build the Body. Embody the Life.", and
+ * the constellation on the landing page is drawn with four named anchors —
+ * Restore, Build, Embody, Gather. Executive is a product tier here, not a
+ * stage of the sequence, and promoting it to a pillar would have put a
+ * customer segment where a practice belongs.
+ *
+ * Kept as a single array because that is the whole point: this is a brand
+ * decision, so changing it should be one edit and never a refactor.
  */
 const PILLARS: Pillar[] = [
   {
@@ -66,11 +74,15 @@ const PILLARS: Pillar[] = [
     section: null,
   },
   {
-    key: "executive",
-    title: "Executive",
-    blurb: "Mindset, leadership and performance.",
-    image: "/images/elegant-interior.webp",
-    section: "coaching",
+    key: "embody",
+    title: "Embody",
+    // Their own line: the body is the terrain you live your whole life
+    // through. This door opens onto the nine centres, which is the closest
+    // thing the app has to reading your own body — and which was otherwise
+    // buried in the More sheet with no front door at all.
+    blurb: "The terrain you live in, read from the inside.",
+    image: "/images/rugged-cliffs.webp",
+    section: "body",
   },
   {
     key: "retreats",
