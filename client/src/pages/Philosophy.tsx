@@ -9,6 +9,8 @@ import { Constellation } from "@/components/Constellation";
 import { MoonPhase, moonPhaseName } from "@/components/MoonPhase";
 import { StarDust } from "@/components/StarDust";
 import { ImageBand } from "@/components/ImageBand";
+import { AscentChart } from "@/components/AscentChart";
+import { LoopCycle } from "@/components/LoopCycle";
 import { YinYang } from "@/components/YinYang";
 import { Button } from "@/components/ui/button";
 import { TERRITORIES, CAPACITY_MODEL, OPERATING_LOOP } from "@/data/territories";
@@ -164,23 +166,13 @@ export default function Philosophy() {
             />
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-12 gap-y-14 max-w-5xl mx-auto">
-            {CAPACITY_MODEL.map((c, i) => (
-              <motion.div variants={fadeInUp} key={c.stage}>
-                <div
-                  className="h-full pt-8 border-t border-border text-center"
-                  data-testid={`card-capacity-${i}`}
-                >
-                  <h3 className="font-display text-xl mt-3 mb-3">{c.stage}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{c.body}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          <motion.div variants={fadeInUp}>
+            <AscentChart stages={CAPACITY_MODEL} testId="chart-capacity" />
+          </motion.div>
 
           <motion.p
             variants={fadeInUp}
-            className="text-center font-display text-xl md:text-2xl mt-12 max-w-2xl mx-auto leading-relaxed"
+            className="text-center font-display text-xl md:text-2xl mt-10 max-w-2xl mx-auto leading-relaxed"
           >
             The point was never the body.
             <br />
@@ -201,23 +193,10 @@ export default function Philosophy() {
             />
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-12 gap-y-14 max-w-5xl mx-auto">
-            {OPERATING_LOOP.map((l, i) => (
-              <motion.div variants={fadeInUp} key={l.step}>
-                <div
-                  className="h-full border border-gold-subtle rounded-lg p-6 text-center bg-card"
-                  data-testid={`card-loop-${i}`}
-                >
-                  <h3 className="font-display text-2xl mb-3 text-gold">{l.step}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{l.body}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-
-          <motion.p variants={fadeInUp} className="text-center text-muted-foreground mt-10 max-w-xl mx-auto">
-            Then repeat. Adaptation is a cycle, not a finish line.
-          </motion.p>
+          {/* The ring is the sentence that used to sit under the grid. */}
+          <motion.div variants={fadeInUp}>
+            <LoopCycle beats={OPERATING_LOOP} />
+          </motion.div>
         </motion.div>
       </Section>
 

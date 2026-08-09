@@ -89,7 +89,7 @@ export const TERRITORIES: Territory[] = [
     body: "You are affected by the conversations that surround you, the standards your people hold, whether your life contains real challenge, and whether you ever spend uninterrupted days in nature. Retreats and the mastermind are the social expression of the same philosophy.",
     domains: [
       "Small-group masterminds",
-      "Retreats in Puerto Rico",
+      "Retreats somewhere quiet",
       "Uninterrupted time in nature",
       "Shared standards",
       "Real challenge",

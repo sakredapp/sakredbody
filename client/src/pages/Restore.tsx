@@ -7,6 +7,7 @@ import { Section } from "@/components/Section";
 import { PageHero, SectionHeader } from "@/components/PageHero";
 import { FlowField } from "@/components/FlowField";
 import { Deck } from "@/components/Deck";
+import { FlipCards } from "@/components/FlipCards";
 import { Button } from "@/components/ui/button";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
@@ -82,19 +83,9 @@ export default function Restore() {
             />
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-x-12 gap-y-14 max-w-4xl mx-auto">
-            {BURDENS.map((b, i) => (
-              <motion.div variants={fadeInUp} key={b.title}>
-                <div
-                  className="h-full pt-8 border-t border-border text-center"
-                  data-testid={`card-burden-${i}`}
-                >
-                  <h3 className="font-display text-xl mb-3">{b.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{b.body}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          <motion.div variants={fadeInUp}>
+            <FlipCards testId="flip-burdens" columns={4} cards={BURDENS} />
+          </motion.div>
         </motion.div>
       </Section>
 
@@ -110,16 +101,19 @@ export default function Restore() {
             />
           </motion.div>
 
-          <div className="max-w-3xl mx-auto space-y-px bg-border border border-border rounded-lg overflow-hidden">
-            {ORDER.map((o, i) => (
-              <motion.div variants={fadeInUp} key={o.step}>
-                <div className="bg-card p-7 text-center" data-testid={`row-order-${i}`}>
-                  <h3 className="font-display text-2xl mt-2 mb-3">{o.step}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed max-w-xl mx-auto">{o.body}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          {/* Numbered, because here the number is the argument. This is the one
+              place on the site where a step's position is the content. */}
+          <motion.div variants={fadeInUp}>
+            <FlipCards
+              testId="flip-order"
+              columns={4}
+              cards={ORDER.map((o, i) => ({
+                title: o.step,
+                body: o.body,
+                meta: `Step ${i + 1}`,
+              }))}
+            />
+          </motion.div>
 
           <motion.p
             variants={fadeInUp}

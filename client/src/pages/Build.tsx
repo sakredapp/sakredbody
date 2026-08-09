@@ -6,6 +6,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { PageHero, SectionHeader } from "@/components/PageHero";
 import { EmberField } from "@/components/EmberField";
+import { CapacityRadar } from "@/components/CapacityRadar";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { usePageMeta } from "@/hooks/use-page-meta";
@@ -81,28 +82,21 @@ export default function Build() {
             className="text-3xl md:text-5xl font-display font-normal mb-8 leading-tight"
             data-testid="text-argument-headline"
           >
-            Strength is what a healthy organism
+            Health should become
             <br />
-            <span className="text-gold">is supposed to be able to express.</span>
+            <span className="text-gold">something you can do.</span>
           </motion.h2>
           <motion.div variants={fadeInUp} className="space-y-5 text-muted-foreground leading-relaxed text-base md:text-lg">
             <p>
-              Ask most health philosophies what a successful outcome looks like and you get a negative: no
-              disease, no inflammation, no symptoms, no toxins. All absence. Nothing you could point at and
-              say <em>that</em> — that's what it was for.
+              Ask most health philosophies what success looks like and you get a negative: no disease, no
+              inflammation, no symptoms. All absence. Nothing you could point at and say <em>that</em> —
+              that's what it was for.
             </p>
             <p className="text-foreground">
-              We think the outcome should be positive and physical. You can carry your own weight. You can
-              pick up something heavy without negotiating with your back. You can run for a train, work a
-              long day, sleep, and do it again. You can take a hit and get up.
-            </p>
-            <p>
-              That's not bodybuilding and it isn't aesthetics. It's competence — the physical form of being
-              able to participate in your own life instead of managing it from a distance.
-            </p>
-            <p className="text-foreground">
-              And it's the honest end of the arc that Restore begins. Clearing the terrain was never the
-              point. It was clearing the terrain <em>so that something could be built on it.</em>
+              We think it should be positive and physical. You can carry your own weight, work a long day,
+              sleep, and do it again. That's competence, not aesthetics — and it's the honest end of the arc
+              Restore begins. Clearing the terrain was never the point. It was clearing the terrain{" "}
+              <em>so that something could be built on it.</em>
             </p>
           </motion.div>
         </motion.div>
@@ -115,24 +109,14 @@ export default function Build() {
             <SectionHeader
               eyebrow="The Qualities"
               title={<>What We Build</>}
-              intro="Six qualities. One principle each."
+              intro="Capacity is the area they enclose, not the length of any one spoke."
               testId="text-pillars-headline"
             />
           </motion.div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-14">
-            {PILLARS.map((p, i) => (
-              <motion.div variants={fadeInUp} key={p.name}>
-                <div
-                  className="h-full pt-8 border-t border-border text-center flex flex-col"
-                  data-testid={`card-pillar-${i}`}
-                >
-                  <h3 className="font-display text-2xl mb-3">{p.name}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{p.body}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          <motion.div variants={fadeInUp}>
+            <CapacityRadar qualities={PILLARS.map((p) => ({ name: p.name, body: p.body }))} />
+          </motion.div>
         </motion.div>
       </Section>
 

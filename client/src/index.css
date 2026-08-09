@@ -599,6 +599,18 @@
   }
 
   /*
+   * A snapping rail should read as one object, not as a scrolled pane. The
+   * bar is the only thing that gives it away on a trackpad Mac.
+   */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /*
    * Kill the 300ms tap highlight and the blue flash. Both read as "web page"
    * instantly on iOS.
    */
