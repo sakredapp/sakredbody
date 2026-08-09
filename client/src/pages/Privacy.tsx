@@ -31,9 +31,14 @@ const SECTIONS: LegalSection[] = [
     body: (
       <>
         <p>
-          Sakred Body is a health education, coaching and retreat service operated by Sakred Health
-          ("Sakred Body", "we", "us"). This policy covers the Sakred Body website, the member portal at
-          app.sakredbody.com, and the Sakred Body mobile applications for iOS and Android.
+          <strong>Sakred Body</strong> is a registered trade name — a DBA — of{" "}
+          <strong>Sakred Health</strong>, the legal entity behind it ("we", "us"). Naming both matters
+          here: the company that holds your data and answers for it is Sakred Health, and the product
+          you signed up to is Sakred Body.
+        </p>
+        <p>
+          This policy covers the Sakred Body website, the member portal at app.sakredbody.com, and the
+          Sakred Body mobile applications for iOS and Android.
         </p>
         <p>
           For anything in this policy, or to exercise any right described in it, write to{" "}

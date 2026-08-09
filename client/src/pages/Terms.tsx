@@ -19,9 +19,12 @@ const SECTIONS: LegalSection[] = [
     body: (
       <>
         <p>
-          These terms govern your use of the Sakred Body website, the member portal, the mobile
-          applications, and any coaching, mastermind or retreat we provide (together, "the service"),
-          operated by Sakred Health ("Sakred Body", "we", "us").
+          <strong>Sakred Body</strong> is a registered trade name — a DBA — of{" "}
+          <strong>Sakred Health</strong> ("we", "us"), which is the contracting party under these terms.
+        </p>
+        <p>
+          They govern your use of the Sakred Body website, the member portal, the mobile applications,
+          and any coaching, mastermind or retreat we provide (together, "the service").
         </p>
         <p>
           By creating an account, applying, or attending anything we run, you agree to these terms. If
