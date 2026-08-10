@@ -84,8 +84,18 @@ const DEFAULTS: Record<string, Partial<Row>> = {
   tissue: { pattern: "tissue", equipment: "other", tracking: "duration", load: false },
   breath: { pattern: "breath", equipment: "bodyweight", tracking: "duration", load: false },
   recovery: { pattern: "recovery", equipment: "bodyweight", tracking: "duration", load: false },
+  // Studio work. Resistance here is a spring, a band or the body against a
+  // slow tempo — never a plate — so `load` is false throughout and the weight
+  // box never appears. Lagree is timed rather than counted because that is how
+  // it is actually taught: stay on the carriage until the minute is up.
+  pilates: { pattern: "core", equipment: "mat", tracking: "reps", load: false },
+  lagree: { pattern: "core", equipment: "megaformer", tracking: "duration", load: false },
+  barre: { pattern: "core", equipment: "barre", tracking: "reps", load: false },
   // A session, not a movement. See the note on PRACTICES below.
   practice: { pattern: "flow", equipment: "bodyweight", tracking: "duration", load: false },
+  class: { pattern: "flow", equipment: "other", tracking: "duration", load: false },
+  sport: { pattern: "sport", equipment: "other", tracking: "duration", load: false },
+  endurance: { pattern: "conditioning", equipment: "other", tracking: "duration", load: false },
 };
 
 const N = (name: string, extra: Partial<Row> = {}) => ({ name, ...extra });
@@ -488,13 +498,14 @@ const CATALOGUE: Record<string, Partial<Row>[]> = {
     N("Deceleration Drill"), N("Backward Running", { tracking: "distance" }),
     N("Footwork Drill"), N("Reaction Drill"),
   ],
+  // Drill-level running. Walking, hiking, rucking, cycling and swimming used
+  // to sit here too and have moved to `endurance` below, where they are what
+  // they actually are — a session with a duration, not a movement with sets.
   locomotion: [
-    N("Walking", { aliases: ["walk"] }), N("Hiking"), N("Rucking", { equipment: "other" }),
-    N("Jogging"), N("Sprinting", { aliases: ["sprints"] }),
+    N("Sprinting", { aliases: ["sprints"] }),
     N("Acceleration Sprint"), N("Flying Sprint"), N("Hill Sprint"),
     N("Resisted Sprint", { equipment: "sled" }),
-    N("Stair Climbing"), N("Cycling", { aliases: ["bike"] }),
-    N("Swimming", { aliases: ["swim"] }), N("Skipping"),
+    N("Stair Climbing"), N("Skipping"),
   ],
   ground: [
     N("Leopard Crawl"), N("Ape"), N("Beast Hold"), N("Beast Reach"),
@@ -511,6 +522,109 @@ const CATALOGUE: Record<string, Partial<Row>[]> = {
     N("Freeform Movement"), N("Constructive Rest"), N("Elastic Pulsing"),
     N("Oscillatory Squat"), N("Multi-Planar Bouncing"),
   ],
+  /**
+   * ── Pilates, on the mat and on the apparatus ──────────────────────────
+   *
+   * Here so a Sakred-programmed sequence can name the actual work — "Short
+   * Spine, then Long Stretch, then Knee Stretches" — and a member following
+   * one can tick it off. Nobody in a class logs these, and nobody should:
+   * that is what `Reformer Pilates — 45 min` in the practices below is for.
+   *
+   * Reps rather than duration because Pilates is counted in the room ("ten
+   * more, five, four…"), and no load at all: the resistance is a spring, and
+   * springs are named by colour, not kilograms. A kilogram box on Short Spine
+   * would be the same mistake as one on a couch stretch.
+   */
+  pilates: [
+    // Mat — the classical order, which is the order it is taught in.
+    N("Pilates Hundred", { aliases: ["hundred"] }),
+    N("Roll-Up"), N("Roll-Over"), N("Rolling Like a Ball"),
+    N("Single-Leg Stretch", { uni: true }), N("Double-Leg Stretch"),
+    N("Single Straight-Leg Stretch", { uni: true, aliases: ["scissors"] }),
+    N("Criss-Cross", { aliases: ["bicycle"] }),
+    N("Spine Stretch Forward"), N("Open-Leg Rocker"), N("Corkscrew"),
+    N("Saw"), N("Swan"), N("Single-Leg Kick", { uni: true }), N("Double-Leg Kick"),
+    N("Neck Pull"), N("Shoulder Bridge"), N("Spine Twist"),
+    N("Teaser"), N("Pilates Swimming"), N("Leg Pull Front"), N("Leg Pull Back"),
+    N("Side-Kick Series", { uni: true }), N("Pilates Leg Circles", { uni: true }),
+    N("Mermaid", { uni: true }), N("Boomerang"), N("Seal"),
+    N("Pilates Push-Up"), N("Pilates Plank Series", { tracking: "duration" }),
+    N("Pilates Ring Squeeze", { equipment: "ring", aliases: ["magic circle"] }),
+    N("Pilates Ring Arm Press", { equipment: "ring" }),
+
+    // Reformer.
+    N("Reformer Footwork", { equipment: "reformer", aliases: ["footwork"] }),
+    N("Reformer Hundred", { equipment: "reformer" }),
+    N("Reformer Leg Circles", { equipment: "reformer" }),
+    N("Reformer Frog", { equipment: "reformer" }),
+    N("Reformer Short Spine", { equipment: "reformer" }),
+    N("Reformer Long Spine", { equipment: "reformer" }),
+    N("Reformer Coordination", { equipment: "reformer" }),
+    N("Reformer Rowing", { equipment: "reformer" }),
+    N("Reformer Arm Series", { equipment: "reformer" }),
+    N("Reformer Pulling Straps", { equipment: "reformer" }),
+    N("Reformer Long Box Backstroke", { equipment: "reformer" }),
+    N("Reformer Short Box Series", { equipment: "reformer" }),
+    N("Reformer Stomach Massage", { equipment: "reformer" }),
+    N("Reformer Long Stretch", { equipment: "reformer" }),
+    N("Reformer Down Stretch", { equipment: "reformer" }),
+    N("Reformer Up Stretch", { equipment: "reformer" }),
+    N("Reformer Elephant", { equipment: "reformer" }),
+    N("Reformer Knee Stretches", { equipment: "reformer" }),
+    N("Reformer Scooter", { equipment: "reformer", uni: true }),
+    N("Reformer Lunge", { equipment: "reformer", uni: true, aliases: ["reformer lunges"] }),
+    N("Reformer Side Splits", { equipment: "reformer" }),
+    N("Reformer Front Splits", { equipment: "reformer", uni: true }),
+    N("Reformer Mermaid", { equipment: "reformer", uni: true }),
+    N("Reformer Semi-Circle", { equipment: "reformer" }),
+    N("Reformer Tendon Stretch", { equipment: "reformer" }),
+    N("Reformer Snake & Twist", { equipment: "reformer" }),
+
+    // Cadillac / Trapeze, Chair, Spine Corrector, Barrel.
+    N("Cadillac Roll-Down", { equipment: "cadillac", aliases: ["trapeze table"] }),
+    N("Cadillac Leg Springs", { equipment: "cadillac" }),
+    N("Cadillac Arm Springs", { equipment: "cadillac" }),
+    N("Cadillac Push-Through Bar", { equipment: "cadillac" }),
+    N("Cadillac Hanging Series", { equipment: "cadillac", tracking: "duration" }),
+    N("Chair Pumping", { equipment: "chair", aliases: ["wunda chair"] }),
+    N("Chair Push-Down", { equipment: "chair" }),
+    N("Chair Step-Up", { equipment: "chair", uni: true }),
+    N("Chair Mountain Climber", { equipment: "chair", uni: true }),
+    N("Chair Teaser", { equipment: "chair" }),
+    N("Spine Corrector Arc", { equipment: "spine corrector" }),
+    N("Ladder Barrel Swan", { equipment: "barrel" }),
+  ],
+
+  /**
+   * Lagree. Timed, not counted — the whole method is slow tempo under constant
+   * tension, and a rep count would describe none of what makes it hard.
+   */
+  lagree: [
+    N("Lagree Bear", { aliases: ["bear"] }),
+    N("Lagree Wheelbarrow"), N("Lagree Pike"), N("Lagree Plank"),
+    N("Lagree Saw"), N("Lagree French Twist"), N("Lagree Catfish"),
+    N("Lagree Elevator Lunge", { uni: true }),
+    N("Lagree Giant Reverse Lunge", { uni: true }),
+    N("Lagree Super Lunge", { uni: true }),
+    N("Lagree Escalator", { uni: true }),
+    N("Lagree Skating"), N("Lagree Carriage Kick", { uni: true }),
+    N("Lagree Cobra"), N("Lagree Mermaid", { uni: true }),
+    N("Lagree Scrambled Eggs"), N("Lagree Spoon"),
+    N("Lagree Teaser"), N("Lagree Kneeling Kickback", { uni: true }),
+    N("Lagree Wheel Barrow to Bear"), N("Lagree Serve the Platter"),
+    N("Lagree Arm Series"), N("Lagree Oblique Series", { uni: true }),
+  ],
+
+  barre: [
+    N("Barre Plié Series"), N("Barre Relevé"), N("Barre Curtsy Pulse", { uni: true }),
+    N("Barre Attitude Lift", { uni: true }), N("Barre Arabesque Lift", { uni: true }),
+    N("Barre Grand Battement", { uni: true }), N("Barre Passé Balance", { uni: true, tracking: "duration" }),
+    N("Barre Chair Pose Pulse", { tracking: "duration" }),
+    N("Barre Thigh Dancing", { tracking: "duration" }),
+    N("Barre Seat Work"), N("Barre Ab Series"), N("Barre Port de Bras"),
+    N("Barre Fold-Over", { uni: true }), N("Barre Clamshell", { uni: true }),
+  ],
+
   corrective: [
     N("Chin Tuck"), N("Wall Angel"), N("Serratus Wall Slide"),
     N("Scapular Retraction"), N("Y-T-W Raises", { equipment: "dumbbell", load: true }),
@@ -523,23 +637,89 @@ const CATALOGUE: Record<string, Partial<Row>[]> = {
     N("Massage Gun", { equipment: "other" }), N("Mobility Stick", { equipment: "other" }),
   ],
   /**
-   * Session-level, not movement-level.
+   * ── Session-level, not movement-level ─────────────────────────────────
    *
-   * Somebody who does twenty minutes of yoga is not going to log seventeen
-   * separate poses, and an app that requires it is quietly saying that only
-   * countable gym sets are real training. These track duration and nothing
-   * else. Sport practice is deliberately generic for the same reason — nobody
-   * needs "basketball left-hand crossover drill" as a catalogue row.
+   * Everything from here down is one row and one number: minutes. See the
+   * note beside `isPracticeCategory` in the training model for why they share
+   * a table with the movements rather than living somewhere of their own.
+   *
+   * The test for whether something belongs here is not how hard it is or how
+   * structured it is — it is whether a person doing it has a free hand and a
+   * reason to reach for their phone between efforts. In a class, on a court,
+   * or forty minutes into a ride, they do not.
    */
   practice: [
     N("Yoga Flow"), N("Mobility Flow"), N("Fascial Flow"), N("Animal Flow"),
     N("Somatic Movement"), N("Dynamic Warm-Up"), N("Full-Body Stretch"),
     N("Upper-Body Mobility"), N("Lower-Body Mobility"), N("Hip Mobility"),
     N("Shoulder Mobility"), N("Spinal Mobility"), N("Recovery Session"),
-    N("Breathwork Session"), N("Rebounding Session"), N("Cooldown"),
-    N("Basketball Practice"), N("Soccer Practice"), N("Tennis Practice"),
-    N("Boxing Training"), N("Martial Arts"), N("Sports Practice"),
-    N("Custom Activity"),
+    N("Breathwork Session"), N("Rebounding Session"), N("Sauna"),
+    N("Cold Plunge"), N("Cooldown"), N("Custom Activity"),
+  ],
+
+  /**
+   * Taught in a room by somebody else, on somebody else's clock.
+   *
+   * `Reformer Pilates` sits here while `Reformer Short Spine` sits up in the
+   * studio movements, and that pair is the whole argument: the member who took
+   * the class logs one line, the member following a Sakred sequence logs the
+   * work. Neither is the more legitimate record of what happened.
+   */
+  class: [
+    N("Mat Pilates", { aliases: ["pilates class"] }),
+    N("Reformer Pilates", { equipment: "reformer", aliases: ["pilates reformer"] }),
+    N("Cadillac Session", { equipment: "cadillac" }),
+    N("Chair Session", { equipment: "chair" }),
+    N("Lagree", { equipment: "megaformer", aliases: ["megaformer", "lagree class"] }),
+    N("Barre Class", { equipment: "barre", aliases: ["barre"] }),
+    N("Yoga Class", { aliases: ["yoga"] }),
+    N("Vinyasa"), N("Hot Yoga", { aliases: ["bikram"] }), N("Yin Yoga"),
+    N("Hatha Yoga"), N("Power Yoga"), N("Ashtanga"), N("Restorative Yoga"),
+    N("Spin Class", { equipment: "machine", aliases: ["spin", "indoor cycling"] }),
+    N("HIIT Class"), N("Bootcamp"), N("CrossFit Class", { aliases: ["wod", "crossfit"] }),
+    N("Group Strength Class"), N("Aqua Fitness"),
+    N("Dance Class"), N("Ballet Class", { aliases: ["ballet"] }),
+    N("Contemporary Dance"), N("Reformer Sculpt"),
+  ],
+
+  /**
+   * Played, not performed. Basketball is Basketball and ninety minutes, and
+   * `Basketball Skills` exists for the member who genuinely wants to separate
+   * a shooting session from a scrimmage — most will not, and are not asked to.
+   */
+  sport: [
+    N("Basketball", { aliases: ["hoops", "ball"] }),
+    N("Basketball Skills"), N("Soccer", { aliases: ["football"] }),
+    N("Tennis"), N("Padel"), N("Pickleball"), N("Squash"), N("Badminton"),
+    N("Table Tennis"), N("Golf"), N("Volleyball"), N("Beach Volleyball"),
+    N("Baseball"), N("Softball"), N("American Football"), N("Rugby"),
+    N("Ice Hockey"), N("Field Hockey"), N("Lacrosse"), N("Cricket"),
+    N("Handball"), N("Ultimate Frisbee"), N("Water Polo"),
+    N("Boxing", { aliases: ["boxing training"] }), N("Kickboxing"),
+    N("Muay Thai"), N("Brazilian Jiu-Jitsu", { aliases: ["bjj", "jiu jitsu"] }),
+    N("Judo"), N("Wrestling"), N("Karate"), N("Taekwondo"),
+    N("Martial Arts"), N("MMA Training"), N("Fencing"),
+    N("Rock Climbing", { aliases: ["climbing"] }), N("Bouldering"),
+    N("Surfing"), N("Skateboarding"), N("Snowboarding"), N("Skiing"),
+    N("Cross-Country Skiing"), N("Mountain Biking"), N("Kayaking"),
+    N("Paddleboarding"), N("Sailing"), N("Horse Riding"),
+    N("Parkour"), N("Gymnastics Practice"), N("Track & Field"),
+    N("Sports Practice"), N("Pickup Game"),
+  ],
+
+  /**
+   * Distance is optional and duration is not, because the one number everybody
+   * has after a ride is how long they were out. A member who knows the miles
+   * can add them; nobody is stopped from logging a walk for want of a GPS.
+   */
+  endurance: [
+    N("Easy Run"), N("Long Run"), N("Tempo Run"), N("Interval Run"),
+    N("Trail Run"), N("Bike Ride", { aliases: ["cycling", "bike"] }),
+    N("Zone 2 Bike"), N("Long Ride"), N("Swim Session", { aliases: ["swim"] }),
+    N("Open-Water Swim"), N("Row Session", { equipment: "machine", aliases: ["erg"] }),
+    N("Hike", { aliases: ["hiking"] }), N("Ruck", { equipment: "other", aliases: ["rucking"] }),
+    N("Walk", { aliases: ["walking"] }), N("Conditioning Session"),
+    N("Zone 2 Session"), N("Sprint Session"),
   ],
 };
 

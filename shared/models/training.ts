@@ -223,6 +223,11 @@ export const EXERCISE_CATEGORIES = [
   { id: "corrective", label: "Corrective", group: "mobility" },
   { id: "yoga", label: "Yoga", group: "mobility" },
 
+  // ── Studio — controlled, spring-loaded, taught in classes ──
+  { id: "pilates", label: "Pilates & Reformer", group: "studio" },
+  { id: "lagree", label: "Lagree", group: "studio" },
+  { id: "barre", label: "Barre", group: "studio" },
+
   // ── Fascia — the reason this is not a lifting app ──
   { id: "fascia", label: "Fascia", group: "fascia" },
   { id: "somatic", label: "Somatic", group: "fascia" },
@@ -231,7 +236,10 @@ export const EXERCISE_CATEGORIES = [
   { id: "recovery", label: "Recovery", group: "fascia" },
 
   // ── Whole sessions ──
-  { id: "practice", label: "Practices", group: "practice" },
+  { id: "practice", label: "Flows", group: "practice" },
+  { id: "class", label: "Classes", group: "practice" },
+  { id: "sport", label: "Sports", group: "practice" },
+  { id: "endurance", label: "Endurance", group: "practice" },
   { id: "full_body", label: "Full body", group: "practice" },
 ] as const;
 
@@ -249,11 +257,42 @@ export const EXERCISE_GROUPS = [
   { id: "strength", label: "Strength" },
   { id: "athletic", label: "Athletic" },
   { id: "mobility", label: "Mobility" },
+  { id: "studio", label: "Studio" },
   { id: "fascia", label: "Fascia & recovery" },
   { id: "practice", label: "Practices" },
 ] as const;
 
 export type ExerciseGroup = (typeof EXERCISE_GROUPS)[number]["id"];
+
+/**
+ * ── The distinction that stops this being a bodybuilding app ──────────────
+ *
+ * Somebody who takes a 50-minute Lagree class did not do "3 × 12 Lagree Bear
+ * followed by 3 × 12 Wheelbarrow". They did Lagree, for fifty minutes. An app
+ * that will only accept the first version is quietly saying that countable gym
+ * sets are the only real training — and it is also just wrong about what
+ * happened, because nobody in a class is holding a phone.
+ *
+ * So the catalogue holds both. `Reformer Footwork` is a movement: a Sakred
+ * sequence can prescribe it, and a member following one can log it. `Reformer
+ * Pilates` is a practice: one row, one number, minutes. The same is true of
+ * Basketball, a bike ride, a yoga class and a BJJ session.
+ *
+ * They live in one table because everything downstream — history, the coach's
+ * view, weekly load, what the member has and has not touched lately — wants
+ * one list of what a person did, not two that have to be merged at every read.
+ * The only thing that differs is how it is entered, which is what this asks.
+ *
+ * Derived from the group rather than stored as a column: the group already
+ * says it, and a second source of truth is a second thing to keep in sync.
+ */
+export function isPracticeCategory(category: string): boolean {
+  return PRACTICE_CATEGORIES.has(category);
+}
+
+const PRACTICE_CATEGORIES: ReadonlySet<string> = new Set(
+  EXERCISE_CATEGORIES.filter((c) => c.group === "practice").map((c) => c.id as string),
+);
 
 export type ExerciseCategory = (typeof EXERCISE_CATEGORIES)[number]["id"];
 export const exerciseCategoryEnum = z.enum(

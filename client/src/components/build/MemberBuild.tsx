@@ -21,7 +21,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Dumbbell, Plus, Play, Pencil, Trash2, X, GripVertical } from "lucide-react";
+import { Dumbbell, Plus, Play, Pencil, Trash2, X, GripVertical, Clock } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Panel } from "@/components/portal/Panel";
 import { MovementPicker, type Movement } from "./MovementPicker";
+import { LogPractice } from "./LogPractice";
 import { cn } from "@/lib/utils";
 
 type SavedExercise = {
@@ -65,6 +66,7 @@ export function MemberBuild({ onStarted }: { onStarted: (sessionId: string, titl
   const { toast } = useToast();
   const qc = useQueryClient();
   const [building, setBuilding] = useState<SavedWorkout | "new" | null>(null);
+  const [logging, setLogging] = useState(false);
 
   const workouts = useQuery<SavedWorkout[]>({ queryKey: ["/api/training/workouts"] });
 
@@ -91,10 +93,16 @@ export function MemberBuild({ onStarted }: { onStarted: (sessionId: string, titl
       <Panel title="Your own training">
         <div className="space-y-4">
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Log whatever you're doing — lifting, a yoga flow, mobility, a run. It all lands in
-            the same history your coach reads.
+            Log whatever you're doing — lifting, a Pilates class, basketball, a bike ride. It all
+            lands in the same history your coach reads.
           </p>
 
+          {/* ── Two doors, because there are two kinds of day ──
+              Counted work — sets, reps, load — needs a session you keep open
+              and add to. A class or a game does not: it already happened, and
+              the only thing to record is what and how long. Putting both
+              behind "Start a session" is how somebody who just did ninety
+              minutes of basketball ends up logging nothing at all. */}
           <div className="flex flex-wrap gap-2">
             <Button
               size="sm"
@@ -107,6 +115,15 @@ export function MemberBuild({ onStarted }: { onStarted: (sessionId: string, titl
             >
               <Play className="h-3.5 w-3.5 mr-1.5" />
               Start a session
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setLogging(true)}
+              data-testid="build-log-practice"
+            >
+              <Clock className="h-3.5 w-3.5 mr-1.5" />
+              Log an activity
             </Button>
             <Button
               size="sm"
@@ -175,6 +192,8 @@ export function MemberBuild({ onStarted }: { onStarted: (sessionId: string, titl
           )}
         </div>
       </Panel>
+
+      {logging && <LogPractice onClose={() => setLogging(false)} />}
 
       {building && (
         <WorkoutBuilder
@@ -286,6 +305,7 @@ function WorkoutBuilder({
         {picking ? (
           <div className="flex-1 min-h-0 flex flex-col">
             <MovementPicker
+              only="movements"
               picked={picked}
               onPick={add}
               onCreate={(n) => n && createMovement.mutate(n)}

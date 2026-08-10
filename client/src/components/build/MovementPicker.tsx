@@ -32,7 +32,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Search, Plus, X, Check } from "lucide-react";
-import { EXERCISE_CATEGORIES, EXERCISE_GROUPS } from "@shared/schema";
+import { EXERCISE_CATEGORIES, EXERCISE_GROUPS, isPracticeCategory } from "@shared/schema";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -78,12 +78,23 @@ export function MovementPicker({
   onClose,
   onCreate,
   picked,
+  only,
+  placeholder,
 }: {
   onPick: (m: Movement) => void;
   onClose?: () => void;
   onCreate?: (name: string) => void;
   /** Ids already in the workout, ticked rather than hidden. */
   picked?: Set<string>;
+  /**
+   * Which half of the catalogue this picker is for.
+   *
+   * A member adding movements to a workout has no use for `Basketball`, and a
+   * member logging what they did this evening has no use for `Barbell Row` —
+   * offering both is how a picker ends up feeling like a database.
+   */
+  only?: "practices" | "movements";
+  placeholder?: string;
 }) {
   const { data, isLoading } = useCatalogue();
   const [q, setQ] = useState("");
@@ -93,15 +104,31 @@ export function MovementPicker({
   // Built once per catalogue, not per keystroke.
   const indexed: Indexed[] = useMemo(
     () =>
-      (data ?? []).map((m) => ({
-        ...m,
-        _name: m.name.toLowerCase(),
-        _hay: `${m.name} ${(m.aliases ?? []).join(" ")} ${
-          CATEGORY_LABEL.get(m.category) ?? ""
-        } ${m.equipment}`.toLowerCase(),
-      })),
-    [data],
+      (data ?? [])
+        .filter((m) => (only ? isPracticeCategory(m.category) === (only === "practices") : true))
+        .map((m) => ({
+          ...m,
+          _name: m.name.toLowerCase(),
+          _hay: `${m.name} ${(m.aliases ?? []).join(" ")} ${
+            CATEGORY_LABEL.get(m.category) ?? ""
+          } ${m.equipment}`.toLowerCase(),
+        })),
+    [data, only],
   );
+
+  /**
+   * With the catalogue cut in half, one side may have a single group left —
+   * and a filter bar holding one chip is a chip that does nothing. When that
+   * happens the group is simply assumed and its categories take the top row.
+   */
+  const groups = useMemo(
+    () =>
+      EXERCISE_GROUPS.filter((g) =>
+        only ? (g.id === "practice") === (only === "practices") : true,
+      ),
+    [only],
+  );
+  const activeGroup = groups.length === 1 ? groups[0].id : group;
 
   const query = q.trim().toLowerCase();
 
@@ -109,7 +136,7 @@ export function MovementPicker({
     const scored: { row: Indexed; r: number }[] = [];
     for (const row of indexed) {
       if (category && row.category !== category) continue;
-      if (!category && group && GROUP_OF.get(row.category) !== group) continue;
+      if (!category && activeGroup && GROUP_OF.get(row.category) !== activeGroup) continue;
       const r = rank(row, query);
       if (r < 0) continue;
       scored.push({ row, r });
@@ -117,14 +144,16 @@ export function MovementPicker({
     scored.sort((a, b) => a.r - b.r || a.row.name.length - b.row.name.length);
     // Nobody scrolls past this many; the rest are reachable by typing more.
     return scored.slice(0, 80).map((s) => s.row);
-  }, [indexed, query, group, category]);
+  }, [indexed, query, activeGroup, category]);
 
   /** Categories worth showing: only those with something in them right now. */
   const categoriesInGroup = useMemo(() => {
-    if (!group) return [];
-    const present = new Set(indexed.filter((m) => GROUP_OF.get(m.category) === group).map((m) => m.category));
-    return EXERCISE_CATEGORIES.filter((c) => c.group === group && present.has(c.id));
-  }, [group, indexed]);
+    if (!activeGroup) return [];
+    const present = new Set(
+      indexed.filter((m) => GROUP_OF.get(m.category) === activeGroup).map((m) => m.category),
+    );
+    return EXERCISE_CATEGORIES.filter((c) => c.group === activeGroup && present.has(c.id));
+  }, [activeGroup, indexed]);
 
   return (
     <div className="flex flex-col gap-3 min-h-0">
@@ -135,7 +164,7 @@ export function MovementPicker({
           autoFocus
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search movements…"
+          placeholder={placeholder ?? "Search movements…"}
           className="pl-9 pr-9"
           data-testid="movement-search"
         />
@@ -154,8 +183,9 @@ export function MovementPicker({
           Five chips, not thirty-four. The second row appears only once a group
           is chosen, so the default state is calm. */}
       <div className="shrink-0 space-y-2">
+        {groups.length > 1 && (
         <div className="flex gap-1.5 overflow-x-auto scroll-touch pb-0.5 -mx-1 px-1">
-          {EXERCISE_GROUPS.map((g) => {
+          {groups.map((g) => {
             const on = group === g.id;
             return (
               <button
@@ -177,6 +207,7 @@ export function MovementPicker({
             );
           })}
         </div>
+        )}
 
         {categoriesInGroup.length > 1 && (
           <div className="flex gap-1.5 overflow-x-auto scroll-touch pb-0.5 -mx-1 px-1">

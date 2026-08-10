@@ -16,6 +16,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Check, X, Send } from "lucide-react";
+import { isPracticeCategory } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -108,9 +109,14 @@ export function FreeSession({
     const body: Record<string, unknown> = { exerciseId: b.movement.id, setIndex: ri + 1 };
 
     if (b.movement.trackingType === "duration") {
-      const secs = Number(r.seconds);
-      if (!secs) return toast({ title: "How long?", variant: "destructive" });
-      body.durationSeconds = secs;
+      // A hold is seconds and a class is minutes. Asking for "3000 secs" of
+      // Reformer Pilates is the kind of unit that gets typed wrong once and
+      // then sits in the history forever.
+      const entered = Number(r.seconds);
+      if (!entered) return toast({ title: "How long?", variant: "destructive" });
+      body.durationSeconds = isPracticeCategory(b.movement.category)
+        ? Math.round(entered * 60)
+        : entered;
     } else {
       const reps = Number(r.reps);
       if (!reps) return toast({ title: "How many reps?", variant: "destructive" });
@@ -121,7 +127,9 @@ export function FreeSession({
     await logSet.mutateAsync(body);
     patch(bi, ri, { logged: true });
     // A logged set almost always means another is coming; adding the next row
-    // saves a tap on every set of every workout.
+    // saves a tap on every set of every workout. A practice is the exception —
+    // nobody does a second forty-five-minute yoga class.
+    if (isPracticeCategory(b.movement.category)) return;
     setBlocks((prev) =>
       prev.map((blk, i) =>
         i === bi && ri === blk.rows.length - 1 ? { ...blk, rows: [...blk.rows, blank()] } : blk,
@@ -169,12 +177,16 @@ export function FreeSession({
                     <Input
                       type="number"
                       inputMode="numeric"
-                      placeholder="secs"
+                      placeholder={isPracticeCategory(b.movement.category) ? "mins" : "secs"}
                       value={r.seconds}
                       onChange={(e) => patch(bi, ri, { seconds: e.target.value })}
                       disabled={r.logged}
                       className="h-9 text-sm"
-                      aria-label={`Seconds, set ${ri + 1}`}
+                      aria-label={
+                        isPracticeCategory(b.movement.category)
+                          ? `Minutes, set ${ri + 1}`
+                          : `Seconds, set ${ri + 1}`
+                      }
                     />
                   ) : (
                     <Input
