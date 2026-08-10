@@ -86,6 +86,8 @@ import { BuildTab } from "@/components/BuildTab";
 import { SettingsTab } from "@/components/SettingsTab";
 import { useHealthAutoSync } from "@/hooks/use-health";
 import { HealthConnectPrompt } from "@/components/portal/HealthConnectPrompt";
+import { useEffect } from "react";
+import { scheduleMorningNotice } from "@/lib/morningNotice";
 
 // Icon mapping (UI-only, can't live in shared/)
 const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -214,6 +216,13 @@ export default function MemberDashboard() {
   // dashboard root rather than on the Stats tab: a member who never opens
   // Stats should still have their data current when their coach looks.
   useHealthAutoSync();
+
+  // Rewrite the next few mornings' banners on every open, so what they say
+  // stays true. The fixed ids mean this replaces rather than accumulates, and
+  // it no-ops entirely if the member never granted notifications.
+  useEffect(() => {
+    void scheduleMorningNotice();
+  }, []);
 
   const [bookingStep, setBookingStep] = useState<"choose-type" | "configure">("choose-type");
   const [retreatType, setRetreatType] = useState<"private" | "shared">("shared");

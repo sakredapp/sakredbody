@@ -889,5 +889,80 @@ check("the modal does not reopen once connected", /connected/.test(PROMPT_SRC));
 check("declining is remembered", /snooze\(\)/.test(PROMPT_SRC));
 
 
+
+// ── 15. The morning banner ─────────────────────────────────────────────────
+section("Morning notification");
+
+const { morningBody, morningDates } = await import("../client/src/lib/morningNoticeContent.js");
+
+/**
+ * A notification that says "Open Sakred Body" is an advert for an app the
+ * member already installed. Every rule here is about it carrying something
+ * they could not have guessed, or not firing.
+ */
+const withRoutine = morningBody(
+  { routine: { name: "Liver Clear" }, dayNumber: 3 } as never,
+  5,
+  1
+);
+check("an active protocol names itself", withRoutine?.title === "Day 4 — Liver Clear", withRoutine?.title);
+check("the day number advances for tomorrow", /Day 4/.test(withRoutine?.title ?? ""));
+check("the practices are counted", withRoutine?.body === "5 practices today.", withRoutine?.body);
+
+const oneHabit = morningBody({ routine: { name: "Liver Clear" }, dayNumber: 1 } as never, 1, 1);
+check("one practice is singular", /1 practice today/.test(oneHabit?.body ?? ""), oneHabit?.body);
+
+const noRoutine = morningBody(null, 3, 1);
+check("without a protocol it still counts practices", noRoutine?.title === "Today's practice");
+check("and says how many", /3 practices waiting/.test(noRoutine?.body ?? ""), noRoutine?.body);
+
+/**
+ * The important one. A member with nothing assigned gets nothing — telling
+ * someone "0 practices today" every morning is how an app earns a permanent
+ * "off" in Settings.
+ */
+check("nothing assigned means no banner at all", morningBody(null, 0, 1) === null);
+
+const routineOnly = morningBody({ routine: { name: "Reset" }, dayNumber: 9 } as never, 0, 1);
+check("a protocol with no practices still has something to say", routineOnly !== null);
+check("and does not claim practices it does not have", !/0 practice/.test(routineOnly?.body ?? ""));
+
+/** Scheduling advances a day at a time, at a fixed local hour. */
+const from = new Date(2026, 7, 10, 22, 30);
+const dates = morningDates(from, 5);
+check("five mornings are scheduled", dates.length === 5);
+check("the first is tomorrow", dates[0].getDate() === 11, String(dates[0]));
+check("at 07:00 local", dates[0].getHours() === 7 && dates[0].getMinutes() === 0);
+check("they are consecutive", dates[4].getDate() === 15, String(dates[4]));
+check(
+  "scheduling from late at night does not fire the same night",
+  dates[0].getTime() > from.getTime()
+);
+
+/** Re-scheduling must replace, not stack. */
+const NOTICE_SRC = readFileSync("client/src/lib/morningNotice.ts", "utf8");
+const NOTICE_CONTENT_SRC = readFileSync("client/src/lib/morningNoticeContent.ts", "utf8");
+check(
+  "ids are fixed so re-scheduling replaces",
+  /NOTIFICATION_ID\s*=\s*\d+/.test(NOTICE_CONTENT_SRC)
+);
+check("previous ones are cancelled first", /LocalNotifications\.cancel/.test(NOTICE_SRC));
+/**
+ * scheduleMorningNotice runs on every app open, so it must never raise the
+ * system permission dialog — an unexplained prompt on launch is the one people
+ * refuse, and on iOS a refusal cannot be re-asked in-app.
+ */
+const scheduler = NOTICE_SRC.slice(
+  NOTICE_SRC.indexOf("export async function scheduleMorningNotice"),
+  NOTICE_SRC.indexOf("export async function requestMorningNotice")
+);
+check("the scheduler checks permission", /checkPermissions/.test(scheduler));
+check("the scheduler never requests it", !/requestPermissions/.test(scheduler));
+check(
+  "requesting is its own function, called from Settings",
+  /export async function requestMorningNotice/.test(NOTICE_SRC)
+);
+
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
