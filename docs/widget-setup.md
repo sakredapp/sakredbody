@@ -34,10 +34,22 @@ says "Not synced today" rather than quietly showing an old number.
 Xcode → **File → New → Target…** → **Widget Extension** → Next.
 
 - Product Name: **`SakredWidget`**
-- Team: your team
-- **Uncheck** "Include Configuration Intent" — the widget takes no options, and
-  the intent variant generates a second file this code does not use.
-- **Uncheck** "Include Live Activity"
+- Team: your team (NATI GLOBAL INCORPORATED)
+- **Uncheck all three checkboxes.** They are all ticked by default, and the
+  set of them varies by Xcode version — at time of writing: **Include Live
+  Activity**, **Include Control**, **Include Configuration App Intent**.
+
+  Each generates source declaring its own entry point, and the widget below
+  declares its own `@main`. Leaving any of them on produces "Invalid
+  redeclaration of 'main'", which reads as a problem with the pasted file
+  rather than with a checkbox two dialogs ago.
+
+  If a future Xcode adds a fourth option here, the rule is the same: this
+  widget takes no configuration, shows no Live Activity and provides no
+  Control, so nothing in that list should be ticked.
+- Leave **Project: App** and **Embed in Application: App** as they are.
+- Bundle Identifier should read `com.sakredbody.app.SakredWidget` — derived, not
+  typed. If it says anything else, the Product Name is wrong.
 - Finish. When Xcode offers to activate the new scheme, click **Activate**.
 
 ### 2. Replace the generated source
