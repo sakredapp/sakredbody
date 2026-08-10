@@ -1,0 +1,57 @@
+// Versions deliberately match @capgo/capacitor-health's own build.gradle.
+// Two Health Connect clients or two Kotlin stdlibs at different versions in
+// one APK is a duplicate-class failure at merge time, and the error names the
+// class rather than the mismatch.
+ext {
+    kotlinVersion = project.hasProperty('kotlinVersion') ? rootProject.ext.kotlinVersion : '2.4.10'
+}
+
+buildscript {
+    ext.kotlin_version = '2.4.10'
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.13.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'org.jetbrains.kotlin.android'
+
+android {
+    namespace "com.sakredbody.healthsync"
+    compileSdk project.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 36
+    defaultConfig {
+        // Health Connect's floor. The app module is raised to match in
+        // android/variables.gradle — a library minSdk above the application's
+        // is a manifest-merger failure, not a warning.
+        minSdk 26
+        targetSdk project.hasProperty('targetSdkVersion') ? rootProject.ext.targetSdkVersion : 36
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+    kotlinOptions {
+        jvmTarget = '21'
+    }
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+dependencies {
+    implementation project(':capacitor-android')
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    implementation 'androidx.health.connect:connect-client:1.1.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0'
+    // WorkManager, not AlarmManager or a foreground service. It is the only
+    // scheduler that survives reboot and Doze without asking the member to
+    // exempt the app from battery optimisation.
+    implementation 'androidx.work:work-runtime-ktx:2.10.0'
+}

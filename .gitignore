@@ -10,3 +10,6 @@ vite.config.ts.*
 .vercel
 # drizzle-kit scratch output (schema is managed via db:push / supabase/*.sql)
 migrations/
+
+# Xcode per-user state inside the local plugin — machine-specific, not shared.
+plugins/**/.swiftpm/

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Reading Health Connect while the app is not in the foreground.
+         Separate from the per-type read grants and separately refusable: a
+         member can allow us to read their sleep and still decline to let us do
+         it in the background, so every run has to tolerate this being absent.
+
+         Google requires this to be justified on its own line in the Health
+         apps declaration form. Ours: the app reads a daily summary shortly
+         after a wearable writes it, so a coach sees last night's sleep without
+         the member having to remember to open the app. -->
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" />
+
+</manifest>

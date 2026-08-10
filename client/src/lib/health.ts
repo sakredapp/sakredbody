@@ -106,6 +106,75 @@ export async function requestHealthAccess(): Promise<{
   };
 }
 
+/**
+ * Hand the native side what it needs to post on its own.
+ *
+ * Called on every sync rather than once at connect time, because the token
+ * rotates. A background worker holding a token from ninety days ago posts into
+ * a 401 forever, and the only symptom is data quietly stopping — so the cheap
+ * refresh on every foreground sync is worth more than the call it costs.
+ *
+ * The token is passed in rather than read by the native code out of Capacitor
+ * Preferences' own storage: that key is the Preferences plugin's private
+ * contract, and a rename in one of its releases would break background sync
+ * silently on an app that still compiles.
+ */
+export async function configureBackgroundSync(): Promise<boolean> {
+  if (!healthPlatform()) return false;
+  try {
+    const [{ HealthSync }, { apiOrigin }, { getAuthToken }] = await Promise.all([
+      import("@sakred/health-sync"),
+      import("./apiBase"),
+      import("./apiFetch"),
+    ]);
+    const token = await getAuthToken();
+    await HealthSync.configure({
+      apiOrigin,
+      token,
+      overlapDays: FALLBACK_OVERLAP_DAYS,
+    });
+    return true;
+  } catch (err) {
+    console.warn("[health] background configure failed", err);
+    return false;
+  }
+}
+
+export async function enableBackgroundSync(): Promise<{ enabled: boolean; reason?: string }> {
+  if (!healthPlatform()) return { enabled: false, reason: "web" };
+  try {
+    await configureBackgroundSync();
+    const { HealthSync } = await import("@sakred/health-sync");
+    return await HealthSync.enableBackgroundSync();
+  } catch (err) {
+    return { enabled: false, reason: errText(err) };
+  }
+}
+
+export async function disableBackgroundSync(): Promise<void> {
+  if (!healthPlatform()) return;
+  try {
+    const { HealthSync } = await import("@sakred/health-sync");
+    await HealthSync.disableBackgroundSync();
+  } catch {
+    // Nothing to undo if it was never enabled.
+  }
+}
+
+export async function backgroundSyncStatus(): Promise<{
+  enabled: boolean;
+  lastRunAt: string | null;
+  lastResult: string | null;
+}> {
+  if (!healthPlatform()) return { enabled: false, lastRunAt: null, lastResult: null };
+  try {
+    const { HealthSync } = await import("@sakred/health-sync");
+    return await HealthSync.status();
+  } catch {
+    return { enabled: false, lastRunAt: null, lastResult: null };
+  }
+}
+
 /** Android only — deep link into Health Connect so a member can change grants. */
 export async function openHealthSettings(): Promise<void> {
   const p = await plugin();
@@ -165,6 +234,10 @@ export async function syncHealth(): Promise<SyncResult> {
     // unique index makes re-sending a day free, so the wrong guess here costs
     // bandwidth and never correctness.
   }
+
+  // Keep the background worker's token current. Deliberately not awaited —
+  // a slow bridge call should not delay the read the member is waiting on.
+  void configureBackgroundSync();
 
   const end = new Date();
   const start = new Date(end);

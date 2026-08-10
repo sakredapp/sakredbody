@@ -1,0 +1,26 @@
+{
+  "name": "@sakred/health-sync",
+  "version": "1.0.0",
+  "description": "Background health sync \u2014 wakes on new HealthKit / Health Connect data and posts it without the app being open.",
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "type": "module",
+  "files": [
+    "Package.swift",
+    "src/",
+    "ios/",
+    "android/",
+    "SakredHealthSync.podspec"
+  ],
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    },
+    "android": {
+      "src": "android"
+    }
+  },
+  "peerDependencies": {
+    "@capacitor/core": ">=8.0.0"
+  }
+}

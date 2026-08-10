@@ -18,5 +18,18 @@
 	     in a far stricter review category for nothing. -->
 	<key>com.apple.developer.healthkit.access</key>
 	<array/>
+
+	<!-- Wakes the app when new health data is written, so last night's sleep is
+	     in the database before the member opens anything. Without it
+	     enableBackgroundDelivery returns an error and the observers only ever
+	     fire while the app is already in the foreground — which is the state
+	     the foreground sync already covers, so the failure looks like nothing
+	     happening rather than like an error.
+
+	     In Xcode this is the "Background Delivery" checkbox under the HealthKit
+	     capability. Ticking it there regenerates the provisioning profile; the
+	     key below is what actually ships. -->
+	<key>com.apple.developer.healthkit.background-delivery</key>
+	<true/>
 </dict>
 </plist>

@@ -9,7 +9,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { healthAvailability, healthPlatform, requestHealthAccess, syncHealth } from "@/lib/health";
+import {
+  disableBackgroundSync,
+  enableBackgroundSync,
+  healthAvailability,
+  healthPlatform,
+  requestHealthAccess,
+  syncHealth,
+} from "@/lib/health";
 import type { SyncResult } from "@/lib/health";
 import type { HealthMetric, HealthWorkout } from "@shared/schema";
 
@@ -98,7 +105,12 @@ export function useHealthSync() {
   const connect = useMutation<SyncResult>({
     mutationFn: async () => {
       await requestHealthAccess();
-      return syncHealth();
+      const result = await syncHealth();
+      // Enabled after the first sync, not before it. Registering observers
+      // against types the member just declined is how an app ends up woken
+      // repeatedly to post nothing.
+      await enableBackgroundSync();
+      return result;
     },
     onSuccess: invalidate,
   });
@@ -110,6 +122,10 @@ export function useHealthSync() {
 
   const disconnect = useMutation({
     mutationFn: async () => {
+      // Stop the background worker FIRST. Deleting the rows while a run is
+      // still scheduled means the next wake re-posts the same week, and the
+      // member watches the data they just deleted come back.
+      await disableBackgroundSync();
       const res = await apiRequest("DELETE", "/api/health/connection");
       return res.json();
     },
@@ -122,8 +138,11 @@ export function useHealthSync() {
 /**
  * Sync whenever the app becomes active, at most every SYNC_MIN_MS.
  *
- * Neither plugin path gives us background delivery, so "the app became active"
- * is the only moment we have — which makes it worth listening for properly.
+ * This is no longer the only moment we sync — @sakred/health-sync posts from a
+ * background wake as well — but it is still the one that matters most, because
+ * it is the only one guaranteed to happen. iOS coalesces background delivery
+ * and Android's worker runs when Doze permits, so the foreground path is what
+ * makes the numbers current at the moment a member is actually looking.
  *
  * Two listeners, not one, because they are not the same event:
  *

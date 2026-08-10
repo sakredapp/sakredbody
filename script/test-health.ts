@@ -369,5 +369,106 @@ check(
   routes.includes(".delete(healthDays)") && routes.includes(".delete(healthWorkouts)")
 );
 
+// ── 8. The native background implementations ──────────────────────────────
+section("Background sync (native)");
+
+/**
+ * The unit table now exists three times: TypeScript, Swift and Kotlin. That is
+ * the real cost of syncing from a background wake — the WebView is suspended,
+ * so the mapping has to be repeated in each native language.
+ *
+ * Three copies drift. These assertions are the thing that makes the drift loud
+ * instead of silent, because the failure mode is not a crash: a Swift table
+ * missing an entry falls back to "count", the server rejects the sample for a
+ * unit mismatch, and the member simply never sees that metric.
+ */
+const swift = readFileSync("plugins/health-sync/ios/Sources/HealthSyncPlugin/HealthSyncEngine.swift", "utf8");
+const kotlin = readFileSync(
+  "plugins/health-sync/android/src/main/java/com/sakredbody/healthsync/HealthSyncWorker.kt",
+  "utf8"
+);
+
+for (const m of METRICS) {
+  const unit = HEALTH_UNITS[m];
+  check(
+    `Swift knows ${m} is in ${unit}`,
+    new RegExp(`"${m}"\\s*:\\s*"${unit.replace(/[/*]/g, "\\$&")}"`).test(swift),
+    "missing or wrong in HealthSyncEngine.swift"
+  );
+  check(
+    `Kotlin knows ${m} is in ${unit}`,
+    new RegExp(`"${m}"\\s+to\\s+"${unit.replace(/[/*]/g, "\\$&")}"`).test(kotlin),
+    "missing or wrong in HealthSyncWorker.kt"
+  );
+}
+
+const reader = readFileSync(
+  "plugins/health-sync/android/src/main/java/com/sakredbody/healthsync/HealthReader.kt",
+  "utf8"
+);
+
+/**
+ * Sleep is attributed to the date the session ENDS on, in all three. This is
+ * the single easiest thing to get differently in three languages, and getting
+ * it wrong on one platform means iPhone and Android members' sleep sits on
+ * different days in the same table.
+ */
+check("Swift files sleep by end date", /localDate\(sample\.endDate\)/.test(swift));
+check("Kotlin files sleep by end date", /localDate\(session\.endTime\)/.test(reader));
+
+/** HealthKit's percent() is a fraction; Health Connect's is already 0–100. */
+check("Swift scales HealthKit percentages to 0-100", /scale:\s*100/.test(swift));
+check(
+  "Swift applies the scale rather than storing it unused",
+  /doubleValue\(for:\s*plan\.unit\)\s*\*\s*plan\.scale/.test(swift)
+);
+
+/** Both native paths must dedupe before posting, for the same Postgres reason. */
+check("Swift dedupes by date and metric", /byKey\[/.test(swift));
+check("Kotlin dedupes by date and metric", /byKey\[/.test(kotlin));
+
+/** Neither native path may write to the health store. */
+check("Swift never saves to HealthKit", !/\bsave\(/.test(swift) && !/HKObjectType\.workoutType/.test(swift));
+check("Kotlin never writes records", !/insertRecords/.test(reader));
+
+/** A 401 must not be retried forever — nothing native can refresh a token. */
+check("Swift stops on 401", /status == 401/.test(swift));
+check("Kotlin stops on 401", /401 ->\s*PostResult\.Unauthorized/.test(kotlin));
+
+/**
+ * The iOS observers must be re-registered on every launch. An HKObserverQuery
+ * does not survive process death, so a plugin that registers once at first
+ * grant works right up until iOS kills the app, and then never again.
+ */
+const swiftPlugin = readFileSync("plugins/health-sync/ios/Sources/HealthSyncPlugin/HealthSyncPlugin.swift", "utf8");
+check(
+  "iOS re-registers observers in load()",
+  /override public func load\(\)[\s\S]{0,220}enableBackgroundDelivery/.test(swiftPlugin)
+);
+
+const appEntitlements = readFileSync("ios/App/App/App.entitlements", "utf8");
+check(
+  "the background delivery entitlement is present",
+  appEntitlements.includes("com.apple.developer.healthkit.background-delivery")
+);
+
+const pluginManifestAndroid = readFileSync(
+  "plugins/health-sync/android/src/main/AndroidManifest.xml",
+  "utf8"
+);
+check(
+  "Android asks for background read",
+  pluginManifestAndroid.includes("android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND")
+);
+
+/**
+ * Health Connect's client declares minSdk 26. A library floor above the
+ * application's stops the Android build outright, so this is a build break
+ * rather than a warning.
+ */
+const variables = readFileSync("android/variables.gradle", "utf8");
+const minSdk = Number(/minSdkVersion\s*=\s*(\d+)/.exec(variables)?.[1] ?? 0);
+check("the app's minSdk clears Health Connect's floor", minSdk >= 26, `minSdk is ${minSdk}`);
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

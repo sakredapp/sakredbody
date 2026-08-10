@@ -1,5 +1,13 @@
 ext {
-    minSdkVersion = 24
+    // 26, not 24. Health Connect's client library declares minSdk 26, and a
+    // library floor above the application's is a manifest-merger FAILURE, not
+    // a warning — the Android build stops. This is already true of
+    // @capgo/capacitor-health, so the build was going to break on the next
+    // Android compile regardless of the background worker.
+    //
+    // The cost is Android 7.0 and 7.1 devices, which cannot run Health Connect
+    // at all and are around one percent of active devices.
+    minSdkVersion = 26
     compileSdkVersion = 36
     targetSdkVersion = 36
     androidxActivityVersion = '1.11.0'
