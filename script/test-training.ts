@@ -22,6 +22,8 @@ import {
   MAX_REPS_FOR_ESTIMATE,
   EXERCISE_CATEGORIES,
   EXERCISE_GROUPS,
+  MOVEMENT_PATTERNS,
+  EQUIPMENT,
   isPracticeCategory,
 } from "../shared/models/training.js";
 import { catalogueRows, slug, arrayLiteral } from "../shared/data/exerciseCatalogue.js";
@@ -133,6 +135,42 @@ check(
 check(
   "every barbell lift names its equipment",
   !rows.some((r) => r.pattern === "hinge" && r.category === "back" && r.equipment === "bodyweight"),
+);
+
+// The database has a CHECK constraint on each of these. It is a fourth copy of
+// the list, and the only one that can reject a write — so a word the catalogue
+// uses and the vocabulary does not is a 500 at sync time, not a lint.
+console.log("\nOne vocabulary, not four that drifted\n");
+
+const patterns = new Set<string>(MOVEMENT_PATTERNS);
+const equipment = new Set<string>(EQUIPMENT);
+
+check(
+  "every movement pattern is in the vocabulary",
+  rows.every((r) => patterns.has(r.pattern)),
+  Array.from(new Set(rows.filter((r) => !patterns.has(r.pattern)).map((r) => r.pattern))).join(", "),
+);
+check(
+  "every equipment is in the vocabulary",
+  rows.every((r) => equipment.has(r.equipment)),
+  Array.from(new Set(rows.filter((r) => !equipment.has(r.equipment)).map((r) => r.equipment))).join(
+    ", ",
+  ),
+);
+check(
+  "no vocabulary word is dead — each is used by something",
+  EQUIPMENT.filter((e) => e !== "band" && e !== "smith_machine" && e !== "medicine_ball").every(
+    (e) => rows.some((r) => r.equipment === e),
+  ),
+  EQUIPMENT.filter((e) => !rows.some((r) => r.equipment === e)).join(", "),
+);
+check(
+  "no word carries a space — these become SQL literals and URL-ish slugs",
+  [...MOVEMENT_PATTERNS, ...EQUIPMENT].every((w) => !/\s/.test(w)),
+);
+check(
+  "every tracking type is one the schema allows",
+  rows.every((r) => ["reps", "duration", "distance"].includes(r.tracking ?? "reps")),
 );
 
 console.log("\nA practice is a duration, and never a weight\n");

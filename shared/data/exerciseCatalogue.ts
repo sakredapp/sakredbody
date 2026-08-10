@@ -549,8 +549,8 @@ const CATALOGUE: Record<string, Partial<Row>[]> = {
     N("Side-Kick Series", { uni: true }), N("Pilates Leg Circles", { uni: true }),
     N("Mermaid", { uni: true }), N("Boomerang"), N("Seal"),
     N("Pilates Push-Up"), N("Pilates Plank Series", { tracking: "duration" }),
-    N("Pilates Ring Squeeze", { equipment: "ring", aliases: ["magic circle"] }),
-    N("Pilates Ring Arm Press", { equipment: "ring" }),
+    N("Pilates Ring Squeeze", { equipment: "pilates_ring", aliases: ["magic circle"] }),
+    N("Pilates Ring Arm Press", { equipment: "pilates_ring" }),
 
     // Reformer.
     N("Reformer Footwork", { equipment: "reformer", aliases: ["footwork"] }),
@@ -591,7 +591,7 @@ const CATALOGUE: Record<string, Partial<Row>[]> = {
     N("Chair Step-Up", { equipment: "chair", uni: true }),
     N("Chair Mountain Climber", { equipment: "chair", uni: true }),
     N("Chair Teaser", { equipment: "chair" }),
-    N("Spine Corrector Arc", { equipment: "spine corrector" }),
+    N("Spine Corrector Arc", { equipment: "spine_corrector" }),
     N("Ladder Barrel Swan", { equipment: "barrel" }),
   ],
 

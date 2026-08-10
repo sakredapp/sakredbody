@@ -610,18 +610,49 @@ export function displayWeight(kg: number, unit: "kg" | "lb"): number {
 export const weightUnitEnum = z.enum(["kg", "lb"]);
 export type WeightUnit = z.infer<typeof weightUnitEnum>;
 
-export const movementPatternEnum = z.enum([
+/**
+ * ── The vocabularies, stated once ─────────────────────────────────────────
+ *
+ * These two lists had drifted into four disagreeing copies: a zod enum here, a
+ * CHECK constraint in Postgres, whatever the catalogue happened to write, and
+ * whatever the admin select happened to offer. The catalogue quietly grew
+ * `rings`, `sled`, `elastic` and `flow`; nothing complained, because nothing
+ * compared them — until the sync endpoint finally ran and Postgres rejected a
+ * sled push on a constraint written before sleds existed.
+ *
+ * So: one array each, the zod enums derived from them, a test that every
+ * catalogue row uses a word from them, and a migration that sets the CHECK
+ * constraints to exactly these. Adding a word is now one edit and a migration,
+ * and forgetting the migration fails loudly at the sync rather than silently
+ * in the picker.
+ *
+ * `pattern` is how a coach programmes — hinge, push, carry. `equipment` is
+ * what it is done on, which for the studio work is a machine with a name
+ * rather than a plate: a reformer is not a "machine" in any sense that helps
+ * somebody searching for one.
+ */
+export const MOVEMENT_PATTERNS = [
   "squat",
   "hinge",
   "push",
   "pull",
   "carry",
   "core",
+  "rotation",
+  "isometric",
+  "balance",
+  "locomotion",
+  "elastic",
   "conditioning",
   "mobility",
-]);
+  "tissue",
+  "breath",
+  "recovery",
+  "flow",
+  "sport",
+] as const;
 
-export const equipmentEnum = z.enum([
+export const EQUIPMENT = [
   "barbell",
   "dumbbell",
   "kettlebell",
@@ -631,8 +662,24 @@ export const equipmentEnum = z.enum([
   "bodyweight",
   "band",
   "medicine_ball",
+  "rings",
+  "sled",
+  // Studio apparatus. Named rather than folded into "machine" because a member
+  // looking for reformer work is looking for a reformer.
+  "mat",
+  "reformer",
+  "cadillac",
+  "chair",
+  "barrel",
+  "spine_corrector",
+  "megaformer",
+  "barre",
+  "pilates_ring",
   "other",
-]);
+] as const;
+
+export const movementPatternEnum = z.enum(MOVEMENT_PATTERNS);
+export const equipmentEnum = z.enum(EQUIPMENT);
 
 export const trackingTypeEnum = z.enum(["reps", "duration", "distance"]);
 export type TrackingType = z.infer<typeof trackingTypeEnum>;

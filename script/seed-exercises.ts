@@ -15,6 +15,7 @@
 
 import { writeFileSync } from "fs";
 import { catalogueRows, slug, arrayLiteral } from "../shared/data/exerciseCatalogue.js";
+import { MOVEMENT_PATTERNS, EQUIPMENT } from "../shared/models/training.js";
 
 const rows = catalogueRows();
 
@@ -75,3 +76,47 @@ ON CONFLICT (id) DO UPDATE SET
 );
 
 console.log(`generated supabase/exercise-catalogue.sql — ${rows.length} movements, ${categories.size} categories`);
+
+/**
+ * ── And the constraints that decide whether any of it is allowed in ───────
+ *
+ * `pattern` and `equipment` each have a CHECK constraint in Postgres, written
+ * when Build meant barbells. The catalogue has since grown rings, sleds,
+ * reformers, megaformers and barres, and patterns the original eight never
+ * covered — and nothing complained, because nothing compared them. It surfaced
+ * only when the sync endpoint first ran and Postgres rejected a sled push on a
+ * constraint that predates sleds.
+ *
+ * So this file emits both alongside the rows. Regenerating the catalogue
+ * regenerates its vocabulary, and the two cannot drift apart again without
+ * somebody deliberately editing one of them by hand.
+ */
+const list = (a: readonly string[]) => a.map((v) => q(v)).join(", ");
+
+writeFileSync(
+  "supabase/exercise-vocabulary.sql",
+  `-- ═══════════════════════════════════════════════════════════════════════════
+-- The movement vocabulary — ${MOVEMENT_PATTERNS.length} patterns, ${EQUIPMENT.length} kinds of equipment
+-- ═══════════════════════════════════════════════════════════════════════════
+--
+-- GENERATED from MOVEMENT_PATTERNS and EQUIPMENT in shared/models/training.ts
+-- by script/seed-exercises.ts. Those arrays are also what the zod enums and the
+-- catalogue test read, so this file is the fourth reader of one list rather
+-- than a fourth copy of it.
+--
+-- Run this BEFORE the catalogue: a row using a word the constraint has not
+-- heard of is rejected outright, and the whole transactional file rolls back.
+
+ALTER TABLE exercises DROP CONSTRAINT IF EXISTS exercises_pattern_chk;
+ALTER TABLE exercises ADD CONSTRAINT exercises_pattern_chk
+  CHECK (pattern IN (${list(MOVEMENT_PATTERNS)}));
+
+ALTER TABLE exercises DROP CONSTRAINT IF EXISTS exercises_equipment_chk;
+ALTER TABLE exercises ADD CONSTRAINT exercises_equipment_chk
+  CHECK (equipment IN (${list(EQUIPMENT)}));
+`,
+);
+
+console.log(
+  `generated supabase/exercise-vocabulary.sql — ${MOVEMENT_PATTERNS.length} patterns, ${EQUIPMENT.length} equipment`,
+);
