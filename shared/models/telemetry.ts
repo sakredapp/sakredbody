@@ -117,6 +117,12 @@ export const EVENT_NAMES = [
   // identical from the member's side to an email that is merely slow.
   "auth.reset.requested",
   "auth.reset.completed",
+  // The way in. `onboarding.answered` is the one that can be audited: it
+  // carries what was chosen for each of the three questions, per account, so
+  // "has everybody answered" is a query rather than a belief about what is in
+  // some phone's localStorage.
+  "onboarding.shown",
+  "onboarding.answered",
 
   // Administration. Who changed whose access, and when — the one category
   // where the audit trail matters more than the aggregate.

@@ -1054,11 +1054,110 @@ check(
   "weight is a goal, not a virtue — colouring it takes a position we have no business taking"
 );
 
+/**
+ * Strip comments before asserting on source.
+ *
+ * These checks match text, and this file is heavily commented — so an
+ * assertion can pass because the pattern appears in a note *explaining why the
+ * code no longer does that*. It happened: "onboarding waits for the native
+ * probe" kept passing against `available !== true` after the gate was removed,
+ * because the phrase survived in the comment describing its removal. A green
+ * test asserting the opposite of the code is worse than no test.
+ */
+const stripComments = (src: string) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
 /** The prompt only ever appears where it can be acted on. */
-const ONBOARD_SRC = readFileSync("client/src/components/portal/Onboarding.tsx", "utf8");
-check("onboarding waits for the native probe", /available !== true/.test(ONBOARD_SRC));
-check("a connected member skips the health step", /if \(connected\) setStep/.test(ONBOARD_SRC));
-check("leaving early is remembered", /SNOOZE_KEY/.test(ONBOARD_SRC));
+const TELEMETRY_SRC = readFileSync("shared/models/telemetry.ts", "utf8");
+const ONBOARD_SRC = stripComments(
+  readFileSync("client/src/components/portal/Onboarding.tsx", "utf8")
+);
+
+/**
+ * Onboarding is gated on being a phone, and on nothing else.
+ *
+ * It used to return early unless HealthKit reported available, which meant one
+ * unresolved probe silently withheld the notification and widget questions too
+ * — neither of which involves health at all. Verified on a device: nothing was
+ * ever asked.
+ */
+check(
+  "onboarding is gated on native, not on health availability",
+  /if \(!isNative \|\| isLoading/.test(ONBOARD_SRC),
+  "gating the whole flow on HealthKit removes notifications and widgets with it"
+);
+check(
+  "no early return on health availability",
+  !/if \(available !== true\)\s*return/.test(ONBOARD_SRC)
+);
+check(
+  "the health step is skipped when unavailable or already connected",
+  /available === true && !connected \? "health" : "notifications"/.test(ONBOARD_SRC),
+  "unavailable or connected must fall through to notifications, not to nothing"
+);
+check(
+  "the modal opens once and does not re-step underneath the member",
+  /openedRef/.test(ONBOARD_SRC)
+);
+
+/**
+ * Answered-state is per account.
+ *
+ * A flat localStorage key is one answer per handset: the second person to sign
+ * in on a phone is never asked, and silently inherits the first person's
+ * choices. "Every account has answered" cannot be true while the record is
+ * keyed by device.
+ */
+check(
+  "onboarding state is keyed by user",
+  /keyFor\(\s*userId/.test(ONBOARD_SRC) && /\$\{userId\}/.test(ONBOARD_SRC),
+  "a flat key means the second account on a phone is never asked"
+);
+check(
+  "nothing is asked before we know who is asking",
+  /!userId \|\| !shouldAsk\(userId\)/.test(ONBOARD_SRC)
+);
+
+/**
+ * And it is auditable from the server.
+ *
+ * localStorage cannot be inspected from here, so a device-only record makes
+ * "has everyone answered" unanswerable. The event carries what was chosen for
+ * each question, and is sent on dismissal as well as completion — someone who
+ * closed the modal at step two still answered step one.
+ */
+check("the answers are reported to the server", /track\("onboarding\.answered"/.test(ONBOARD_SRC));
+check("being shown is reported too", /track\("onboarding\.shown"/.test(ONBOARD_SRC));
+check(
+  "a dismissal reports what was answered so far",
+  /stoppedAt: step/.test(ONBOARD_SRC),
+  "recording only completions reports someone who answered two of three as never asked"
+);
+check(
+  "the notification answer records what the OS granted, not what we asked",
+  /granted \? next : "off"/.test(ONBOARD_SRC),
+  "choosing the full brief and then denying the system sheet means notifications are off"
+);
+for (const name of ["onboarding.shown", "onboarding.answered"]) {
+  check(`${name} is a declared event`, TELEMETRY_SRC.includes(`"${name}"`));
+}
+
+/** An unavailable store is stated, never rendered as silence. */
+const SWATCH_UNAVAIL = stripComments(SWATCH_SRC);
+check(
+  "the home screen says so when health is unavailable",
+  /available === false/.test(SWATCH_UNAVAIL) && /reason/.test(SWATCH_UNAVAIL),
+  "returning null for an unavailable store is indistinguishable from the feature not existing"
+);
+check(
+  "a still-resolving probe renders nothing rather than an error",
+  /available === null/.test(SWATCH_UNAVAIL)
+);
+check(
+  "leaving early is remembered, and separately from finishing",
+  /remember\(userId, completed \? "done" : "snoozed"\)/.test(ONBOARD_SRC),
+  "a dismissal must snooze rather than mark answered, or the questions are never asked again"
+);
 check(
   "the widget step gives instructions, not a button that cannot work",
   /Touch and hold/.test(ONBOARD_SRC),

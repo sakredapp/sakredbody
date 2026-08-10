@@ -29,6 +29,7 @@
  */
 
 import { ChevronRight, TrendingDown, TrendingUp } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
 import { useHealthSummary, useHealthSync } from "@/hooks/use-health";
 import { METRIC_DISPLAY, planTiles, trendOf } from "@/lib/healthDisplay";
 import type { DaySeries, Tile } from "@/lib/healthDisplay";
@@ -272,7 +273,8 @@ function TileBody({ tile }: { tile: Tile }) {
 
 export function HealthSwatches({ onOpenStats }: { onOpenStats?: () => void }) {
   const { data } = useHealthSummary(30);
-  const { available, platform, connect } = useHealthSync();
+  const { available, reason, platform, connect } = useHealthSync();
+  const isNative = Capacitor.isNativePlatform();
 
   const days = (data?.days ?? []) as DaySeries[];
   const connected = data?.connected ?? false;
@@ -280,9 +282,36 @@ export function HealthSwatches({ onOpenStats }: { onOpenStats?: () => void }) {
 
   const tiles = planTiles(days, MAX_TILES);
 
-  // Nothing to say and nothing to offer: a browser cannot read health data, so
-  // a prompt there would be an instruction the member cannot follow.
-  if (!connected && available !== true) return null;
+  // A browser cannot read health data, so a prompt there would be an
+  // instruction the member cannot follow.
+  if (!connected && !isNative) return null;
+
+  // Still probing. Render nothing rather than flashing an error that resolves
+  // a beat later.
+  if (!connected && available === null) return null;
+
+  // ── Unavailable, said out loud ──────────────────────────────────────────
+  //
+  // This branch used to be folded into `available !== true` and returned null,
+  // which meant a phone where the probe answered "no" showed no health UI and
+  // no explanation — indistinguishable from the feature not existing. It cost
+  // an hour of looking for a bug that the app already knew about and was
+  // declining to mention.
+  //
+  // `reason` has been carried up from the plugin since the beginning and was
+  // never rendered anywhere. On Android it is the actionable case: Health
+  // Connect is genuinely absent on some devices and is installable.
+  if (!connected && available === false) {
+    return (
+      <div
+        className="rounded-xl border border-border/40 bg-white/[0.03] p-4"
+        data-testid="health-unavailable"
+      >
+        <p className="text-sm">{storeName} isn't available on this phone</p>
+        {reason && <p className="text-xs text-muted-foreground mt-1">{reason}</p>}
+      </div>
+    );
+  }
 
   if (!connected) {
     return (

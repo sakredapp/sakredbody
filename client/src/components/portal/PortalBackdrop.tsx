@@ -75,6 +75,19 @@ export function PortalBackdrop({ variant = "member" }: { variant?: BackdropVaria
       className="fixed inset-0 pointer-events-none -z-10"
       aria-hidden="true"
     >
+      {/* Held to the right of the reading edge.
+          A figure was standing directly behind "Welcome back, <name>" — the
+          first line of the screen, and the one place a constellation is
+          competing with something someone is actually reading.
+          `clearTop` cannot fix it: ConstellationSky caps that inset at 140px
+          internally, which is nothing on a tall phone. Adding a `clearLeft`
+          prop would mean editing a motion component the site session owns and
+          the login screen also renders, so the sky is simply anchored to the
+          right instead and given the right two-thirds. The left third — where
+          every heading, label and number in the portal begins — stays empty.
+          Nothing is clipped; the field is planned to whatever box it is given,
+          so it composes for this one rather than being cropped to it. */}
+      <div className="absolute inset-y-0 right-0 w-[66%]">
       <ConstellationSky
         className="w-full h-full"
         density={density}
@@ -95,6 +108,7 @@ export function PortalBackdrop({ variant = "member" }: { variant?: BackdropVaria
         // there is being watched.
         fps={variant === "desk" ? 20 : 30}
       />
+      </div>
 
       {/* The reading column runs down the middle. This settles it without
           dimming the edges, where the field is doing its work. */}
