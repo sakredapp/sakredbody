@@ -318,6 +318,11 @@ export interface NoteContext {
    */
   memberRef?: string | null;
   /**
+   * Values held only so they can be scrubbed OUT of the assembled prompt.
+   * Nothing in buildUserPrompt may read this — it exists for redaction.
+   */
+  identifiers?: (string | null | undefined)[];
+  /**
    * What their phone measured, already reduced to signals. Raw daily series
    * would be several hundred numbers the model would average badly; these are
    * the four a coach would actually look at, plus the direction of travel.

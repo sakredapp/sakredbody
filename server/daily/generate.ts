@@ -29,6 +29,7 @@ import {
 } from "../../shared/schema.js";
 import { almanacFor, elementalSeason } from "../../shared/utils/almanac.js";
 import { memberRef } from "./memberRef.js";
+import { sanitisePrompt } from "./redact.js";
 import { healthSignals } from "./healthSignals.js";
 import { addDaysToString, routineDayNumber } from "../../shared/utils/dates.js";
 import {
@@ -56,6 +57,23 @@ function protocolPhase(dayNumber: number, durationDays: number): string {
 }
 
 export async function buildContext(userId: string, onDate: string): Promise<NoteContext> {
+  /**
+   * Read purely so it can be removed.
+   *
+   * The prompt quotes the member's own intention verbatim, and a member can
+   * write their own name or email into it. Knowing those exact values is what
+   * turns scrubbing from a guess into a certainty — so they are selected here,
+   * handed to sanitisePrompt, and never written into a prompt line.
+   */
+  const [user] = await db
+    .select({
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+    })
+    .from(users)
+    .where(eq(users.id, userId));
+
   const [chart] = await db
     .select()
     .from(userCosmology)
@@ -143,6 +161,9 @@ export async function buildContext(userId: string, onDate: string): Promise<Note
     // a select whose only consumer has been removed is a read of personal data
     // for no reason, and the next person would assume something still needed it.
     memberRef: memberRef(userId),
+    // Held so the prompt can be scrubbed of them, and for no other purpose.
+    // See the note in buildContext above the query.
+    identifiers: [user?.firstName, user?.lastName, user?.email],
     health: await healthSignals(userId),
     polarity: chart?.polarity ?? null,
     protocol,
@@ -199,7 +220,15 @@ async function generate(ctx: NoteContext): Promise<Generated> {
     return { candidate: fallbackNote(ctx), source: "fallback", model: null, attempts: 0 };
   }
 
-  const userPrompt = buildUserPrompt(ctx);
+  const built = buildUserPrompt(ctx);
+  // The last thing before it leaves. Redacting rather than refusing: a member
+  // losing their note is a worse outcome than a note written from a prompt we
+  // already stripped.
+  const { prompt: userPrompt, redacted } = sanitisePrompt(built, ctx.identifiers ?? []);
+  if (redacted.length) {
+    // The value is never logged — only that something matched, and what kind.
+    console.warn(`[daily] redacted from prompt: ${redacted.join(", ")}`);
+  }
   // The facts this note is allowed to be about. A note citing none of them is
   // about nothing, which is the failure mode that matters most here.
   const anchors = anchorsFor(ctx);

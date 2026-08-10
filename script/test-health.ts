@@ -625,10 +625,25 @@ check(
   "the context is built with a ref",
   /memberRef:\s*memberRef\(userId\)/.test(GENERATE)
 );
+/**
+ * The name IS read again — deliberately, and this assertion had to change to
+ * say so honestly rather than fail.
+ *
+ * The first version of this rule was "do not select it at all", which was right
+ * while nothing consumed it. It now has one consumer: sanitisePrompt needs the
+ * exact values to remove them from the member's own free text with certainty
+ * rather than by pattern. So the rule is no longer "never read it" but the
+ * stronger and more useful "read it only to remove it".
+ */
 check(
-  "the query that read the name is gone too",
-  !/firstName:\s*users\.firstName/.test(GENERATE),
-  "a select whose only consumer was removed is a read of personal data for nothing"
+  "the name is read only to be scrubbed",
+  /identifiers:\s*\[user\?\.firstName/.test(GENERATE),
+  "if it is selected it must flow into the scrub list and nowhere else"
+);
+check(
+  "no prompt line interpolates a name field",
+  !/lines\.push\([^)]*(firstName|lastName|\bemail\b)/.test(VOICE),
+  "reading it for redaction is fine; writing it into a prompt is not"
 );
 
 /**
@@ -701,6 +716,95 @@ check(
 check(
   "and the timestamp parsers too",
   /builtins\.TIMESTAMP[\s\S]{0,80}\(val\) => val/.test(DRIZZLE_SESSION)
+);
+
+
+
+// ── 13. Nothing identifying reaches the model ──────────────────────────────
+section("What leaves for inference");
+
+const { sanitisePrompt, findLeaks, redactFree, scrubKnown } = await import(
+  "../server/daily/redact.js"
+);
+const { buildUserPrompt } = await import("../server/daily/voice.js");
+
+const IDS = ["Nicholas", "Russell", "nick@sakredhealth.com"];
+
+/** The exact pass: values we hold, so certainty rather than a guess. */
+check(
+  "a member's own name is removed",
+  !scrubKnown("Nicholas should rest", IDS).includes("Nicholas")
+);
+check(
+  "a name inside a longer word survives",
+  scrubKnown("Sameness matters", ["Sam"]).includes("Sameness"),
+  "over-eager scrubbing turns a note into [redacted] soup"
+);
+check("case does not matter", !scrubKnown("nicholas here", IDS).toLowerCase().includes("nicholas"));
+
+/** The pattern pass: shapes we recognise without knowing the person. */
+check("an email is removed", !redactFree("write to a@b.com today").includes("a@b.com"));
+check("a phone number is removed", !redactFree("call 555 123 4567 now").includes("4567"));
+check("a URL is removed", !redactFree("see https://example.com/x").includes("example.com"));
+check("a handle is removed", !redactFree("ask @drnguyen about it").includes("@drnguyen"));
+check(
+  "a record number is removed",
+  !redactFree("policy 883921144 renews").includes("883921144")
+);
+check("ordinary numbers survive", redactFree("8 hours and 54 bpm").includes("54"));
+
+/**
+ * The whole assembled prompt, for a member with everything filled in and an
+ * intention written the way a real person eventually will.
+ */
+const prompt = buildUserPrompt({
+  almanac: {
+    date: "2026-08-10",
+    moon: { phase: "waning gibbous", direction: "waning", illumination: 0.72, age: 18 },
+    sunSign: "Leo",
+    season: "summer",
+    elemental: { season: "late summer", element: "earth", organ: "spleen" },
+    universalDay: 7,
+    personal: { depth: 0.8, personalDay: 4, personalYear: 9, lifePath: 3 },
+  } as never,
+  memberRef: "m-9f2a1c7d40",
+  identifiers: IDS,
+  polarity: "balanced",
+  health: [{ label: "Sleep", recent: "6h 40m a night", direction: "down, and worth noticing" }],
+  protocol: { name: "Liver Clear", dayNumber: 3, durationDays: 28, phase: "clear" },
+  intention: "Text Nicholas at 555 123 4567 and email nick@sakredhealth.com about the biopsy",
+  recentCompletion: { done: 9, total: 21 },
+} as never);
+
+const { prompt: safe, redacted } = sanitisePrompt(prompt, IDS);
+
+check("the raw prompt did contain identifiers", findLeaks(prompt, IDS).length > 0);
+check("the sanitised prompt contains none", redacted.length === 0, redacted.join(", "));
+check("the member's name is gone", !/Nicholas/i.test(safe));
+check("their email is gone", !/sakredhealth\.com/i.test(safe));
+check("their phone number is gone", !/555\s?123\s?4567/.test(safe));
+
+/** And the note is still worth generating from what remains. */
+check("the protocol survives", /Liver Clear/.test(safe));
+check("the health signal survives", /6h 40m/.test(safe));
+check("the ref survives", /m-9f2a1c7d40/.test(safe));
+check("the moon survives", /waning gibbous/.test(safe));
+
+/** Nothing in the prompt builder may read the scrub list. */
+const VOICE_SRC = readFileSync("server/daily/voice.ts", "utf8");
+const builderBody = VOICE_SRC.slice(VOICE_SRC.indexOf("export function buildUserPrompt"));
+check(
+  "buildUserPrompt never prints the identifiers it is given",
+  !/ctx\.identifiers/.test(builderBody),
+  "they exist to be removed, not written"
+);
+
+/** The generator must sanitise, not merely have the ability to. */
+const GEN_SRC = readFileSync("server/daily/generate.ts", "utf8");
+check("every generation is sanitised", /sanitisePrompt\(built/.test(GEN_SRC));
+check(
+  "the redacted value is never logged",
+  !/console\.(warn|log|error)\([^)]*\bbuilt\b/.test(GEN_SRC)
 );
 
 
