@@ -29,6 +29,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { HealthSwatches } from "@/components/portal/HealthSwatches";
 import type { MemberSection } from "@/components/MemberNav";
 
 interface Pillar {
@@ -104,15 +105,15 @@ const PILLARS: Pillar[] = [
  *
  * Relative paths, deliberately, for now.
  *
- * These briefly went through an `apiUrl` helper so they would resolve inside
- * the Capacitor shell, where the bundle is served from `https://localhost` and
- * a bare `/api/...` hits the device rather than the server. That helper is
- * real but is not committed yet, and neither is `@capacitor/core` — importing
- * it broke the production build, since the file exists on one laptop and
- * nowhere else.
+ * Relative is now safe natively. `installNativeApiFetch()` runs in main.tsx
+ * before render and rewrites same-origin `/api/` requests to the real API
+ * origin, adding the bearer token — so a bare fetch here resolves correctly
+ * inside the Capacitor shell rather than hitting the device.
  *
- * When the native wrapper lands properly, every relative fetch in the client
- * needs that treatment in one sweep, not this component alone.
+ * This note used to say the opposite, and it outlived the fix: it claimed the
+ * wrapper had not landed and that every relative fetch needed converting in
+ * one sweep. Read cold, it sends you off to change eighty call sites that
+ * already work.
  */
 function useCounts() {
   const today = useQuery<{ habits: Array<{ completed: boolean }> }>({
@@ -237,10 +238,17 @@ export function PillarHome({
         </p>
       </div>
 
-      <div className="space-y-3">
-        {PILLARS.map((p) => {
+      {/* Their own numbers, before the menu. */}
+      <HealthSwatches onOpenStats={() => onOpen("coaching")} />
+
+      {/* One hero, then a 2x2 grid. Five identical full-width slabs gave every
+          door the same weight and made the screen read as a list of links —
+          and at that height, four of them were mostly photograph. */}
+      <div className="grid grid-cols-2 gap-3">
+        {PILLARS.map((p, i) => {
           const fact = factFor(p.key);
           const open = p.section !== null;
+          const hero = i === 0;
 
           return (
             <button
@@ -249,7 +257,7 @@ export function PillarHome({
               disabled={!open}
               className={cn(
                 "group relative w-full overflow-hidden rounded-xl border border-[hsl(var(--gold))]/12 text-left tap-clean",
-                "h-28 sm:h-32",
+                hero ? "col-span-2 h-28 sm:h-32" : "col-span-1 h-32 sm:h-36",
                 open ? "hover:border-[hsl(var(--gold))]/30 transition-colors" : "opacity-60",
               )}
               data-testid={`pillar-${p.key}`}
@@ -263,20 +271,42 @@ export function PillarHome({
               {/* Read left-to-right: opaque where the words are, image where
                   they aren't. A flat scrim over the whole card would dim the
                   photograph without making the text any more legible. */}
-              <div className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--ink))] via-[hsl(var(--ink))]/85 to-[hsl(var(--ink))]/20" />
+              <div
+                className={cn(
+                  "absolute inset-0",
+                  hero
+                    ? "bg-gradient-to-r from-[hsl(var(--ink))] via-[hsl(var(--ink))]/85 to-[hsl(var(--ink))]/20"
+                    // A square card has no room to clear space beside the text,
+                    // so the scrim runs bottom-up and the words sit on it.
+                    : "bg-gradient-to-t from-[hsl(var(--ink))] via-[hsl(var(--ink))]/80 to-[hsl(var(--ink))]/10",
+                )}
+              />
 
-              <div className="relative h-full flex items-center gap-3 px-4">
+              <div
+                className={cn(
+                  "relative h-full flex gap-3 px-4",
+                  hero ? "items-center" : "items-end pb-3",
+                )}
+              >
                 <div className="min-w-0 flex-1">
-                  <h2 className="font-display text-xl tracking-wide uppercase text-white">
+                  <h2
+                    className={cn(
+                      "font-display tracking-wide uppercase text-white",
+                      hero ? "text-xl" : "text-base",
+                    )}
+                  >
                     {p.title}
                   </h2>
-                  <p className="text-xs text-white/60 mt-0.5 line-clamp-2">{p.blurb}</p>
+                  {/* The blurb is the first thing to go when the card narrows —
+                      two lines of small type under a title is what made these
+                      read as dense rather than considered. */}
+                  {hero && <p className="text-xs text-white/60 mt-0.5 line-clamp-2">{p.blurb}</p>}
                   {fact && (
                     <p className="text-[11px] text-[hsl(var(--gold))] mt-1">{fact}</p>
                   )}
                 </div>
 
-                {open && (
+                {open && hero && (
                   <span className="shrink-0 h-7 w-7 rounded-full border border-[hsl(var(--gold))]/40 grid place-items-center group-hover:border-[hsl(var(--gold))] transition-colors">
                     <ChevronRight className="h-3.5 w-3.5 text-[hsl(var(--gold))]" />
                   </span>
