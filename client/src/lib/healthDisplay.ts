@@ -286,3 +286,62 @@ export function groupsWithData(
     metrics: present.filter((m) => METRIC_DISPLAY[m].group === group),
   })).filter((g) => g.metrics.length > 0);
 }
+
+/**
+ * The order a coach would look in, for the home-screen swatches.
+ *
+ * Anything not listed still qualifies — it falls in behind these, so a member
+ * who only shares steps and water gets steps and water rather than nothing.
+ */
+export const SWATCH_PRIORITY: HealthMetric[] = [
+  "sleepMinutes",
+  "restingHeartRate",
+  "heartRateVariability",
+  "steps",
+  "activeCalories",
+  "exerciseMinutes",
+  "weightKg",
+  "vo2Max",
+  "oxygenSaturation",
+  "respiratoryRate",
+  "distanceMeters",
+  "mindfulnessMinutes",
+  "waterMl",
+];
+
+/**
+ * Which metrics this member actually has, best first.
+ *
+ * Extracted from the component so it can be tested, because the rule it
+ * encodes is the one that matters: a tile must never appear for a metric we do
+ * not hold data for. An empty or zeroed tile reads as the app being broken,
+ * not as the member not sharing that category — and the member cannot tell
+ * those apart from the outside.
+ *
+ * "Has data" means at least one day with a number AND at least one of those
+ * numbers above zero. The second half is the part that is easy to miss: a
+ * metric whose every reading is 0 is one the device is reporting but nobody is
+ * recording, and "Water 0.0 L" is exactly the tile that looks like a bug.
+ */
+export function pickSwatches(days: DaySeries[], limit = 4): HealthMetric[] {
+  const ranked = [
+    ...SWATCH_PRIORITY,
+    ...(Object.keys(METRIC_DISPLAY) as HealthMetric[]).filter(
+      (m) => !SWATCH_PRIORITY.includes(m)
+    ),
+  ];
+
+  const held = ranked.filter((metric) => {
+    let seen = false;
+    for (const day of days) {
+      const value = day[metric];
+      if (typeof value !== "number" || !Number.isFinite(value)) continue;
+      seen = true;
+      if (value > 0) return true;
+    }
+    // Seen but never above zero — the device reports it, nobody records it.
+    return seen ? false : false;
+  });
+
+  return held.slice(0, limit);
+}

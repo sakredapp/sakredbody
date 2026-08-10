@@ -85,6 +85,7 @@ import { PillarHome } from "@/components/PillarHome";
 import { BuildTab } from "@/components/BuildTab";
 import { SettingsTab } from "@/components/SettingsTab";
 import { useHealthAutoSync } from "@/hooks/use-health";
+import { HealthConnectPrompt } from "@/components/portal/HealthConnectPrompt";
 
 // Icon mapping (UI-only, can't live in shared/)
 const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -343,6 +344,11 @@ export default function MemberDashboard() {
           it. `isolate` here is what lets it sit at a negative z-index without
           disappearing behind the page background — see PortalBackdrop. */}
       <PortalBackdrop />
+
+      {/* Asked once on the way in, snoozed for a fortnight if declined. A
+          member who never opens Stats never learns the app can read their
+          ring, so the feature may as well not exist for them. */}
+      <HealthConnectPrompt />
 
       {/* ─── Header ─── */}
       <header className="sticky top-0 pt-safe border-b border-border/50 bg-background/90 backdrop-blur-md" style={{ zIndex: 9999 }}>

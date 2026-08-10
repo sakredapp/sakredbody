@@ -23,6 +23,8 @@ import {
   GROUP_ORDER,
   groupsWithData,
   summarise,
+  pickSwatches,
+  SWATCH_PRIORITY,
 } from "../client/src/lib/healthDisplay.js";
 
 let passed = 0;
@@ -806,6 +808,85 @@ check(
   "the redacted value is never logged",
   !/console\.(warn|log|error)\([^)]*\bbuilt\b/.test(GEN_SRC)
 );
+
+
+
+// ── 14. A tile only ever appears for data we hold ──────────────────────────
+section("Swatches are deterministic");
+
+/**
+ * The rule the member can see: never show a stat card for something we do not
+ * have for that person. An empty or zeroed tile reads as the app being broken,
+ * and from the outside a member cannot tell that apart from "I never shared
+ * that category".
+ */
+const onlyTwo = [
+  { onDate: "2026-08-08", steps: 8100, sleepMinutes: 430 },
+  { onDate: "2026-08-09", steps: 9300, sleepMinutes: 455 },
+];
+const picked = pickSwatches(onlyTwo as never, 4);
+check("only metrics with data are picked", picked.length === 2, picked.join(", "));
+check("sleep outranks steps", picked[0] === "sleepMinutes", picked.join(", "));
+check("nothing unheld appears", !picked.includes("vo2Max" as never));
+check("no data means no tiles", pickSwatches([], 4).length === 0);
+
+/** A metric the device reports but nobody records. */
+const allZero = [
+  { onDate: "2026-08-08", steps: 8100, waterMl: 0 },
+  { onDate: "2026-08-09", steps: 9300, waterMl: 0 },
+];
+const zeroPicked = pickSwatches(allZero as never, 4);
+check(
+  "an all-zero metric is not shown",
+  !zeroPicked.includes("waterMl" as never),
+  "\"Water 0.0 L\" is the tile that looks like a bug"
+);
+check("its neighbours still are", zeroPicked.includes("steps" as never));
+
+/** One real reading among zeros is still a reading. */
+const oneReal = [
+  { onDate: "2026-08-08", waterMl: 0 },
+  { onDate: "2026-08-09", waterMl: 1800 },
+];
+check("a single non-zero day counts", pickSwatches(oneReal as never, 4).includes("waterMl" as never));
+
+/** Never more than asked for, however much data there is. */
+const everything: Record<string, number | string> = { onDate: "2026-08-09" };
+for (const m of METRICS) everything[m] = 42;
+check("the limit is respected", pickSwatches([everything] as never, 4).length === 4);
+check("a different limit is respected", pickSwatches([everything] as never, 2).length === 2);
+
+/** Same input, same output — it is a pure function of the data. */
+const a1 = pickSwatches(onlyTwo as never, 4).join(",");
+const a2 = pickSwatches(onlyTwo as never, 4).join(",");
+check("the same data yields the same tiles", a1 === a2);
+
+/** Priority must name only real metrics, or it silently ranks nothing. */
+for (const m of SWATCH_PRIORITY) {
+  check(`${m} in the swatch priority is a real metric`, METRICS.includes(m));
+}
+
+/** Non-finite values are not data. */
+const broken = [{ onDate: "2026-08-09", steps: Number.NaN, sleepMinutes: 400 }];
+check(
+  "NaN does not earn a tile",
+  !pickSwatches(broken as never, 4).includes("steps" as never)
+);
+
+/** The component must not re-implement the rule it was extracted from. */
+const SWATCH_SRC = readFileSync("client/src/components/portal/HealthSwatches.tsx", "utf8");
+check("the component uses pickSwatches", SWATCH_SRC.includes("pickSwatches("));
+check(
+  "the component keeps no second priority list",
+  !/const\s+PRIORITY\s*[:=]/.test(SWATCH_SRC),
+  "two orderings drift and the home screen stops matching Stats"
+);
+
+/** The prompt only ever appears where it can be acted on. */
+const PROMPT_SRC = readFileSync("client/src/components/portal/HealthConnectPrompt.tsx", "utf8");
+check("the modal waits for the native probe", /available !== true/.test(PROMPT_SRC));
+check("the modal does not reopen once connected", /connected/.test(PROMPT_SRC));
+check("declining is remembered", /snooze\(\)/.test(PROMPT_SRC));
 
 
 console.log(`\n${passed} passed, ${failed} failed`);

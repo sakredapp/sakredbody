@@ -14,31 +14,10 @@
 
 import { ChevronRight } from "lucide-react";
 import { useHealthSummary, useHealthSync } from "@/hooks/use-health";
-import { METRIC_DISPLAY, summarise } from "@/lib/healthDisplay";
+import { METRIC_DISPLAY, pickSwatches, summarise } from "@/lib/healthDisplay";
 import type { DaySeries } from "@/lib/healthDisplay";
 import type { HealthMetric } from "@shared/schema";
 import { Button } from "@/components/ui/button";
-
-/**
- * The order a coach would look in. Anything not listed still qualifies — it
- * simply falls in behind these, so a member who only shares steps and water
- * gets steps and water rather than nothing.
- */
-const PRIORITY: HealthMetric[] = [
-  "sleepMinutes",
-  "restingHeartRate",
-  "heartRateVariability",
-  "steps",
-  "activeCalories",
-  "exerciseMinutes",
-  "weightKg",
-  "vo2Max",
-  "oxygenSaturation",
-  "respiratoryRate",
-  "distanceMeters",
-  "mindfulnessMinutes",
-  "waterMl",
-];
 
 const MAX_TILES = 4;
 
@@ -50,15 +29,11 @@ export function HealthSwatches({ onOpenStats }: { onOpenStats?: () => void }) {
   const connected = data?.connected ?? false;
   const storeName = platform === "healthconnect" ? "Health Connect" : "Apple Health";
 
-  // Everything with a number, best first, then whatever else there is.
-  const ranked = [
-    ...PRIORITY,
-    ...(Object.keys(METRIC_DISPLAY) as HealthMetric[]).filter((m) => !PRIORITY.includes(m)),
-  ];
-  const tiles = ranked
+  // Only what this member actually has, best first. pickSwatches is the rule;
+  // see the note on it in healthDisplay.ts.
+  const tiles = pickSwatches(days, MAX_TILES)
     .map((metric) => ({ metric, stat: summarise(days, metric) }))
-    .filter((t): t is { metric: HealthMetric; stat: NonNullable<typeof t.stat> } => t.stat !== null)
-    .slice(0, MAX_TILES);
+    .filter((t): t is { metric: HealthMetric; stat: NonNullable<typeof t.stat> } => t.stat !== null);
 
   // Nothing to say and nothing to offer: a browser cannot read health data, so
   // a prompt there would be an instruction the member cannot follow.
