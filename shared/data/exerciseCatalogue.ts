@@ -1,0 +1,569 @@
+/**
+ * The movement catalogue — the data, in one place.
+ *
+ * Roughly 470 movements. Catalogue content is cheap relative to the feature and
+ * search makes size irrelevant to the member, but an absent movement is a
+ * member who cannot log their session at all. The old catalogue was twenty-five
+ * barbell lifts, which is a powerlifting app wearing a wellness name.
+ *
+ * ── Why it is data with rules rather than a .sql file ─────────────────────
+ *
+ * Every row needs a slug, a pattern, a category, a tracking type, a load flag
+ * and sensible defaults. Two hundred hand-written INSERTs guarantee some of
+ * them disagree — a stretch marked as taking load, a carry tracked in reps.
+ * Here the rules are stated once per category and the rows inherit them. That
+ * is also how the equipment bug surfaced: every barbell lift was inheriting the
+ * bodyweight fallback, because the category defaults never named one.
+ *
+ * Consumed twice: script/seed-exercises.ts renders it to a reviewable
+ * migration, and POST /api/admin/training/catalogue/sync upserts it directly,
+ * so the catalogue can be corrected without a database console.
+ */
+
+export type Row = {
+  name: string;
+  category: string;
+  pattern: string;
+  equipment: string;
+  tracking?: "reps" | "duration" | "distance";
+  load?: boolean;
+  uni?: boolean;
+  /** Fraction of bodyweight the movement carries before added plates. */
+  bw?: number;
+  /** Worth estimating a one-rep max for. */
+  orm?: boolean;
+  aliases?: string[];
+};
+
+/** `Barbell Bench Press` → `barbell-bench-press`. Stable, readable in a URL. */
+const slug = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/[—–]/g, "-")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+/**
+ * Defaults by category, so each row only states what is unusual about it.
+ * This is the part that stops a foam roll being logged in kilograms.
+ */
+const DEFAULTS: Record<string, Partial<Row>> = {
+  chest: { pattern: "push", equipment: "barbell", tracking: "reps", load: true },
+  back: { pattern: "pull", equipment: "barbell", tracking: "reps", load: true },
+  shoulders: { pattern: "push", equipment: "barbell", tracking: "reps", load: true },
+  arms: { pattern: "pull", equipment: "barbell", tracking: "reps", load: true },
+  legs: { pattern: "squat", equipment: "barbell", tracking: "reps", load: true },
+  glutes: { pattern: "hinge", equipment: "barbell", tracking: "reps", load: true },
+  calves: { pattern: "push", equipment: "machine", tracking: "reps", load: true },
+  core: { pattern: "core", equipment: "bodyweight", tracking: "reps", load: false },
+  carry: { pattern: "carry", equipment: "dumbbell", tracking: "distance", load: true },
+  kettlebell: { pattern: "hinge", equipment: "kettlebell", tracking: "reps", load: true },
+  olympic: { pattern: "hinge", equipment: "barbell", tracking: "reps", load: true },
+  landmine: { pattern: "push", equipment: "barbell", tracking: "reps", load: true },
+  calisthenics: { pattern: "pull", equipment: "bodyweight", tracking: "reps", load: false },
+  rings: { pattern: "pull", equipment: "rings", tracking: "reps", load: false },
+  neck_grip: { pattern: "carry", equipment: "other", tracking: "reps", load: true },
+  feet: { pattern: "balance", equipment: "bodyweight", tracking: "duration", load: false },
+  rotation: { pattern: "rotation", equipment: "cable", tracking: "reps", load: true },
+  isometric: { pattern: "isometric", equipment: "bodyweight", tracking: "duration", load: false },
+  balance: { pattern: "balance", equipment: "bodyweight", tracking: "duration", load: false },
+  agility: { pattern: "locomotion", equipment: "bodyweight", tracking: "duration", load: false },
+  plyometric: { pattern: "elastic", equipment: "bodyweight", tracking: "reps", load: false },
+  explosive: { pattern: "elastic", equipment: "bodyweight", tracking: "reps", load: false },
+  locomotion: { pattern: "locomotion", equipment: "bodyweight", tracking: "distance", load: false },
+  cardio: { pattern: "conditioning", equipment: "machine", tracking: "duration", load: false },
+  corrective: { pattern: "mobility", equipment: "bodyweight", tracking: "reps", load: false },
+  ground: { pattern: "locomotion", equipment: "bodyweight", tracking: "duration", load: false },
+  yoga: { pattern: "mobility", equipment: "bodyweight", tracking: "duration", load: false },
+  somatic: { pattern: "elastic", equipment: "bodyweight", tracking: "duration", load: false },
+  // Everything below is held for time and takes no load. That is the whole
+  // reason `takesLoad` exists — a couch stretch with a kilogram box beside it
+  // is an app built for something else.
+  mobility: { pattern: "mobility", equipment: "bodyweight", tracking: "duration", load: false },
+  fascia: { pattern: "elastic", equipment: "bodyweight", tracking: "duration", load: false },
+  tissue: { pattern: "tissue", equipment: "other", tracking: "duration", load: false },
+  breath: { pattern: "breath", equipment: "bodyweight", tracking: "duration", load: false },
+  recovery: { pattern: "recovery", equipment: "bodyweight", tracking: "duration", load: false },
+  // A session, not a movement. See the note on PRACTICES below.
+  practice: { pattern: "flow", equipment: "bodyweight", tracking: "duration", load: false },
+};
+
+const N = (name: string, extra: Partial<Row> = {}) => ({ name, ...extra });
+
+const CATALOGUE: Record<string, Partial<Row>[]> = {
+  chest: [
+    N("Barbell Bench Press", { orm: true, aliases: ["bench", "bench press", "bb bench"] }),
+    N("Incline Barbell Bench Press", { orm: true, aliases: ["incline bench"] }),
+    N("Decline Barbell Bench Press", { orm: true }),
+    N("Dumbbell Bench Press", { equipment: "dumbbell", aliases: ["db bench"] }),
+    N("Incline Dumbbell Press", { equipment: "dumbbell" }),
+    N("Decline Dumbbell Press", { equipment: "dumbbell" }),
+    N("Dumbbell Squeeze Press", { equipment: "dumbbell" }),
+    N("Machine Chest Press", { equipment: "machine" }),
+    N("Incline Machine Chest Press", { equipment: "machine" }),
+    N("Plate-Loaded Chest Press", { equipment: "machine" }),
+    N("Smith Machine Bench Press", { equipment: "machine" }),
+    N("Smith Machine Incline Press", { equipment: "machine" }),
+    N("Cable Chest Press", { equipment: "cable" }),
+    N("Cable Fly", { equipment: "cable", aliases: ["fly", "flye"] }),
+    N("Low-to-High Cable Fly", { equipment: "cable" }),
+    N("High-to-Low Cable Fly", { equipment: "cable" }),
+    N("Pec Deck", { equipment: "machine", aliases: ["machine fly", "pec dec"] }),
+    N("Push-Up", { equipment: "bodyweight", load: false, bw: 0.64, aliases: ["pushup", "press up"] }),
+    N("Weighted Push-Up", { equipment: "bodyweight", bw: 0.64 }),
+    N("Dip — Chest Emphasis", { equipment: "bodyweight", bw: 1, aliases: ["chest dip"] }),
+  ],
+  back: [
+    N("Conventional Deadlift", { pattern: "hinge", orm: true, aliases: ["deadlift", "dl"] }),
+    N("Rack Pull", { pattern: "hinge", orm: true }),
+    N("Barbell Row", { aliases: ["bent over row", "bb row"] }),
+    N("Pendlay Row", {}),
+    N("T-Bar Row", { equipment: "machine" }),
+    N("Chest-Supported T-Bar Row", { equipment: "machine" }),
+    N("Dumbbell Row", { equipment: "dumbbell", uni: true, aliases: ["db row", "one arm row"] }),
+    N("Chest-Supported Dumbbell Row", { equipment: "dumbbell" }),
+    N("Meadows Row", { uni: true }),
+    N("Seal Row", {}),
+    N("Machine Row", { equipment: "machine" }),
+    N("Plate-Loaded Row", { equipment: "machine" }),
+    N("Iso-Lateral Row", { equipment: "machine", uni: true }),
+    N("Seated Cable Row", { equipment: "cable", aliases: ["cable row"] }),
+    N("Wide-Grip Cable Row", { equipment: "cable" }),
+    N("Single-Arm Cable Row", { equipment: "cable", uni: true }),
+    N("Lat Pulldown", { equipment: "cable", aliases: ["pulldown", "lats"] }),
+    N("Neutral-Grip Lat Pulldown", { equipment: "cable" }),
+    N("Close-Grip Lat Pulldown", { equipment: "cable" }),
+    N("Single-Arm Lat Pulldown", { equipment: "cable", uni: true }),
+    N("Straight-Arm Pulldown", { equipment: "cable" }),
+    N("Machine Pullover", { equipment: "machine" }),
+    N("Dumbbell Pullover", { equipment: "dumbbell" }),
+    N("Pull-Up", { equipment: "bodyweight", load: false, bw: 1, aliases: ["pullup"] }),
+    N("Chin-Up", { equipment: "bodyweight", load: false, bw: 1, aliases: ["chinup"] }),
+    N("Assisted Pull-Up", { equipment: "machine", bw: 1 }),
+    N("Weighted Pull-Up", { equipment: "bodyweight", bw: 1 }),
+  ],
+  shoulders: [
+    N("Barbell Overhead Press", { orm: true, aliases: ["ohp", "overhead press", "military press"] }),
+    N("Seated Barbell Shoulder Press", {}),
+    N("Dumbbell Shoulder Press", { equipment: "dumbbell" }),
+    N("Arnold Press", { equipment: "dumbbell" }),
+    N("Machine Shoulder Press", { equipment: "machine" }),
+    N("Plate-Loaded Shoulder Press", { equipment: "machine" }),
+    N("Smith Machine Shoulder Press", { equipment: "machine" }),
+    N("Dumbbell Lateral Raise", { equipment: "dumbbell", aliases: ["lat raise", "side raise"] }),
+    N("Seated Lateral Raise", { equipment: "dumbbell" }),
+    N("Leaning Lateral Raise", { equipment: "dumbbell", uni: true }),
+    N("Cable Lateral Raise", { equipment: "cable", uni: true }),
+    N("Behind-the-Back Cable Lateral Raise", { equipment: "cable", uni: true }),
+    N("Machine Lateral Raise", { equipment: "machine" }),
+    N("Dumbbell Front Raise", { equipment: "dumbbell" }),
+    N("Cable Front Raise", { equipment: "cable" }),
+    N("Rear-Delt Dumbbell Fly", { equipment: "dumbbell", pattern: "pull", aliases: ["rear delt"] }),
+    N("Reverse Pec Deck", { equipment: "machine", pattern: "pull" }),
+    N("Cable Rear-Delt Fly", { equipment: "cable", pattern: "pull" }),
+    N("Face Pull", { equipment: "cable", pattern: "pull" }),
+    N("Upright Row", { pattern: "pull" }),
+  ],
+  arms: [
+    N("Barbell Curl", { aliases: ["bb curl", "curl"] }),
+    N("EZ-Bar Curl", {}),
+    N("Dumbbell Curl", { equipment: "dumbbell" }),
+    N("Alternating Dumbbell Curl", { equipment: "dumbbell", uni: true }),
+    N("Incline Dumbbell Curl", { equipment: "dumbbell" }),
+    N("Hammer Curl", { equipment: "dumbbell", aliases: ["hammers"] }),
+    N("Cross-Body Hammer Curl", { equipment: "dumbbell", uni: true }),
+    N("Preacher Curl", {}),
+    N("Machine Preacher Curl", { equipment: "machine" }),
+    N("Cable Curl", { equipment: "cable" }),
+    N("Bayesian Cable Curl", { equipment: "cable", uni: true }),
+    N("Spider Curl", { equipment: "dumbbell" }),
+    N("Concentration Curl", { equipment: "dumbbell", uni: true }),
+    N("Reverse Curl", {}),
+    N("Zottman Curl", { equipment: "dumbbell" }),
+    N("Wrist Curl", { equipment: "dumbbell" }),
+    N("Reverse Wrist Curl", { equipment: "dumbbell" }),
+    N("Wrist Roller", { equipment: "other", tracking: "duration" }),
+    N("Close-Grip Bench Press", { pattern: "push", orm: true, aliases: ["cgbp"] }),
+    N("Skull Crusher", { pattern: "push", aliases: ["lying triceps extension"] }),
+    N("EZ-Bar Skull Crusher", { pattern: "push" }),
+    N("Dumbbell Skull Crusher", { equipment: "dumbbell", pattern: "push" }),
+    N("Cable Pushdown", { equipment: "cable", pattern: "push", aliases: ["pushdown", "tricep pushdown"] }),
+    N("Rope Pushdown", { equipment: "cable", pattern: "push" }),
+    N("Reverse-Grip Pushdown", { equipment: "cable", pattern: "push" }),
+    N("Overhead Cable Extension", { equipment: "cable", pattern: "push" }),
+    N("Overhead Rope Extension", { equipment: "cable", pattern: "push" }),
+    N("Dumbbell Overhead Extension", { equipment: "dumbbell", pattern: "push" }),
+    N("Single-Arm Cable Extension", { equipment: "cable", pattern: "push", uni: true }),
+    N("Machine Triceps Extension", { equipment: "machine", pattern: "push" }),
+    N("Dip — Triceps Emphasis", { equipment: "bodyweight", pattern: "push", bw: 1, aliases: ["dip"] }),
+  ],
+  legs: [
+    N("Back Squat", { orm: true, aliases: ["squat", "bb squat"] }),
+    N("Front Squat", { orm: true }),
+    N("High-Bar Squat", { orm: true }),
+    N("Low-Bar Squat", { orm: true }),
+    N("Goblet Squat", { equipment: "dumbbell" }),
+    N("Smith Machine Squat", { equipment: "machine" }),
+    N("Hack Squat", { equipment: "machine" }),
+    N("Pendulum Squat", { equipment: "machine" }),
+    N("Belt Squat", { equipment: "machine" }),
+    N("Leg Press", { equipment: "machine", aliases: ["press"] }),
+    N("Horizontal Leg Press", { equipment: "machine" }),
+    N("Single-Leg Press", { equipment: "machine", uni: true }),
+    N("Leg Extension", { equipment: "machine", aliases: ["quad extension"] }),
+    N("Single-Leg Extension", { equipment: "machine", uni: true }),
+    N("Bulgarian Split Squat", { equipment: "dumbbell", uni: true, aliases: ["bss", "split squat"] }),
+    N("Walking Lunge", { equipment: "dumbbell", uni: true }),
+    N("Reverse Lunge", { equipment: "dumbbell", uni: true }),
+    N("Forward Lunge", { equipment: "dumbbell", uni: true }),
+    N("Step-Up", { equipment: "dumbbell", uni: true }),
+    N("Romanian Deadlift", { pattern: "hinge", orm: true, aliases: ["rdl"] }),
+    N("Dumbbell Romanian Deadlift", { equipment: "dumbbell", pattern: "hinge" }),
+    N("Stiff-Leg Deadlift", { pattern: "hinge" }),
+    N("Good Morning", { pattern: "hinge" }),
+    N("Seated Leg Curl", { equipment: "machine", pattern: "hinge" }),
+    N("Lying Leg Curl", { equipment: "machine", pattern: "hinge" }),
+    N("Standing Leg Curl", { equipment: "machine", pattern: "hinge", uni: true }),
+    N("Nordic Hamstring Curl", { equipment: "bodyweight", pattern: "hinge", load: false, bw: 0.6 }),
+  ],
+  glutes: [
+    N("Barbell Hip Thrust", { orm: true, aliases: ["hip thrust"] }),
+    N("Machine Hip Thrust", { equipment: "machine" }),
+    N("Glute Bridge", { equipment: "bodyweight", load: false }),
+    N("Cable Kickback", { equipment: "cable", uni: true }),
+    N("Machine Glute Kickback", { equipment: "machine", uni: true }),
+    N("Hip Abduction Machine", { equipment: "machine", aliases: ["abduction"] }),
+    N("Hip Adduction Machine", { equipment: "machine", aliases: ["adduction"] }),
+  ],
+  calves: [
+    N("Standing Calf Raise", { equipment: "machine", aliases: ["calf raise"] }),
+    N("Seated Calf Raise", { equipment: "machine" }),
+    N("Leg Press Calf Raise", { equipment: "machine" }),
+    N("Hack Squat Calf Raise", { equipment: "machine" }),
+    N("Smith Machine Calf Raise", { equipment: "machine" }),
+    N("Single-Leg Calf Raise", { equipment: "bodyweight", uni: true, bw: 1 }),
+    N("Donkey Calf Raise", { equipment: "machine" }),
+    N("Tibialis Raise", { equipment: "bodyweight", load: false }),
+    N("Tibialis Machine", { equipment: "machine" }),
+  ],
+  core: [
+    N("Crunch", { equipment: "bodyweight" }),
+    N("Cable Crunch", { equipment: "cable", load: true }),
+    N("Machine Crunch", { equipment: "machine", load: true }),
+    N("Reverse Crunch", { equipment: "bodyweight" }),
+    N("Decline Sit-Up", { equipment: "bodyweight" }),
+    N("Hanging Knee Raise", { equipment: "bodyweight" }),
+    N("Hanging Leg Raise", { equipment: "bodyweight" }),
+    N("Captain's Chair Leg Raise", { equipment: "machine" }),
+    N("Ab Wheel Rollout", { equipment: "other" }),
+    N("Plank", { equipment: "bodyweight", tracking: "duration" }),
+    N("Side Plank", { equipment: "bodyweight", tracking: "duration", uni: true }),
+    N("Dead Bug", { equipment: "bodyweight" }),
+    N("Bird Dog", { equipment: "bodyweight", uni: true }),
+    N("Hollow Body Hold", { equipment: "bodyweight", tracking: "duration" }),
+    N("Pallof Press", { equipment: "cable", load: true, uni: true }),
+    N("Cable Wood Chop", { equipment: "cable", load: true, uni: true }),
+    N("Cable Lift", { equipment: "cable", load: true, uni: true }),
+    N("Russian Twist", { equipment: "other" }),
+  ],
+  carry: [
+    N("Farmer's Carry", { equipment: "dumbbell", aliases: ["farmers walk"] }),
+    N("Suitcase Carry", { equipment: "dumbbell", uni: true }),
+    N("Front Rack Carry", { equipment: "barbell" }),
+    N("Overhead Carry", { equipment: "dumbbell" }),
+    N("Zercher Carry", { equipment: "barbell" }),
+    N("Sled Push", { equipment: "sled" }),
+    N("Sled Drag", { equipment: "sled" }),
+    N("Backward Sled Drag", { equipment: "sled" }),
+    N("Bear Crawl", { equipment: "bodyweight", load: false }),
+    N("Crab Walk", { equipment: "bodyweight", load: false }),
+  ],
+  kettlebell: [
+    N("Kettlebell Swing", { equipment: "kettlebell", aliases: ["kb swing", "swing"] }),
+    N("Single-Arm Kettlebell Swing", { equipment: "kettlebell", uni: true }),
+    N("Kettlebell Clean", { equipment: "kettlebell", uni: true }),
+    N("Kettlebell Press", { equipment: "kettlebell", pattern: "push", uni: true }),
+    N("Kettlebell Clean & Press", { equipment: "kettlebell", uni: true }),
+    N("Kettlebell Snatch", { equipment: "kettlebell", uni: true }),
+    N("Turkish Get-Up", { equipment: "kettlebell", uni: true }),
+    N("Kettlebell Goblet Squat", { equipment: "kettlebell", pattern: "squat" }),
+    N("Kettlebell Deadlift", { equipment: "kettlebell" }),
+    N("Kettlebell Windmill", { equipment: "kettlebell", uni: true }),
+  ],
+  explosive: [
+    N("Box Jump", { equipment: "bodyweight" }),
+    N("Broad Jump", { equipment: "bodyweight" }),
+    N("Squat Jump", { equipment: "bodyweight" }),
+    N("Jump Lunge", { equipment: "bodyweight", uni: true }),
+    N("Medicine Ball Slam", { equipment: "other" }),
+    N("Rotational Medicine Ball Throw", { equipment: "other", uni: true }),
+  ],
+  cardio: [
+    N("Battle Ropes", { equipment: "other" }),
+    N("SkiErg", { equipment: "machine" }),
+    N("Rowing Ergometer", { equipment: "machine", aliases: ["rower", "erg"] }),
+    N("Assault Bike", { equipment: "machine", aliases: ["air bike", "echo bike"] }),
+    N("Treadmill Run", { equipment: "machine", tracking: "distance" }),
+    N("Outdoor Run", { equipment: "bodyweight", tracking: "distance", aliases: ["run"] }),
+    N("Incline Walk", { equipment: "machine", aliases: ["ruck", "walk"] }),
+    N("Stair Climber", { equipment: "machine" }),
+    N("Jump Rope", { equipment: "other", aliases: ["skipping"] }),
+  ],
+  mobility: [
+    N("Couch Stretch", { uni: true }),
+    N("Half-Kneeling Hip Flexor Stretch", { uni: true }),
+    N("90/90 Hip Switch"),
+    N("90/90 Hip Stretch", { uni: true }),
+    N("Pigeon Stretch", { uni: true }),
+    N("Figure-Four Stretch", { uni: true }),
+    N("Frog Stretch"),
+    N("Butterfly Stretch"),
+    N("Adductor Rockback"),
+    N("Cossack Squat", { tracking: "reps", uni: true }),
+    N("Deep Squat Hold"),
+    N("World's Greatest Stretch", { uni: true }),
+    N("Standing Hamstring Stretch", { uni: true }),
+    N("Pancake Stretch"),
+    N("Quad Stretch", { uni: true }),
+    N("Calf Wall Stretch", { uni: true }),
+    N("Ankle Dorsiflexion Mobilisation", { uni: true }),
+    N("Knee-to-Wall Ankle Mobilisation", { uni: true }),
+    N("Cat-Cow"),
+    N("Child's Pose"),
+    N("Cobra"),
+    N("Thoracic Extension"),
+    N("Thoracic Rotation", { uni: true }),
+    N("Open Book", { uni: true }),
+    N("Thread the Needle", { uni: true }),
+    N("Supine Spinal Twist", { uni: true }),
+    N("Jefferson Curl", { tracking: "reps", load: true }),
+    N("Segmented Spinal Roll"),
+    N("Doorway Pec Stretch", { uni: true }),
+    N("Lat Stretch", { uni: true }),
+    N("Bench Lat Stretch"),
+    N("Overhead Triceps Stretch", { uni: true }),
+    N("Cross-Body Shoulder Stretch", { uni: true }),
+    N("Sleeper Stretch", { uni: true }),
+    N("Shoulder CARs", { tracking: "reps", uni: true }),
+    N("Scapular CARs", { tracking: "reps" }),
+    N("Wall Slides", { tracking: "reps" }),
+    N("Scapular Push-Ups", { tracking: "reps" }),
+    N("Dead Hang"),
+    N("Active Hang"),
+  ],
+  fascia: [
+    N("Rebounding"),
+    N("Pogo Hops", { tracking: "reps" }),
+    N("Low Pogo Hops", { tracking: "reps" }),
+    N("Single-Leg Pogo", { tracking: "reps", uni: true }),
+    N("Lateral Pogo", { tracking: "reps", uni: true }),
+    N("Rhythm Bounces"),
+    N("Heel Bounces"),
+    N("Whole-Body Shaking", { aliases: ["shake", "shaking"] }),
+    N("Loose Limb Shaking"),
+    N("Elastic Arm Swings"),
+    N("Cross-Body Arm Swings"),
+    N("Pendulum Arm Swings"),
+    N("Rotational Bounces"),
+    N("Standing Spiral Rotation"),
+    N("Walking Spiral"),
+    N("Contralateral Walking"),
+    N("Crawling"),
+    N("Lateral Crawl"),
+    N("Loaded Pancake", { load: true }),
+    N("Cossack Flow"),
+    N("Deep Squat Flow"),
+    N("Lunge + Rotation", { uni: true }),
+    N("Side Bend Reach", { uni: true }),
+    N("Standing Lateral Line Stretch", { uni: true }),
+    N("Cross-Body Chain Stretch", { uni: true }),
+    N("Spiral Line Stretch", { uni: true }),
+    N("Hanging Lateral Stretch", { uni: true }),
+    N("Hanging Rotation", { uni: true }),
+  ],
+  tissue: [
+    N("Foam Roll — Calves", { equipment: "other" }),
+    N("Foam Roll — Quads", { equipment: "other" }),
+    N("Foam Roll — Hamstrings", { equipment: "other" }),
+    N("Foam Roll — Glutes", { equipment: "other" }),
+    N("Foam Roll — Adductors", { equipment: "other" }),
+    N("Foam Roll — IT-Band Region", { equipment: "other" }),
+    N("Foam Roll — Thoracic Spine", { equipment: "other" }),
+    N("Foam Roll — Lats", { equipment: "other" }),
+    N("Lacrosse Ball — Feet", { equipment: "other" }),
+    N("Lacrosse Ball — Glutes", { equipment: "other" }),
+    N("Lacrosse Ball — Pec", { equipment: "other" }),
+    N("Lacrosse Ball — Upper Back", { equipment: "other" }),
+    N("Massage Ball — Hip", { equipment: "other" }),
+    N("Peanut Ball — Spine", { equipment: "other" }),
+    N("Foot Rolling", { equipment: "other" }),
+  ],
+  breath: [
+    N("Crocodile Breathing"),
+    N("90/90 Breathing"),
+    N("Supine Diaphragmatic Breathing"),
+    N("Child's Pose Breathing"),
+    N("Deep Squat Breathing"),
+    N("Dead Hang Breathing"),
+    N("Rib Expansion Breathing"),
+    N("Lateral Rib Breathing"),
+    N("Cat-Cow + Breath"),
+    N("Segmental Breathing"),
+    N("Box Breathing"),
+    N("Extended-Exhale Breathing"),
+    N("Walking Breath Practice"),
+  ],
+  olympic: [
+    N("Power Clean", { orm: true, aliases: ["clean"] }),
+    N("Hang Clean"), N("Clean & Jerk"), N("Power Snatch", { aliases: ["snatch"] }),
+    N("Hang Snatch"), N("Push Press", { pattern: "push" }), N("Push Jerk", { pattern: "push" }),
+    N("High Pull"), N("Clean Pull"), N("Snatch Pull"),
+  ],
+  landmine: [
+    N("Landmine Press", { uni: true }), N("Single-Arm Landmine Press", { uni: true }),
+    N("Landmine Row", { pattern: "pull" }), N("Landmine Squat", { pattern: "squat" }),
+    N("Landmine RDL", { pattern: "hinge" }),
+    N("Landmine Rotation", { pattern: "rotation", uni: true }),
+    N("Landmine Lunge", { pattern: "squat", uni: true }),
+  ],
+  calisthenics: [
+    N("Inverted Row", { aliases: ["australian pull-up"] }), N("Pike Push-Up", { pattern: "push" }),
+    N("Handstand Push-Up", { pattern: "push", aliases: ["hspu"] }),
+    N("Handstand Hold", { pattern: "isometric", tracking: "duration" }),
+    N("L-Sit", { pattern: "isometric", tracking: "duration" }),
+    N("Muscle-Up"), N("Scapular Pull-Up"),
+    N("Reverse Nordic", { pattern: "squat" }), N("Sissy Squat", { pattern: "squat" }),
+    N("Shrimp Squat", { pattern: "squat", uni: true }),
+    N("Pistol Squat", { pattern: "squat", uni: true }),
+  ],
+  rings: [
+    N("Ring Support Hold", { pattern: "isometric", tracking: "duration" }),
+    N("Ring Push-Up", { pattern: "push" }), N("Ring Fly", { pattern: "push" }),
+    N("Ring Fallout", { pattern: "core" }), N("Ring Row"), N("Ring Dip", { pattern: "push" }),
+    N("Skin the Cat"), N("German Hang", { tracking: "duration" }),
+    N("Front-Lever Progression", { tracking: "duration" }),
+    N("Back-Lever Progression", { tracking: "duration" }),
+  ],
+  neck_grip: [
+    N("Barbell Shrug", { equipment: "barbell", pattern: "pull", aliases: ["shrug"] }),
+    N("Dumbbell Shrug", { equipment: "dumbbell", pattern: "pull" }),
+    N("Machine Shrug", { equipment: "machine", pattern: "pull" }),
+    N("Cable Shrug", { equipment: "cable", pattern: "pull" }),
+    N("Neck Flexion", { tracking: "reps" }), N("Neck Extension", { tracking: "reps" }),
+    N("Neck Lateral Flexion", { tracking: "reps", uni: true }),
+    N("Plate Pinch", { tracking: "duration" }), N("Towel Hang", { tracking: "duration", load: false }),
+    N("Farmer Hold", { tracking: "duration" }), N("Gripper Work", { tracking: "reps" }),
+  ],
+  feet: [
+    N("Short-Foot Exercise"), N("Toe Yoga"), N("Toe Spreading"), N("Big-Toe Extension"),
+    N("Foot Doming"), N("Barefoot Balance", { uni: true }),
+    N("Soleus Raise", { tracking: "reps" }), N("Calf Isometric", { pattern: "isometric" }),
+  ],
+  rotation: [
+    N("Cable Rotation", { uni: true }), N("Cable Chop", { uni: true }), N("Cable Lift Rotation", { uni: true }),
+    N("Rotational Lunge", { equipment: "bodyweight", load: false, uni: true }),
+    N("Split-Stance Rotation", { equipment: "bodyweight", load: false, uni: true }),
+    N("Cable External Rotation", { uni: true }), N("Cable Internal Rotation", { uni: true }),
+    N("Cable Y-Raise"), N("Cable Pull-Through", { pattern: "hinge" }),
+    N("Cable Upright Row", { pattern: "pull" }),
+  ],
+  isometric: [
+    N("Wall Sit"), N("Split-Squat Hold", { uni: true }), N("Horse Stance"),
+    N("Glute Bridge Hold"), N("Copenhagen Hold", { uni: true }),
+    N("Push-Up Hold"), N("Pull-Up Hold"), N("Calf Hold"),
+  ],
+  balance: [
+    N("Single-Leg Balance", { uni: true }), N("Single-Leg Reach", { uni: true }),
+    N("Airplane", { uni: true }), N("Balance Board", { equipment: "other" }),
+    N("Bosu Balance", { equipment: "other" }), N("Single-Leg RDL Reach", { uni: true }),
+  ],
+  plyometric: [
+    N("Depth Jump"), N("Drop Jump"), N("Lateral Bound", { uni: true }),
+    N("Skater Jump", { uni: true }), N("Single-Leg Hop", { uni: true }),
+    N("Bounds"), N("Hurdle Hop"),
+  ],
+  agility: [
+    N("Lateral Shuffle"), N("Carioca"), N("Cone Drill"), N("Ladder Drill"),
+    N("Shuttle Run", { tracking: "distance" }), N("5-10-5 Drill"), N("T-Drill"),
+    N("Deceleration Drill"), N("Backward Running", { tracking: "distance" }),
+    N("Footwork Drill"), N("Reaction Drill"),
+  ],
+  locomotion: [
+    N("Walking", { aliases: ["walk"] }), N("Hiking"), N("Rucking", { equipment: "other" }),
+    N("Jogging"), N("Sprinting", { aliases: ["sprints"] }),
+    N("Acceleration Sprint"), N("Flying Sprint"), N("Hill Sprint"),
+    N("Resisted Sprint", { equipment: "sled" }),
+    N("Stair Climbing"), N("Cycling", { aliases: ["bike"] }),
+    N("Swimming", { aliases: ["swim"] }), N("Skipping"),
+  ],
+  ground: [
+    N("Leopard Crawl"), N("Ape"), N("Beast Hold"), N("Beast Reach"),
+    N("Frogger"), N("Lizard Crawl"), N("Duck Walk"),
+  ],
+  yoga: [
+    N("Downward Dog"), N("Upward Dog"), N("Low Lunge", { uni: true }),
+    N("Warrior I", { uni: true }), N("Warrior II", { uni: true }),
+    N("Triangle Pose", { uni: true }), N("Garland Squat"), N("Happy Baby"),
+    N("Puppy Pose"), N("Sphinx Pose"), N("Legs-Up-the-Wall"),
+  ],
+  somatic: [
+    N("Pandiculation"), N("Pelvic Rocking"), N("Spinal Waves"), N("Undulation"),
+    N("Freeform Movement"), N("Constructive Rest"), N("Elastic Pulsing"),
+    N("Oscillatory Squat"), N("Multi-Planar Bouncing"),
+  ],
+  corrective: [
+    N("Chin Tuck"), N("Wall Angel"), N("Serratus Wall Slide"),
+    N("Scapular Retraction"), N("Y-T-W Raises", { equipment: "dumbbell", load: true }),
+    N("Hip Airplane", { uni: true }), N("Pelvic Tilt"), N("Pelvic Clock"),
+    N("Bear Hold", { tracking: "duration" }), N("Copenhagen Plank", { tracking: "duration", uni: true }),
+  ],
+  recovery: [
+    N("Easy Walk"), N("Recovery Bike", { equipment: "machine" }),
+    N("Gentle Rebounding"), N("Passive Hang"), N("Supported Deep Squat"),
+    N("Massage Gun", { equipment: "other" }), N("Mobility Stick", { equipment: "other" }),
+  ],
+  /**
+   * Session-level, not movement-level.
+   *
+   * Somebody who does twenty minutes of yoga is not going to log seventeen
+   * separate poses, and an app that requires it is quietly saying that only
+   * countable gym sets are real training. These track duration and nothing
+   * else. Sport practice is deliberately generic for the same reason — nobody
+   * needs "basketball left-hand crossover drill" as a catalogue row.
+   */
+  practice: [
+    N("Yoga Flow"), N("Mobility Flow"), N("Fascial Flow"), N("Animal Flow"),
+    N("Somatic Movement"), N("Dynamic Warm-Up"), N("Full-Body Stretch"),
+    N("Upper-Body Mobility"), N("Lower-Body Mobility"), N("Hip Mobility"),
+    N("Shoulder Mobility"), N("Spinal Mobility"), N("Recovery Session"),
+    N("Breathwork Session"), N("Rebounding Session"), N("Cooldown"),
+    N("Basketball Practice"), N("Soccer Practice"), N("Tennis Practice"),
+    N("Boxing Training"), N("Martial Arts"), N("Sports Practice"),
+    N("Custom Activity"),
+  ],
+};
+
+
+/** Every catalogue row, with its category defaults applied. */
+export function catalogueRows(): Row[] {
+  const rows: Row[] = [];
+  for (const [category, entries] of Object.entries(CATALOGUE)) {
+    const base = DEFAULTS[category] ?? {};
+    for (const e of entries) {
+      rows.push({ equipment: "bodyweight", ...base, ...e, category } as Row);
+    }
+  }
+
+  // A duplicate slug silently overwrites a different movement, and the pair
+  // that collides is always two near-identical names — exactly the one nobody
+  // would notice had gone missing.
+  const seen = new Map<string, string>();
+  for (const r of rows) {
+    const id = slug(r.name);
+    if (seen.has(id)) throw new Error(`Duplicate slug ${id}: "${seen.get(id)}" and "${r.name}"`);
+    seen.set(id, r.name);
+  }
+  return rows;
+}
+
+export { slug };

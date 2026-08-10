@@ -53,6 +53,8 @@ import {
   lbToKg,
   displayWeight,
   type WeightUnit,
+  EXERCISE_CATEGORIES,
+  coachingMessages,
 } from "../../shared/schema.js";
 import {
   bestEstimates,
@@ -171,14 +173,114 @@ async function bodyweightLookup(userId: string) {
   };
 }
 
+/**
+ * Post a finished session into the member's coaching thread.
+ *
+ * A summary rather than a notification. The point of a coach seeing this is to
+ * know what the week actually contained — "12 sets, here they are" is
+ * something to respond to; "Jace finished a workout" is not.
+ *
+ * Weights are rendered in the member's own unit, because the coach is reading
+ * a message the member can also see and two different numbers for the same
+ * lift in one thread is the confusion this module exists to prevent.
+ */
+async function shareSessionWithCoach(userId: string, sessionId: string): Promise<void> {
+  const unit = await unitFor(userId);
+
+  const [session] = await db
+    .select()
+    .from(workoutSessions)
+    .where(eq(workoutSessions.id, sessionId));
+  if (!session) return;
+
+  const rows = await db
+    .select({
+      name: exercises.name,
+      trackingType: exercises.trackingType,
+      reps: workoutSets.reps,
+      durationSeconds: workoutSets.durationSeconds,
+      weightKg: workoutSets.weightKg,
+      isWarmup: workoutSets.isWarmup,
+    })
+    .from(workoutSets)
+    .innerJoin(exercises, eq(exercises.id, workoutSets.exerciseId))
+    .where(eq(workoutSets.sessionId, sessionId))
+    .orderBy(asc(workoutSets.setIndex));
+
+  const working = rows.filter((r) => !r.isWarmup);
+  if (working.length === 0) return;
+
+  // Collapsed per movement: "Bench Press — 3 × 8 @ 185 lb" reads in a glance,
+  // and one line per set does not.
+  type Logged = (typeof working)[number];
+  const byMovement = new Map<string, Logged[]>();
+  for (const r of working) {
+    const list = byMovement.get(r.name) ?? [];
+    list.push(r);
+    byMovement.set(r.name, list);
+  }
+
+  const lines: string[] = [];
+  // Array.from rather than iterating the Map directly — this file targets a
+  // build without downlevelIteration.
+  for (const [name, sets] of Array.from(byMovement.entries())) {
+    const first = sets[0];
+    if (first.trackingType === "duration") {
+      const total = sets.reduce((t: number, s: Logged) => t + (s.durationSeconds ?? 0), 0);
+      lines.push(`${name} — ${sets.length} × ${Math.round(total / sets.length)}s`);
+    } else {
+      const reps = sets.map((s: Logged) => s.reps ?? 0);
+      const sameReps = reps.every((n: number) => n === reps[0]);
+      const loads = sets.map((s: Logged) => out(s.weightKg, unit) ?? 0).filter((n: number) => n > 0);
+      const top = loads.length ? Math.max(...loads) : null;
+      lines.push(
+        `${name} — ${sets.length} × ${sameReps ? reps[0] : reps.join("/")}` +
+          (top ? ` @ ${top}${unit}` : ""),
+      );
+    }
+  }
+
+  const title = session.title?.trim() || "Training";
+  const content = [`${title} — ${working.length} sets`, "", ...lines].join("\n");
+
+  await db.insert(coachingMessages).values({
+    userId,
+    senderRole: "member",
+    messageType: "progress_update",
+    content,
+    metadata: JSON.stringify({ sessionId, sets: working.length, source: "build" }),
+  });
+}
+
 export function registerTrainingRoutes(app: Express) {
   // ─── Catalogue ───────────────────────────────────────────────────────────
 
+  /**
+   * The movement picker.
+   *
+   * Search cuts across everything; category and group narrow a browse. Both
+   * exist because they answer different questions — somebody who knows they
+   * want a cable fly types it, and somebody who knows only that they are doing
+   * legs today taps their way there. With 469 movements, an endpoint that
+   * offered only one of the two would be unusable for half the people opening
+   * it.
+   *
+   * A member's own movements come back alongside the catalogue, and nobody
+   * else ever sees them.
+   */
   app.get("/api/training/exercises", isAuthenticated, async (req, res) => {
     try {
+      const userId = req.session!.userId!;
       const q = String((req.query.q as string) ?? "").trim();
+      const category = String((req.query.category as string) ?? "").trim();
+      const group = String((req.query.group as string) ?? "").trim();
 
-      const filters = [eq(exercises.isActive, true)];
+      const filters = [
+        eq(exercises.isActive, true),
+        // The shared catalogue, plus this member's own. Never anyone else's.
+        or(sql`${exercises.ownerUserId} is null`, eq(exercises.ownerUserId, userId))!,
+      ];
+
       if (q) {
         // Name or alias. The alias array is what lets somebody type "bench"
         // and find Barbell Bench Press instead of nothing.
@@ -190,12 +292,23 @@ export function registerTrainingRoutes(app: Express) {
         );
       }
 
+      if (category) {
+        filters.push(eq(exercises.category, category));
+      } else if (group) {
+        // Resolved from the shared table rather than duplicated in SQL, so a
+        // category moving between groups is a one-line change.
+        const ids = EXERCISE_CATEGORIES.filter((c) => c.group === group).map((c) => c.id);
+        if (ids.length) filters.push(inArray(exercises.category, ids as string[]));
+      }
+
       const rows = await db
         .select()
         .from(exercises)
         .where(and(...filters))
         .orderBy(asc(exercises.sortOrder), asc(exercises.name))
-        .limit(200);
+        // Only ever a search result or one category at a time, so this is a
+        // guard against a pathological query rather than a page size.
+        .limit(300);
 
       res.json(rows);
     } catch (err) {
@@ -407,6 +520,9 @@ export function registerTrainingRoutes(app: Express) {
         .object({
           durationMinutes: z.number().int().min(0).max(1440).nullable().optional(),
           note: z.string().max(1000).nullable().optional(),
+          /** Named at the end for an ad-hoc session — there was nothing to call it at the start. */
+          title: z.string().max(120).nullable().optional(),
+          shareWithCoach: z.boolean().optional(),
         })
         .parse(req.body ?? {});
 
@@ -416,11 +532,34 @@ export function registerTrainingRoutes(app: Express) {
           finishedAt: new Date(),
           durationMinutes: input.durationMinutes ?? null,
           note: input.note ?? null,
+          // Only when one was sent: a prescribed session already has its title
+          // and must not be blanked by a finish call that omits it.
+          ...(input.title !== undefined ? { title: input.title } : {}),
         })
         .where(and(eq(workoutSessions.id, param(req, "id")), eq(workoutSessions.userId, userId)))
         .returning();
 
       if (!row) return res.status(404).json({ message: "No such session" });
+
+      /**
+       * Tell the coach, if asked.
+       *
+       * Written as a normal message in the thread they already read, rather
+       * than as a notification type of its own — a coach should not have to
+       * learn a second inbox to find out their member trained. Composed from
+       * what was actually logged, so it is a summary and not a ping.
+       *
+       * Deliberately best-effort: a member's workout is saved whether or not
+       * the message sends, and failing the finish call because a chat insert
+       * had a bad day would lose the session they just did.
+       */
+      if (input.shareWithCoach) {
+        try {
+          await shareSessionWithCoach(userId, row.id);
+        } catch (err) {
+          trackError("training.share", err);
+        }
+      }
 
       track("training.session_finish", { userId, surface: "build", subjectId: row.id });
       res.json(row);

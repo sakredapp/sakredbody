@@ -35,6 +35,8 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { InfoTip } from "@/components/ui/info-tip";
 import { SectionHeading, Panel, StatTile } from "@/components/portal/Panel";
+import { MemberBuild } from "@/components/build/MemberBuild";
+import { FreeSession } from "@/components/build/FreeSession";
 import { Dumbbell, Check, Plus, Trophy, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { estimateOneRepMax, lbToKg } from "@shared/models/training";
@@ -89,6 +91,8 @@ export function BuildTab() {
   const qc = useQueryClient();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [entries, setEntries] = useState<Record<string, Entry[]>>({});
+  /** An ad-hoc or template-started session, which has no prescription behind it. */
+  const [freeSession, setFreeSession] = useState<{ id: string; title: string } | null>(null);
 
   const today = useQuery<TodayBuild>({
     queryKey: ["/api/training/today"],
@@ -144,16 +148,30 @@ export function BuildTab() {
     return (
       <div className="space-y-6">
         <SectionHeading title="Build" subtitle="Strength, movement and resilience." />
+        {/* This used to be the end of the road: one paragraph explaining that
+            sessions arrive with a protocol, and nothing to do. For a member
+            already dialled on their own training — which is most people who
+            train seriously — that was the app saying it had no interest in
+            what they were doing. */}
         <Panel>
-          <div className="py-12 text-center space-y-2">
+          <div className="py-8 text-center space-y-2">
             <Dumbbell className="h-6 w-6 mx-auto text-muted-foreground/40" />
             <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-              Nothing planned today. Build sessions arrive with your protocol —
-              when one is running and today is a lifting day, the lifts show up here
-              with their targets already worked out.
+              Nothing prescribed today. When a protocol is running and today is a lifting day,
+              the lifts appear here with their targets already worked out.
             </p>
           </div>
         </Panel>
+        {freeSession ? (
+          <FreeSession
+            sessionId={freeSession.id}
+            title={freeSession.title}
+            unit={unit}
+            onDone={() => setFreeSession(null)}
+          />
+        ) : (
+          <MemberBuild onStarted={(id, t) => setFreeSession({ id, title: t })} />
+        )}
       </div>
     );
   }

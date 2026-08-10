@@ -83,6 +83,41 @@ export const exercises = pgTable(
     equipment: text("equipment").notNull().default("barbell"),
 
     /**
+     * The word a member would use to find it. See EXERCISE_CATEGORIES.
+     *
+     * `pattern` is how a coach thinks — hinge, push, carry — and it is what
+     * programming is built from. It is not how anybody searches. Nobody opens
+     * a picker looking for "a hinge"; they look for legs, or arms, or the
+     * stretch for their hips. Both exist because they answer different
+     * questions, and collapsing them would cost one of the two.
+     *
+     * Fascia is deliberately its own category rather than a corner of
+     * mobility. Pogo hops, spiral walks and shaking are not stretching, they
+     * are the elastic work this product is actually about — and burying them
+     * under "mobility" is how they end up looking like a warm-up nobody does.
+     */
+    category: text("category").notNull().default("full_body"),
+
+    /**
+     * Whether load is even a question.
+     *
+     * ChatGPT's spec proposed exploding trackingType into weight_reps,
+     * weight_distance, assisted_reps and so on. That would duplicate what the
+     * schema already says better: `workout_sets` carries reps, duration and
+     * distance *alongside* a separate weightKg, so a weighted carry is
+     * distance + weight and a weighted pull-up is reps + weight, with no new
+     * vocabulary and no combinatorial explosion when the next pairing appears.
+     *
+     * The genuinely missing bit was smaller: whether to show a weight field at
+     * all. A couch stretch with a "kg" box next to it is the sort of detail
+     * that makes an app feel like it was built for something else.
+     */
+    takesLoad: boolean("takes_load").notNull().default(true),
+
+    /** One side at a time — the picker says so, and volume doubles honestly. */
+    unilateral: boolean("unilateral").notNull().default(false),
+
+    /**
      * What a set of this is measured in: reps, duration or distance.
      *
      * The column exists because a plank has no reps and a carry has no reps,
@@ -119,13 +154,183 @@ export const exercises = pgTable(
     cues: text("cues"),
     isActive: boolean("is_active").notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),
+
+    /**
+     * Whose movement this is. Null for the shared catalogue.
+     *
+     * The note at the top of this table argues against free text, and it is
+     * right: "bench", "Bench Press" and "BB bench" become three movements that
+     * can never be graphed together. But a catalogue that does not contain
+     * what somebody actually does is its own failure — a member training
+     * bodybuilding accessories finds no cable fly and simply cannot log their
+     * session, which is worse than an untidy row.
+     *
+     * So both. The shared catalogue stays curated and is the only thing that
+     * feeds cross-member analysis; a member can add what is missing, and it is
+     * visible to them alone. Their history is real either way, and nothing
+     * they invent can fragment anyone else's data.
+     */
+    ownerUserId: varchar("owner_user_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   },
   (t) => [
     index("idx_exercises_pattern").on(t.pattern),
     index("idx_exercises_active").on(t.isActive),
+    index("idx_exercises_owner").on(t.ownerUserId),
   ],
 );
+
+/**
+ * The categories, in the order the picker shows them.
+ *
+ * Ordered by how often somebody reaches for them, not alphabetically and not
+ * by anatomy. Chest and back first because that is most of what gets logged;
+ * fascia and breath last but present, because they are the reason this is not
+ * a lifting app with a wellness skin.
+ */
+export const EXERCISE_CATEGORIES = [
+  // ── Strength ──
+  { id: "chest", label: "Chest", group: "strength" },
+  { id: "back", label: "Back", group: "strength" },
+  { id: "shoulders", label: "Shoulders", group: "strength" },
+  { id: "arms", label: "Arms", group: "strength" },
+  { id: "legs", label: "Legs", group: "strength" },
+  { id: "glutes", label: "Glutes", group: "strength" },
+  { id: "calves", label: "Calves", group: "strength" },
+  { id: "core", label: "Core", group: "strength" },
+  { id: "olympic", label: "Olympic", group: "strength" },
+  { id: "landmine", label: "Landmine", group: "strength" },
+  { id: "calisthenics", label: "Calisthenics", group: "strength" },
+  { id: "rings", label: "Rings", group: "strength" },
+  { id: "neck_grip", label: "Neck & grip", group: "strength" },
+  { id: "isometric", label: "Isometrics", group: "strength" },
+
+  // ── Athletic ──
+  { id: "explosive", label: "Explosive", group: "athletic" },
+  { id: "plyometric", label: "Plyometrics", group: "athletic" },
+  { id: "agility", label: "Agility", group: "athletic" },
+  { id: "locomotion", label: "Running & locomotion", group: "athletic" },
+  { id: "carry", label: "Carries", group: "athletic" },
+  { id: "kettlebell", label: "Kettlebell", group: "athletic" },
+  { id: "rotation", label: "Rotation", group: "athletic" },
+  { id: "balance", label: "Balance", group: "athletic" },
+  { id: "ground", label: "Ground movement", group: "athletic" },
+  { id: "cardio", label: "Cardio", group: "athletic" },
+
+  // ── Mobility ──
+  { id: "mobility", label: "Mobility", group: "mobility" },
+  { id: "feet", label: "Feet & ankles", group: "mobility" },
+  { id: "corrective", label: "Corrective", group: "mobility" },
+  { id: "yoga", label: "Yoga", group: "mobility" },
+
+  // ── Fascia — the reason this is not a lifting app ──
+  { id: "fascia", label: "Fascia", group: "fascia" },
+  { id: "somatic", label: "Somatic", group: "fascia" },
+  { id: "tissue", label: "Tissue work", group: "fascia" },
+  { id: "breath", label: "Breath", group: "fascia" },
+  { id: "recovery", label: "Recovery", group: "fascia" },
+
+  // ── Whole sessions ──
+  { id: "practice", label: "Practices", group: "practice" },
+  { id: "full_body", label: "Full body", group: "practice" },
+] as const;
+
+/**
+ * The five chips the picker actually shows.
+ *
+ * Thirty-four categories is a correct taxonomy and a terrible filter bar —
+ * nobody scans thirty-four chips, they scroll past them. The groups are what
+ * somebody has in mind when they open the picker ("I'm doing legs", "I want
+ * something for my hips"), and the category is what narrows it once they are
+ * inside. Search cuts across all of it, so neither level has to be guessed
+ * correctly to find anything.
+ */
+export const EXERCISE_GROUPS = [
+  { id: "strength", label: "Strength" },
+  { id: "athletic", label: "Athletic" },
+  { id: "mobility", label: "Mobility" },
+  { id: "fascia", label: "Fascia & recovery" },
+  { id: "practice", label: "Practices" },
+] as const;
+
+export type ExerciseGroup = (typeof EXERCISE_GROUPS)[number]["id"];
+
+export type ExerciseCategory = (typeof EXERCISE_CATEGORIES)[number]["id"];
+export const exerciseCategoryEnum = z.enum(
+  EXERCISE_CATEGORIES.map((c) => c.id) as [ExerciseCategory, ...ExerciseCategory[]],
+);
+
+// ─── 1b. THE MEMBER'S OWN SESSIONS ─────────────────────────────────────────
+
+/**
+ * A workout somebody wrote for themselves, saved to repeat.
+ *
+ * Not everyone arrives needing to be told how to train. Plenty of members are
+ * already dialled on their lifting and want the coaching for fascia, mobility
+ * and recovery — the parts they are *not* dialled on. Until now Build had
+ * nothing for them: no prescription meant an empty screen, so the app's
+ * position was effectively "train our way or don't log."
+ *
+ * Deliberately a separate table from `habit_exercises` rather than a shared
+ * one with an owner column. They are different things with different rules: a
+ * prescription belongs to a protocol, is authored by a coach, arrives on a
+ * schedule and is edited centrally for everyone on it. This belongs to one
+ * person, is authored by them, appears when they choose it, and nobody else
+ * ever sees it. Merging them would mean every query in Build growing a clause
+ * about which kind it was looking at.
+ *
+ * The catalogue, the sets, the volume maths and the 1RM estimates are all
+ * shared. Only authorship differs.
+ */
+export const memberWorkouts = pgTable(
+  "member_workouts",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull(),
+    name: text("name").notNull(),
+    note: text("note"),
+    /** Hidden rather than deleted, so past sessions keep their origin. */
+    isArchived: boolean("is_archived").notNull().default(false),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (t) => [index("idx_member_workouts_user").on(t.userId, t.isArchived)],
+);
+
+/**
+ * The movements in one of those, mirroring habit_exercises on purpose.
+ *
+ * Same column names and same meanings, so the Build UI renders a prescribed
+ * session and a self-written one with the same component, and a member reading
+ * "4 × 3–5" sees the same thing in both. Percent-of-1RM is kept even though
+ * most people writing their own will not use it — the ones who do are exactly
+ * the members already dialled enough to be writing their own.
+ */
+export const memberWorkoutExercises = pgTable(
+  "member_workout_exercises",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    memberWorkoutId: uuid("member_workout_id").notNull(),
+    exerciseId: text("exercise_id").notNull(),
+
+    orderIndex: integer("order_index").notNull().default(0),
+    targetSets: integer("target_sets").notNull().default(3),
+    targetRepsLow: integer("target_reps_low"),
+    targetRepsHigh: integer("target_reps_high"),
+    targetPercent1rm: real("target_percent_1rm"),
+    restSeconds: integer("rest_seconds"),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (t) => [
+    index("idx_member_workout_exercises").on(t.memberWorkoutId, t.orderIndex),
+    index("idx_member_workout_exercises_ex").on(t.exerciseId),
+  ],
+);
+
+export type MemberWorkout = typeof memberWorkouts.$inferSelect;
+export type MemberWorkoutExercise = typeof memberWorkoutExercises.$inferSelect;
 
 // ─── 2. THE PRESCRIPTION ───────────────────────────────────────────────────
 

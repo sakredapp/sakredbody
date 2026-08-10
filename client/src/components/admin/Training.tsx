@@ -1,3 +1,4 @@
+import { EXERCISE_CATEGORIES } from "@shared/schema";
 /**
  * Admin — Build.
  *
@@ -488,7 +489,15 @@ function Prescription({ habitId }: { habitId: string }) {
 function Catalogue() {
   const [open, setOpen] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const [draft, setDraft] = useState({ name: "", pattern: "push", equipment: "barbell", trackingType: "reps" });
+  const [draft, setDraft] = useState({
+    name: "",
+    pattern: "push",
+    equipment: "barbell",
+    trackingType: "reps",
+    category: "full_body",
+    takesLoad: true,
+    unilateral: false,
+  });
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -511,7 +520,15 @@ function Catalogue() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/admin/exercises"] });
-      setDraft({ name: "", pattern: "push", equipment: "barbell", trackingType: "reps" });
+      setDraft({
+        name: "",
+        pattern: "push",
+        equipment: "barbell",
+        trackingType: "reps",
+        category: "full_body",
+        takesLoad: true,
+        unilateral: false,
+      });
       setCreating(false);
       toast({ title: "Movement added" });
     },
@@ -572,6 +589,56 @@ function Catalogue() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {PATTERNS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs flex items-center gap-1.5">
+                Category
+                <InfoTip label="About categories" title="How a member finds it">
+                  Pattern is how a coach thinks — hinge, push, carry. Category is how
+                  somebody searches: legs, hips, fascia. Both exist because they answer
+                  different questions.
+                </InfoTip>
+              </Label>
+              <Select value={draft.category} onValueChange={(v) => setDraft({ ...draft, category: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {EXERCISE_CATEGORIES.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs flex items-center gap-1.5">
+                Takes load
+                <InfoTip label="About load" title="Whether weight is even asked">
+                  Off for stretches, breathing and most mobility. A couch stretch with a
+                  weight box beside it is an app built for something else.
+                </InfoTip>
+              </Label>
+              <Select
+                value={draft.takesLoad ? "yes" : "no"}
+                onValueChange={(v) => setDraft({ ...draft, takesLoad: v === "yes" })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="yes">Yes</SelectItem>
+                  <SelectItem value="no">No</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">One side at a time</Label>
+              <Select
+                value={draft.unilateral ? "yes" : "no"}
+                onValueChange={(v) => setDraft({ ...draft, unilateral: v === "yes" })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="no">No</SelectItem>
+                  <SelectItem value="yes">Yes</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -23,6 +23,7 @@ import { registerProfileRoutes } from "./profile/routes.js";
 import { registerWinRoutes } from "./wins/index.js";
 import { registerMemberRoutes } from "./members/index.js";
 import { registerTrainingRoutes } from "./training/index.js";
+import { registerMemberWorkoutRoutes } from "./training/memberWorkouts.js";
 import { registerHealthRoutes } from "./health/index.js";
 import { registerModerationRoutes } from "./moderation/index.js";
 import { requireRole } from "./auth/roles.js";
@@ -490,6 +491,8 @@ export async function registerRoutes(
 
   // Build — the prescription and what was actually lifted against it.
   registerTrainingRoutes(app);
+  // The member's own movements and saved workouts.
+  registerMemberWorkoutRoutes(app);
 
   // Health — what the phone measured. Read-only to us; the device owns it.
   registerHealthRoutes(app);
