@@ -57,6 +57,16 @@ const MUTED = "#7d766c";
 const SERIF = "'Playfair Display', Georgia, 'Times New Roman', Times, serif";
 const SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif";
 
+/**
+ * How much invisible padding follows the preheader.
+ *
+ * Sized for a phone lock screen, which is the widest preview either platform
+ * renders and roughly six times an inbox row. Built once at module load rather
+ * than per send — it is the same string every time.
+ */
+const PREHEADER_PAD_PAIRS = 70;
+const PREHEADER_PAD = "&#847;&zwnj;&nbsp;".repeat(PREHEADER_PAD_PAIRS);
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -121,11 +131,20 @@ export function passwordResetMail(opts: {
   <body style="margin:0;padding:0;background-color:${GROUND};-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
     <!-- Preheader: the grey line the inbox shows next to the subject. Without
          one, clients scrape the first visible words and the list reads
-         "Sakred Body Hello, Someone asked to…". Hidden in the body itself, and
-         padded so no further content is dragged into the preview. -->
-    <div style="display:none;font-size:1px;color:${GROUND};line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
-      A link to set a new password. It works once and expires in ${expiresMinutes} minutes.
-      &#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;
+         "Sakred Body Reset your password Jace, Someone asked to…".
+         ── On the padding ──────────────────────────────────────────────────
+         The trailing run of zero-width joiners is not decoration. A client
+         stops at the end of the hidden block only if the block is longer than
+         the space it wants to fill, and it keeps scraping into the visible
+         body otherwise. Ten pairs was enough for an inbox row and nowhere near
+         enough for a phone's lock screen, which is several times wider — so
+         the notification read "…expires in 60 minutes.<gap>Sakred Body Reset
+         your password Jace, Someone asked to…", the sentence twice with a hole
+         in the middle. ${PREHEADER_PAD_PAIRS} pairs covers the largest preview
+         either platform shows. It costs about a kilobyte and is invisible in
+         every client, including the ones that ignore display:none. -->
+    <div style="display:none;font-size:1px;color:${GROUND};line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">
+      A link to set a new password. It works once and expires in ${expiresMinutes} minutes.${PREHEADER_PAD}
     </div>
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${GROUND}" style="background-color:${GROUND};">
@@ -135,14 +154,26 @@ export function passwordResetMail(opts: {
           <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;">
 
             <!-- ── Masthead ───────────────────────────────────────────────
-                 The mark is an image and images are blocked by default in a
-                 good share of clients, so the wordmark underneath is text.
-                 With images off this still reads as Sakred Body rather than as
-                 a broken box. -->
+                 The mark sits on an ink disc, and that is not a style choice.
+                 The logo is a gold-and-white caduceus on transparency: the
+                 wings are white, so on parchment they disappear entirely and
+                 the masthead renders as a gap with a faint gold squiggle in
+                 it. On ink both halves read, which is the ground it was drawn
+                 for. Outlook ignores border-radius and shows a square — still
+                 legible, still deliberate-looking, so no VML for this.
+
+                 The wordmark below is text, because images are blocked by
+                 default in a good share of clients and this must still say
+                 Sakred Body rather than show a broken box. -->
             <tr>
-              <td align="center" style="padding:0 0 28px;">
-                <img src="https://sakredbody.com/favicon.png" width="44" height="44" alt="Sakred Body"
-                     style="display:block;width:44px;height:44px;border:0;outline:none;text-decoration:none;">
+              <td align="center" style="padding:0 0 20px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+                  <td align="center" valign="middle" width="64" height="64" bgcolor="${INK}"
+                      style="width:64px;height:64px;background-color:${INK};border-radius:32px;text-align:center;">
+                    <img src="https://sakredbody.com/favicon.png" width="38" height="38" alt="Sakred Body"
+                         style="display:inline-block;width:38px;height:38px;border:0;outline:none;text-decoration:none;">
+                  </td>
+                </tr></table>
               </td>
             </tr>
             <tr>
