@@ -151,7 +151,26 @@ const SECTIONS: LegalSection[] = [
             executive application, or in a retreat booking request.
           </li>
           <li>Dietary preferences, restrictions and allergies you tell us about.</li>
+          <li>
+            If you connect Apple Health or Health Connect in the phone app: your daily activity,
+            sleep, heart and body measurements, and recorded workouts.
+          </li>
         </ul>
+        <p>
+          <strong>Apple Health and Health Connect.</strong> Connecting is optional, and nothing is
+          read until you grant access on your own device. We read only the categories you grant, and
+          only in one direction — we never write anything back into Apple Health or Health Connect.
+          What we store is a daily summary, not the raw second-by-second readings: a day's step
+          total rather than every step, a night's sleep and its stages rather than every movement.
+          It is used to show you your own progress and to let the coach you are working with see how
+          a protocol is actually landing. It is never used for advertising or marketing, never sold,
+          and never shared with a third party for their own purposes.
+        </p>
+        <p>
+          You can withdraw access at any time in iOS Settings or in Health Connect, which stops any
+          further reading immediately. Disconnecting inside the app goes further: it deletes every
+          health measurement we have stored for you, not merely stops the flow.
+        </p>
         <p>
           Under the UK and EU GDPR this is special category data (Article 9). We process it only with
           your explicit consent, given when you create an account and provide it, and you may withdraw

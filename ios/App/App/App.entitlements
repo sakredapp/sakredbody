@@ -4,5 +4,19 @@
 <dict>
 	<key>aps-environment</key>
 	<string>development</string>
+
+	<!-- HealthKit. This entitlement is only half the story: the App ID in the
+	     developer portal must also have the HealthKit capability enabled, or
+	     signing fails with a provisioning profile that does not match. That is
+	     a portal action, not a file. -->
+	<key>com.apple.developer.healthkit</key>
+	<true/>
+
+	<!-- Clinical records — lab results, medications, a real medical history
+	     pulled from a health system. Deliberately empty: we read fitness and
+	     vitals, and requesting clinical access we do not use would put the app
+	     in a far stricter review category for nothing. -->
+	<key>com.apple.developer.healthkit.access</key>
+	<array/>
 </dict>
 </plist>

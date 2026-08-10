@@ -4,4 +4,8 @@
     <string name="title_activity_main">Sakred Body</string>
     <string name="package_name">com.sakredbody.app</string>
     <string name="custom_url_scheme">com.sakredbody.app</string>
+    <!-- Health Connect shows this when a member taps "Privacy policy" on the
+         permission sheet. Google requires it to match the policy on the Play
+         listing, so both point at the same page rather than two that drift. -->
+    <string name="health_connect_privacy_policy_url">https://sakredbody.com/privacy</string>
 </resources>

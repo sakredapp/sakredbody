@@ -1,0 +1,362 @@
+/**
+ * Health data from the phone — Apple Health and Health Connect
+ *
+ *   health_connections  — that a member linked a phone, and how far we've read
+ *   health_days         — one number, for one member, for one day, for one metric
+ *   health_workouts     — sessions, which are events rather than daily totals
+ *
+ * The device is the source of truth and we are a cache. Nothing here is
+ * authored by us and nothing here should be edited by hand: a member revokes
+ * access in iOS Settings or Health Connect, not in our UI, and the next sync
+ * simply stops carrying that metric.
+ *
+ * WHY LONG AND NARROW, not a wide `health_days(steps, hrv, sleep_minutes, …)`:
+ * the metric vocabulary is the platforms', not ours, and it grows. Apple added
+ * wrist temperature; Health Connect added skin temperature after that. A wide
+ * table turns each of those into a migration, a schema type change, and a
+ * client change — and the migration is the step that gets skipped, so the
+ * column exists in the type and never in the database. One row per metric
+ * costs a little space and makes a new metric a string.
+ *
+ * The cost of that choice, stated honestly: you cannot express "steps and HRV
+ * for the same day" as one row without a pivot. Every read here is
+ * "some metrics over a date range for one member", which pivots in the query,
+ * so that cost never lands on a request path.
+ *
+ * We store DAILY AGGREGATES, not raw samples. A watch writes heart rate every
+ * few seconds — a year of one member is millions of rows to say something a
+ * coach reads as a single line. The device aggregates before it posts.
+ * Workouts are the exception, because a workout genuinely is one event.
+ */
+
+import { sql } from "drizzle-orm";
+import {
+  pgTable,
+  text,
+  uuid,
+  integer,
+  doublePrecision,
+  jsonb,
+  date,
+  timestamp,
+  index,
+  uniqueIndex,
+  varchar,
+} from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+
+// ─── 1. THE VOCABULARY ─────────────────────────────────────────────────────
+
+/**
+ * Every metric we will accept. A closed list on purpose: `metric` is a text
+ * column, so without this a client typo writes `restingHR` next to
+ * `restingHeartRate` and the chart quietly loses half its points with nothing
+ * anywhere reporting an error.
+ *
+ * Names are ours, not either platform's — the client maps into these. That is
+ * what keeps an iPhone member and an Android member comparable in one query.
+ */
+export const healthMetricEnum = z.enum([
+  // Movement
+  "steps",
+  "distanceMeters",
+  "flightsClimbed",
+  "exerciseMinutes",
+  "activeCalories",
+  "totalCalories",
+  // Heart
+  "restingHeartRate",
+  "heartRateVariability",
+  "vo2Max",
+  // Sleep — total, and the stages when the device breaks them out
+  "sleepMinutes",
+  "sleepDeepMinutes",
+  "sleepRemMinutes",
+  "sleepAwakeMinutes",
+  // Body
+  "weightKg",
+  "bodyFatPercent",
+  "heightCm",
+  // Vitals
+  "respiratoryRate",
+  "oxygenSaturation",
+  "bodyTemperatureC",
+  // Practice
+  "mindfulnessMinutes",
+  "waterMl",
+  "dietaryCalories",
+]);
+export type HealthMetric = z.infer<typeof healthMetricEnum>;
+
+/**
+ * The one unit each metric is stored in — always SI, always the same for both
+ * platforms.
+ *
+ * This exists because HealthKit hands you whatever unit you ask for and Health
+ * Connect hands you its own, so "82.4" is a plausible weight in kilograms and
+ * a plausible weight in pounds, and a mixed column is not detectably wrong
+ * until a member's weight chart has a 2.2x step in it on the day they changed
+ * phones. The server rejects a sample whose unit is not this one rather than
+ * converting: a conversion silently accepts a client that is confused about
+ * what it is sending, and we would rather find that in a 400.
+ */
+export const HEALTH_UNITS: Record<HealthMetric, string> = {
+  steps: "count",
+  distanceMeters: "m",
+  flightsClimbed: "count",
+  exerciseMinutes: "min",
+  activeCalories: "kcal",
+  totalCalories: "kcal",
+  restingHeartRate: "bpm",
+  heartRateVariability: "ms",
+  vo2Max: "mL/kg/min",
+  sleepMinutes: "min",
+  sleepDeepMinutes: "min",
+  sleepRemMinutes: "min",
+  sleepAwakeMinutes: "min",
+  weightKg: "kg",
+  bodyFatPercent: "%",
+  heightCm: "cm",
+  respiratoryRate: "brpm",
+  oxygenSaturation: "%",
+  bodyTemperatureC: "degC",
+  mindfulnessMinutes: "min",
+  waterMl: "mL",
+  dietaryCalories: "kcal",
+};
+
+/**
+ * Bounds a real human stays inside, used to drop impossible values before they
+ * reach a chart. These are deliberately wide — this is a "the phone is
+ * confused" filter, not a medical judgement, and a real outlier that a coach
+ * should see must survive it.
+ *
+ * The failure this prevents is specific and common: a device that reports a
+ * cumulative lifetime total instead of a daily one puts a single 4,000,000
+ * step day in the series, and every other day flattens to nothing against the
+ * new axis maximum.
+ */
+export const HEALTH_RANGES: Record<HealthMetric, [number, number]> = {
+  steps: [0, 200_000],
+  distanceMeters: [0, 500_000],
+  flightsClimbed: [0, 2_000],
+  exerciseMinutes: [0, 1_440],
+  activeCalories: [0, 20_000],
+  totalCalories: [0, 30_000],
+  restingHeartRate: [20, 220],
+  heartRateVariability: [0, 500],
+  vo2Max: [5, 100],
+  sleepMinutes: [0, 1_440],
+  sleepDeepMinutes: [0, 1_440],
+  sleepRemMinutes: [0, 1_440],
+  sleepAwakeMinutes: [0, 1_440],
+  weightKg: [15, 500],
+  bodyFatPercent: [1, 80],
+  heightCm: [50, 260],
+  respiratoryRate: [2, 80],
+  oxygenSaturation: [50, 100],
+  bodyTemperatureC: [25, 45],
+  mindfulnessMinutes: [0, 1_440],
+  waterMl: [0, 30_000],
+  dietaryCalories: [0, 30_000],
+};
+
+export const healthPlatformEnum = z.enum(["healthkit", "healthconnect"]);
+export type HealthPlatform = z.infer<typeof healthPlatformEnum>;
+
+// ─── 2. CONNECTIONS ────────────────────────────────────────────────────────
+
+export const healthConnections = pgTable(
+  "health_connections",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull(),
+
+    /** 'healthkit' | 'healthconnect' */
+    platform: text("platform").notNull(),
+
+    /**
+     * Which metrics the member actually granted, as of the last sync.
+     *
+     * Worth knowing that on iOS this is a polite fiction: HealthKit refuses to
+     * tell an app whether READ access was denied, precisely so that an app
+     * cannot infer "they hid their weight from me" — a denied read is
+     * indistinguishable from no data. So this records what we asked for and
+     * received something for, not a permission grant we can trust.
+     */
+    grantedMetrics: text("granted_metrics").array(),
+
+    /**
+     * The read watermark. The next sync starts here minus an overlap window,
+     * never at "now" — see the note on syncing in server/health/routes.ts.
+     */
+    syncedThrough: timestamp("synced_through"),
+    lastSyncAt: timestamp("last_sync_at"),
+    /** Rows written by the last sync. 0 for a long stretch means look at it. */
+    lastSyncCount: integer("last_sync_count").notNull().default(0),
+    lastError: text("last_error"),
+
+    /** For support: "it works on my phone" is answerable with a model string. */
+    deviceModel: text("device_model"),
+    osVersion: text("os_version"),
+
+    /**
+     * Set when the member disconnects. The row is kept and the data is deleted
+     * — the opposite of the usual soft delete, and deliberate. Both stores
+     * require that revoking access removes the data; nobody requires us to
+     * forget that a phone was once linked, and keeping it means a re-link
+     * starts from a known watermark instead of re-reading a year.
+     */
+    revokedAt: timestamp("revoked_at"),
+
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_health_connections").on(t.userId, t.platform),
+    index("idx_health_connections_user").on(t.userId),
+  ]
+);
+
+export type HealthConnection = typeof healthConnections.$inferSelect;
+export const insertHealthConnectionSchema = createInsertSchema(healthConnections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// ─── 3. DAILY VALUES ───────────────────────────────────────────────────────
+
+export const healthDays = pgTable(
+  "health_days",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull(),
+
+    /**
+     * The member's own calendar date, as the phone computed it — matching
+     * daily_notes.on_date, and for the same reason. A member in Bali whose
+     * steps land on the server's yesterday has a chart that is wrong by a day
+     * forever, and it is wrong in a way that looks like a data problem rather
+     * than a timezone one.
+     */
+    onDate: date("on_date").notNull(),
+
+    /** One of healthMetricEnum. */
+    metric: text("metric").notNull(),
+    value: doublePrecision("value").notNull(),
+    /** Always HEALTH_UNITS[metric]. Stored anyway, so a row is self-describing. */
+    unit: text("unit").notNull(),
+
+    /** 'healthkit' | 'healthconnect' — which phone this came from. */
+    source: text("source").notNull(),
+    /**
+     * The app that originally wrote it into Health, when the platform says
+     * so — "Oura", "Whoop", "Apple Watch". A coach reading an HRV number
+     * wants to know whether a ring or a phone produced it.
+     */
+    sourceApp: text("source_app"),
+
+    syncedAt: timestamp("synced_at").defaultNow(),
+  },
+  (t) => [
+    /**
+     * The idempotency key. Every sync re-reads a trailing window, so the same
+     * day arrives many times; this is what makes the second arrival an update
+     * instead of a duplicate row that doubles a step count.
+     */
+    uniqueIndex("uq_health_days").on(t.userId, t.onDate, t.metric),
+    index("idx_health_days_user_metric").on(t.userId, t.metric, t.onDate),
+  ]
+);
+
+export type HealthDay = typeof healthDays.$inferSelect;
+
+/** One value the phone is posting. */
+export const healthSampleSchema = z.object({
+  onDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "onDate must be YYYY-MM-DD."),
+  metric: healthMetricEnum,
+  value: z.number().finite(),
+  unit: z.string().min(1),
+  sourceApp: z.string().max(120).optional().nullable(),
+});
+export type HealthSampleInput = z.infer<typeof healthSampleSchema>;
+
+// ─── 4. WORKOUTS ───────────────────────────────────────────────────────────
+
+export const healthWorkouts = pgTable(
+  "health_workouts",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull(),
+
+    /**
+     * The platform's own id for the session. This is the whole reason a
+     * workout is not stored as a daily total: it is what lets a re-sync
+     * recognise the same run rather than adding a second one.
+     */
+    externalId: text("external_id").notNull(),
+
+    /** Free text from the platform — 'running', 'strength', 'yoga', … */
+    workoutType: text("workout_type"),
+    startAt: timestamp("start_at").notNull(),
+    endAt: timestamp("end_at"),
+    /** The member's local date, for grouping alongside health_days. */
+    onDate: date("on_date").notNull(),
+
+    durationSeconds: integer("duration_seconds"),
+    activeCalories: doublePrecision("active_calories"),
+    distanceMeters: doublePrecision("distance_meters"),
+    avgHeartRate: doublePrecision("avg_heart_rate"),
+    maxHeartRate: doublePrecision("max_heart_rate"),
+
+    source: text("source").notNull(),
+    sourceApp: text("source_app"),
+    /** Whatever else the platform sent, unread. Cheap, and answers questions later. */
+    raw: jsonb("raw"),
+
+    syncedAt: timestamp("synced_at").defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_health_workouts").on(t.userId, t.externalId),
+    index("idx_health_workouts_user_date").on(t.userId, t.onDate),
+  ]
+);
+
+export type HealthWorkout = typeof healthWorkouts.$inferSelect;
+
+export const healthWorkoutSchema = z.object({
+  externalId: z.string().min(1).max(200),
+  workoutType: z.string().max(80).optional().nullable(),
+  startAt: z.string().datetime({ offset: true }),
+  endAt: z.string().datetime({ offset: true }).optional().nullable(),
+  onDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "onDate must be YYYY-MM-DD."),
+  durationSeconds: z.number().int().min(0).max(86_400 * 2).optional().nullable(),
+  activeCalories: z.number().min(0).max(30_000).optional().nullable(),
+  distanceMeters: z.number().min(0).max(1_000_000).optional().nullable(),
+  avgHeartRate: z.number().min(20).max(250).optional().nullable(),
+  maxHeartRate: z.number().min(20).max(260).optional().nullable(),
+  sourceApp: z.string().max(120).optional().nullable(),
+});
+export type HealthWorkoutInput = z.infer<typeof healthWorkoutSchema>;
+
+// ─── 5. THE SYNC ENVELOPE ──────────────────────────────────────────────────
+
+/**
+ * What the phone posts. Capped at a size that survives a slow connection:
+ * a first sync of 90 days x 20 metrics is 1,800 samples, so the client pages
+ * rather than sending one enormous body a mobile network will drop halfway.
+ */
+export const healthSyncSchema = z.object({
+  platform: healthPlatformEnum,
+  samples: z.array(healthSampleSchema).max(3_000).default([]),
+  workouts: z.array(healthWorkoutSchema).max(500).default([]),
+  /** Metrics the member granted, so we can show what is and isn't flowing. */
+  grantedMetrics: z.array(healthMetricEnum).optional(),
+  /** How far the client read. Becomes the next watermark on success. */
+  syncedThrough: z.string().datetime({ offset: true }).optional(),
+  deviceModel: z.string().max(120).optional().nullable(),
+  osVersion: z.string().max(60).optional().nullable(),
+});
+export type HealthSyncInput = z.infer<typeof healthSyncSchema>;

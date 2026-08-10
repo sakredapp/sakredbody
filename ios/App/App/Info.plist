@@ -4,6 +4,14 @@
 <dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Sakred Body uses your microphone so you can record voice memos in the community. Recordings are only sent when you choose to send them.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Sakred Body reads your activity, sleep, heart and body measurements from Apple Health so your coach can see how a protocol is actually landing, and so your progress reflects what you did rather than what you remembered. You choose which categories to share, and you can turn any of them off in Settings at any time.</string>
+	<!-- We request read access only, so this string is never shown. It is here
+	     because HealthKit raises an exception the moment an app touches an
+	     authorization API without it, and a missing purpose string is a launch
+	     crash rather than a denied prompt. -->
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Sakred Body does not write anything to Apple Health.</string>
 	<key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>

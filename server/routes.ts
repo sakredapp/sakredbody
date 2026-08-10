@@ -22,6 +22,7 @@ import { registerTelemetryRoutes } from "./telemetry/index.js";
 import { registerWinRoutes } from "./wins/index.js";
 import { registerMemberRoutes } from "./members/index.js";
 import { registerTrainingRoutes } from "./training/index.js";
+import { registerHealthRoutes } from "./health/index.js";
 import { registerModerationRoutes } from "./moderation/index.js";
 import { requireRole } from "./auth/roles.js";
 import {
@@ -488,6 +489,9 @@ export async function registerRoutes(
 
   // Build — the prescription and what was actually lifted against it.
   registerTrainingRoutes(app);
+
+  // Health — what the phone measured. Read-only to us; the device owns it.
+  registerHealthRoutes(app);
 
   // Reporting and blocking — required by both app stores for UGC.
   registerModerationRoutes(app);
