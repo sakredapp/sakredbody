@@ -312,7 +312,22 @@ function describeNumbers(a: AlmanacDay): string[] {
 
 export interface NoteContext {
   almanac: AlmanacDay;
-  firstName?: string | null;
+  /**
+   * A stable pseudonym, never a name. See server/daily/memberRef.ts for why the
+   * model is not told who this is.
+   */
+  memberRef?: string | null;
+  /**
+   * What their phone measured, already reduced to signals. Raw daily series
+   * would be several hundred numbers the model would average badly; these are
+   * the four a coach would actually look at, plus the direction of travel.
+   */
+  health?: {
+    label: string;
+    recent: string;
+    /** "up", "down", or null when there is no baseline worth comparing to. */
+    direction: string | null;
+  }[] | null;
   polarity?: string | null;
   /** Where they are in a protocol, if they're running one. */
   protocol?: {
@@ -406,7 +421,9 @@ export function buildUserPrompt(ctx: NoteContext): string {
 
   lines.push("");
   lines.push("THE PERSON");
-  if (ctx.firstName) lines.push(`Name: ${ctx.firstName} (you may use it once, or not at all)`);
+  // A ref, not a name. The model personalises from their protocol, their
+  // numbers and their own words — none of which require knowing who they are.
+  if (ctx.memberRef) lines.push(`Member: ${ctx.memberRef} (a reference, not a name — never write it)`);
 
   if (ctx.polarity) {
     // The member chose this themselves. It sets register, not content.
@@ -418,6 +435,23 @@ export function buildUserPrompt(ctx: NoteContext): string {
       balanced: "They have asked for a balanced register. Write plainly to both.",
     };
     lines.push(register[ctx.polarity] ?? "");
+  }
+
+  if (ctx.health?.length) {
+    lines.push("");
+    lines.push("THEIR BODY, LAST SEVEN DAYS (measured, not reported)");
+    // Given with the direction because the direction is the finding. A resting
+    // heart rate of 54 means nothing on its own; 54 and rising is the note.
+    for (const signal of ctx.health) {
+      lines.push(
+        `${signal.label}: ${signal.recent}${signal.direction ? ` (${signal.direction} on their own baseline)` : ""}`,
+      );
+    }
+    lines.push(
+      "These are measurements, not a diagnosis. You may notice one of them. " +
+        "Do not give medical advice, do not name a condition, and do not tell " +
+        "them a number is good or bad — say what it suggests about today.",
+    );
   }
 
   if (a.personal?.sunSign || a.personal?.moonSign || a.personal?.risingSign) {

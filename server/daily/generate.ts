@@ -28,6 +28,8 @@ import {
   type DailyNote,
 } from "../../shared/schema.js";
 import { almanacFor, elementalSeason } from "../../shared/utils/almanac.js";
+import { memberRef } from "./memberRef.js";
+import { healthSignals } from "./healthSignals.js";
 import { addDaysToString, routineDayNumber } from "../../shared/utils/dates.js";
 import {
   SYSTEM_PROMPT,
@@ -54,11 +56,6 @@ function protocolPhase(dayNumber: number, durationDays: number): string {
 }
 
 export async function buildContext(userId: string, onDate: string): Promise<NoteContext> {
-  const [user] = await db
-    .select({ firstName: users.firstName })
-    .from(users)
-    .where(eq(users.id, userId));
-
   const [chart] = await db
     .select()
     .from(userCosmology)
@@ -142,7 +139,11 @@ export async function buildContext(userId: string, onDate: string): Promise<Note
 
   return {
     almanac,
-    firstName: user?.firstName ?? null,
+    // A pseudonym, not a name. The query that read firstName is gone with it —
+    // a select whose only consumer has been removed is a read of personal data
+    // for no reason, and the next person would assume something still needed it.
+    memberRef: memberRef(userId),
+    health: await healthSignals(userId),
     polarity: chart?.polarity ?? null,
     protocol,
     centre,

@@ -18,6 +18,12 @@ import {
   toCanonical,
   foldSleep,
 } from "../client/src/lib/healthMetrics.js";
+import {
+  METRIC_DISPLAY,
+  GROUP_ORDER,
+  groupsWithData,
+  summarise,
+} from "../client/src/lib/healthDisplay.js";
 
 let passed = 0;
 let failed = 0;
@@ -481,6 +487,181 @@ check(
 const variables = readFileSync("android/variables.gradle", "utf8");
 const minSdk = Number(/minSdkVersion\s*=\s*(\d+)/.exec(variables)?.[1] ?? 0);
 check("the app's minSdk clears Health Connect's floor", minSdk >= 26, `minSdk is ${minSdk}`);
+
+
+// ── 9. Everything we store has somewhere to be shown ───────────────────────
+section("Display");
+
+/**
+ * The gap this closes: the sync collected twenty-two metrics and the UI
+ * hard-coded four, so eighteen were stored and rendered nowhere. Nothing
+ * failed — a missing metric looks exactly like a member having no data for it,
+ * which is why it survived review.
+ */
+for (const m of METRICS) {
+  const d = METRIC_DISPLAY[m];
+  check(`${m} has a display definition`, Boolean(d));
+  if (!d) continue;
+  check(`${m} has a label`, d.label.length > 0);
+  check(`${m} sits in a known group`, GROUP_ORDER.includes(d.group), d.group);
+  check(`${m} formats a number without throwing`, typeof d.format(1) === "string");
+  check(`${m} declares how a window collapses`, ["average", "latest"].includes(d.summarise));
+}
+
+/** Formatting has to be readable, not merely produced. */
+check("442 minutes reads as 7h 22m", METRIC_DISPLAY.sleepMinutes.format(442) === "7h 22m",
+  METRIC_DISPLAY.sleepMinutes.format(442));
+check("45 minutes drops the hour", METRIC_DISPLAY.exerciseMinutes.format(45) === "45m",
+  METRIC_DISPLAY.exerciseMinutes.format(45));
+check("6200 metres reads as 6.2 km", METRIC_DISPLAY.distanceMeters.format(6200) === "6.2 km",
+  METRIC_DISPLAY.distanceMeters.format(6200));
+check("2500 mL reads as 2.5 L", METRIC_DISPLAY.waterMl.format(2500) === "2.5 L",
+  METRIC_DISPLAY.waterMl.format(2500));
+check("resting HR carries its unit", METRIC_DISPLAY.restingHeartRate.format(54) === "54 bpm",
+  METRIC_DISPLAY.restingHeartRate.format(54));
+check("weight keeps one decimal", METRIC_DISPLAY.weightKg.format(78.64) === "78.6 kg",
+  METRIC_DISPLAY.weightKg.format(78.64));
+
+/**
+ * Direction of "better" is per metric and gets colour applied to it, so a
+ * wrong one is an actively misleading green arrow rather than a missing tile.
+ */
+check("a rising resting heart rate is not an improvement",
+  METRIC_DISPLAY.restingHeartRate.higherIsBetter === false);
+check("more time awake in the night is not an improvement",
+  METRIC_DISPLAY.sleepAwakeMinutes.higherIsBetter === false);
+check("more HRV is an improvement", METRIC_DISPLAY.heartRateVariability.higherIsBetter === true);
+check("weight takes no position", METRIC_DISPLAY.weightKg.higherIsBetter === null);
+check("body fat takes no position", METRIC_DISPLAY.bodyFatPercent.higherIsBetter === null);
+
+/** Measured values must never be summed across a window. */
+for (const m of NEVER_SUMMED) {
+  check(`${m} is summarised, not totalled`,
+    METRIC_DISPLAY[m as keyof typeof METRIC_DISPLAY].summarise !== ("total" as never));
+}
+
+// ── 10. The shape the API actually returns ─────────────────────────────────
+section("Pivot → UI");
+
+/**
+ * Built to match what /api/health/summary emits: one object per day, metric
+ * names as keys. If the server's pivot and this ever disagree, every tile
+ * silently renders "no data".
+ */
+const series = Array.from({ length: 30 }, (_, i) => {
+  const d = new Date(2026, 6, 1 + i);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return {
+    onDate: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    // Last week deliberately worse than the weeks before it.
+    steps: i >= 23 ? 6000 : 10000,
+    sleepMinutes: 430,
+    restingHeartRate: 54,
+    weightKg: 78 + i * 0.01,
+  };
+});
+
+const stepStat = summarise(series, "steps");
+check("a metric present every day is summarised", stepStat !== null);
+check("the headline is the recent window", Math.round(stepStat?.value ?? 0) === 6000,
+  String(stepStat?.value));
+check("the baseline excludes the recent window", Math.round(stepStat?.baseline ?? 0) === 10000,
+  String(stepStat?.baseline));
+
+const weightStat = summarise(series, "weightKg");
+check("a 'latest' metric takes the last value, not a mean",
+  Math.abs((weightStat?.value ?? 0) - 78.29) < 0.001, String(weightStat?.value));
+check("a 'latest' metric shows no trend", weightStat?.baseline === null);
+
+check("a metric with no data yields nothing", summarise(series, "vo2Max") === null);
+
+const shown = groupsWithData(series);
+const shownMetrics = shown.flatMap((g) => g.metrics);
+check("only metrics with data are grouped", shownMetrics.length === 4, shownMetrics.join(", "));
+check("groups come back in display order",
+  shown.map((g) => g.group).join(",") === "Movement,Sleep,Heart,Body",
+  shown.map((g) => g.group).join(","));
+check("an empty series renders nothing", groupsWithData([]).length === 0);
+
+/**
+ * A short history must not fabricate a trend. Two days is not a baseline, and
+ * an arrow drawn from it is a number the member will act on.
+ */
+const short = series.slice(-4);
+check("four days produce no baseline", summarise(short, "steps")?.baseline === null);
+
+/** Both surfaces read the same table — no second source of truth. */
+const card = readFileSync("client/src/components/portal/HealthCard.tsx", "utf8");
+const coach = readFileSync("client/src/components/admin/MemberHealth.tsx", "utf8");
+for (const [name, src] of [["member card", card], ["coach panel", coach]] as const) {
+  check(`the ${name} uses METRIC_DISPLAY`, src.includes("METRIC_DISPLAY"));
+  check(`the ${name} renders every group with data`, src.includes("groupsWithData"));
+  check(`the ${name} hard-codes no metric list`, !/const\s+(HEADLINE|TRACKED)\s*=/.test(src));
+}
+
+
+
+// ── 11. What the model is told ─────────────────────────────────────────────
+section("The model gets no name");
+
+/**
+ * The daily note is generated by a third-party model. Before this, the prompt
+ * carried `Name: Nick` next to that member's protocol and intention — and now
+ * it would have carried their sleep and heart data too. That is a named
+ * person's health information leaving our infrastructure on every generation.
+ */
+const VOICE = readFileSync("server/daily/voice.ts", "utf8");
+const GENERATE = readFileSync("server/daily/generate.ts", "utf8");
+
+check("the prompt no longer carries a name", !/Name:\s*\$\{ctx\.firstName\}/.test(VOICE));
+check("NoteContext has no firstName", !/firstName\??:/.test(VOICE));
+check("the prompt carries a ref instead", /Member:\s*\$\{ctx\.memberRef\}/.test(VOICE));
+check(
+  "the model is told not to write the ref back",
+  /never write it/.test(VOICE),
+  "a bare id in a note reads as a bug to the member"
+);
+check(
+  "the context is built with a ref",
+  /memberRef:\s*memberRef\(userId\)/.test(GENERATE)
+);
+check(
+  "the query that read the name is gone too",
+  !/firstName:\s*users\.firstName/.test(GENERATE),
+  "a select whose only consumer was removed is a read of personal data for nothing"
+);
+
+/**
+ * The ref must be an HMAC, not the user id. The user id is a join key printed
+ * beside the member's name in every other table, so a prompt log carrying it
+ * could be re-identified by anyone who also had a database dump.
+ */
+const REF = readFileSync("server/daily/memberRef.ts", "utf8");
+check("the ref is an HMAC", /createHmac\(/.test(REF));
+check("the ref is not the raw user id", !/return\s+userId/.test(REF));
+check("the secret is never logged", !/console\.(log|warn|error)\([^)]*SECRET/.test(REF));
+
+const { memberRef } = await import("../server/daily/memberRef.js");
+const a = memberRef("user-alpha");
+const b = memberRef("user-beta");
+check("a ref is stable for the same member", memberRef("user-alpha") === a);
+check("two members get different refs", a !== b);
+check("a ref contains no part of the user id", !a.includes("alpha"));
+check("a ref is short enough to read as a label", a.length <= 16, a);
+
+/** Health reaches the model as signals, not as raw arithmetic to do. */
+const SIGNALS = readFileSync("server/daily/healthSignals.ts", "utf8");
+check("signals are reduced server-side", /reduce\(/.test(SIGNALS));
+check(
+  "a short history produces no claim about them",
+  /points\.length < 3/.test(SIGNALS),
+  "one night presented as 'lately' is a claim that isn't true"
+);
+check(
+  "the model is told these are not a diagnosis",
+  /not a diagnosis/.test(VOICE) && /Do not give medical advice/.test(VOICE)
+);
+
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

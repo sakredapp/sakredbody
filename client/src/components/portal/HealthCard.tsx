@@ -1,52 +1,73 @@
 /**
- * The Health card — connect a phone, and see what came back.
+ * The Health card — connect a phone, and see everything it sent.
  *
- * Shown on Stats. It has three states and they are genuinely different, so it
- * does not try to be one component with a flag:
+ * Shown on Stats. Three genuinely different states, so it does not try to be
+ * one component with a flag:
  *
  *   web           — health only reads on the phone; say so and stop
  *   not connected — one button, and an honest sentence about what we read
- *   connected     — the numbers, when they last arrived, and a way out
+ *   connected     — every metric that has data, grouped
+ *
+ * "Every metric that has data" rather than a fixed four. The sync collects
+ * twenty-two, and hard-coding a handful in the component meant the other
+ * eighteen were stored and rendered nowhere — which looks exactly like the
+ * member having no data, so nobody would ever report it.
  *
  * The way out is deliberately not buried. A member who cannot find how to
  * disconnect their health data reads that as the data not really being theirs.
  */
 
-import { Activity, HeartPulse, Moon, Footprints, RefreshCw, Link2Off } from "lucide-react";
+import { RefreshCw, Link2Off, TrendingDown, TrendingUp } from "lucide-react";
 import { useHealthSummary, useHealthSync } from "@/hooks/use-health";
-import type { HealthDay } from "@/hooks/use-health";
+import { METRIC_DISPLAY, groupsWithData, summarise } from "@/lib/healthDisplay";
+import type { DaySeries } from "@/lib/healthDisplay";
+import { HealthWorkouts } from "@/components/portal/HealthWorkouts";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
-/** The four a coach looks at first. Everything else lives in the detail view. */
-const HEADLINE = [
-  { metric: "steps", label: "Steps", icon: Footprints, format: (v: number) => Math.round(v).toLocaleString() },
-  { metric: "sleepMinutes", label: "Sleep", icon: Moon, format: (v: number) => `${Math.floor(v / 60)}h ${Math.round(v % 60)}m` },
-  { metric: "restingHeartRate", label: "Resting HR", icon: HeartPulse, format: (v: number) => `${Math.round(v)} bpm` },
-  { metric: "heartRateVariability", label: "HRV", icon: Activity, format: (v: number) => `${Math.round(v)} ms` },
-] as const;
+/** Under 3%, a trend arrow is noise dressed up as a finding. */
+const TREND_FLOOR = 0.03;
 
-/**
- * The most recent day that actually has this metric — not simply the last day.
- *
- * Today is almost always partial: a member opening the app at 9am has 400
- * steps and no sleep yet, and showing that as their number makes a healthy
- * member look like they have stopped moving.
- */
-function latest(days: HealthDay[], metric: string): { value: number; onDate: string } | null {
-  for (let i = days.length - 1; i >= 0; i--) {
-    const v = days[i][metric as keyof HealthDay];
-    if (typeof v === "number") return { value: v, onDate: days[i].onDate };
+function MetricTile({ days, metric }: { days: DaySeries[]; metric: keyof typeof METRIC_DISPLAY }) {
+  const display = METRIC_DISPLAY[metric];
+  const stat = summarise(days, metric);
+  if (!stat) return null;
+
+  let delta: number | null = null;
+  if (stat.baseline !== null && stat.baseline !== 0) {
+    const d = (stat.value - stat.baseline) / stat.baseline;
+    if (Math.abs(d) >= TREND_FLOOR) delta = d;
   }
-  return null;
-}
 
-function average(days: HealthDay[], metric: string): number | null {
-  const values = days
-    .map((d) => d[metric as keyof HealthDay])
-    .filter((v): v is number => typeof v === "number");
-  if (!values.length) return null;
-  return values.reduce((a, b) => a + b, 0) / values.length;
+  // `higherIsBetter: null` means the metric has no good direction — weight is a
+  // goal, not a virtue — so it gets an arrow without a colour.
+  const better =
+    delta === null || display.higherIsBetter === null
+      ? null
+      : delta > 0 === display.higherIsBetter;
+
+  return (
+    <div className="rounded-xl border border-border/30 p-3">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">
+        {display.label}
+      </div>
+      <div className="mt-1.5 text-lg font-display">{display.format(stat.value)}</div>
+      {delta !== null && (
+        <div
+          className={cn(
+            "flex items-center gap-1 text-[10px] mt-0.5",
+            better === null && "text-muted-foreground",
+            better === true && "text-[hsl(var(--gold))]",
+            better === false && "text-destructive",
+          )}
+        >
+          {delta > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+          {Math.abs(Math.round(delta * 100))}% vs earlier
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function HealthCard() {
@@ -55,12 +76,13 @@ export function HealthCard() {
   const { toast } = useToast();
 
   const storeName = platform === "healthconnect" ? "Health Connect" : "Apple Health";
-  const days = data?.days ?? [];
+  const days = (data?.days ?? []) as DaySeries[];
   const connected = data?.connected ?? false;
+  const groups = groupsWithData(days);
 
-  // `available === null` means the availability probe has not resolved yet.
-  // Rendering the "phone only" message during that beat would flash the wrong
-  // explanation at every member on a phone.
+  // `available === null` means the probe has not resolved. Rendering the
+  // "phone only" message during that beat would flash the wrong explanation at
+  // every member who is in fact on a phone.
   const showConnect = available === true && !connected;
   const webOnly = available === false && !connected;
 
@@ -92,10 +114,12 @@ export function HealthCard() {
     <div className="rounded-2xl border border-border/40 bg-white/[0.03] p-5 space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-lg font-display font-semibold tracking-tight">Your body's own record</h3>
+          <h3 className="text-lg font-display font-semibold tracking-tight">
+            Your body's own record
+          </h3>
           <p className="text-xs text-muted-foreground mt-1">
             {connected
-              ? `From ${storeName}. Updates when you open the app.`
+              ? `From ${storeName}. Updates on its own.`
               : `Activity, sleep and heart data from ${storeName}.`}
           </p>
         </div>
@@ -115,7 +139,7 @@ export function HealthCard() {
       {webOnly && (
         <p className="text-sm text-muted-foreground">
           Health data can only be read on your phone. Open Sakred Body on iPhone or Android to
-          connect it — anything already synced will show up here too.
+          connect it — anything already synced shows up here too.
           {reason ? <span className="block mt-1 text-xs opacity-70">{reason}</span> : null}
         </p>
       )}
@@ -123,9 +147,9 @@ export function HealthCard() {
       {showConnect && (
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            We read a daily summary — steps, sleep, resting heart rate, HRV and workouts — so your
-            progress reflects what you actually did. We never write anything back, and you choose
-            which categories to share.
+            We read a daily summary — movement, sleep, heart, body and workouts — so your progress
+            reflects what you actually did. We never write anything back, and you choose which
+            categories to share.
           </p>
           <Button onClick={runConnect} disabled={connect.isPending} className="w-full sm:w-auto">
             {connect.isPending ? "Connecting…" : `Connect ${storeName}`}
@@ -135,28 +159,27 @@ export function HealthCard() {
 
       {connected && (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {HEADLINE.map(({ metric, label, icon: Icon, format }) => {
-              const recent = latest(days, metric);
-              const avg = average(days, metric);
-              return (
-                <div key={metric} className="rounded-xl border border-border/30 p-3">
-                  <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                    <Icon className="w-3 h-3" />
-                    {label}
-                  </div>
-                  <div className="mt-1.5 text-xl font-display">
-                    {recent ? format(recent.value) : "—"}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground mt-0.5">
-                    {avg !== null ? `${format(avg)} avg · 30d` : "no data yet"}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          {groups.map(({ group, metrics }) => (
+            <div key={group} className="space-y-2">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{group}</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {metrics.map((metric) => (
+                  <MetricTile key={metric} days={days} metric={metric} />
+                ))}
+              </div>
+            </div>
+          ))}
+
+          <HealthWorkouts workouts={data?.workouts ?? []} />
 
           {isLoading && <p className="text-xs text-muted-foreground">Loading…</p>}
+
+          {!isLoading && groups.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              Connected, but nothing has come through yet. If you only just allowed access, give it
+              a minute — or check which categories you shared in {storeName}.
+            </p>
+          )}
 
           <div className="flex items-center justify-between gap-3 pt-1">
             <p className="text-[11px] text-muted-foreground">
@@ -170,9 +193,8 @@ export function HealthCard() {
               className="text-[11px] text-muted-foreground hover:text-destructive"
               disabled={disconnect.isPending}
               onClick={async () => {
-                // Confirmed, because it deletes rather than unlinks — and a
-                // member who taps it expecting "pause" cannot get the history
-                // back afterwards.
+                // Confirmed, because it deletes rather than unlinks — a member
+                // who taps it expecting "pause" cannot get the history back.
                 if (
                   !window.confirm(
                     "Disconnect and delete every health measurement we hold for you? This cannot be undone."
