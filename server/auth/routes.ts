@@ -520,10 +520,15 @@ export function registerAuthRoutes(app: Express): void {
         trackError("auth.reset.send", new Error(result.reason ?? "unknown"));
       }
 
+      // The provider's id is worth keeping. "Accepted by Resend" and
+      // "arrived in a mailbox" are different claims, and without the id the
+      // only way to tell them apart afterwards is to guess — which cost an
+      // afternoon the first time, when a reset was accepted, sent, and
+      // bounced because the recipient's domain had no MX record at all.
       track("auth.reset.requested", {
         userId: user.id,
         surface: "forgot",
-        props: { known: true, sent: result.sent },
+        props: { known: true, sent: result.sent, providerId: result.id ?? null },
       });
       return ok();
     } catch (error: unknown) {
