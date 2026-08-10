@@ -18,6 +18,7 @@
  */
 
 import { useState } from "react";
+import { MemberHealth } from "@/components/admin/MemberHealth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -225,6 +226,11 @@ export function MembersAdmin() {
 
                 {open && (
                   <div className="border-t border-border/60 p-4 space-y-4 bg-muted/20">
+                    {/* Their phone's own record, above the counters we keep.
+                        Streaks measure whether they logged; this measures what
+                        actually happened. */}
+                    <MemberHealth userId={m.id} />
+
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
                       {[
                         ["Streak", m.currentStreak ?? 0],

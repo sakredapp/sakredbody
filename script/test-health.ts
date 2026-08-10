@@ -428,7 +428,19 @@ check("Swift dedupes by date and metric", /byKey\[/.test(swift));
 check("Kotlin dedupes by date and metric", /byKey\[/.test(kotlin));
 
 /** Neither native path may write to the health store. */
-check("Swift never saves to HealthKit", !/\bsave\(/.test(swift) && !/HKObjectType\.workoutType/.test(swift));
+/**
+ * Read-only means no WRITE call, not "does not mention workouts". The original
+ * form of this assertion used the absence of HKObjectType.workoutType as a
+ * proxy, which was simply wrong — reading a member's workouts requires exactly
+ * that symbol, so the check would have blocked a legitimate read while still
+ * permitting an actual save.
+ */
+check("Swift never writes to HealthKit", !/store\.save\(/.test(swift));
+check("Swift does read workouts in the background", /HKObjectType\.workoutType\(\)/.test(swift));
+check(
+  "background workouts carry a stable idempotency key",
+  /externalId:\s*workout\.uuid\.uuidString/.test(swift)
+);
 check("Kotlin never writes records", !/insertRecords/.test(reader));
 
 /** A 401 must not be retried forever — nothing native can refresh a token. */

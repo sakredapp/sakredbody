@@ -221,14 +221,17 @@ import HealthKit
 
         collect(from: start, to: end) { [weak self] samples in
             guard let self = self else { return }
-            if samples.isEmpty {
-                self.record("nothing to post")
-                completion("nothing to post")
-                return
-            }
-            self.post(origin: origin, token: token, samples: samples, syncedThrough: end) { result in
-                self.record(result)
-                completion(result)
+            self.workouts(start: start, end: end) { workouts in
+                if samples.isEmpty && workouts.isEmpty {
+                    self.record("nothing to post")
+                    completion("nothing to post")
+                    return
+                }
+                self.post(origin: origin, token: token, samples: samples,
+                          workouts: workouts, syncedThrough: end) { result in
+                    self.record(result)
+                    completion(result)
+                }
             }
         }
     }
@@ -244,6 +247,17 @@ import HealthKit
         let onDate: String
         let metric: String
         let value: Double
+    }
+
+    private struct WorkoutRow {
+        let externalId: String
+        let workoutType: String
+        let startAt: String
+        let endAt: String
+        let onDate: String
+        let durationSeconds: Int
+        let activeCalories: Double?
+        let distanceMeters: Double?
     }
 
     private func collect(from start: Date, to end: Date, completion: @escaping ([Sample]) -> Void) {
@@ -421,6 +435,75 @@ import HealthKit
         store.execute(query)
     }
 
+    /**
+     * Workouts, which are events rather than daily totals.
+     *
+     * `uuid` is the idempotency key the server dedupes on. A workout with no
+     * stable id would be re-inserted as a new session on every run, so a member
+     * who ran once on Tuesday would accumulate a Tuesday run per background
+     * wake for as long as it stayed inside the re-read window.
+     */
+    private func workouts(start: Date, end: Date, completion: @escaping ([WorkoutRow]) -> Void) {
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: [])
+        let query = HKSampleQuery(sampleType: HKObjectType.workoutType(), predicate: predicate,
+                                  limit: 200, sortDescriptors: nil) { _, results, _ in
+            guard let workouts = results as? [HKWorkout] else {
+                completion([])
+                return
+            }
+            let iso = ISO8601DateFormatter()
+            completion(workouts.map { workout in
+                WorkoutRow(
+                    externalId: workout.uuid.uuidString,
+                    workoutType: Self.activityName(workout.workoutActivityType),
+                    startAt: iso.string(from: workout.startDate),
+                    endAt: iso.string(from: workout.endDate),
+                    onDate: Self.localDate(workout.startDate),
+                    durationSeconds: Int(workout.duration),
+                    activeCalories: workout.totalEnergyBurned?.doubleValue(for: .kilocalorie()),
+                    distanceMeters: workout.totalDistance?.doubleValue(for: .meter())
+                )
+            })
+        }
+        store.execute(query)
+    }
+
+    /**
+     * A readable name for the activity.
+     *
+     * HKWorkoutActivityType is an enum over UInt with no name at runtime, so
+     * this is a lookup rather than reflection. Unmapped types fall through to
+     * "other" instead of a number: a coach reading "37" learns nothing, and the
+     * value is free text on our side anyway.
+     */
+    private static func activityName(_ type: HKWorkoutActivityType) -> String {
+        switch type {
+        case .running: return "running"
+        case .walking: return "walking"
+        case .cycling: return "cycling"
+        case .swimming: return "swimming"
+        case .hiking: return "hiking"
+        case .yoga: return "yoga"
+        case .pilates: return "pilates"
+        case .functionalStrengthTraining: return "strength"
+        case .traditionalStrengthTraining: return "strength"
+        case .highIntensityIntervalTraining: return "hiit"
+        case .rowing: return "rowing"
+        case .elliptical: return "elliptical"
+        case .stairClimbing: return "stairs"
+        case .coreTraining: return "core"
+        case .flexibility: return "flexibility"
+        case .mindAndBody: return "mind and body"
+        case .dance: return "dance"
+        case .boxing: return "boxing"
+        case .martialArts: return "martial arts"
+        case .tennis: return "tennis"
+        case .golf: return "golf"
+        case .cooldown: return "cooldown"
+        default: return "other"
+        }
+    }
+
     // MARK: - Posting
 
     private static let units: [String: String] = [
@@ -434,7 +517,8 @@ import HealthKit
         "dietaryCalories": "kcal",
     ]
 
-    private func post(origin: String, token: String, samples: [Sample], syncedThrough: Date,
+    private func post(origin: String, token: String, samples: [Sample],
+                      workouts: [WorkoutRow], syncedThrough: Date,
                       completion: @escaping (String) -> Void) {
         guard let url = URL(string: origin + "/api/health/sync") else {
             completion("bad api origin")
@@ -447,6 +531,9 @@ import HealthKit
         var byKey: [String: Sample] = [:]
         for sample in samples { byKey["\(sample.onDate)|\(sample.metric)"] = sample }
 
+        var byWorkout: [String: WorkoutRow] = [:]
+        for workout in workouts { byWorkout[workout.externalId] = workout }
+
         let payload: [String: Any] = [
             "platform": "healthkit",
             "samples": byKey.values.map { sample -> [String: Any] in
@@ -457,6 +544,23 @@ import HealthKit
                     "unit": Self.units[sample.metric] ?? "count",
                     "sourceApp": "Apple Health",
                 ]
+            },
+            "workouts": byWorkout.values.map { workout -> [String: Any] in
+                var row: [String: Any] = [
+                    "externalId": workout.externalId,
+                    "workoutType": workout.workoutType,
+                    "startAt": workout.startAt,
+                    "endAt": workout.endAt,
+                    "onDate": workout.onDate,
+                    "durationSeconds": workout.durationSeconds,
+                    "sourceApp": "Apple Health",
+                ]
+                // Omitted rather than sent as null: the server's schema treats
+                // an absent optional and an explicit null the same, but a
+                // smaller body is a body more likely to survive a bad signal.
+                if let calories = workout.activeCalories { row["activeCalories"] = calories }
+                if let distance = workout.distanceMeters { row["distanceMeters"] = distance }
+                return row
             },
             "syncedThrough": ISO8601DateFormatter().string(from: syncedThrough),
             "deviceModel": "ios-background",
@@ -493,7 +597,7 @@ import HealthKit
                 completion("http \(status)")
                 return
             }
-            var accepted = byKey.count
+            var accepted = byKey.count + byWorkout.count
             if let data = data,
                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let n = json["accepted"] as? Int {
