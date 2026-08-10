@@ -148,7 +148,7 @@ export function BuildTab() {
           <div className="py-12 text-center space-y-2">
             <Dumbbell className="h-6 w-6 mx-auto text-muted-foreground/40" />
             <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-              Nothing prescribed today. Build sessions arrive with your protocol —
+              Nothing planned today. Build sessions arrive with your protocol —
               when one is running and today is a lifting day, the lifts show up here
               with their targets already worked out.
             </p>

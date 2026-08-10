@@ -191,7 +191,13 @@ export function PillarHome({
       case "build": {
         if (build.isLoading) return undefined;
         const n = build.data?.sessions?.length ?? 0;
-        if (n === 0) return "Nothing prescribed today";
+        // "Prescribed" is the one word this app cannot use. Every legal page
+        // we publish says we do not diagnose, treat, cure or prescribe — and
+        // then the home screen told a member what had been prescribed for
+        // them today. A reviewer reading both sees a health app claiming
+        // medical authority its own disclaimer denies. "Planned" says the
+        // same thing about the same data and claims nothing.
+        if (n === 0) return "Nothing planned today";
         const lifts = build.data!.sessions.reduce((t, s) => t + s.exercises.length, 0);
         return `${lifts} ${lifts === 1 ? "lift" : "lifts"} today`;
       }

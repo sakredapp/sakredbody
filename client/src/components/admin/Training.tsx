@@ -87,7 +87,7 @@ export function TrainingAdmin() {
     <div className="space-y-6">
       <SectionHeading
         title="Build"
-        subtitle="What gets prescribed, and the movements it's prescribed from."
+        subtitle="What gets planned, and the movements it's built from."
       />
 
       <div className="flex gap-2">
@@ -149,7 +149,7 @@ function SessionBuilder() {
           <p className="text-sm text-muted-foreground max-w-sm mx-auto">
             No protocols yet. A Build session is a habit on a protocol — make one in{" "}
             <span className="text-foreground">Coaching → Routines</span>, add a session
-            like "Lower Body Power", then prescribe its lifts here.
+            like "Lower Body Power", then plan its lifts here.
           </p>
         </div>
       </Panel>
@@ -298,12 +298,12 @@ function Prescription({ habitId }: { habitId: string }) {
   const available = (catalogue.data ?? []).filter((e) => e.isActive && !already.has(e.id));
 
   return (
-    <Panel title="Prescribed lifts">
+    <Panel title="Planned lifts">
       {prescribed.isLoading ? (
         <Skeleton className="h-24 w-full" />
       ) : list.length === 0 ? (
         <p className="text-sm text-muted-foreground mb-4">
-          Nothing prescribed. This session will appear in the member's day as an
+          Nothing planned. This session will appear in the member's day as an
           ordinary habit with nothing to open.
         </p>
       ) : (
@@ -354,7 +354,7 @@ function Prescription({ habitId }: { habitId: string }) {
               </div>
 
               {/* Reps only matter for a movement measured in reps. A plank
-                  prescribed "4 × 3–5" would be nonsense. */}
+                  a planned "4 × 3–5" would be nonsense. */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pl-6">
                 <div className="space-y-1">
                   <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Sets</Label>
