@@ -141,8 +141,8 @@ export function IntakeStep({
         {ys.length > 0 && (
           <div className="rounded-xl border border-[hsl(var(--gold))]/20 bg-[hsl(var(--gold))]/[0.04] p-3 space-y-2">
             <div className="flex items-center gap-1.5">
-              <Sparkles className="h-3 w-3 text-[hsl(var(--gold))]" />
-              <p className="text-[11px] uppercase tracking-widest text-[hsl(var(--gold))]">
+              <Sparkles className="h-3 w-3 text-[hsl(var(--gold))] shrink-0" />
+              <p className="text-xs uppercase tracking-[0.18em] text-[hsl(var(--gold))]">
                 The Y in your name
               </p>
             </div>
@@ -155,8 +155,8 @@ export function IntakeStep({
               const isVowel = yOverrides[key] ?? y.isVowel;
               return (
                 <div key={key} className="flex items-center justify-between gap-2">
-                  <span className="text-xs">
-                    <span className="text-muted-foreground">{y.word}</span> — the Y sounds like
+                  <span className="text-[11px] min-w-0 truncate">
+                    <span className="text-muted-foreground">{y.word}</span> — sounds like
                   </span>
                   <div className="flex rounded-lg border border-border/60 overflow-hidden shrink-0">
                     {[true, false].map((vowel) => (
@@ -184,7 +184,7 @@ export function IntakeStep({
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-2">
           <div className="space-y-1.5">
             <label
               htmlFor="intake-birth-date"

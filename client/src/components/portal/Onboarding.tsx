@@ -284,7 +284,21 @@ export function Onboarding() {
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && close(false)}>
-      <DialogContent className="max-w-sm" data-testid={`onboarding-${step}`}>
+      {/* `max-h` and `overflow-y-auto` are load-bearing, not polish.
+          DialogContent is centred with translate-y-[-50%] and has no height
+          cap of its own, so content taller than the viewport runs off *both*
+          edges — and the part above the fold cannot be scrolled to, because
+          the overflow is on an element that is already half off-screen. The
+          intake step is three name fields, the Y question, two date fields and
+          two buttons; on a small phone that is over the line.
+
+          `svh` rather than `vh`: on mobile Safari `vh` is the height with the
+          address bar hidden, which is not the height you have while it is
+          showing. */}
+      <DialogContent
+        className="max-w-sm max-h-[88svh] overflow-y-auto scroll-touch"
+        data-testid={`onboarding-${step}`}
+      >
         {step === "intake" && (
           <>
             <DialogHeader>
