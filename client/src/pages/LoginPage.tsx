@@ -14,7 +14,14 @@ import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 /** The app has no website to return to, and no store badges to offer. */
 const isNative = Capacitor.isNativePlatform();
 
-type Mode = "login" | "register";
+/**
+ * "forgot" is a third state of this same screen, not a page of its own.
+ *
+ * Someone who cannot get in is already on this form with their email typed;
+ * sending them elsewhere to type it again is the wrong direction. The screen
+ * they *do* get sent to is /reset-password, and only from the emailed link.
+ */
+type Mode = "login" | "register" | "forgot";
 
 export default function LoginPage() {
   const [, navigate] = useLocation();
@@ -36,11 +43,48 @@ export default function LoginPage() {
   })();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  /** Set once a reset link has been asked for, so the form can stand down. */
+  const [sent, setSent] = useState(false);
 
   // Redirect if already logged in
   if (isAuthenticated) {
     navigate("/member");
     return null;
+  }
+
+  /**
+   * Ask for a reset link.
+   *
+   * Kept out of handleSubmit because it shares almost nothing with it: no
+   * password, no token to store, no redirect, and a success state that stays
+   * on this screen. Folding a third branch into the sign-in path would put the
+   * one request that must never authenticate anybody inside the function whose
+   * whole job is authenticating people.
+   */
+  async function handleForgot(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const res = await apiFetch("/api/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      // The server answers the same way for an address it knows and one it
+      // does not — see the note on the route. The only thing worth surfacing
+      // is the throttle, which is about this person, not about the account.
+      if (!res.ok) {
+        setError(data.message || "Something went wrong");
+        return;
+      }
+      setSent(true);
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -175,7 +219,11 @@ export default function LoginPage() {
                   className="h-16 w-16 mx-auto object-contain drop-shadow-xl"
                 />
                 <h1 className="font-display text-2xl text-white">
-                  {mode === "login" ? "Welcome Back" : "Create Account"}
+                  {mode === "login"
+                    ? "Welcome Back"
+                    : mode === "register"
+                      ? "Create Account"
+                      : "Reset your password"}
                 </h1>
                 <div className="w-10 h-px bg-gradient-to-r from-transparent via-gold to-transparent mx-auto" />
               </div>
@@ -186,6 +234,75 @@ export default function LoginPage() {
                 </p>
               )}
 
+              {/* ── Forgot password ─────────────────────────────────────────
+                  Two states, and the second one is the important one: once a
+                  request has gone in, the form is replaced rather than left
+                  sitting there with a button to press again. The server tells
+                  us nothing about whether that address exists, so this copy
+                  cannot promise an email is coming — "if that address belongs
+                  to an account" is the honest phrasing and also the one that
+                  keeps the membership private. */}
+              {mode === "forgot" && (
+                sent ? (
+                  <div className="space-y-4">
+                    <p className="text-sm text-white/70 leading-relaxed text-center">
+                      If that address belongs to an account, a reset link is on its way. It works
+                      once and expires in an hour.
+                    </p>
+                    <p className="text-xs text-white/40 leading-relaxed text-center">
+                      Nothing arriving? Check spam, and check the address you typed.
+                    </p>
+                    <Button
+                      type="button"
+                      size="lg"
+                      onClick={() => {
+                        setMode("login");
+                        setSent(false);
+                        setError("");
+                      }}
+                      className="w-full bg-gold border-gold-border text-white"
+                      data-testid="forgot-back"
+                    >
+                      Back to sign in
+                    </Button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleForgot} className="space-y-4">
+                    <p className="text-sm text-white/50 leading-relaxed">
+                      Enter the email on your account and we'll send you a link to set a new
+                      password.
+                    </p>
+                    <Input
+                      type="email"
+                      placeholder="Email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      autoComplete="email"
+                      className="bg-white/10 border-white/20 text-white placeholder:text-white/40"
+                      data-testid="forgot-email"
+                    />
+                    <Button
+                      type="submit"
+                      size="lg"
+                      disabled={loading}
+                      className="w-full bg-gold border-gold-border text-white"
+                      data-testid="forgot-submit"
+                    >
+                      {loading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          Send reset link
+                          <ArrowRight className="w-4 h-4 ml-2" />
+                        </>
+                      )}
+                    </Button>
+                  </form>
+                )
+              )}
+
+              {mode !== "forgot" && (
               <form onSubmit={handleSubmit} className="space-y-4">
                 {mode === "register" && (
                   <div className="grid grid-cols-2 gap-3">
@@ -264,6 +381,27 @@ export default function LoginPage() {
                   )}
                 </Button>
               </form>
+              )}
+
+              {/* Under the button, not beside the password field. It is the
+                  thing you look for after the button has already failed. */}
+              {mode === "login" && (
+                <div className="text-center -mt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode("forgot");
+                      setSent(false);
+                      setError("");
+                      setPassword("");
+                    }}
+                    className="text-white/40 text-xs hover:text-white/70 transition-colors"
+                    data-testid="link-forgot-password"
+                  >
+                    Forgot your password?
+                  </button>
+                </div>
+              )}
 
               {/* The portal and the app are the same product — the web is
                   simply one of the doors into it.
@@ -316,6 +454,10 @@ export default function LoginPage() {
                   onClick={() => {
                     setMode(mode === "login" ? "register" : "login");
                     setError("");
+                    // Leaving this set would show the "check your email"
+                    // panel again the next time forgot mode is opened, with
+                    // no request behind it.
+                    setSent(false);
                   }}
                   className="text-white/50 text-sm hover:text-white/70 transition-colors"
                 >

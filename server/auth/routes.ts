@@ -15,17 +15,27 @@
  */
 
 import type { Express, Request, Response } from "express";
+import crypto from "crypto";
 import { zodMessage } from "../../shared/utils/zodMessage.js";
 import { storage } from "../storage.js";
 import { isAuthenticated } from "./sessionAuth.js";
 import { db } from "../db.js";
-import { sql, inArray } from "drizzle-orm";
+import { sql, inArray, eq, and, isNull } from "drizzle-orm";
 import { loginAttempts, THROTTLE } from "../../shared/models/security.js";
+import {
+  users,
+  authTokens,
+  passwordResetTokens,
+  RESET_TOKEN_TTL_MS,
+  RESET_THROTTLE,
+} from "../../shared/models/auth.js";
 import { track, trackError } from "../telemetry/index.js";
 import { z } from "zod";
 import { hashPassword, verifyPassword, burnTime } from "./password.js";
 import { issueToken, revokeToken, bearerFrom } from "./bearerAuth.js";
 import { isAdult } from "./age.js";
+import { send, APP_URL, logFallbackLink } from "../email/index.js";
+import { passwordResetMail } from "../email/passwordReset.js";
 
 // ─── What we accept ────────────────────────────────────────────────────────
 
@@ -56,6 +66,31 @@ const registerSchema = z.object({
     .refine((value) => !Number.isNaN(Date.parse(value)), "That isn't a real date")
     .refine(isAdult, "You must be 18 or older to join"),
 });
+
+const forgotSchema = z.object({
+  email: z.string().email("Valid email is required"),
+});
+
+const resetSchema = z.object({
+  // The token is opaque and generated here; length is checked only so a blank
+  // or truncated one fails before it costs a database round trip.
+  token: z.string().min(20, "That reset link isn't valid"),
+  // Identical rule to registration. A reset that accepted a weaker password
+  // than signup would be the way around the signup rule.
+  password: z.string().min(8, "Password must be at least 8 characters").max(1024),
+});
+
+/**
+ * How a reset token is stored and looked up.
+ *
+ * SHA-256, not scrypt — see the note on authTokens in shared/models/auth.ts.
+ * A 256-bit random value has no structure to guess, so the slow KDF that
+ * protects a human-chosen password buys nothing here and would put a
+ * deliberate delay on the lookup.
+ */
+function hashToken(raw: string): string {
+  return crypto.createHash("sha256").update(raw).digest("hex");
+}
 
 
 // ─── Throttling ────────────────────────────────────────────────────────────
@@ -167,6 +202,60 @@ async function clearFailures(email: string): Promise<void> {
   await db.execute(
     sql`delete from login_attempts where identifier = ${"email:" + email}`,
   );
+}
+
+/**
+ * Count one reset request, against the same table under its own key space.
+ *
+ * `reset-email:` and `reset-ip:`, deliberately distinct from the `email:` and
+ * `ip:` keys login uses. Sharing them would mean a burst of reset requests
+ * locked the member out of signing in with the password they already know —
+ * turning a self-service recovery endpoint into a denial-of-service against
+ * any address an attacker can name. Postgres `LIKE 'email:%'` does not match
+ * `reset-email:…`, so the two limits stay independent by construction.
+ *
+ * The statement mirrors recordFailure exactly, including the explicit `::int`
+ * casts. See the long note there: without them node-postgres infers `text` for
+ * a parameter compared only against other parameters, and the whole thing
+ * fails at runtime with *operator does not exist: integer >= text*.
+ *
+ * Unlike login there is no clear-on-success, because there is no success to
+ * clear on: asking for a link is the whole interaction, and the limit should
+ * count links sent rather than links clicked.
+ */
+async function recordResetRequest(email: string, ip: string): Promise<void> {
+  const windowSec = Math.floor(RESET_THROTTLE.windowMs / 1000);
+  const lockSec = Math.floor(RESET_THROTTLE.lockMs / 1000);
+
+  await db.execute(sql`
+    insert into login_attempts (identifier, attempts, window_start, locked_until)
+    values
+      (${"reset-email:" + email}, 1, now(), null),
+      (${"reset-ip:" + ip},       1, now(), null)
+    on conflict (identifier) do update set
+      attempts = case
+        when login_attempts.window_start < now() - make_interval(secs => ${windowSec})
+          then 1
+        else login_attempts.attempts + 1
+      end,
+      window_start = case
+        when login_attempts.window_start < now() - make_interval(secs => ${windowSec})
+          then now()
+        else login_attempts.window_start
+      end,
+      locked_until = case
+        when (case
+                when login_attempts.window_start < now() - make_interval(secs => ${windowSec})
+                  then 1
+                else login_attempts.attempts + 1
+              end)
+             >= (case when excluded.identifier like 'reset-email:%'
+                        then ${RESET_THROTTLE.emailMax}::int
+                        else ${RESET_THROTTLE.ipMax}::int end)
+          then now() + make_interval(secs => ${lockSec})
+        else login_attempts.locked_until
+      end
+  `);
 }
 
 /**
@@ -342,5 +431,195 @@ export function registerAuthRoutes(app: Express): void {
       res.clearCookie("connect.sid");
       res.redirect("/");
     });
+  });
+
+  // ─── Password reset ──────────────────────────────────────────────────────
+
+  /**
+   * Ask for a link.
+   *
+   * Always 200, always the same body, whether or not the address belongs to an
+   * account. The alternative — "no account with that email" — turns this into
+   * a membership oracle: type an address, learn whether that person is a
+   * client. For a private membership whose value is partly discretion, that
+   * leak is worse than the inconvenience of a member mistyping their address
+   * and waiting for an email that never comes.
+   *
+   * Timing is not a perfect tell-nothing here: a real address costs one insert
+   * and one HTTPS call to the mail provider, an unknown one costs neither, and
+   * a determined observer could measure that. The throttle below is what
+   * actually makes enumeration impractical — five attempts per address per
+   * hour is not a rate you can walk a list at — and network jitter on the mail
+   * call is larger than the signal in any case. Worth knowing rather than
+   * worth pretending otherwise.
+   */
+  app.post("/api/forgot-password", async (req: Request, res: Response) => {
+    // One body for every outcome, constructed once so no branch can drift.
+    const ok = () =>
+      res.json({
+        message: "If that address belongs to an account, a reset link is on its way.",
+      });
+
+    try {
+      const parsed = forgotSchema.parse(req.body);
+      const email = parsed.email.toLowerCase();
+      const ip = clientIp(req);
+
+      const state = await throttleState([`reset-email:${email}`, `reset-ip:${ip}`]);
+      if (state.locked) {
+        // 429 rather than a silent 200. Unlike existence, "you have asked a
+        // lot recently" is something the person in front of the screen already
+        // knows, and swallowing it means they keep clicking and keep waiting.
+        res.setHeader("Retry-After", String(state.retryAfterSec));
+        return res.status(429).json({
+          message: `Too many reset requests. Try again in ${Math.max(
+            1,
+            Math.ceil(state.retryAfterSec / 60),
+          )} minutes.`,
+        });
+      }
+      await recordResetRequest(email, ip);
+
+      const user = await storage.getUserByEmail(email);
+      // No account, or an account with no password at all (an invited row that
+      // has never been claimed): nothing to reset, and nothing to say about it.
+      if (!user || !user.password) {
+        track("auth.reset.requested", { surface: "forgot", props: { known: false } });
+        return ok();
+      }
+
+      // Outstanding links for this account stop working the moment a new one
+      // is asked for. Someone who requests three because the first seemed slow
+      // should not leave three live credentials in their inbox.
+      await db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, user.id));
+
+      const raw = crypto.randomBytes(32).toString("base64url");
+      await db.insert(passwordResetTokens).values({
+        userId: user.id,
+        tokenHash: hashToken(raw),
+        expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
+      });
+
+      const url = `${APP_URL}/reset-password?token=${encodeURIComponent(raw)}`;
+      const result = await send(
+        passwordResetMail({
+          to: email,
+          firstName: user.firstName,
+          url,
+          expiresMinutes: Math.round(RESET_TOKEN_TTL_MS / 60000),
+        }),
+      );
+
+      if (!result.sent) {
+        // The member still gets the same 200. A mail provider that is down or
+        // unconfigured is our problem, and telling them "we could not send it"
+        // gives them nothing to do about it — while telling them that only for
+        // real accounts would hand back the oracle the generic response exists
+        // to close.
+        logFallbackLink(`password reset for ${email}`, url);
+        trackError("auth.reset.send", new Error(result.reason ?? "unknown"));
+      }
+
+      track("auth.reset.requested", {
+        userId: user.id,
+        surface: "forgot",
+        props: { known: true, sent: result.sent },
+      });
+      return ok();
+    } catch (error: unknown) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: zodMessage(error) });
+      }
+      trackError("auth.reset.request", error);
+      // Even the failure path stays generic — a 500 on real addresses and a
+      // 200 on unknown ones would be the same leak by another route.
+      return ok();
+    }
+  });
+
+  /**
+   * Redeem a link and set the new password.
+   *
+   * Everything that could still be holding the old credential is torn down
+   * here, because the reason people reset passwords is that they think someone
+   * else has one. A reset that leaves the attacker's phone signed in has done
+   * nothing.
+   */
+  app.post("/api/reset-password", async (req: Request, res: Response) => {
+    try {
+      const parsed = resetSchema.parse(req.body);
+
+      const [row] = await db
+        .select()
+        .from(passwordResetTokens)
+        .where(eq(passwordResetTokens.tokenHash, hashToken(parsed.token)))
+        .limit(1);
+
+      // Unknown, spent and expired are three different states and the member
+      // gets told which. There is nothing to protect: possession of the token
+      // is the secret, and someone holding a token already knows it existed.
+      // "Invalid link" for an hour-old link sends people back to their inbox
+      // to click it again, forever.
+      if (!row) {
+        return res.status(400).json({ message: "That reset link isn't valid. Ask for a new one." });
+      }
+      if (row.usedAt) {
+        return res
+          .status(400)
+          .json({ message: "That link has already been used. Ask for a new one." });
+      }
+      if (new Date(row.expiresAt).getTime() <= Date.now()) {
+        return res.status(400).json({ message: "That link has expired. Ask for a new one." });
+      }
+
+      const user = await storage.getUser(row.userId);
+      if (!user) {
+        return res.status(400).json({ message: "That reset link isn't valid. Ask for a new one." });
+      }
+
+      const hashed = await hashPassword(parsed.password);
+      await db
+        .update(users)
+        .set({ password: hashed, updatedAt: new Date() })
+        .where(eq(users.id, row.userId));
+
+      // Spend the token before anything else can fail. Marked rather than
+      // deleted so a second submission of the same form — a double tap, a
+      // retried request — reads as "already used" rather than "invalid".
+      await db
+        .update(passwordResetTokens)
+        .set({ usedAt: new Date() })
+        .where(eq(passwordResetTokens.id, row.id));
+
+      // Any other outstanding link for this account is now dead weight.
+      await db
+        .delete(passwordResetTokens)
+        .where(and(eq(passwordResetTokens.userId, row.userId), isNull(passwordResetTokens.usedAt)));
+
+      // Every native device is signed out. The bearer token is a ninety-day
+      // credential that a password change would otherwise leave completely
+      // untouched — which is the exact failure this endpoint exists to fix.
+      await db.delete(authTokens).where(eq(authTokens.userId, row.userId));
+
+      // And every browser session. connect-pg-simple stores the session body
+      // as jsonb, so the user id is reachable without loading the store.
+      await db.execute(
+        sql`delete from sessions where sess->>'userId' = ${row.userId}`,
+      );
+
+      // Someone who locked themselves out guessing, then reset, should be able
+      // to sign in immediately rather than serve out the remaining lockout on
+      // a password that no longer exists.
+      if (user.email) await clearFailures(user.email.toLowerCase());
+
+      track("auth.reset.completed", { userId: row.userId, surface: "reset" });
+      res.json({ message: "Password updated. Sign in with your new password." });
+    } catch (error: unknown) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: zodMessage(error) });
+      }
+      trackError("auth.reset.complete", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
   });
 }

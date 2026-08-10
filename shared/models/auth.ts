@@ -128,3 +128,64 @@ export const pushTokens = pgTable(
 
 export type AuthToken = typeof authTokens.$inferSelect;
 export type PushToken = typeof pushTokens.$inferSelect;
+
+/**
+ * Password reset tokens.
+ *
+ * Until this existed there was no recovery path at all: no route, no email, no
+ * column. A member who forgot their password was locked out permanently and
+ * the only fix was someone editing a hash in the database by hand. For a paid
+ * membership that is not a missing feature, it is a way to lose an account.
+ *
+ * ── Only the hash is stored ───────────────────────────────────────────────
+ *
+ * Same reasoning as authTokens: the raw token is 256 bits from a CSPRNG, so it
+ * has no structure to guess and needs no slow KDF — SHA-256 is the right cost.
+ * Storing the raw value would mean anyone who could read this table could take
+ * over any account that had ever asked for a reset, which is strictly worse
+ * than the password table it protects.
+ *
+ * ── Single use, and short ─────────────────────────────────────────────────
+ *
+ * `usedAt` rather than deletion, so a second click on the same link can say
+ * "already used" instead of the indistinguishable "invalid link" — the
+ * difference between a member trying again and a member giving up. Rows are
+ * swept later; see supabase/password-reset.sql.
+ *
+ * An hour is the window. Reset links sit in inboxes forever, and inboxes are
+ * the thing most likely to be compromised in the first place.
+ */
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull(),
+    tokenHash: varchar("token_hash").notNull().unique(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    /** Null until redeemed. Set, never deleted, so reuse is distinguishable. */
+    usedAt: timestamp("used_at", { withTimezone: true }),
+  },
+  (table) => [index("IDX_password_reset_user").on(table.userId)]
+);
+
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+
+/** How long a reset link stays good. */
+export const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
+
+/**
+ * How many resets may be asked for before we stop sending.
+ *
+ * Looser than the login limits because the cost of tripping it is different:
+ * a locked login is a member who cannot get in, while a throttled reset is a
+ * member who has already been sent a link and is clicking again. The limit
+ * exists to stop this endpoint being used to mail-bomb someone, not to stop
+ * guessing — there is nothing here to guess.
+ */
+export const RESET_THROTTLE = {
+  emailMax: 5,
+  ipMax: 15,
+  windowMs: 60 * 60 * 1000,
+  lockMs: 60 * 60 * 1000,
+} as const;

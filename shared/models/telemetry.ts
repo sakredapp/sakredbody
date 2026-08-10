@@ -111,6 +111,12 @@ export const EVENT_NAMES = [
   "auth.login",
   "auth.register",
   "auth.throttled",
+  // Password recovery. `requested` carries whether the address was known and
+  // whether the mail provider accepted it — the second is the one that matters
+  // operationally, because a provider quietly refusing every send looks
+  // identical from the member's side to an email that is merely slow.
+  "auth.reset.requested",
+  "auth.reset.completed",
 
   // Administration. Who changed whose access, and when — the one category
   // where the audit trail matters more than the aggregate.
