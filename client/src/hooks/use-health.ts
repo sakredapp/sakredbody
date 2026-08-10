@@ -120,13 +120,28 @@ export function useHealthSync() {
 }
 
 /**
- * Sync once when the app comes to the foreground, at most every SYNC_MIN_MS.
+ * Sync whenever the app becomes active, at most every SYNC_MIN_MS.
  *
- * Neither plugin path gives us background delivery, so "when they open the
- * app" is the only moment we have. The throttle exists because a member
- * switching to Messages and back would otherwise re-read ninety days of
- * samples on every return, which on Android is slow enough to feel like a
- * frozen screen.
+ * Neither plugin path gives us background delivery, so "the app became active"
+ * is the only moment we have — which makes it worth listening for properly.
+ *
+ * Two listeners, not one, because they are not the same event:
+ *
+ *   appStateChange  — Capacitor's native signal, from applicationDidBecomeActive
+ *                     on iOS and onResume on Android. This is the reliable one
+ *                     in the shells.
+ *   visibilitychange — the web signal. Correct in a browser, and on iOS it also
+ *                     fires for things that are not a real return to the app:
+ *                     pulling down Notification Centre, or the app switcher
+ *                     card. Kept as the fallback so the web portal still
+ *                     refreshes, since WKWebView's visibility handling has
+ *                     never been something to depend on alone.
+ *
+ * Both funnel into the same throttled `run`, so double-firing costs nothing.
+ *
+ * The throttle exists because a member switching to Messages and back would
+ * otherwise re-read ninety days of samples on every return, which on Android is
+ * slow enough to feel like a frozen screen.
  */
 const SYNC_MIN_MS = 15 * 60 * 1000;
 
@@ -137,6 +152,7 @@ export function useHealthAutoSync(enabled = true) {
 
   useEffect(() => {
     if (!enabled || !available) return;
+    let cancelled = false;
 
     const run = () => {
       const now = Date.now();
@@ -149,11 +165,34 @@ export function useHealthAutoSync(enabled = true) {
     };
 
     run();
+
     const onVisible = () => {
       if (document.visibilityState === "visible") run();
     };
     document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
+
+    // Dynamically imported so the web bundle never carries the native shim.
+    // The listener handle arrives asynchronously, which means an unmount can
+    // land before it does — hence `cancelled`, or we would leak a listener
+    // that fires against a dead component every time the app resumes.
+    let remove: (() => void) | null = null;
+    import("@capacitor/app")
+      .then(({ App }) => App.addListener("appStateChange", ({ isActive }) => {
+        if (isActive) run();
+      }))
+      .then((handle) => {
+        if (cancelled) handle.remove();
+        else remove = () => handle.remove();
+      })
+      .catch(() => {
+        // Web, or the plugin is absent. visibilitychange already covers it.
+      });
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      remove?.();
+    };
     // `sync` is a stable mutation object from react-query; including it would
     // re-subscribe on every render and defeat the throttle.
     // eslint-disable-next-line react-hooks/exhaustive-deps
