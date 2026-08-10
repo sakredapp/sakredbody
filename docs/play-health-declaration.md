@@ -49,11 +49,25 @@ Play Console → **App content → Health apps**.
 
 Tick, under **Health and fitness** only:
 
-- Activity and fitness
-- Sleep management
+- **Activity and fitness** — steps, distance, exercise, active and total
+  calories, floors climbed, VO2 max, resting heart rate, HRV
+- **Nutrition and weight management** — hydration, nutrition, weight, body fat
+- **Sleep management** — sleep sessions and stages
+- **Stress management, relaxation, mental acuity** — mindfulness
 
-Do **not** tick anything under **Medical**. Nothing here is clinical decision
-support, and ticking a medical category invites a far stricter review.
+Derived from the permission list Play reports for the uploaded bundle, not from
+how we describe the product. An earlier version of this file listed only the
+first and third, which under-declared: the bundle requests READ_HYDRATION,
+READ_NUTRITION, READ_WEIGHT, READ_BODY_FAT and READ_MINDFULNESS, and Google can
+see all five. A declaration narrower than the manifest is the one that gets
+bounced.
+
+If a category here is unwanted, the fix is to drop the permission and the code
+that reads it, not to leave the box unticked.
+
+Do **not** tick anything under **Medical**, **Human subjects research**, or
+**Other**. Nothing here is clinical decision support, and a medical category
+invites a far stricter review.
 
 ### Per data type justification
 
