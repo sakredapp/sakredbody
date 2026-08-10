@@ -7,13 +7,16 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { track } from "@/lib/track";
 import {
   disableBackgroundSync,
   enableBackgroundSync,
   healthAvailability,
   healthPlatform,
+  healthProbeDetail,
   requestHealthAccess,
   syncHealth,
 } from "@/lib/health";
@@ -89,6 +92,14 @@ export function useHealthSync() {
       if (!alive) return;
       setAvailable(a.available);
       setReason(a.reason);
+      // Recorded once per mount, and only on a phone — a browser reporting
+      // "not a phone app" is noise. This is the evidence that was missing
+      // while the feature was silently unavailable on a real device.
+      if (Capacitor.isNativePlatform()) {
+        void healthProbeDetail().then((detail) =>
+          track("health.probe", { surface: "health", props: { ...detail, resolved: a.available } })
+        );
+      }
     });
     return () => {
       alive = false;

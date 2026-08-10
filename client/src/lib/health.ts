@@ -61,17 +61,93 @@ export type HealthAvailability = {
   reason?: string;
 };
 
+/**
+ * Can this phone read health data?
+ *
+ * ── Why this is not simply `isAvailable()` ────────────────────────────────
+ *
+ * It was, and on a real iPhone it answered false. Everything downstream is
+ * gated on this — the onboarding step, the home tiles, the Connect button in
+ * Settings — so one wrong answer removed the entire feature with no error
+ * anywhere, on a device where the plugin is demonstrably linked into the
+ * binary (`HealthPlugin` and `_TtC12HealthPlugin6Health` are both in the
+ * compiled App target) and whose Swift reports `HKHealthStore
+ * .isHealthDataAvailable()`, which is true on every iPhone ever made.
+ *
+ * So the probe is treated as evidence rather than as the verdict.
+ *
+ * `Capacitor.isPluginAvailable` asks the bridge whether a native
+ * implementation is registered under that name, which is a different question
+ * from what the plugin's own method returns and cannot be broken by the
+ * plugin's internals. On iOS, a registered bridge is sufficient: HealthKit
+ * ships on every iPhone, so "the bridge is there" and "HealthKit exists" are
+ * the same statement. If some future iPad genuinely lacks it, the
+ * authorization request fails cleanly and says so — a far better failure than
+ * silently hiding the feature from everyone.
+ *
+ * Android keeps the probe as the verdict, because there the question is real:
+ * Health Connect is a separate app that can be absent, and `reason` is what
+ * tells the member to install it.
+ */
 export async function healthAvailability(): Promise<HealthAvailability> {
   const platform = healthPlatform();
   if (!platform) return { available: false, platform: null, reason: "Not a phone app." };
+
+  const bridged = Capacitor.isPluginAvailable("Health");
   const p = await plugin();
-  if (!p) return { available: false, platform, reason: "Health plugin failed to load." };
+  if (!p) {
+    return {
+      available: false,
+      platform,
+      reason: bridged
+        ? "The Health plugin is in this build but its code did not load."
+        : "This build has no Health plugin.",
+    };
+  }
+
+  // iOS is decided by the bridge, before the probe can get it wrong.
+  const iosFallback = platform === "healthkit" && bridged;
+
   try {
     const res = await p.isAvailable();
-    return { available: res.available, platform, reason: res.reason };
+    if (res?.available) return { available: true, platform };
+    if (iosFallback) return { available: true, platform };
+    return { available: false, platform, reason: res?.reason ?? "Health data is unavailable." };
   } catch (err) {
+    if (iosFallback) return { available: true, platform };
     return { available: false, platform, reason: String(err) };
   }
+}
+
+/**
+ * Everything the probe saw, for telemetry.
+ *
+ * Separate from the answer above because this is diagnosis, not behaviour. A
+ * device reporting "unavailable" is the only evidence there is when the
+ * developer cannot hold the phone, and an hour went into guessing at exactly
+ * this because nothing was ever recorded. Sent once per app open.
+ */
+export async function healthProbeDetail(): Promise<Record<string, unknown>> {
+  const platform = healthPlatform();
+  const bridged = Capacitor.isPluginAvailable("Health");
+  let loaded = false;
+  let raw: unknown = null;
+  let error: string | null = null;
+  try {
+    const p = await plugin();
+    loaded = Boolean(p);
+    if (p) raw = await p.isAvailable();
+  } catch (err) {
+    error = String(err);
+  }
+  return {
+    platform,
+    nativePlatform: Capacitor.getPlatform(),
+    bridged,
+    loaded,
+    probe: raw,
+    error,
+  };
 }
 
 /**

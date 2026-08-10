@@ -248,10 +248,10 @@ export function Onboarding() {
               <div className="h-11 w-11 rounded-full bg-[hsl(var(--gold))]/10 grid place-items-center mb-2">
                 <Bell className="h-5 w-5 text-[hsl(var(--gold))]" />
               </div>
-              <DialogTitle className="font-display text-xl">How much, in the morning?</DialogTitle>
+              <DialogTitle className="font-display text-xl">Your morning brief</DialogTitle>
               <DialogDescription className="text-sm leading-relaxed">
-                One notification a day, at 7am. Nothing else — we will not message you about
-                anything you did not ask for.
+                One notification a day, at 7am — your protocol, your practices, your sleep.
+                Nothing else, ever.
               </DialogDescription>
             </DialogHeader>
 

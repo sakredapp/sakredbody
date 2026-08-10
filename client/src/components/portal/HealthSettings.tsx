@@ -40,7 +40,7 @@ const DEPTHS: { key: NoticeDepth; title: string; example: string | null }[] = [
 ];
 
 export function HealthSettings() {
-  const { available, platform, connect, disconnect } = useHealthSync();
+  const { available, reason, platform, connect, disconnect } = useHealthSync();
   const { data } = useHealthSummary(30);
   const { toast } = useToast();
 
@@ -163,6 +163,25 @@ export function HealthSettings() {
             >
               {connect.isPending ? "Connecting…" : `Connect ${storeName}`}
             </Button>
+            {/* A disabled button with no explanation is the worst control in
+                any app: it looks broken, and the member cannot tell whether
+                they mis-tapped. This is the only place that says why nothing
+                happened when they pressed it. */}
+            {available === false && (
+              <p className="text-[11px] text-destructive">
+                {reason ?? `${storeName} isn't available on this phone.`}
+              </p>
+            )}
+            {available === null && (
+              <p className="text-[11px] text-muted-foreground">Checking {storeName}…</p>
+            )}
+            {connect.isError && (
+              <p className="text-[11px] text-destructive">
+                {connect.error instanceof Error
+                  ? connect.error.message
+                  : "That didn't go through. Try again."}
+              </p>
+            )}
           </div>
         )}
       </div>

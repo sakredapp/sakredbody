@@ -123,6 +123,10 @@ export const EVENT_NAMES = [
   // some phone's localStorage.
   "onboarding.shown",
   "onboarding.answered",
+  // What the phone said about its own Health store. Diagnosis, not product
+  // behaviour: when a device reports the feature unavailable, this is the only
+  // evidence anyone has, and without it the answer is guesswork.
+  "health.probe",
 
   // Administration. Who changed whose access, and when — the one category
   // where the audit trail matters more than the aggregate.
