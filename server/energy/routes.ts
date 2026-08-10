@@ -269,33 +269,52 @@ export function registerEnergyRoutes(app: Express) {
         updatedAt: new Date(),
       };
 
+      /**
+       * Only the fields the caller actually sent.
+       *
+       * The set clause used to read `birthTime: values.birthTime ?? null` for
+       * every column, which turns any partial save into a wipe: send a new
+       * birth name without resending the birth time, and the birth time is
+       * gone. That is precisely the value most likely to be added later and by
+       * itself — nobody knows their time of birth when first asked, they ask a
+       * parent that evening — so the field most at risk was the one most
+       * likely to be lost.
+       *
+       * `in input` rather than a null check, because null is a legitimate
+       * value here: clearing a birth time is a thing a member may do
+       * deliberately, and it has to be distinguishable from not mentioning it.
+       */
+      const set: Record<string, unknown> = { updatedAt: values.updatedAt };
+      for (const key of [
+        "birthDate",
+        "birthTime",
+        "birthPlace",
+        // birthName and polarity were missing from the old list entirely, so
+        // on a second save — which is every save after the first, since the
+        // row is created on the first — the update silently kept the old name
+        // and the member's edit vanished.
+        "birthName",
+        "yOverrides",
+        "polarity",
+        "sunSign",
+        "moonSign",
+        "risingSign",
+      ] as const) {
+        if (key in input) set[key] = values[key] ?? null;
+      }
+      // The derived numbers follow whichever inputs they are derived from, so
+      // they are only rewritten when that input was part of this request.
+      if ("birthDate" in input) set.lifePathNumber = values.lifePathNumber;
+      if ("birthName" in input || "yOverrides" in input) {
+        set.expressionNumber = values.expressionNumber;
+        set.soulUrgeNumber = values.soulUrgeNumber;
+        set.personalityNumber = values.personalityNumber;
+      }
+
       const [saved] = await db
         .insert(userCosmology)
         .values(values)
-        .onConflictDoUpdate({
-          target: userCosmology.userId,
-          set: {
-            birthDate: values.birthDate ?? null,
-            birthTime: values.birthTime ?? null,
-            birthPlace: values.birthPlace ?? null,
-            // birthName and polarity were missing from this list, so on a
-            // second save — which is every save after the first, since the row
-            // is created on the first — the insert silently kept the old name
-            // and the member's edit vanished. The numbers below were never
-            // written at all.
-            birthName: values.birthName ?? null,
-            yOverrides: values.yOverrides ?? null,
-            polarity: values.polarity ?? null,
-            sunSign: values.sunSign ?? null,
-            moonSign: values.moonSign ?? null,
-            risingSign: values.risingSign ?? null,
-            lifePathNumber: values.lifePathNumber,
-            expressionNumber: values.expressionNumber,
-            soulUrgeNumber: values.soulUrgeNumber,
-            personalityNumber: values.personalityNumber,
-            updatedAt: values.updatedAt,
-          },
-        })
+        .onConflictDoUpdate({ target: userCosmology.userId, set })
         .returning();
 
       res.json(saved);
