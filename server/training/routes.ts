@@ -54,6 +54,7 @@ import {
   displayWeight,
   type WeightUnit,
   EXERCISE_CATEGORIES,
+  isPracticeCategory,
   coachingMessages,
 } from "../../shared/schema.js";
 import {
@@ -197,6 +198,7 @@ async function shareSessionWithCoach(userId: string, sessionId: string): Promise
     .select({
       name: exercises.name,
       trackingType: exercises.trackingType,
+      category: exercises.category,
       reps: workoutSets.reps,
       durationSeconds: workoutSets.durationSeconds,
       weightKg: workoutSets.weightKg,
@@ -225,7 +227,13 @@ async function shareSessionWithCoach(userId: string, sessionId: string): Promise
   // build without downlevelIteration.
   for (const [name, sets] of Array.from(byMovement.entries())) {
     const first = sets[0];
-    if (first.trackingType === "duration") {
+    // A class is one line and the honest unit is minutes. Reading "Reformer
+    // Pilates — 1 × 2700s" in a coaching thread is the sort of detail that
+    // makes a coach stop trusting the summary.
+    if (isPracticeCategory(first.category)) {
+      const total = sets.reduce((t: number, s: Logged) => t + (s.durationSeconds ?? 0), 0);
+      lines.push(`${name} — ${Math.round(total / 60)} min`);
+    } else if (first.trackingType === "duration") {
       const total = sets.reduce((t: number, s: Logged) => t + (s.durationSeconds ?? 0), 0);
       lines.push(`${name} — ${sets.length} × ${Math.round(total / sets.length)}s`);
     } else {
@@ -360,6 +368,13 @@ export function registerTrainingRoutes(app: Express) {
           name: exercises.name,
           trackingType: exercises.trackingType,
           equipment: exercises.equipment,
+          // Both here because the screen cannot draw the right row without
+          // them: a prescribed couch stretch has no weight and no reps, and
+          // until it knew that it offered two boxes that had to be filled
+          // before the log button would enable — which made every non-lifting
+          // prescription impossible to record.
+          category: exercises.category,
+          takesLoad: exercises.takesLoad,
         })
         .from(habitExercises)
         .innerJoin(exercises, eq(habitExercises.exerciseId, exercises.id))
@@ -588,6 +603,10 @@ export function registerTrainingRoutes(app: Express) {
           sessionId: workoutSets.sessionId,
           exerciseId: workoutSets.exerciseId,
           name: exercises.name,
+          // History has to be able to tell a 45-minute class from a 45-second
+          // hold, and the number alone cannot.
+          category: exercises.category,
+          trackingType: exercises.trackingType,
           setIndex: workoutSets.setIndex,
           reps: workoutSets.reps,
           durationSeconds: workoutSets.durationSeconds,

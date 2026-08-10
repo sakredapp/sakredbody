@@ -39,7 +39,7 @@ import { MemberBuild } from "@/components/build/MemberBuild";
 import { FreeSession } from "@/components/build/FreeSession";
 import { Dumbbell, Check, Plus, Trophy, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { estimateOneRepMax, lbToKg } from "@shared/models/training";
+import { estimateOneRepMax, lbToKg, isPracticeCategory } from "@shared/models/training";
 
 interface PrescribedLift {
   id: string;
@@ -47,6 +47,8 @@ interface PrescribedLift {
   name: string;
   equipment: string;
   trackingType: string;
+  category: string;
+  takesLoad: boolean;
   targetSets: number;
   targetRepsLow: number | null;
   targetRepsHigh: number | null;
@@ -71,12 +73,48 @@ interface TodayBuild {
 interface Entry {
   weight: string;
   reps: string;
+  /** Seconds for a hold, minutes for a practice. See `amountLabel`. */
+  amount: string;
   logged: boolean;
   isPr: boolean;
 }
 
+/**
+ * ── What a prescribed row actually asks for ───────────────────────────────
+ *
+ * This screen was built when Build meant heavy barbell work, so every row was
+ * two boxes — weight and reps — and the log button stayed disabled until both
+ * were filled. That quietly made a whole half of what Sakred prescribes
+ * impossible to record: a coach could assign a couch stretch, a fascia flow, a
+ * Zone 2 ride or a Reformer sequence, and the member would be shown "LB" and
+ * "Reps" and could not log any of it.
+ *
+ * So the row is derived from the movement rather than assumed. The rules are
+ * the same three the rest of Build uses, and they live here in one place:
+ * `takesLoad` decides the weight box, `trackingType` decides the second box,
+ * and a practice counts in minutes rather than seconds because nobody logs
+ * "2700" for a forty-five minute class.
+ */
+function amountLabel(l: PrescribedLift): string | null {
+  if (l.trackingType === "duration") return isPracticeCategory(l.category) ? "Mins" : "Secs";
+  if (l.trackingType === "distance") return "Metres";
+  return "Reps";
+}
+
+/** What the member typed, in the unit the API wants. */
+function amountBody(l: PrescribedLift, amount: string): Record<string, number> {
+  const n = Number(amount);
+  if (l.trackingType === "duration") {
+    return { durationSeconds: isPracticeCategory(l.category) ? Math.round(n * 60) : Math.round(n) };
+  }
+  if (l.trackingType === "distance") return { distanceM: n };
+  return { reps: Math.round(n) };
+}
+
 function targetLabel(l: PrescribedLift): string {
-  if (l.trackingType === "duration") return `${l.targetSets} × hold`;
+  if (l.trackingType === "duration") {
+    return isPracticeCategory(l.category) ? "Log how long" : `${l.targetSets} × hold`;
+  }
   if (l.trackingType === "distance") return `${l.targetSets} × distance`;
   if (l.targetRepsLow && l.targetRepsHigh) {
     return l.targetRepsLow === l.targetRepsHigh
@@ -178,10 +216,16 @@ export function BuildTab() {
 
   const rowsFor = (lift: PrescribedLift): Entry[] =>
     entries[lift.id] ??
-    Array.from({ length: lift.targetSets }, () => ({
+    // A practice is one row, not four. "3 × 45 minutes of Reformer" is not a
+    // prescription anybody has ever written.
+    Array.from({ length: isPracticeCategory(lift.category) ? 1 : lift.targetSets }, () => ({
       // Prefilled with the prescribed weight so the common case is one tap.
       weight: lift.suggestedWeight != null ? String(lift.suggestedWeight) : "",
       reps: lift.targetRepsHigh != null ? String(lift.targetRepsHigh) : "",
+      amount:
+        lift.trackingType === "reps" && lift.targetRepsHigh != null
+          ? String(lift.targetRepsHigh)
+          : "",
       logged: false,
       isPr: false,
     }));
@@ -217,12 +261,18 @@ export function BuildTab() {
         const allRows = s.exercises.flatMap((l) => rowsFor(l));
         const done = allRows.filter((r) => r.logged).length;
         const prs = allRows.filter((r) => r.isPr).length;
+        // Load × reps, and only where both exist. A held stretch and a bike
+        // ride contribute nothing here — not because they don't count, but
+        // because tonnage is not what they are measured in, and folding them
+        // in would make the number mean nothing at all.
         const volume = s.exercises.reduce(
           (sum, l) =>
-            sum +
-            rowsFor(l)
-              .filter((r) => r.logged)
-              .reduce((v, r) => v + (Number(r.weight) || 0) * (Number(r.reps) || 0), 0),
+            l.takesLoad && l.trackingType === "reps"
+              ? sum +
+                rowsFor(l)
+                  .filter((r) => r.logged)
+                  .reduce((v, r) => v + (Number(r.weight) || 0) * (Number(r.amount) || 0), 0)
+              : sum,
           0,
         );
 
@@ -284,8 +334,18 @@ export function BuildTab() {
                     )}
 
                     <div className="space-y-1.5">
-                      <div className="grid grid-cols-[2.5rem_1fr_1fr_2.5rem] gap-2 px-1">
-                        {["Set", unit.toUpperCase(), "Reps", ""].map((h, i) => (
+                      <div
+                        className={cn(
+                          "grid gap-2 px-1",
+                          lift.takesLoad
+                            ? "grid-cols-[2.5rem_1fr_1fr_2.5rem]"
+                            : "grid-cols-[2.5rem_1fr_2.5rem]",
+                        )}
+                      >
+                        {(lift.takesLoad
+                          ? ["Set", unit.toUpperCase(), amountLabel(lift), ""]
+                          : ["Set", amountLabel(lift), ""]
+                        ).map((h, i) => (
                           <span
                             key={i}
                             className="text-[10px] uppercase tracking-widest text-muted-foreground/60"
@@ -299,24 +359,29 @@ export function BuildTab() {
                         <div
                           key={i}
                           className={cn(
-                            "grid grid-cols-[2.5rem_1fr_1fr_2.5rem] gap-2 items-center rounded-lg px-1 py-1",
+                            "grid gap-2 items-center rounded-lg px-1 py-1",
+                            lift.takesLoad
+                              ? "grid-cols-[2.5rem_1fr_1fr_2.5rem]"
+                              : "grid-cols-[2.5rem_1fr_2.5rem]",
                             row.logged && "bg-[hsl(var(--gold))]/5",
                           )}
                         >
                           <span className="text-sm text-muted-foreground text-center">{i + 1}</span>
+                          {lift.takesLoad && (
+                            <Input
+                              inputMode="decimal"
+                              value={row.weight}
+                              disabled={row.logged}
+                              onChange={(e) => setRow(lift.id, i, { weight: e.target.value }, lift)}
+                              className="h-10 text-center"
+                              data-testid={`input-weight-${lift.exerciseId}-${i}`}
+                            />
+                          )}
                           <Input
-                            inputMode="decimal"
-                            value={row.weight}
+                            inputMode={lift.trackingType === "distance" ? "decimal" : "numeric"}
+                            value={row.amount}
                             disabled={row.logged}
-                            onChange={(e) => setRow(lift.id, i, { weight: e.target.value }, lift)}
-                            className="h-10 text-center"
-                            data-testid={`input-weight-${lift.exerciseId}-${i}`}
-                          />
-                          <Input
-                            inputMode="numeric"
-                            value={row.reps}
-                            disabled={row.logged}
-                            onChange={(e) => setRow(lift.id, i, { reps: e.target.value }, lift)}
+                            onChange={(e) => setRow(lift.id, i, { amount: e.target.value }, lift)}
                             className="h-10 text-center"
                             data-testid={`input-reps-${lift.exerciseId}-${i}`}
                           />
@@ -336,16 +401,26 @@ export function BuildTab() {
                             )
                           ) : (
                             <button
-                              disabled={!active || !row.weight || !row.reps || logSet.isPending}
+                              disabled={
+                                !active ||
+                                !row.amount ||
+                                (lift.takesLoad && !row.weight) ||
+                                logSet.isPending
+                              }
                               onClick={() => {
-                                const w = Number(row.weight);
-                                const r = Number(row.reps);
-                                const pr = isPersonalRecord(lift, w, r);
+                                const w = lift.takesLoad ? Number(row.weight) : 0;
+                                // Only a weighted set of reps can be a record.
+                                // A forty-minute bike ride is not a better
+                                // forty-minute bike ride than the last one.
+                                const pr =
+                                  lift.takesLoad && lift.trackingType === "reps"
+                                    ? isPersonalRecord(lift, w, Number(row.amount))
+                                    : false;
                                 logSet.mutate(
                                   {
                                     exerciseId: lift.exerciseId,
                                     habitExerciseId: lift.id,
-                                    reps: r,
+                                    ...amountBody(lift, row.amount),
                                     weight: w,
                                     unit,
                                   },
@@ -364,7 +439,7 @@ export function BuildTab() {
                               }}
                               className={cn(
                                 "h-8 w-8 rounded-full border grid place-items-center transition-colors tap-clean",
-                                active && row.weight && row.reps
+                                active && row.amount && (!lift.takesLoad || row.weight)
                                   ? "border-[hsl(var(--gold))]/50 hover:bg-[hsl(var(--gold))]/15"
                                   : "border-border/50 opacity-40",
                               )}
@@ -377,22 +452,32 @@ export function BuildTab() {
                         </div>
                       ))}
 
-                      <button
-                        onClick={() =>
-                          setEntries({
-                            ...entries,
-                            [lift.id]: [
-                              ...rows,
-                              { weight: rows[rows.length - 1]?.weight ?? "", reps: "", logged: false, isPr: false },
-                            ],
-                          })
-                        }
-                        className="w-full text-xs text-[hsl(var(--gold))] py-2 inline-flex items-center justify-center gap-1 tap-clean"
-                        data-testid={`button-add-set-${lift.exerciseId}`}
-                      >
-                        <Plus className="h-3 w-3" />
-                        Add a set
-                      </button>
+                      {/* A practice has one line by definition, so there is
+                          nothing to add to it. */}
+                      {!isPracticeCategory(lift.category) && (
+                        <button
+                          onClick={() =>
+                            setEntries({
+                              ...entries,
+                              [lift.id]: [
+                                ...rows,
+                                {
+                                  weight: rows[rows.length - 1]?.weight ?? "",
+                                  reps: "",
+                                  amount: "",
+                                  logged: false,
+                                  isPr: false,
+                                },
+                              ],
+                            })
+                          }
+                          className="w-full text-xs text-[hsl(var(--gold))] py-2 inline-flex items-center justify-center gap-1 tap-clean"
+                          data-testid={`button-add-set-${lift.exerciseId}`}
+                        >
+                          <Plus className="h-3 w-3" />
+                          Add a set
+                        </button>
+                      )}
                     </div>
                   </div>
                 </Panel>

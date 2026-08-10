@@ -20,7 +20,11 @@ import {
   logSetSchema,
   prescribeExerciseSchema,
   MAX_REPS_FOR_ESTIMATE,
+  EXERCISE_CATEGORIES,
+  EXERCISE_GROUPS,
+  isPracticeCategory,
 } from "../shared/models/training.js";
+import { catalogueRows, slug, arrayLiteral } from "../shared/data/exerciseCatalogue.js";
 
 let passed = 0;
 let failed = 0;
@@ -87,6 +91,91 @@ check("4 × 3–5 is valid", prescribeExerciseSchema.safeParse({ exerciseId: "sq
 check("an inverted range is refused", !prescribeExerciseSchema.safeParse({ exerciseId: "squat", targetRepsLow: 8, targetRepsHigh: 3 }).success);
 check("no rep range is allowed", prescribeExerciseSchema.safeParse({ exerciseId: "squat", targetSets: 5 }).success);
 check("zero sets is refused", !prescribeExerciseSchema.safeParse({ exerciseId: "squat", targetSets: 0 }).success);
+
+// ── The catalogue ──────────────────────────────────────────────────────────
+//
+// Not decoration. Every one of these went wrong once: the equipment default
+// that silently wrote "bodyweight" onto every barbell lift, the alias array
+// that made the sync endpoint fail 500 for its entire life because nothing had
+// ever called it, the practice sitting in a category the picker cannot reach.
+
+console.log("\nThe catalogue holds together\n");
+
+const rows = catalogueRows();
+const knownCategories = new Set(EXERCISE_CATEGORIES.map((c) => c.id as string));
+const knownGroups = new Set(EXERCISE_GROUPS.map((g) => g.id as string));
+
+check("it is not the twenty-five barbell lifts any more", rows.length > 500, `${rows.length}`);
+check(
+  "every row sits in a category the picker knows",
+  rows.every((r) => knownCategories.has(r.category)),
+  rows.filter((r) => !knownCategories.has(r.category)).map((r) => r.category).join(", "),
+);
+check(
+  "every category sits in a group the picker shows",
+  EXERCISE_CATEGORIES.every((c) => knownGroups.has(c.group)),
+);
+check(
+  "no category is unreachable — each has at least one movement in it",
+  EXERCISE_CATEGORIES.filter((c) => c.id !== "full_body").every((c) =>
+    rows.some((r) => r.category === c.id),
+  ),
+  EXERCISE_CATEGORIES.filter(
+    (c) => c.id !== "full_body" && !rows.some((r) => r.category === c.id),
+  )
+    .map((c) => c.id)
+    .join(", "),
+);
+check(
+  "slugs are unique",
+  new Set(rows.map((r) => slug(r.name))).size === rows.length,
+);
+check(
+  "every barbell lift names its equipment",
+  !rows.some((r) => r.pattern === "hinge" && r.category === "back" && r.equipment === "bodyweight"),
+);
+
+console.log("\nA practice is a duration, and never a weight\n");
+
+const practices = rows.filter((r) => isPracticeCategory(r.category));
+check("there are practices at all", practices.length > 50, `${practices.length}`);
+check(
+  "every practice is tracked as a duration",
+  practices.every((r) => r.tracking === "duration"),
+  practices.filter((r) => r.tracking !== "duration").map((r) => r.name).join(", "),
+);
+check(
+  "no practice asks for a weight",
+  practices.every((r) => !r.load),
+  practices.filter((r) => r.load).map((r) => r.name).join(", "),
+);
+check(
+  "no practice claims a one-rep max",
+  practices.every((r) => !r.orm),
+);
+check("a class is a practice", isPracticeCategory("class"));
+check("basketball is a practice", isPracticeCategory("sport"));
+check("a barbell row is not", !isPracticeCategory("back"));
+check("a reformer movement is not — a sequence can prescribe it", !isPracticeCategory("pilates"));
+check(
+  "the studio takes springs, not kilograms",
+  rows
+    .filter((r) => ["pilates", "lagree", "barre"].includes(r.category))
+    .every((r) => !r.load),
+);
+
+console.log("\nAn alias array survives the trip to Postgres\n");
+
+// The bug this catches returns `(a, b)` — a record — where a text[] is needed.
+check("nothing becomes NULL", arrayLiteral(undefined) === null && arrayLiteral([]) === null);
+check("one alias", arrayLiteral(["bench"]) === '{"bench"}');
+check("two aliases", arrayLiteral(["bench", "bb bench"]) === '{"bench","bb bench"}');
+check('a quote is escaped', arrayLiteral(['say "hi"']) === '{"say \\"hi\\""}');
+check("a backslash is escaped", arrayLiteral(["a\\b"]) === '{"a\\\\b"}');
+check(
+  "every alias in the catalogue renders",
+  rows.every((r) => (r.aliases?.length ? arrayLiteral(r.aliases)!.startsWith("{") : true)),
+);
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

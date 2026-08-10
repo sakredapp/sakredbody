@@ -29,7 +29,7 @@ import {
   memberWorkoutExercises,
   exerciseCategoryEnum,
 } from "../../shared/schema.js";
-import { catalogueRows, slug } from "../../shared/data/exerciseCatalogue.js";
+import { catalogueRows, slug, arrayLiteral } from "../../shared/data/exerciseCatalogue.js";
 
 function fail(res: Response, err: unknown) {
   if (err instanceof z.ZodError) {
@@ -48,6 +48,7 @@ async function isAdminUser(userId: string): Promise<boolean> {
   const user = await storage.getUser(userId);
   return user?.isAdmin === "true";
 }
+
 
 const exerciseInput = z.object({
   name: z.string().trim().min(2, "Give it a name").max(80),
@@ -298,7 +299,7 @@ export function registerMemberWorkoutRoutes(app: Express): void {
 
       const rows = catalogueRows();
       let order = 0;
-      // Chunked: a single statement with 469 rows and twelve columns each is a
+      // Chunked: a single statement with 657 rows and twelve columns each is a
       // large parse on a serverless connection, and a failure part-way through
       // one enormous statement tells you nothing about where.
       for (let i = 0; i < rows.length; i += 100) {
@@ -307,7 +308,7 @@ export function registerMemberWorkoutRoutes(app: Express): void {
           order += 10;
           return sql`(${slug(r.name)}, ${r.name}, ${r.category}, ${r.pattern}, ${r.equipment},
             ${r.tracking ?? "reps"}, ${r.load ?? true}, ${r.uni ?? false}, ${r.bw ?? 0},
-            ${r.orm ?? false}, ${r.aliases ?? null}, ${order})`;
+            ${r.orm ?? false}, ${arrayLiteral(r.aliases)}::text[], ${order})`;
         });
         await db.execute(sql`
           insert into exercises

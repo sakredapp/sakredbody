@@ -14,12 +14,17 @@
  */
 
 import { writeFileSync } from "fs";
-import { catalogueRows, slug } from "../shared/data/exerciseCatalogue.js";
+import { catalogueRows, slug, arrayLiteral } from "../shared/data/exerciseCatalogue.js";
 
 const rows = catalogueRows();
 
 const q = (s: string) => `'${s.replace(/'/g, "''")}'`;
-const arr = (a?: string[]) => (a && a.length ? `ARRAY[${a.map(q).join(", ")}]::text[]` : "NULL");
+// The same rendering the sync endpoint binds, so a file reviewed here and a
+// row written by the API cannot disagree about what an alias list is.
+const arr = (a?: string[]) => {
+  const literal = arrayLiteral(a);
+  return literal === null ? "NULL" : `${q(literal)}::text[]`;
+};
 
 let order = 0;
 const values = rows.map((r) => {

@@ -746,4 +746,23 @@ export function catalogueRows(): Row[] {
   return rows;
 }
 
+/**
+ * A `text[]` as one value rather than a list of them.
+ *
+ * Interpolating a JavaScript array into drizzle's `sql` template does not
+ * produce an array — it expands into a comma-separated list, which Postgres
+ * reads as a record: *column "aliases" is of type text[] but expression is of
+ * type record*. The catalogue sync endpoint failed on exactly that for its
+ * entire life, silently, because nothing had ever called it.
+ *
+ * Both consumers of this module render aliases, so the escaping rule lives
+ * here rather than twice. It is the only interesting part: a backslash and a
+ * double quote both have meaning inside `{...}`, and an alias containing
+ * either would otherwise end its element early.
+ */
+export function arrayLiteral(values: string[] | undefined | null): string | null {
+  if (!values?.length) return null;
+  return `{${values.map((v) => `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`).join(",")}}`;
+}
+
 export { slug };
