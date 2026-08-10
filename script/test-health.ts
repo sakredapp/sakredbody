@@ -382,6 +382,47 @@ check(
 );
 
 // ── 8. The native background implementations ──────────────────────────────
+section("Build numbers");
+
+/**
+ * Every iOS target carries the same build number.
+ *
+ * App Store Connect rejects an upload whose extension build number differs
+ * from the app's, and it rejects it *after* the upload — the slowest possible
+ * place to learn. These two have now drifted apart twice in one day, in two
+ * different ways: once because a new target starts its numbering at 1 rather
+ * than inheriting the app's, and once because bumping the number in Xcode's
+ * UI edits the selected target and leaves the other behind.
+ *
+ * Twice is a pattern, so this is an assertion rather than a paragraph in
+ * docs/widget-setup.md, which is where the warning lived while both failures
+ * happened.
+ */
+const PBXPROJ = readFileSync("ios/App/App.xcodeproj/project.pbxproj", "utf8");
+const buildNumbers = Array.from(
+  new Set(Array.from(PBXPROJ.matchAll(/CURRENT_PROJECT_VERSION = ([0-9]+);/g)).map((m) => m[1]))
+);
+check(
+  "every iOS target shares one build number",
+  buildNumbers.length === 1,
+  `found ${buildNumbers.join(", ")} — App Store Connect rejects a mismatch after the upload`
+);
+
+/** Both targets must also agree on the App Group, or the widget reads nothing. */
+const APP_ENT = readFileSync("ios/App/App/App.entitlements", "utf8");
+const WIDGET_ENT = readFileSync("ios/App/SakredWidgetExtension.entitlements", "utf8");
+const APP_GROUP = "group.com.sakredbody.app";
+check("the app declares the App Group", APP_ENT.includes(APP_GROUP));
+check("the widget declares the same App Group", WIDGET_ENT.includes(APP_GROUP));
+check(
+  "the Swift engine writes to that same group",
+  readFileSync(
+    "plugins/health-sync/ios/Sources/HealthSyncPlugin/HealthSyncEngine.swift",
+    "utf8"
+  ).includes(APP_GROUP),
+  "a mismatch is silent — UserDefaults(suiteName:) returns nil and the widget shows its placeholder forever"
+);
+
 section("Background sync (native)");
 
 /**
