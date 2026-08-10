@@ -25,6 +25,10 @@ import {
   summarise,
   pickSwatches,
   SWATCH_PRIORITY,
+  METRIC_TARGET,
+  seriesFor,
+  planTiles,
+  trendOf,
 } from "../client/src/lib/healthDisplay.js";
 
 let passed = 0;
@@ -875,11 +879,138 @@ check(
 
 /** The component must not re-implement the rule it was extracted from. */
 const SWATCH_SRC = readFileSync("client/src/components/portal/HealthSwatches.tsx", "utf8");
-check("the component uses pickSwatches", SWATCH_SRC.includes("pickSwatches("));
+const DISPLAY_SRC = readFileSync("client/src/lib/healthDisplay.ts", "utf8");
+// The component now asks planTiles, which asks pickSwatches — so the rule is
+// still the single source of truth, one layer further in. Both links are
+// asserted, because "the component calls planTiles" is worth nothing if
+// planTiles has quietly stopped consulting the eligibility rule.
+check("the component plans its tiles from the data", SWATCH_SRC.includes("planTiles("));
+check(
+  "the component does not select metrics itself",
+  !SWATCH_SRC.includes("pickSwatches("),
+  "selection belongs in planTiles; two callers of the rule is two places to change it"
+);
+check("planTiles is built on pickSwatches", /planTiles[\s\S]{0,600}pickSwatches\(/.test(DISPLAY_SRC));
 check(
   "the component keeps no second priority list",
   !/const\s+PRIORITY\s*[:=]/.test(SWATCH_SRC),
   "two orderings drift and the home screen stops matching Stats"
+);
+
+// ─── The home board ────────────────────────────────────────────────────────
+//
+// The layout is derived, so the layout is testable. These pin the rules that
+// keep a richer home screen from becoming a dishonest one: no tile without
+// data, no chart without enough points to be a shape, no ring without a target
+// that exists outside this app.
+
+section("The home board");
+
+/** A metric with no data can never reach the board, whatever its shape. */
+const boardSparse = [
+  { onDate: "2026-08-07", steps: 8000 },
+  { onDate: "2026-08-08", steps: 9100 },
+  { onDate: "2026-08-09", steps: 7400 },
+];
+const sparseTiles = planTiles(boardSparse as never, 5);
+check(
+  "no tile for a metric with no readings",
+  sparseTiles.every((t) => t.metric === "steps"),
+  "a tile the member has no data for reads as the app being broken"
+);
+check("every tile carries a finite value", sparseTiles.every((t) => Number.isFinite(t.value)));
+
+/** Three points is not a chart. */
+check(
+  "too little history draws no line",
+  sparseTiles.every((t) => t.shape !== "spark" || t.points.length >= 4),
+  "a three-point line is a shape with no information in it"
+);
+
+/** A ring asserts a goal, so it may only appear where a goal is defined. */
+const everyMetricDay: Record<string, number | string> = { onDate: "2026-08-09" };
+for (const m of METRICS) everyMetricDay[m] = 42;
+const wideTiles = planTiles([everyMetricDay] as never, 5);
+check(
+  "a ring only appears where a target exists",
+  wideTiles.every((t) => t.shape !== "ring" || t.target !== null)
+);
+check(
+  "no target is invented for a metric without one",
+  wideTiles.every((t) => t.target === null || t.target === METRIC_TARGET[t.metric])
+);
+for (const metric of Object.keys(METRIC_TARGET)) {
+  check(`${metric} carrying a target is a real metric`, METRICS.includes(metric));
+}
+
+/** Fourteen days of one metric earns the hero slot; the shape follows the data. */
+const fortnight = Array.from({ length: 14 }, (_, i) => ({
+  onDate: `2026-07-${String(20 + i).padStart(2, "0")}`,
+  sleepMinutes: 420 + i * 3,
+}));
+const heroTiles = planTiles(fortnight as never, 5);
+check("a fortnight of history earns the hero", heroTiles[0].shape === "hero");
+check("the hero spans the row", heroTiles[0].span === 4);
+check("the hero has points to draw", heroTiles[0].points.length >= 7);
+check(
+  "one hero at most",
+  heroTiles.filter((t) => t.shape === "hero").length <= 1,
+  "a screen with two heroes has no hero"
+);
+
+/** The grid must not be left with a hole beside an odd tile. */
+for (let n = 1; n <= 5; n++) {
+  const cols = planTiles([everyMetricDay] as never, n).reduce((sum, t) => sum + t.span, 0);
+  check(`a board of ${n} tiles fills whole rows`, cols % 4 === 0);
+}
+
+/** Same data, same board — it is a pure function, like the rule beneath it. */
+const b1 = JSON.stringify(planTiles(fortnight as never, 5));
+const b2 = JSON.stringify(planTiles(fortnight as never, 5));
+check("the same data yields the same board", b1 === b2);
+
+/** Gaps are skipped, never filled — a zero-filled day is a fabricated day. */
+const gappy = [
+  { onDate: "2026-08-05", steps: 9000 },
+  { onDate: "2026-08-06" },
+  { onDate: "2026-08-07", steps: 11000 },
+];
+check("a missing day is not read as zero", !seriesFor(gappy as never, "steps" as never).includes(0));
+check("only real readings are plotted", seriesFor(gappy as never, "steps" as never).length === 2);
+check(
+  "the series is capped",
+  seriesFor(fortnight as never, "sleepMinutes" as never, 7).length === 7
+);
+
+/** Trend is against the member's own past, and silent when it is noise. */
+const flat = Array.from({ length: 14 }, (_, i) => ({
+  onDate: `2026-07-${String(20 + i).padStart(2, "0")}`,
+  restingHeartRate: 60,
+}));
+check("an unchanged metric shows no trend", trendOf(planTiles(flat as never, 1)[0]) === null);
+
+const climbing = Array.from({ length: 14 }, (_, i) => ({
+  onDate: `2026-07-${String(20 + i).padStart(2, "0")}`,
+  restingHeartRate: i < 7 ? 55 : 65,
+}));
+const rhrTrend = trendOf(planTiles(climbing as never, 1)[0]);
+check("a real change shows a trend", rhrTrend !== null && rhrTrend.pct > 0);
+check(
+  "rising resting heart rate is not celebrated",
+  rhrTrend !== null && rhrTrend.good === false,
+  "higherIsBetter is false for resting HR — the trend colour must follow it"
+);
+
+const heavier = Array.from({ length: 14 }, (_, i) => ({
+  onDate: `2026-07-${String(20 + i).padStart(2, "0")}`,
+  weightKg: i < 7 ? 80 : 86,
+}));
+const weightTiles = planTiles(heavier as never, 5);
+const weightTrend = weightTiles.length ? trendOf(weightTiles[0]) : null;
+check(
+  "weight is reported without a verdict",
+  weightTrend === null || weightTrend.good === null,
+  "weight is a goal, not a virtue — colouring it takes a position we have no business taking"
 );
 
 /** The prompt only ever appears where it can be acted on. */

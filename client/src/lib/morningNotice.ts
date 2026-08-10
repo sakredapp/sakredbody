@@ -150,6 +150,33 @@ export async function scheduleMorningNotice(): Promise<{ scheduled: number; reas
   }
 }
 
+/**
+ * Do we currently have permission to post a notification?
+ *
+ * Checks, never asks — the distinction is the whole reason this exists
+ * separately from requestMorningNotice. Settings renders this on mount, and a
+ * screen that fires the system permission prompt just because you opened it is
+ * how an app gets permanently denied: iOS shows that dialog once, ever, and a
+ * "Don't Allow" collected by accident cannot be asked for again.
+ *
+ * Read live rather than from the stored preference, because the two drift.
+ * Permission can be revoked in iOS Settings without the app being told, and
+ * the failure that produces — a ticked "Just the nudge" that never fires — is
+ * invisible from inside the app unless something actually looks.
+ */
+export async function noticePermission(): Promise<boolean> {
+  if (!Capacitor.isNativePlatform()) return false;
+  try {
+    const { LocalNotifications } = await import("@capacitor/local-notifications");
+    const res = await LocalNotifications.checkPermissions();
+    return res.display === "granted";
+  } catch {
+    // A missing plugin is indistinguishable from a refusal as far as the
+    // member is concerned: either way nothing will arrive.
+    return false;
+  }
+}
+
 /** Ask for permission. Called from Settings, where the member chose to. */
 export async function requestMorningNotice(): Promise<boolean> {
   if (!Capacitor.isNativePlatform()) return false;

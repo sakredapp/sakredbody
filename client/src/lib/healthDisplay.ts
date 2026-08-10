@@ -323,6 +323,164 @@ export const SWATCH_PRIORITY: HealthMetric[] = [
  * metric whose every reading is 0 is one the device is reporting but nobody is
  * recording, and "Water 0.0 L" is exactly the tile that looks like a bug.
  */
+/**
+ * Daily goals, for the metrics where one exists outside this app.
+ *
+ * Deliberately sparse. A ring implies a target, and a target implies we are
+ * telling a member what their body should be doing — which for most of these
+ * we have no business doing. Ten thousand steps, half an hour of movement,
+ * eight hours of sleep and two litres of water are conventions a member
+ * already carries in their head from every other device they own; putting a
+ * ring on them reflects an expectation they arrived with. Inventing one for
+ * resting heart rate or body fat would be the app taking a clinical position.
+ *
+ * Anything absent here simply never renders as a ring. That is the mechanism,
+ * not an oversight — see planTiles.
+ */
+export const METRIC_TARGET: Partial<Record<HealthMetric, number>> = {
+  steps: 10_000,
+  exerciseMinutes: 30,
+  activeCalories: 500,
+  sleepMinutes: 8 * 60,
+  mindfulnessMinutes: 10,
+  waterMl: 2500,
+  flightsClimbed: 10,
+};
+
+/**
+ * The last `limit` readings for a metric, oldest first.
+ *
+ * Missing days are skipped rather than filled with zero. Filling would draw a
+ * line to the floor on a day the member simply did not wear the watch, which
+ * on a sleep chart reads as a catastrophic night rather than as absence — the
+ * single most misleading thing a small chart can do. The cost is an x-axis
+ * that is not strictly even, which at this size nobody can perceive.
+ */
+export function seriesFor(days: DaySeries[], metric: HealthMetric, limit = 14): number[] {
+  const values: number[] = [];
+  for (const day of days) {
+    const value = day[metric];
+    if (typeof value === "number" && Number.isFinite(value)) values.push(value);
+  }
+  return values.slice(-limit);
+}
+
+/** How a tile draws itself. Derived from the data, never assigned by hand. */
+export type TileShape = "hero" | "ring" | "spark" | "stat";
+
+export type Tile = {
+  metric: HealthMetric;
+  shape: TileShape;
+  /** Columns out of four. Full-width tiles take 4, the rest take 2. */
+  span: 2 | 4;
+  value: number;
+  /** The mean of the days before the recent window, or null if too few. */
+  baseline: number | null;
+  /** Chronological readings for the chart. Empty for a plain stat. */
+  points: number[];
+  /** Only set when METRIC_TARGET has one — a ring cannot exist without it. */
+  target: number | null;
+};
+
+/** Below this a line is two dots and a slope, which says nothing. */
+const MIN_SPARK_POINTS = 4;
+/** The hero tile carries a fortnight's shape; less than a week isn't one. */
+const MIN_HERO_POINTS = 7;
+
+/**
+ * The home board: which tiles, in what order, drawn how.
+ *
+ * The shape of every tile falls out of what the member actually has, which is
+ * the point — two members open this screen and get different layouts, because
+ * they are different people with different devices. A fixed layout would have
+ * to either leave holes for whoever lacks a metric, or pad them with zeroes,
+ * and both read as the app being broken rather than as data not existing.
+ *
+ * The rules, in order:
+ *
+ *   1. Priority order comes from pickSwatches, which already guarantees every
+ *      metric here has at least one non-zero reading.
+ *   2. The top metric becomes the hero — full width, with its own chart — but
+ *      only if it has a week of readings to draw. A hero tile with three
+ *      points is a big box containing a short line.
+ *   3. A metric with a conventional daily target and a reading for today gets
+ *      a ring.
+ *   4. A metric with enough history gets a sparkline.
+ *   5. Everything else is a number and a trend, which is honest about being
+ *      all we have.
+ *   6. Half-width tiles are laid two to a row, so an odd one out is widened
+ *      rather than left beside a hole.
+ */
+export function planTiles(days: DaySeries[], limit = 5): Tile[] {
+  const metrics = pickSwatches(days, limit);
+
+  const tiles: Tile[] = [];
+  for (let i = 0; i < metrics.length; i++) {
+    const metric = metrics[i];
+    const stat = summarise(days, metric);
+    if (!stat) continue;
+
+    const points = seriesFor(days, metric);
+    const target = METRIC_TARGET[metric] ?? null;
+
+    // Rule 2, and only for the first metric: a screen with two heroes has no
+    // hero, and the second one is just a wide tile pretending to lead.
+    const hero = i === 0 && points.length >= MIN_HERO_POINTS;
+
+    const shape: TileShape = hero
+      ? "hero"
+      : target !== null
+        ? "ring"
+        : points.length >= MIN_SPARK_POINTS
+          ? "spark"
+          : "stat";
+
+    tiles.push({
+      metric,
+      shape,
+      span: hero ? 4 : 2,
+      value: stat.value,
+      baseline: stat.baseline,
+      points,
+      target,
+    });
+  }
+
+  // Rule 6. Count only the half-width tiles: the hero already fills its row,
+  // so it must not be counted when deciding whether one is left over.
+  const halves = tiles.filter((t) => t.span === 2);
+  if (halves.length % 2 === 1) {
+    const last = halves[halves.length - 1];
+    last.span = 4;
+    // A ring stretched across the full width is mostly empty space with a
+    // circle marooned on one side. Widening it changes what it should draw.
+    if (last.shape === "ring" && last.points.length >= MIN_SPARK_POINTS) {
+      last.shape = "spark";
+    }
+  }
+
+  return tiles;
+}
+
+/**
+ * How a value compares to the member's own earlier weeks.
+ *
+ * Against their own baseline, never against a population — the whole premise
+ * of the product is that the interesting comparison is with yourself. `good`
+ * is null where the metric has no better direction, so the UI can show the
+ * movement without colouring it as an achievement or a failure.
+ */
+export function trendOf(tile: Tile): { pct: number; good: boolean | null } | null {
+  if (tile.baseline === null || tile.baseline === 0) return null;
+  const pct = ((tile.value - tile.baseline) / tile.baseline) * 100;
+  // Under a couple of percent is noise in the sensor, not a change in the
+  // person. Showing "+0.4%" invites someone to read meaning into drift.
+  if (Math.abs(pct) < 2) return null;
+
+  const better = METRIC_DISPLAY[tile.metric].higherIsBetter;
+  return { pct, good: better === null ? null : pct > 0 === better };
+}
+
 export function pickSwatches(days: DaySeries[], limit = 4): HealthMetric[] {
   const ranked = [
     ...SWATCH_PRIORITY,

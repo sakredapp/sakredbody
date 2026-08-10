@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SectionHeading, Panel } from "@/components/portal/Panel";
+import { HealthSettings } from "@/components/portal/HealthSettings";
 import { InfoTip } from "@/components/ui/info-tip";
 import { EyeOff, Scale, LogOut, ShieldOff } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -81,6 +82,16 @@ export function SettingsTab({
   return (
     <div className="space-y-6">
       <SectionHeading title="Settings" subtitle="You, rather than what you're doing." />
+
+      {/* ── Health, reminders and the widget ───────────────────────────────
+          First, and above the older panels, because it is the only group here
+          that onboarding asks about and then never mentions again. A member
+          who tapped "no notifications" half-awake on their first morning had
+          no way back — a choice you can make once and never unmake is a trap,
+          and this panel is the way out of it. */}
+      <Panel title="Health &amp; reminders">
+        <HealthSettings />
+      </Panel>
 
       {/* ── Blocked ────────────────────────────────────────────────────────── */}
       <Panel title="People you've blocked">
