@@ -17,33 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import {
-  Calendar,
-  MapPin,
-  Users,
-  ArrowRight,
-  LogOut,
-  Check,
-  Clock,
-  Star,
-  Sparkles,
-  DollarSign,
-  Heart,
-  Dumbbell,
-  Hotel,
-  Home,
-  UtensilsCrossed,
-  MoreHorizontal,
-  Building2,
-  User,
-  UserPlus,
-  ChevronRight,
-  ListChecks,
-  Map,
-  Compass,
-  BarChart3,
-  ShieldCheck,
-} from "lucide-react";
+import { ArrowRight, BarChart3, Building2, Calendar, Check, ChevronRight, Clock, Compass, DollarSign, Dumbbell, Heart, HelpCircle, Home, Hotel, ListChecks, LogOut, Map, MapPin, MoreHorizontal, Settings, ShieldCheck, Sparkles, Star, User, UserPlus, Users, UtensilsCrossed } from "lucide-react";
 import type { Retreat, BookingRequest, Partner, PartnerService } from "@shared/schema";
 import {
   SERVICE_CATEGORIES,
@@ -86,6 +60,14 @@ import { BuildTab } from "@/components/BuildTab";
 import { SettingsTab } from "@/components/SettingsTab";
 import { useHealthAutoSync } from "@/hooks/use-health";
 import { Onboarding } from "@/components/portal/Onboarding";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useEffect } from "react";
 import { scheduleMorningNotice } from "@/lib/morningNotice";
 import { updateWidget } from "@/lib/widget";
@@ -392,14 +374,71 @@ export default function MemberDashboard() {
                 <span className="hidden sm:inline">Admin</span>
               </Link>
             )}
-            <Avatar className="w-8 h-8">
-              {user?.profileImageUrl && <AvatarImage src={user.profileImageUrl} alt={user.firstName || "Member"} />}
-              <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-            </Avatar>
-            <span className="text-sm hidden sm:inline" data-testid="text-member-name">{user?.firstName || "Member"}</span>
-            <Button variant="ghost" size="icon" onClick={() => logout()} data-testid="button-logout">
-              <LogOut className="w-4 h-4" />
-            </Button>
+            {/* Help, before the avatar. Someone stuck is looking along the top
+                bar for a way to ask, and "ask a person" should not be buried
+                two taps into a menu labelled with your own face. */}
+            <Link
+              href="/support"
+              className="tap inline-flex items-center justify-center w-8 h-8 rounded-full text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Ask for help"
+              data-testid="link-help"
+            >
+              <HelpCircle className="w-[18px] h-[18px]" />
+            </Link>
+
+            {/* The avatar is the menu.
+                It was a decorative circle with a separate sign-out icon beside
+                it — the circle did nothing when tapped, which is the first
+                thing anyone tries, and sign-out sat in the header as a
+                one-tap accident next to the thing you actually want. Both
+                fixed by making the avatar the control and putting sign-out
+                inside it, where leaving takes a deliberate second tap. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="tap rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--gold))]/50"
+                  aria-label="Your account"
+                  data-testid="button-account-menu"
+                >
+                  <Avatar className="w-8 h-8 border border-[hsl(var(--gold))]/25">
+                    {user?.profileImageUrl && (
+                      <AvatarImage src={user.profileImageUrl} alt={user.firstName || "Member"} />
+                    )}
+                    <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+                  </Avatar>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel className="font-normal">
+                  <p className="text-sm" data-testid="text-member-name">
+                    {[user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Member"}
+                  </p>
+                  {user?.email && (
+                    <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
+                  )}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setSection("settings")} data-testid="menu-settings">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Profile &amp; settings
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild data-testid="menu-help">
+                  <Link href="/support">
+                    <HelpCircle className="w-4 h-4 mr-2" />
+                    Ask for help
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={() => logout()}
+                  className="text-destructive focus:text-destructive"
+                  data-testid="button-logout"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>

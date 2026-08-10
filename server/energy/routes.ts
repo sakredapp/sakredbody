@@ -43,6 +43,7 @@ import {
   centreActionEnum,
   lifePathNumber,
 } from "../../shared/schema.js";
+import { nameNumbers } from "../../shared/utils/almanac.js";
 
 function isAdmin(req: Request, res: Response, next: NextFunction) {
   const userId = req.session?.userId;
@@ -251,10 +252,20 @@ export function registerEnergyRoutes(app: Express) {
         .omit({ userId: true, disposition: true, lifePathNumber: true })
         .parse(req.body);
 
+      // Derived here, never accepted from the client. These are the whole
+      // reason the birth date and birth name are collected, and a number the
+      // caller can set is a number that can disagree with the name it came
+      // from — the sort of inconsistency nobody notices until a member asks
+      // why their soul urge changed.
+      const names = nameNumbers(input.birthName ?? null, input.yOverrides ?? null);
+
       const values = {
         ...input,
         userId,
         lifePathNumber: input.birthDate ? lifePathNumber(String(input.birthDate)) : null,
+        expressionNumber: names.expression,
+        soulUrgeNumber: names.soulUrge,
+        personalityNumber: names.personality,
         updatedAt: new Date(),
       };
 
@@ -267,10 +278,21 @@ export function registerEnergyRoutes(app: Express) {
             birthDate: values.birthDate ?? null,
             birthTime: values.birthTime ?? null,
             birthPlace: values.birthPlace ?? null,
+            // birthName and polarity were missing from this list, so on a
+            // second save — which is every save after the first, since the row
+            // is created on the first — the insert silently kept the old name
+            // and the member's edit vanished. The numbers below were never
+            // written at all.
+            birthName: values.birthName ?? null,
+            yOverrides: values.yOverrides ?? null,
+            polarity: values.polarity ?? null,
             sunSign: values.sunSign ?? null,
             moonSign: values.moonSign ?? null,
             risingSign: values.risingSign ?? null,
             lifePathNumber: values.lifePathNumber,
+            expressionNumber: values.expressionNumber,
+            soulUrgeNumber: values.soulUrgeNumber,
+            personalityNumber: values.personalityNumber,
             updatedAt: values.updatedAt,
           },
         })

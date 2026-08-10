@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SectionHeading, Panel } from "@/components/portal/Panel";
 import { HealthSettings } from "@/components/portal/HealthSettings";
+import { AboutYouSettings } from "@/components/portal/AboutYouSettings";
 import { InfoTip } from "@/components/ui/info-tip";
 import { EyeOff, Scale, LogOut, ShieldOff } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -82,6 +83,16 @@ export function SettingsTab({
   return (
     <div className="space-y-6">
       <SectionHeading title="Settings" subtitle="You, rather than what you're doing." />
+
+      {/* ── About you ──────────────────────────────────────────────────────
+          First, because it is the one panel that changes what the app says
+          rather than how it behaves — and because most people do not know
+          their time of birth when onboarding asks. They find out that evening,
+          and this is where the answer goes. Without it the rising sign is lost
+          for good. */}
+      <Panel title="About you">
+        <AboutYouSettings />
+      </Panel>
 
       {/* ── Health, reminders and the widget ───────────────────────────────
           First, and above the older panels, because it is the only group here

@@ -250,22 +250,116 @@ function letterValue(ch: string): number {
 const VOWELS = new Set(["A", "E", "I", "O", "U"]);
 
 /**
- * Y is a vowel when a name part has no other vowel ("Lynn", "Myrtle"), and a
- * consonant otherwise ("Mary"). Applied per word, since that's the unit the
- * rule is actually about.
+ * Is this Y acting as a vowel?
+ *
+ * ── Why the old rule was wrong ────────────────────────────────────────────
+ *
+ * It asked whether the *word* contained any other vowel: no other vowel means
+ * Y is a vowel ("Lynn"), otherwise a consonant ("Mary"). That is right for
+ * both of those and wrong for a great many real names, because the rule is
+ * about the syllable, not the word. "Bryan" contains an A, so the old rule
+ * called its Y a consonant — but nobody pronounces Bry-an with a consonant
+ * there. Same for Kyle, Lyla, Myla, Tyler, Wyatt, Bryce, Skyler, Jolyn.
+ *
+ * That is not a rounding error. Soul urge is built from vowels alone and
+ * personality from consonants alone, so one misclassified Y moves a letter
+ * from one number to the other and changes both — and for a name like Kyle,
+ * where the Y is the only vowel sound in the syllable, it produced a soul urge
+ * with a single E in it.
+ *
+ * ── The rule now ──────────────────────────────────────────────────────────
+ *
+ * Y is a consonant only where it is doing consonant work: at the start of a
+ * syllable, immediately before a sounded vowel. Everywhere else the Y is
+ * carrying the vowel sound and counts as one.
+ *
+ *   Yolanda, Yves, Yasmine   Y begins the word before a vowel → consonant
+ *   Maya, Sawyer, Kayla      Y sits between vowels, starting the next
+ *                            syllable → consonant
+ *   Lynn, Myrtle, Bryn       no other vowel → vowel
+ *   Bryan, Kyle, Tyler       Y follows a consonant and carries the sound
+ *                            → vowel, which the old rule got wrong
+ *
+ * It is a heuristic about pronunciation and cannot be perfect — English names
+ * come from everywhere and "Sonya" and "Tanya" are argued over by people who
+ * do this for a living. Where it matters, the member's own answer should win;
+ * this is the default, not the verdict.
  */
-function classifyLetters(namePart: string): { vowels: string[]; consonants: string[] } {
+/**
+ * W and Y glide into the vowel before them — the "aw" of Sawyer, the "ay" of
+ * Kayla. For deciding what a following Y is doing, a vowel plus one of these
+ * still counts as a vowel sound.
+ */
+const SEMI_VOWELS = new Set(["W", "Y"]);
+
+function precededByVowelSound(letters: string[], i: number): boolean {
+  const prev = i > 0 ? letters[i - 1] : null;
+  if (!prev) return false;
+  if (VOWELS.has(prev)) return true;
+  return SEMI_VOWELS.has(prev) && i > 1 && VOWELS.has(letters[i - 2]);
+}
+
+function yIsVowel(letters: string[], i: number): boolean {
+  const next = i < letters.length - 1 ? letters[i + 1] : null;
+
+  // Already a vowel sound in front of it, so the Y is starting the next
+  // syllable rather than carrying this one: Maya, Kayla, Sawyer, Kyley's
+  // second Y. This is the test that "does a vowel follow it" gets wrong,
+  // because Bryan and Maya both have a vowel after the Y and only one of them
+  // has a vowel before it.
+  if (precededByVowelSound(letters, i)) return false;
+
+  // Opening the word onto a vowel: Yolanda, Yasmine, Yannick. Not Yves —
+  // there the Y is followed by a consonant and carries the sound itself
+  // ("EEV"), which is why this checks the next letter rather than the
+  // position alone.
+  if (i === 0 && next && VOWELS.has(next)) return false;
+
+  // Everything else: the Y is the vowel of its syllable. Lynn, Kyle, Bryan,
+  // Tyler, Amy, Bryce, Skyler, Myrtle.
+  return true;
+}
+
+function classifyLetters(
+  namePart: string,
+  yOverrides?: Record<string, boolean> | null,
+): { vowels: string[]; consonants: string[] } {
   const letters = namePart.toUpperCase().replace(/[^A-Z]/g, "").split("");
-  const hasRealVowel = letters.some((l) => VOWELS.has(l));
 
   const vowels: string[] = [];
   const consonants: string[] = [];
-  for (const l of letters) {
+  for (let i = 0; i < letters.length; i++) {
+    const l = letters[i];
     if (VOWELS.has(l)) vowels.push(l);
-    else if (l === "Y") (hasRealVowel ? consonants : vowels).push(l);
-    else consonants.push(l);
+    else if (l === "Y") {
+      // The member's answer first, ours second. Keyed on the word as written
+      // rather than upper-cased, to match what explainY hands the UI.
+      const override = yOverrides?.[`${namePart}:${i}`];
+      const isVowel = typeof override === "boolean" ? override : yIsVowel(letters, i);
+      (isVowel ? vowels : consonants).push(l);
+    } else consonants.push(l);
   }
   return { vowels, consonants };
+}
+
+/**
+ * Where the Ys in a name fall, for showing the member and letting them correct
+ * it. Returns one entry per Y, in order, with the classification we chose.
+ */
+export function explainY(fullName: string | null | undefined): {
+  word: string;
+  index: number;
+  isVowel: boolean;
+}[] {
+  if (!fullName) return [];
+  const out: { word: string; index: number; isVowel: boolean }[] = [];
+  for (const word of fullName.trim().split(/\s+/)) {
+    const letters = word.toUpperCase().replace(/[^A-Z]/g, "").split("");
+    letters.forEach((l, i) => {
+      if (l === "Y") out.push({ word, index: i, isVowel: yIsVowel(letters, i) });
+    });
+  }
+  return out;
 }
 
 export interface NameNumbers {
@@ -279,7 +373,16 @@ export interface NameNumbers {
  * that's the convention, and it's why signup asks for the middle name rather
  * than just first and last.
  */
-export function nameNumbers(fullName: string | null | undefined): NameNumbers {
+export function nameNumbers(
+  fullName: string | null | undefined,
+  /**
+   * The member's own answer about a Y, keyed `Word:index` exactly as
+   * `explainY` reports it. The classifier is a heuristic about pronunciation
+   * and a name belongs to the person saying it, so where they have told us,
+   * they win.
+   */
+  yOverrides?: Record<string, boolean> | null,
+): NameNumbers {
   if (!fullName || !fullName.trim()) {
     return { expression: null, soulUrge: null, personality: null };
   }
@@ -288,7 +391,7 @@ export function nameNumbers(fullName: string | null | undefined): NameNumbers {
   let allV: string[] = [];
   let allC: string[] = [];
   for (const part of parts) {
-    const { vowels, consonants } = classifyLetters(part);
+    const { vowels, consonants } = classifyLetters(part, yOverrides);
     allV = allV.concat(vowels);
     allC = allC.concat(consonants);
   }

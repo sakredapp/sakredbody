@@ -87,7 +87,13 @@ export function PortalBackdrop({ variant = "member" }: { variant?: BackdropVaria
           every heading, label and number in the portal begins — stays empty.
           Nothing is clipped; the field is planned to whatever box it is given,
           so it composes for this one rather than being cropped to it. */}
-      <div className="absolute inset-y-0 right-0 w-[66%]">
+      {/* `top-24`, not `inset-y-0`. ConstellationSky caps its own `clearTop`
+          inset at 140px internally, which on a tall phone is not enough to
+          clear a sticky 64px header plus the safe area — the top figure was
+          rendering with its head cut off under the menu bar. Starting the box
+          below the header is the only way to get the whole figure visible,
+          since the component cannot be told to leave more room. */}
+      <div className="absolute top-24 bottom-0 right-0 w-[52%]">
       <ConstellationSky
         className="w-full h-full"
         density={density}

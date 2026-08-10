@@ -19,6 +19,7 @@ import { registerOfferingRoutes } from "./offerings/index.js";
 import { registerDailyRoutes } from "./daily/index.js";
 import { registerCommunityRoutes } from "./community/index.js";
 import { registerTelemetryRoutes } from "./telemetry/index.js";
+import { registerProfileRoutes } from "./profile/routes.js";
 import { registerWinRoutes } from "./wins/index.js";
 import { registerMemberRoutes } from "./members/index.js";
 import { registerTrainingRoutes } from "./training/index.js";
@@ -498,6 +499,9 @@ export async function registerRoutes(
 
   // Telemetry last: it observes the app, so nothing else should depend on it.
   registerTelemetryRoutes(app);
+
+  // The member's own photo and display name.
+  registerProfileRoutes(app);
 
   return httpServer;
 }

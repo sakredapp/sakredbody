@@ -20,6 +20,7 @@
 import { sql } from "drizzle-orm";
 import {
   pgTable,
+  jsonb,
   text,
   uuid,
   integer,
@@ -188,6 +189,21 @@ export const userCosmology = pgTable(
      * changing your display name shouldn't silently change your numbers.
      */
     birthName: text("birth_name"),
+
+    /**
+     * The member's own answer about a Y in their name, keyed `Word:index`.
+     *
+     * Y is a vowel in Kyle and a consonant in Maya, and which one it is moves a
+     * letter between soul urge (vowels) and personality (consonants) — two
+     * different numbers, both wrong if it is guessed. The classifier in
+     * almanac.ts handles the common cases, but English names come from
+     * everywhere and pronunciation is the actual determinant, so the person
+     * whose name it is gets the final say.
+     *
+     * Null and empty both mean "use the classifier", which is the case for
+     * every member without a Y and most members with one.
+     */
+    yOverrides: jsonb("y_overrides").$type<Record<string, boolean>>(),
 
     /**
      * Self-described energetic polarity, used to pitch the daily note.

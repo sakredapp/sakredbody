@@ -1,5 +1,17 @@
 /**
- * The way in. Three questions, once.
+ * The way in. Asked once, in the order that matters.
+ *
+ *   intake         who they are — the birth name and date every personal
+ *                  number is computed from
+ *   photo          a face instead of two letters
+ *   health         Apple Health / Health Connect
+ *   notifications  the morning brief, and how much of it
+ *   widget         how to put it on the home screen
+ *
+ * Intake is first on purpose. It is the only step that changes what the app
+ * *says* tomorrow rather than what it is permitted to do, and asking for
+ * permissions before knowing who someone is gets the order backwards — the
+ * app should earn the permission by already being personal.
  *
  * Each step asks for one thing and says what it is for before the system does.
  * That ordering is the whole design: iOS raises its own sheet the instant you
@@ -13,12 +25,17 @@
  * as it is given, and what they skipped is asked again in a fortnight.
  */
 
-import { useEffect, useRef, useState } from "react";
-import { HeartPulse, Bell, LayoutGrid, Check } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { HeartPulse, Bell, LayoutGrid, Check, Sparkles, Camera } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { useAuth } from "@/hooks/use-auth";
 import { useHealthSummary, useHealthSync } from "@/hooks/use-health";
 import { track } from "@/lib/track";
+import { IntakeStep, type IntakeValues } from "./IntakeStep";
+import { PhotoStep } from "./PhotoStep";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiFetch } from "@/lib/apiFetch";
 import { requestMorningNotice, setNoticeDepth, getNoticeDepth } from "@/lib/morningNotice";
 import type { NoticeDepth } from "@/lib/morningNoticeContent";
 import {
@@ -72,7 +89,7 @@ function remember(userId: string, kind: "done" | "snoozed"): void {
   }
 }
 
-type Step = "health" | "notifications" | "widget";
+type Step = "intake" | "photo" | "health" | "notifications" | "widget";
 
 export function Onboarding() {
   const { available, platform, connect } = useHealthSync();
@@ -81,13 +98,85 @@ export function Onboarding() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<Step>("health");
+  const [step, setStep] = useState<Step>("intake");
   const [depth, setDepth] = useState<NoticeDepth>(getNoticeDepth());
   const [notifyBusy, setNotifyBusy] = useState(false);
 
   const connected = data?.connected ?? false;
   const isIos = Capacitor.getPlatform() === "ios";
   const storeName = platform === "healthconnect" ? "Health Connect" : "Apple Health";
+
+  const initials =
+    [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join("").toUpperCase() || "·";
+
+  /**
+   * What they already told us, so a second pass through onboarding is an edit
+   * rather than a blank form. `enabled` on the query would be tidier, but this
+   * modal is mounted on every dashboard load and the row is tiny.
+   */
+  const { data: cosmology } = useQuery<{
+    birthDate?: string | null;
+    birthTime?: string | null;
+    birthName?: string | null;
+    yOverrides?: Record<string, boolean> | null;
+  }>({ queryKey: ["/api/energy/cosmology"] });
+
+  // The birth name is stored as one string, because that is what the numbers
+  // are computed from. Splitting it back out for the form is lossy for anyone
+  // with two middle names — so first and last come from the account, and
+  // whatever sits between them is treated as the middle.
+  const intakeInitial = useMemo(() => {
+    const parts = (cosmology?.birthName ?? "").trim().split(/\s+/).filter(Boolean);
+    return {
+      middleName: parts.length > 2 ? parts.slice(1, -1).join(" ") : "",
+      birthDate: cosmology?.birthDate ?? "",
+      birthTime: cosmology?.birthTime ?? "",
+      yOverrides: cosmology?.yOverrides ?? {},
+    };
+  }, [cosmology]);
+
+  const saveIntake = useMutation({
+    mutationFn: async (v: IntakeValues) => {
+      const birthName = [v.firstName, v.middleName, v.lastName]
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .join(" ");
+      // Two writes, because they are two different records: the display name
+      // on the account, and the birth data the numbers come from. See the note
+      // in server/profile/routes.ts on why they must not be the same field.
+      await apiRequest("PATCH", "/api/profile", {
+        firstName: v.firstName.trim(),
+        lastName: v.lastName.trim() || null,
+      });
+      const res = await apiRequest("PUT", "/api/energy/cosmology", {
+        birthName,
+        birthDate: v.birthDate || null,
+        birthTime: v.birthTime || null,
+        yOverrides: Object.keys(v.yOverrides).length ? v.yOverrides : null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/energy/cosmology"] });
+      setStep("photo");
+    },
+  });
+
+  const savePhoto = useMutation({
+    mutationFn: async (file: File) => {
+      const body = new FormData();
+      body.append("photo", file);
+      // Not apiRequest: it sets a JSON content-type, and multipart needs the
+      // browser to write its own boundary. apiFetch still adds the bearer.
+      const res = await apiFetch("/api/profile/photo", { method: "POST", body });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message ?? "Upload failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    },
+  });
 
   /**
    * Opened at most once per mount, and never re-stepped underneath the member.
@@ -125,7 +214,10 @@ export function Onboarding() {
       // rest of the flow runs regardless. `available === null` means the probe
       // has not answered; treat that as "don't ask", since a Connect button
       // that cannot raise the system sheet is worse than no button.
-      setStep(available === true && !connected ? "health" : "notifications");
+      // Intake first. It is the only step that changes what the app *says*
+      // tomorrow rather than merely what it is allowed to do, and asking for
+      // permissions before knowing who someone is gets the order backwards.
+      setStep("intake");
       setOpen(true);
     }, 900);
     return () => clearTimeout(t);
@@ -139,10 +231,12 @@ export function Onboarding() {
    * reached that question — which is different from answering "no" to it, and
    * the difference is the whole point of auditing this.
    */
-  const answers = useRef<{ health: boolean | null; notice: NoticeDepth | null }>({
-    health: null,
-    notice: null,
-  });
+  const answers = useRef<{
+    intake: boolean | null;
+    photo: boolean | null;
+    health: boolean | null;
+    notice: NoticeDepth | null;
+  }>({ intake: null, photo: null, health: null, notice: null });
 
   const close = (completed: boolean) => {
     if (!userId) return;
@@ -157,6 +251,8 @@ export function Onboarding() {
       props: {
         completed,
         stoppedAt: step,
+        intake: answers.current.intake,
+        photo: answers.current.photo,
         health: answers.current.health,
         notice: answers.current.notice,
         platform: Capacitor.getPlatform(),
@@ -189,6 +285,74 @@ export function Onboarding() {
   return (
     <Dialog open={open} onOpenChange={(next) => !next && close(false)}>
       <DialogContent className="max-w-sm" data-testid={`onboarding-${step}`}>
+        {step === "intake" && (
+          <>
+            <DialogHeader>
+              <div className="h-11 w-11 rounded-full bg-[hsl(var(--gold))]/10 grid place-items-center mb-2">
+                <Sparkles className="h-5 w-5 text-[hsl(var(--gold))]" />
+              </div>
+              <DialogTitle className="font-display text-xl">Let's make this yours</DialogTitle>
+              <DialogDescription className="text-sm leading-relaxed">
+                Your name and birth date are what the daily reading is built from. Without them
+                this is a habit tracker; with them it's written for you.
+              </DialogDescription>
+            </DialogHeader>
+
+            <IntakeStep
+              initial={{
+                firstName: user?.firstName ?? "",
+                lastName: user?.lastName ?? "",
+                middleName: intakeInitial.middleName,
+                birthDate: intakeInitial.birthDate,
+                birthTime: intakeInitial.birthTime,
+                yOverrides: intakeInitial.yOverrides,
+              }}
+              saving={saveIntake.isPending}
+              error={saveIntake.isError ? "That didn't save. Try again." : null}
+              onSubmit={(values) => {
+                answers.current.intake = true;
+                saveIntake.mutate(values);
+              }}
+              onSkip={() => {
+                answers.current.intake = false;
+                setStep("photo");
+              }}
+            />
+          </>
+        )}
+
+        {step === "photo" && (
+          <>
+            <DialogHeader>
+              <div className="h-11 w-11 rounded-full bg-[hsl(var(--gold))]/10 grid place-items-center mb-2">
+                <Camera className="h-5 w-5 text-[hsl(var(--gold))]" />
+              </div>
+              <DialogTitle className="font-display text-xl">Put a face to it</DialogTitle>
+              <DialogDescription className="text-sm leading-relaxed">
+                Your coach sees this, and so does the room. Initials work fine if you'd rather.
+              </DialogDescription>
+            </DialogHeader>
+
+            <PhotoStep
+              initials={initials}
+              currentUrl={user?.profileImageUrl}
+              saving={savePhoto.isPending}
+              error={
+                savePhoto.isError
+                  ? savePhoto.error instanceof Error
+                    ? savePhoto.error.message
+                    : "That didn't upload."
+                  : null
+              }
+              onUpload={(file) => {
+                answers.current.photo = true;
+                savePhoto.mutate(file);
+              }}
+              onSkip={() => setStep(available === true && !connected ? "health" : "notifications")}
+            />
+          </>
+        )}
+
         {step === "health" && (
           <>
             <DialogHeader>

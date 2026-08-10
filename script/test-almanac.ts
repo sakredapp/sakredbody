@@ -19,6 +19,7 @@ import {
   personalMonth,
   personalDay,
   nameNumbers,
+  explainY,
   almanacFor,
 } from "../shared/utils/almanac.js";
 
@@ -152,9 +153,68 @@ check("punctuation is ignored", nameNumbers("O'Brien").expression, nameNumbers("
 check("case is ignored", nameNumbers("john doe").expression, nameNumbers("JOHN DOE").expression);
 check("a middle name changes the number", nameNumbers("John Doe").expression !== nameNumbers("John Michael Doe").expression, true);
 
-// Y is a vowel only when its word has no other vowel.
-check("Y is a vowel in Lynn", nameNumbers("Lynn").soulUrge !== null, true);
-check("Y is a consonant in Mary", nameNumbers("Mary").soulUrge, nameNumbers("Mar").soulUrge);
+// ─── Y ─────────────────────────────────────────────────────────────────────
+//
+// Soul urge is vowels alone and personality is consonants alone, so a
+// misclassified Y moves a letter from one number to the other and changes
+// both. This mattered more than it looks: the rule used to ask whether the
+// *word* held any other vowel, which called the Y in "Bryan" a consonant
+// because of the A — and produced a soul urge for Kyle built from a single E.
+//
+// The rule is about the syllable. Y is a consonant only where it opens one:
+// after a vowel sound, or at the start of a word before a vowel.
+const Y_CASES: [string, string][] = [
+  // No other vowel — the classic case, and the only one the old rule got right
+  ["Lynn", "v"],
+  ["Myrtle", "v"],
+  ["Bryn", "v"],
+  // Trailing Y, carrying the sound
+  ["Mary", "v"],
+  ["Betty", "v"],
+  ["Amy", "v"],
+  // A consonant in front, a vowel behind — every one of these was wrong before
+  ["Bryan", "v"],
+  ["Kyle", "v"],
+  ["Tyler", "v"],
+  ["Lyla", "v"],
+  ["Bryce", "v"],
+  ["Skyler", "v"],
+  // Opening a word onto a vowel: the "yuh" sound
+  ["Yolanda", "c"],
+  ["Yasmine", "c"],
+  // Opening a word onto a consonant — "EEV", so the Y is the vowel
+  ["Yves", "v"],
+  // A vowel sound already in front, so the Y starts the next syllable
+  ["Maya", "c"],
+  ["Kayla", "c"],
+  // ...including across the W glide of "aw"
+  ["Sawyer", "c"],
+  // Two Ys in one name, classified independently
+  ["Yancy", "cv"],
+  ["Kyley", "vc"],
+];
+for (const [name, expected] of Y_CASES) {
+  check(
+    `Y in ${name}`,
+    explainY(name)
+      .map((y) => (y.isVowel ? "v" : "c"))
+      .join(""),
+    expected
+  );
+}
+
+// And the classification actually reaches the numbers, rather than only the
+// explanation shown to the member.
+check(
+  "a vowel Y counts toward soul urge",
+  nameNumbers("Lynn").soulUrge !== null,
+  true
+);
+check(
+  "a consonant Y does not",
+  nameNumbers("Maya").soulUrge,
+  nameNumbers("Maa").soulUrge
+);
 
 // ═══ Progressive personalisation ═══════════════════════════════════════════
 // A member gives what they know. Nothing is required, and depth reports how
