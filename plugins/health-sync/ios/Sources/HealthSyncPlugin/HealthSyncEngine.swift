@@ -20,6 +20,17 @@ import HealthKit
 
     public static let shared = HealthSyncEngine()
 
+    /**
+     * The App Group both the app and its widget belong to.
+     *
+     * Must match the identifier enabled under Signing & Capabilities on BOTH
+     * targets, and in the Apple developer portal. A mismatch is not an error at
+     * build time — UserDefaults(suiteName:) simply returns nil and the widget
+     * shows its placeholder forever.
+     */
+    public static let appGroup = "group.com.sakredbody.app"
+    public static let widgetKey = "sakred.widget.snapshot"
+
     private let store = HKHealthStore()
     private let defaults = UserDefaults.standard
 

@@ -8,4 +8,5 @@
          permission sheet. Google requires it to match the policy on the Play
          listing, so both point at the same page rather than two that drift. -->
     <string name="health_connect_privacy_policy_url">https://sakredbody.com/privacy</string>
+    <string name="widget_description">Your practices and last night\'s sleep.</string>
 </resources>

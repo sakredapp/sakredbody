@@ -18,5 +18,6 @@ export const HealthSync = registerPlugin("HealthSync", {
     disableBackgroundSync: async () => ({ enabled: false }),
     status: async () => ({ enabled: false, lastRunAt: null, lastResult: null }),
     syncNow: async () => ({ ran: false, reason: "web" }),
+    updateWidget: async () => ({ written: false }),
   }),
 });

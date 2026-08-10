@@ -13,6 +13,8 @@ import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
 import java.util.concurrent.TimeUnit
 
+private const val WIDGET_PREFS = "sakred.widget"
+
 @CapacitorPlugin(name = "HealthSync")
 class HealthSyncPlugin : Plugin() {
 
@@ -77,6 +79,47 @@ class HealthSyncPlugin : Plugin() {
         WorkManager.getInstance(context).cancelUniqueWork(HealthSyncWorker.WORK_NAME)
         prefs().edit().putBoolean(HealthSyncWorker.KEY_ENABLED, false).apply()
         call.resolve(JSObject().put("enabled", false))
+    }
+
+    /**
+     * Hand the widget its next frame.
+     *
+     * Android has no App Group — a widget provider runs in the same process and
+     * can read the app's own SharedPreferences directly, so this is simpler
+     * than the iOS side. The broadcast at the end is what actually redraws it;
+     * without it the widget keeps its last frame until the system decides
+     * otherwise, which can be half an hour.
+     */
+    @PluginMethod
+    fun updateWidget(call: PluginCall) {
+        val prefs = context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString("title", call.getString("title") ?: "Today")
+            .putString("practices", call.getString("practices") ?: "")
+            // Written only when present, so the widget can tell "no sleep data"
+            // apart from "zero" — different things to show.
+            .putString("sleep", call.getString("sleep"))
+            .putString("sleepNote", call.getString("sleepNote"))
+            .putString("updatedAt", call.getString("updatedAt"))
+            .apply()
+
+        val manager = android.appwidget.AppWidgetManager.getInstance(context)
+        val ids = manager.getAppWidgetIds(
+            android.content.ComponentName(context, "com.sakredbody.app.SakredWidgetProvider")
+        )
+        if (ids.isNotEmpty()) {
+            val intent = android.content.Intent(
+                android.appwidget.AppWidgetManager.ACTION_APPWIDGET_UPDATE
+            ).apply {
+                component = android.content.ComponentName(
+                    context, "com.sakredbody.app.SakredWidgetProvider"
+                )
+                putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+            }
+            context.sendBroadcast(intent)
+        }
+
+        call.resolve(JSObject().put("written", true))
     }
 
     @PluginMethod

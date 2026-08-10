@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Deliberately flat: RemoteViews supports a small subset of the view system,
+     and a nested layout that renders in the preview can still fail inside the
+     launcher's process. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/sakredInk"
+    android:padding="14dp">
+
+    <TextView
+        android:id="@+id/widget_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#F2EDE4"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:maxLines="2"
+        android:ellipsize="end" />
+
+    <TextView
+        android:id="@+id/widget_practices"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:textColor="#B3F2EDE4"
+        android:textSize="11sp"
+        android:maxLines="2"
+        android:ellipsize="end" />
+
+    <!-- Sleep is what people add this widget for, so it gets the size and the
+         gold even though it is written last. -->
+    <TextView
+        android:id="@+id/widget_sleep"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textColor="#C59F59"
+        android:textSize="22sp" />
+
+    <TextView
+        android:id="@+id/widget_sleep_note"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#80F2EDE4"
+        android:textSize="10sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <TextView
+        android:id="@+id/widget_stale"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Not synced today"
+        android:textColor="#59F2EDE4"
+        android:textSize="9sp"
+        android:visibility="gone" />
+</LinearLayout>

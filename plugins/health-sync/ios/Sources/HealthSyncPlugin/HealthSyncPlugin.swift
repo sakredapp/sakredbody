@@ -1,5 +1,6 @@
 import Foundation
 import Capacitor
+import WidgetKit
 
 /**
  * The bridge. All of the work is in HealthSyncEngine, which has to be callable
@@ -16,6 +17,7 @@ public class HealthSyncPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "disableBackgroundSync", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "syncNow", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "updateWidget", returnType: CAPPluginReturnPromise),
     ]
 
     /**
@@ -65,6 +67,44 @@ public class HealthSyncPlugin: CAPPlugin, CAPBridgedPlugin {
             "lastRunAt": HealthSyncEngine.shared.lastRunAt as Any,
             "lastResult": HealthSyncEngine.shared.lastResult as Any,
         ])
+    }
+
+    /**
+     * Hand the widget its next frame.
+     *
+     * The App Group suite is the only place both processes can see. A widget
+     * cannot read the app's own UserDefaults, cannot reach the WebView, and has
+     * no network of its own — so whatever is written here is the entirety of
+     * what it will ever be able to show.
+     */
+    @objc func updateWidget(_ call: CAPPluginCall) {
+        guard let defaults = UserDefaults(suiteName: HealthSyncEngine.appGroup) else {
+            // The App Group capability is not enabled on this target. Resolving
+            // false rather than rejecting: a missing widget is not a reason for
+            // a sync to report failure to the member.
+            call.resolve(["written": false])
+            return
+        }
+
+        var snapshot: [String: Any] = [
+            "title": call.getString("title") ?? "Today",
+            "practices": call.getString("practices") ?? "",
+            "updatedAt": call.getString("updatedAt") ?? ISO8601DateFormatter().string(from: Date()),
+        ]
+        // Written only when present, so the widget can tell "no sleep data"
+        // from "zero", which are different things to show.
+        if let sleep = call.getString("sleep") { snapshot["sleep"] = sleep }
+        if let note = call.getString("sleepNote") { snapshot["sleepNote"] = note }
+
+        defaults.set(snapshot, forKey: HealthSyncEngine.widgetKey)
+
+        // Ask the OS to redraw. Without this the widget keeps its last frame
+        // until the system next decides to refresh it, which can be hours.
+        if #available(iOS 14.0, *) {
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+
+        call.resolve(["written": true])
     }
 
     @objc func syncNow(_ call: CAPPluginCall) {

@@ -88,6 +88,7 @@ import { useHealthAutoSync } from "@/hooks/use-health";
 import { Onboarding } from "@/components/portal/Onboarding";
 import { useEffect } from "react";
 import { scheduleMorningNotice } from "@/lib/morningNotice";
+import { updateWidget } from "@/lib/widget";
 
 // Icon mapping (UI-only, can't live in shared/)
 const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -222,6 +223,10 @@ export default function MemberDashboard() {
   // it no-ops entirely if the member never granted notifications.
   useEffect(() => {
     void scheduleMorningNotice();
+    // The widget's numbers and the banner's come from the same place, so they
+    // are refreshed together — one going stale while the other did not is the
+    // inconsistency a member notices first.
+    void updateWidget();
   }, []);
 
   const [bookingStep, setBookingStep] = useState<"choose-type" | "configure">("choose-type");
