@@ -663,5 +663,46 @@ check(
 );
 
 
+
+// ── 12. An assumption we hold on a library internal ────────────────────────
+section("date columns come back as strings");
+
+/**
+ * Postgres `date` columns are read as strings all over this codebase — the
+ * pivot in server/health/routes.ts keys a Map by one, and both
+ * server/coaching/enrollment.ts and server/training/strength.ts call
+ * localeCompare on one. TypeScript agrees, because Drizzle types date() as
+ * string.
+ *
+ * But node-postgres does NOT parse a DATE to a string by default: pg-types
+ * returns a Date object for OID 1082. The only reason the string type is true
+ * is that drizzle-orm/node-postgres installs its own getTypeParser and returns
+ * identity for DATE, TIMESTAMP, TIMESTAMPTZ and INTERVAL.
+ *
+ * That is a library internal, not a documented contract, and the failure if a
+ * future version drops it is not a type error — it is `.localeCompare is not a
+ * function` inside daily-note generation, and a Map keyed by Date whose lookups
+ * silently miss so one day's metrics split across several rows.
+ *
+ * This assertion is the tripwire. If it fails after an upgrade, the fix is to
+ * normalise every date read, not to delete the check.
+ */
+const DRIZZLE_SESSION = readFileSync(
+  "node_modules/drizzle-orm/node-postgres/session.js",
+  "utf8"
+);
+check(
+  "drizzle still overrides the DATE parser",
+  /types\.builtins\.DATE\)\s*\{\s*return\s*\(val\)\s*=>\s*val;/.test(
+    DRIZZLE_SESSION.replace(/\s+/g, " ").replace(/if \(typeId === /g, "if (typeId === ")
+  ) || /builtins\.DATE[\s\S]{0,80}\(val\) => val/.test(DRIZZLE_SESSION),
+  "date columns would start arriving as Date objects"
+);
+check(
+  "and the timestamp parsers too",
+  /builtins\.TIMESTAMP[\s\S]{0,80}\(val\) => val/.test(DRIZZLE_SESSION)
+);
+
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
