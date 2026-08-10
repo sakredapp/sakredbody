@@ -85,7 +85,7 @@ import { PillarHome } from "@/components/PillarHome";
 import { BuildTab } from "@/components/BuildTab";
 import { SettingsTab } from "@/components/SettingsTab";
 import { useHealthAutoSync } from "@/hooks/use-health";
-import { HealthConnectPrompt } from "@/components/portal/HealthConnectPrompt";
+import { Onboarding } from "@/components/portal/Onboarding";
 import { useEffect } from "react";
 import { scheduleMorningNotice } from "@/lib/morningNotice";
 
@@ -357,7 +357,7 @@ export default function MemberDashboard() {
       {/* Asked once on the way in, snoozed for a fortnight if declined. A
           member who never opens Stats never learns the app can read their
           ring, so the feature may as well not exist for them. */}
-      <HealthConnectPrompt />
+      <Onboarding />
 
       {/* ─── Header ─── */}
       <header className="sticky top-0 pt-safe border-b border-border/50 bg-background/90 backdrop-blur-md" style={{ zIndex: 9999 }}>

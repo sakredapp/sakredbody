@@ -883,17 +883,32 @@ check(
 );
 
 /** The prompt only ever appears where it can be acted on. */
-const PROMPT_SRC = readFileSync("client/src/components/portal/HealthConnectPrompt.tsx", "utf8");
-check("the modal waits for the native probe", /available !== true/.test(PROMPT_SRC));
-check("the modal does not reopen once connected", /connected/.test(PROMPT_SRC));
-check("declining is remembered", /snooze\(\)/.test(PROMPT_SRC));
+const ONBOARD_SRC = readFileSync("client/src/components/portal/Onboarding.tsx", "utf8");
+check("onboarding waits for the native probe", /available !== true/.test(ONBOARD_SRC));
+check("a connected member skips the health step", /if \(connected\) setStep/.test(ONBOARD_SRC));
+check("leaving early is remembered", /SNOOZE_KEY/.test(ONBOARD_SRC));
+check(
+  "the widget step gives instructions, not a button that cannot work",
+  /Touch and hold/.test(ONBOARD_SRC),
+  "neither platform lets an app add its own widget"
+);
+check(
+  "notification permission is requested only after a choice",
+  /chooseDepth[\s\S]{0,400}requestMorningNotice/.test(ONBOARD_SRC)
+);
+check(
+  "choosing off never raises the system sheet",
+  /next === "off"[\s\S]{0,120}return;/.test(ONBOARD_SRC)
+);
 
 
 
 // ── 15. The morning banner ─────────────────────────────────────────────────
 section("Morning notification");
 
-const { morningBody, morningDates } = await import("../client/src/lib/morningNoticeContent.js");
+const { morningBody, morningDates, morningNotice } = await import(
+  "../client/src/lib/morningNoticeContent.js"
+);
 
 /**
  * A notification that says "Open Sakred Body" is an advert for an app the
@@ -961,6 +976,71 @@ check("the scheduler never requests it", !/requestPermissions/.test(scheduler));
 check(
   "requesting is its own function, called from Settings",
   /export async function requestMorningNotice/.test(NOTICE_SRC)
+);
+
+
+
+// ── 16. How much they asked for ────────────────────────────────────────────
+section("Notification depth");
+
+const FACTS = {
+  routine: { routine: { name: "Liver Clear" }, dayNumber: 3 },
+  habitCount: 5,
+  sleepMinutes: 400,
+  sleepBaseline: 470,
+};
+
+check("off schedules nothing", morningNotice(FACTS as never, "off", 1) === null);
+
+const brief = morningNotice(FACTS as never, "brief", 1);
+check("brief is one line", brief?.body === "5 practices today.", brief?.body);
+check("brief says nothing about sleep", !/slept/.test(brief?.body ?? ""));
+
+const full = morningNotice(FACTS as never, "full", 1);
+check("full keeps the practices", /5 practices today/.test(full?.body ?? ""), full?.body);
+check("full adds last night", /slept 6h 40m/.test(full?.body ?? ""), full?.body);
+check("and reads it against their own baseline", /under your usual/.test(full?.body ?? ""));
+
+const steady = morningNotice(
+  { ...FACTS, sleepMinutes: 465, sleepBaseline: 470 } as never,
+  "full",
+  1
+);
+check(
+  "a normal night is not dressed up as a finding",
+  /about your usual/.test(steady?.body ?? ""),
+  steady?.body
+);
+
+const noBaseline = morningNotice(
+  { ...FACTS, sleepBaseline: null } as never,
+  "full",
+  1
+);
+check(
+  "without a baseline it states the fact and no comparison",
+  /You slept/.test(noBaseline?.body ?? "") && !/usual/.test(noBaseline?.body ?? ""),
+  noBaseline?.body
+);
+
+const noSleep = morningNotice({ ...FACTS, sleepMinutes: null } as never, "full", 1);
+check("no sleep data means no sleep sentence", !/slept/.test(noSleep?.body ?? ""), noSleep?.body);
+
+/** Both depths must agree about when there is nothing worth saying. */
+check(
+  "full stays silent when brief would",
+  morningNotice({ routine: null, habitCount: 0 } as never, "full", 1) === null
+);
+
+const NOTICE_LIB = readFileSync("client/src/lib/morningNotice.ts", "utf8");
+check(
+  "switching to off cancels what is already on the device",
+  /depth === "off"[\s\S]{0,400}LocalNotifications\.cancel/.test(NOTICE_LIB),
+  "those notifications live on the phone, not the server"
+);
+check(
+  "only the full brief pays for the health fetch",
+  /depth === "full"[\s\S]{0,120}api\/health\/summary/.test(NOTICE_LIB)
 );
 
 

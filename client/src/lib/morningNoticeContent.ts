@@ -39,6 +39,42 @@ function plural(n: number, one: string, many: string): string {
  * no practices assigned has nothing waiting, and telling them so every morning
  * is how an app earns a permanent "off".
  */
+/**
+ * How much the member asked for.
+ *
+ *   brief — one line. "Day 4 — Liver Clear / 5 practices today."
+ *   full  — the morning brief: protocol, practices, and how they slept, so the
+ *           notification is worth reading without opening anything.
+ *   off   — nothing is scheduled at all.
+ *
+ * A single default would be wrong in both directions: some members want a
+ * nudge and treat anything longer as noise, and some want the day laid out
+ * before they are upright. Asking once is cheaper than guessing.
+ */
+export type NoticeDepth = "off" | "brief" | "full";
+
+export type MorningFacts = {
+  routine: ActiveRoutine;
+  habitCount: number;
+  /** Last night, in minutes, when we have it. */
+  sleepMinutes?: number | null;
+  /** Their own recent average, so the comparison is theirs and not a norm. */
+  sleepBaseline?: number | null;
+};
+
+function sleepLine(minutes: number, baseline: number | null | undefined): string {
+  const h = Math.floor(minutes / 60);
+  const m = Math.round(minutes % 60);
+  const slept = `${h}h ${m}m`;
+  if (!baseline || baseline <= 0) return `You slept ${slept}.`;
+  const delta = (minutes - baseline) / baseline;
+  // Under 8% is inside a normal night's variation; calling it out would invent
+  // a finding, and a member who reads "below your usual" every morning stops
+  // reading it at all.
+  if (Math.abs(delta) < 0.08) return `You slept ${slept}, about your usual.`;
+  return delta > 0 ? `You slept ${slept}, more than usual.` : `You slept ${slept}, under your usual.`;
+}
+
 export function morningBody(
   routine: ActiveRoutine,
   habitCount: number,
@@ -77,3 +113,28 @@ export function morningDates(from: Date, count: number): Date[] {
   return out;
 }
 
+
+/**
+ * The full morning brief.
+ *
+ * Built on top of morningBody rather than beside it, so the two can never
+ * disagree about whether there is anything worth saying — "off" and "nothing
+ * assigned" have to mean the same thing in both.
+ */
+export function morningNotice(
+  facts: MorningFacts,
+  depth: NoticeDepth,
+  dayOffset = 1
+): { title: string; body: string } | null {
+  if (depth === "off") return null;
+
+  const base = morningBody(facts.routine, facts.habitCount, dayOffset);
+  if (!base) return null;
+  if (depth === "brief") return base;
+
+  const lines = [base.body];
+  if (typeof facts.sleepMinutes === "number" && facts.sleepMinutes > 0) {
+    lines.push(sleepLine(facts.sleepMinutes, facts.sleepBaseline));
+  }
+  return { title: base.title, body: lines.join(" ") };
+}

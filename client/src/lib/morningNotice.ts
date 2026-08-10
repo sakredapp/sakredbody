@@ -24,7 +24,33 @@
 
 import { Capacitor } from "@capacitor/core";
 import { apiFetch } from "./apiFetch";
-import { morningBody, morningDates, NOTIFICATION_ID, DAYS_AHEAD } from "./morningNoticeContent";
+import {
+  morningNotice,
+  morningDates,
+  NOTIFICATION_ID,
+  DAYS_AHEAD,
+  type NoticeDepth,
+} from "./morningNoticeContent";
+
+const DEPTH_KEY = "sakred.notice.depth";
+
+/** What the member chose. Defaults to brief — the least they could have meant. */
+export function getNoticeDepth(): NoticeDepth {
+  try {
+    const raw = localStorage.getItem(DEPTH_KEY);
+    return raw === "off" || raw === "full" || raw === "brief" ? raw : "brief";
+  } catch {
+    return "brief";
+  }
+}
+
+export function setNoticeDepth(depth: NoticeDepth): void {
+  try {
+    localStorage.setItem(DEPTH_KEY, depth);
+  } catch {
+    /* the default stands */
+  }
+}
 
 /**
  * Ask, schedule, and replace whatever was scheduled before.
@@ -49,16 +75,40 @@ export async function scheduleMorningNotice(): Promise<{ scheduled: number; reas
     const perm = await LocalNotifications.checkPermissions();
     if (perm.display !== "granted") return { scheduled: 0, reason: "not granted" };
 
-    const [routine, habits] = await Promise.all([
+    const depth = getNoticeDepth();
+    if (depth === "off") {
+      // Still cancel — a member switching to "off" must stop getting the ones
+      // already scheduled, which are sitting on the device, not the server.
+      await LocalNotifications.cancel({
+        notifications: morningDates(new Date(), DAYS_AHEAD).map((_, i) => ({
+          id: NOTIFICATION_ID + i,
+        })),
+      }).catch(() => {});
+      return { scheduled: 0, reason: "off" };
+    }
+
+    const [routine, habits, health] = await Promise.all([
       apiFetch("/api/routines/active")
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null),
       apiFetch("/api/habits/today")
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null),
+      // Only the full brief needs this, so only the full brief pays for it.
+      depth === "full"
+        ? apiFetch("/api/health/summary?days=30")
+            .then((r) => (r.ok ? r.json() : null))
+            .catch(() => null)
+        : Promise.resolve(null),
     ]);
 
     const habitCount: number = Array.isArray(habits?.habits) ? habits.habits.length : 0;
+
+    // Last night, and their own average to read it against.
+    const days: { sleepMinutes?: number }[] = Array.isArray(health?.days) ? health.days : [];
+    const slept = days.map((d) => d.sleepMinutes).filter((v): v is number => typeof v === "number");
+    const sleepMinutes = slept.length ? slept[slept.length - 1] : null;
+    const sleepBaseline = slept.length >= 3 ? slept.reduce((a, b) => a + b, 0) / slept.length : null;
 
     // Cancel first, always — including when there is nothing to say. A member
     // who finishes a protocol should stop getting yesterday's banner.
@@ -71,7 +121,11 @@ export async function scheduleMorningNotice(): Promise<{ scheduled: number; reas
     const dates = morningDates(new Date(), DAYS_AHEAD);
     const notifications = dates
       .map((at, i) => {
-        const content = morningBody(routine, habitCount, i + 1);
+        const content = morningNotice(
+          { routine, habitCount, sleepMinutes, sleepBaseline },
+          depth,
+          i + 1,
+        );
         if (!content) return null;
         return {
           id: NOTIFICATION_ID + i,
