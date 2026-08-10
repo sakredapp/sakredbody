@@ -84,6 +84,7 @@ import { PortalBackdrop } from "@/components/portal/PortalBackdrop";
 import { PillarHome } from "@/components/PillarHome";
 import { BuildTab } from "@/components/BuildTab";
 import { SettingsTab } from "@/components/SettingsTab";
+import { useHealthAutoSync } from "@/hooks/use-health";
 
 // Icon mapping (UI-only, can't live in shared/)
 const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -205,6 +206,13 @@ export default function MemberDashboard() {
   const [retreatView, setRetreatView] = useState<"book" | "services" | "my-bookings" | "masterminds">("masterminds");
   const [coachingTab, setCoachingTab] = useState<"today" | "journey" | "routines" | "catalog" | "analytics" | "coach">("today");
   const [showBookingDialog, setShowBookingDialog] = useState(false);
+
+  // Health syncs when the app comes to the foreground, throttled — neither
+  // HealthKit nor Health Connect gives us background delivery through this
+  // plugin, so opening the app is the only moment we get. Placed at the
+  // dashboard root rather than on the Stats tab: a member who never opens
+  // Stats should still have their data current when their coach looks.
+  useHealthAutoSync();
 
   const [bookingStep, setBookingStep] = useState<"choose-type" | "configure">("choose-type");
   const [retreatType, setRetreatType] = useState<"private" | "shared">("shared");

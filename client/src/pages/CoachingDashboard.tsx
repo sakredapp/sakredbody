@@ -91,6 +91,7 @@ import { Dial } from "@/components/portal/Dial";
 import { PortalBackdrop } from "@/components/portal/PortalBackdrop";
 import { groupByBand } from "@/components/portal/dayBands";
 import { WinMoment } from "@/components/WinMoment";
+import { HealthCard } from "@/components/portal/HealthCard";
 import type { Win } from "@shared/models/wins";
 
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
@@ -1189,6 +1190,10 @@ export function AnalyticsTab() {
 
   return (
     <div className="space-y-6">
+      {/* What the phone measured, above what we asked them to record. The
+          numbers they didn't have to remember to enter come first. */}
+      <HealthCard />
+
       {/* Range selector */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h3 className="font-display text-lg">Analytics</h3>
