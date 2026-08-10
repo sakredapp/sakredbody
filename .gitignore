@@ -13,3 +13,6 @@ migrations/
 
 # Xcode per-user state inside the local plugin — machine-specific, not shared.
 plugins/**/.swiftpm/
+
+# Gradle output from the local plugin module.
+plugins/**/build/
