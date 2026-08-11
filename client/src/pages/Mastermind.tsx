@@ -90,7 +90,7 @@ export default function Mastermind() {
             </motion.h1>
             
             <motion.p variants={fadeInUp} className="text-base md:text-lg text-white/60 mb-8 max-w-2xl leading-relaxed font-sans font-normal">
-              Discussion and teaching, not treatment. Cohorts that meet on a real schedule, people who hold the same standard, and the portal that runs your practice between sessions. The protocols live in the app; the retreats are where they're run in person.
+              Discussion and teaching, not treatment. Build the person, restore the system that person depends on, and do it alongside others doing the same — cohorts on a real schedule, people who hold the same standard, and the portal that runs your practice between sessions. The protocols live in the app; the retreats are where they're run in person.
             </motion.p>
             
             <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4">

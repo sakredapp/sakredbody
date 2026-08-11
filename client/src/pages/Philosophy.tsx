@@ -48,7 +48,7 @@ export default function Philosophy() {
         title={<>The Philosophy.</>}
         testId="text-philosophy-headline"
         ambient={<Constellation className="absolute inset-0 w-full h-full opacity-80" />}
-        marks={["Four territories", "One sequence", "East and the barbell"]}
+        marks={["Two directions", "One sequence", "East and the barbell"]}
       />
 
       {/* ── Tonight ──────────────────────────────────────────
@@ -96,7 +96,7 @@ export default function Philosophy() {
         </motion.div>
       </Section>
 
-      {/* ── Four territories ─────────────────────────────────── */}
+      {/* ── The three territories ────────────────────────────── */}
       <Section tone="raised">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>

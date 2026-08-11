@@ -57,9 +57,15 @@ export default function Build() {
     <div className="min-h-screen bg-background text-foreground font-sans">
       <SiteHeader overHero={false} />
 
+      {/* Yang, said out loud — and fenced off from hustle culture in the same
+          sentence. "Advancing force" on its own reads as more, harder, now,
+          which is the exact misreading that sends people to a page like this
+          already broken. The qualifier is the point: demand a terrain can
+          actually adapt to. */}
       <PageHero
-        eyebrow="Territory Two · Yang"
+        eyebrow="Yang · The Advancing Force"
         title={<>Build.</>}
+        intro="Yang is load, heat, demand and adaptation. Not hustle — hustle is demand a body can't answer, which is just damage on a schedule. This is intelligent challenge applied to a terrain able to adapt to it, which is why Restore comes first."
         testId="text-build-headline"
         ambient={<EmberField className="absolute inset-0 w-full h-full opacity-80" />}
         marks={["Muscle is the organ of longevity", "Load, recover, repeat", "No supplement replaces it"]}
@@ -75,7 +81,7 @@ export default function Build() {
           className="max-w-3xl mx-auto text-center"
         >
           <motion.p variants={fadeInUp} className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
-            Why This Territory Exists
+            Why This Direction Exists
           </motion.p>
           <motion.h2
             variants={fadeInUp}

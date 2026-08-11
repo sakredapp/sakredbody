@@ -149,6 +149,11 @@ export default function Executive() {
               And because the results keep arriving, nobody treats it as a problem. Including them.
             </p>
             <p>
+              High output isn't the problem, and it works — right up until the terrain underneath it can no
+              longer fund it. Nothing about the output changes on the day that happens. What changes is that
+              it starts being paid for out of capital instead of income.
+            </p>
+            <p>
               We're not going to tell you you're burned out. You'd reject that, and you'd probably be right.
               The more useful question is narrower and harder to dismiss:
             </p>

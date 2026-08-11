@@ -63,9 +63,16 @@ export default function Restore() {
     <div className="min-h-screen bg-background text-foreground font-sans">
       <SiteHeader overHero={false} />
 
+      {/* Yin, said out loud.
+          It was in the eyebrow and nowhere else — which meant the word
+          appeared once, in six-point caps, and never got defined. The intro
+          does the defining, and it leads with what Yin is *for* rather than
+          what it feels like: the failure mode of this page is reading as spa,
+          and the fix is physiology, not adjectives. */}
       <PageHero
-        eyebrow="Territory One · Yin"
+        eyebrow="Yin · The Receding Force"
         title={<>Restore.</>}
+        intro="Yin is the half of the system that clears, drains, softens and rebuilds. Not the gentle half — the half that decides whether anything you do next actually lands. A body that cannot drain cannot adapt, and training it harder only adds to what it is already failing to move."
         testId="text-restore-headline"
         ambient={<FlowField className="absolute inset-0 w-full h-full opacity-70" />}
         marks={["Drainage before detox", "Four protocols", "14 to 28 days", "The lymph has no pump"]}

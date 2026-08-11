@@ -103,9 +103,14 @@ export default function Retreats() {
     <div className="min-h-screen bg-background text-foreground font-sans">
       <SiteHeader overHero={false} />
 
+      {/* "Territory Four" no longer exists — there are three. The philosophy
+          stays underneath here rather than on the surface: a retreat is a
+          deliberate change of terrain, which is the whole argument, and it
+          lands without a word of vocabulary attached to it. */}
       <PageHero
-        eyebrow="Territory Four · The Social Terrain"
+        eyebrow="Gather · The Social Terrain"
         title={<>Gather.</>}
+        intro="Your terrain is not only biological. The room you're in, the standard the people around you hold, and whether your week contains any real quiet are inputs like any other — and they are the ones hardest to change from inside your own life. A retreat changes them all at once, on purpose."
         testId="text-retreats-headline"
         image="/images/estate-vineyard.webp"
         imageAlt="A stone estate set among vineyards and low green hills"
