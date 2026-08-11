@@ -17,6 +17,7 @@ import { registerLibraryRoutes } from "./library/index.js";
 import { registerEnergyRoutes } from "./energy/index.js";
 import { registerOfferingRoutes } from "./offerings/index.js";
 import { registerDailyRoutes } from "./daily/index.js";
+import { registerTodayRoutes } from "./today/index.js";
 import { registerCommunityRoutes } from "./community/index.js";
 import { registerTelemetryRoutes } from "./telemetry/index.js";
 import { registerProfileRoutes } from "./profile/routes.js";
@@ -482,6 +483,9 @@ export async function registerRoutes(
 
   // ── The daily ritual ─────────────────────────────────────────────────
   registerDailyRoutes(app);
+
+  // ── Today — the read, the three options, the sky, and rhythm ─────────
+  registerTodayRoutes(app);
 
   // ── Community ────────────────────────────────────────────────────────
   registerCommunityRoutes(app);

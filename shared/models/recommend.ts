@@ -454,6 +454,84 @@ export function moonGuidance(phase: string): MoonGuidance | null {
   };
 }
 
+// ─── 4. The season, said the same way ──────────────────────────────────────
+
+/**
+ * The five-element season, translated on exactly the same terms as the moon.
+ *
+ * Same failure and same fix: "Late summer · Earth · spleen and stomach" is
+ * three pieces of vocabulary and no instruction. What the tradition actually
+ * attaches to each season is a way of eating and a pace of training, and that
+ * part survives translation into ordinary words without losing anything.
+ *
+ * Keyed on the element rather than the calendar month so it stays in step with
+ * `elementalSeason()`, which is the only thing that decides which season a
+ * date is in.
+ */
+export type SeasonGuidance = {
+  /** The plain name, for anyone who wants it: "Late summer". */
+  seasonLabel: string;
+  title: string;
+  detail: string;
+};
+
+const SEASON_GUIDANCE: Readonly<Record<string, SeasonGuidance>> = {
+  wood: {
+    seasonLabel: "Spring",
+    title: "Move more than you did last month",
+    detail:
+      "The turn of the year is the point to add volume and get outside. Lighter, greener food and longer sessions both land well now.",
+  },
+  fire: {
+    seasonLabel: "Summer",
+    title: "Take your hardest efforts now",
+    detail:
+      "The most capable stretch of the year for most people. Train hard, eat cooler and lighter, and don't fight the early mornings.",
+  },
+  earth: {
+    seasonLabel: "Late summer",
+    title: "Eat simply and keep digestion easy",
+    detail:
+      "The short season between summer and autumn. Cooked, plain food and steady rather than maximal training is the traditional read, and it holds up.",
+  },
+  metal: {
+    seasonLabel: "Autumn",
+    title: "Cut back to what's working",
+    detail:
+      "Drop what you've been carrying — in training and elsewhere — and protect sleep as the light goes. Warm food over raw.",
+  },
+  water: {
+    seasonLabel: "Winter",
+    title: "Build slowly and sleep more",
+    detail:
+      "The lowest-output season on purpose. Strength keeps well through here; long, depleting efforts don't. More sleep, warmer food.",
+  },
+};
+
+/** Guidance for an elemental season, or null when it isn't one we know. */
+export function seasonGuidance(element: string): SeasonGuidance | null {
+  return SEASON_GUIDANCE[element] ?? null;
+}
+
+/**
+ * The moon and the season in one line, practice first.
+ *
+ * The ordering rule the whole product runs on: what to do, then what it is.
+ * "Eat lighter today · New moon · Late summer" is readable by somebody who has
+ * never thought about either, and still says the thing for somebody who has.
+ *
+ * Returns null when there is nothing to say, and callers must render nothing
+ * for it — a card that appears every day is a card people stop reading.
+ */
+export function skyLine(
+  moon: MoonGuidance | null,
+  season: SeasonGuidance | null,
+): string | null {
+  const names = [moon?.phaseLabel, season?.seasonLabel].filter(Boolean);
+  if (!names.length) return null;
+  return names.join(" · ");
+}
+
 /**
  * The one-line read shown above the options.
  *

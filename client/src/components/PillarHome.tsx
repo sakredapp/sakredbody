@@ -32,6 +32,8 @@ import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HealthSwatches } from "@/components/portal/HealthSwatches";
 import { TerrainToday } from "@/components/TerrainToday";
+import { TodayRead } from "@/components/TodayRead";
+import { RhythmSection } from "@/components/RhythmCards";
 import type { MemberSection, CoachingTab } from "@/components/MemberNav";
 
 interface Pillar {
@@ -426,8 +428,28 @@ export function PillarHome({
           the doors mean something different once you have read this. */}
       <TerrainToday onOpenRestore={() => onOpen("restore")} />
 
+      {/*
+        The answer to "what should I do in the next hour", above the menu of
+        places to go.
+
+        This is the piece the home screen was missing. A launcher is honest
+        about being sparse, but it still left the member to work out for
+        themselves what the numbers underneath meant — which is the job the
+        product exists to do. Restore and Build tap through to the side the
+        option belongs to; the category is carried so the destination can open
+        on the right thing rather than at the top of a list.
+      */}
+      <TodayRead
+        onOpenCategory={(s) => onOpen(s.side === "restore" ? "restore" : "build")}
+        onCheckIn={() => onOpen("restore")}
+      />
+
       {/* Their own numbers, before the menu. */}
       <HealthSwatches onOpenStats={() => onOpen("coaching")} />
+
+      {/* Rhythm sits below the day's read rather than above it: it is context
+          for a day, never the headline of one. */}
+      <RhythmSection />
 
       {/* The lead, then a 2x2 of equals. One Door component for both, so the
           only difference between them is height. */}
