@@ -81,6 +81,17 @@ export type ReadinessSignals = {
   daysSinceLastSession?: number | null;
   /** −3 (wrung out) to +3 (ready), straight from the terrain check-in. */
   terrainLean?: number | null;
+  /**
+   * What the cycle phase contributes, from `cycleLean` in rhythm.ts.
+   *
+   * Clamped to ±1 below, and that bound is the feature rather than a detail.
+   * Sleep and resting heart rate are each worth ±2, so a phase can colour a
+   * day and can never decide one — somebody in late luteal who slept nine
+   * hours and feels strong still reads as primed. An app that overrides a
+   * woman's own signals because a calendar says day 23 has replaced her
+   * judgement with an average.
+   */
+  cycleLean?: number | null;
 };
 
 export type ReadinessRead = {
@@ -127,6 +138,7 @@ export function readReadiness(signals: ReadinessSignals): ReadinessRead {
     hardSessionsRecently = 0,
     daysSinceLastSession,
     terrainLean,
+    cycleLean,
   } = signals;
 
   // Sleep, against the member's own usual night.
@@ -213,6 +225,16 @@ export function readReadiness(signals: ReadinessSignals): ReadinessRead {
     } else if (terrainLean === 1) {
       score += 1;
     }
+  }
+
+  // Cycle last, clamped, and never on its own. It contributes no reason
+  // string: a phase is context for a day, not an explanation of one, and
+  // "you're luteal" is precisely the sentence this product should not write.
+  // The reason a member reads comes from something actually measured.
+  if (cycleLean != null && cycleLean !== 0) {
+    score += Math.max(-1, Math.min(1, cycleLean));
+    // Deliberately not counted toward `known`. A phase estimate alone is not
+    // grounds to claim we can read somebody's day.
   }
 
   const level: Readiness = score <= -2 ? "depleted" : score >= 2 ? "primed" : "steady";
