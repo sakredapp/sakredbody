@@ -204,6 +204,17 @@ export const EXERCISE_CATEGORIES = [
   { id: "rings", label: "Rings", group: "strength" },
   { id: "neck_grip", label: "Neck & grip", group: "strength" },
   { id: "isometric", label: "Isometrics", group: "strength" },
+  /**
+   * The bucket, and deliberately not in the practice group.
+   *
+   * It is where a member-created movement lands and where nine pre-catalogue
+   * lifts still live — Deadlift, Bench Press, Dip. It sat under "Practices"
+   * when that group meant "whole sessions" and nothing depended on the
+   * distinction; the moment `isPracticeCategory` started reading the group,
+   * that placement quietly declared a deadlift to be a class, and the app
+   * would have asked how many *minutes* of it somebody did.
+   */
+  { id: "full_body", label: "Full body", group: "strength" },
 
   // ── Athletic ──
   { id: "explosive", label: "Explosive", group: "athletic" },
@@ -240,7 +251,6 @@ export const EXERCISE_CATEGORIES = [
   { id: "class", label: "Classes", group: "practice" },
   { id: "sport", label: "Sports", group: "practice" },
   { id: "endurance", label: "Endurance", group: "practice" },
-  { id: "full_body", label: "Full body", group: "practice" },
 ] as const;
 
 /**

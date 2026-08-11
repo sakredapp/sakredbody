@@ -1,4 +1,10 @@
-import { EXERCISE_CATEGORIES } from "@shared/schema";
+import {
+  EXERCISE_CATEGORIES,
+  EXERCISE_GROUPS,
+  MOVEMENT_PATTERNS,
+  EQUIPMENT,
+  isPracticeCategory,
+} from "@shared/schema";
 /**
  * Admin — Build.
  *
@@ -48,6 +54,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { MovementPicker, type Movement } from "@/components/build/MovementPicker";
 import { Plus, Trash2, ChevronDown, ChevronUp, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -72,14 +80,23 @@ type Prescribed = Omit<HabitExerciseRow, "createdAt"> & {
   name: string;
   equipment: string;
   trackingType: string;
+  category: string;
+  takesLoad: boolean;
 };
 
-const PATTERNS = ["squat", "hinge", "push", "pull", "carry", "core", "conditioning", "mobility"];
-const EQUIPMENT = [
-  "barbell", "dumbbell", "kettlebell", "machine", "smith_machine",
-  "cable", "bodyweight", "band", "medicine_ball", "other",
-];
-const TRACKING = ["reps", "duration", "distance"];
+/**
+ * Read, not retyped.
+ *
+ * These were three literal arrays here — the fifth and sixth copies of lists
+ * that also lived in a zod enum, a Postgres CHECK constraint and the catalogue
+ * data. The copy here was the stalest of the lot: it still offered the eight
+ * patterns and ten implements from when Build meant barbells, so an admin
+ * editing a reformer movement was shown a dropdown that could not represent
+ * what it already was, and saving would have silently changed it to a barbell.
+ */
+const PATTERNS = MOVEMENT_PATTERNS;
+const TRACKING = ["reps", "duration", "distance"] as const;
+const GROUP_LABEL = new Map(EXERCISE_GROUPS.map((g) => [g.id as string, g.label]));
 
 export function TrainingAdmin() {
   const [view, setView] = useState<"sessions" | "catalogue">("sessions");
@@ -213,7 +230,7 @@ function SessionBuilder() {
 }
 
 function Prescription({ habitId }: { habitId: string }) {
-  const [adding, setAdding] = useState("");
+  const [picking, setPicking] = useState(false);
   const { toast } = useToast();
   const qc = useQueryClient();
   const key = ["/api/admin/habits", habitId, "exercises"];
@@ -227,31 +244,28 @@ function Prescription({ habitId }: { habitId: string }) {
     },
   });
 
-  const catalogue = useQuery<Exercise[]>({
-    queryKey: ["/api/admin/exercises"],
-    queryFn: async () => {
-      const r = await fetch("/api/admin/exercises", { credentials: "include" });
-      if (!r.ok) throw new Error("Couldn't load movements");
-      return r.json();
-    },
-  });
-
   const list = prescribed.data ?? [];
 
   const add = useMutation({
-    mutationFn: async () =>
-      apiRequest("POST", `/api/admin/habits/${habitId}/exercises`, {
-        exerciseId: adding,
+    mutationFn: async (m: Movement) => {
+      // 4 × 3–5 is the right default for a barbell lift and nonsense for
+      // anything else. A held stretch has no rep range, and "4 × 3–5 Reformer
+      // Pilates" is not a sentence — a practice is prescribed once and the
+      // member says how long it was.
+      const practice = isPracticeCategory(m.category);
+      const counted = m.trackingType === "reps" && !practice;
+      return apiRequest("POST", `/api/admin/habits/${habitId}/exercises`, {
+        exerciseId: m.id,
         // Appended. A new lift belongs at the end until somebody moves it —
         // guessing otherwise silently reorders the session.
         orderIndex: list.length,
-        targetSets: 4,
-        targetRepsLow: 3,
-        targetRepsHigh: 5,
-      }),
+        targetSets: practice ? 1 : counted ? 4 : 3,
+        targetRepsLow: counted ? 3 : null,
+        targetRepsHigh: counted ? 5 : null,
+      });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: key });
-      setAdding("");
       toast({ title: "Added" });
     },
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
@@ -296,7 +310,6 @@ function Prescription({ habitId }: { habitId: string }) {
   });
 
   const already = new Set(list.map((p) => p.exerciseId));
-  const available = (catalogue.data ?? []).filter((e) => e.isActive && !already.has(e.id));
 
   return (
     <Panel title="Planned lifts">
@@ -355,8 +368,19 @@ function Prescription({ habitId }: { habitId: string }) {
               </div>
 
               {/* Reps only matter for a movement measured in reps. A plank
-                  a planned "4 × 3–5" would be nonsense. */}
+                  a planned "4 × 3–5" would be nonsense.
+
+                  A practice has none of these. There is no set count for a
+                  yoga class, no rep range, no percentage of a max and no rest
+                  interval — the member goes, and afterwards says how long. All
+                  that remains worth saying is the note. */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pl-6">
+                {isPracticeCategory(p.category) ? (
+                  <p className="col-span-2 sm:col-span-4 text-[11px] text-muted-foreground">
+                    A practice. They'll log how long it was.
+                  </p>
+                ) : (
+                <>
                 <div className="space-y-1">
                   <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Sets</Label>
                   <Input
@@ -403,6 +427,9 @@ function Prescription({ habitId }: { habitId: string }) {
                   </>
                 )}
 
+                {/* Only where load is a question at all. A percentage of a
+                    couch stretch's one-rep max is not a thing. */}
+                {p.takesLoad && (
                 <div className="space-y-1">
                   <Label className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1">
                     % max
@@ -425,6 +452,7 @@ function Prescription({ habitId }: { habitId: string }) {
                     }
                   />
                 </div>
+                )}
 
                 {/* Rest. The column existed and nothing could set it, which on
                     heavy work is not a detail — three minutes between sets of
@@ -445,6 +473,8 @@ function Prescription({ habitId }: { habitId: string }) {
                     }
                   />
                 </div>
+                </>
+                )}
               </div>
 
               <div className="pl-6">
@@ -463,23 +493,46 @@ function Prescription({ habitId }: { habitId: string }) {
         </div>
       )}
 
-      <div className="flex gap-2">
-        <Select value={adding} onValueChange={setAdding}>
-          <SelectTrigger className="flex-1" data-testid="select-add-lift">
-            <SelectValue placeholder="Add a lift" />
-          </SelectTrigger>
-          <SelectContent>
-            {available.map((e) => (
-              <SelectItem key={e.id} value={e.id}>
-                {e.name} · {e.equipment}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button variant="outline" disabled={!adding || add.isPending} onClick={() => add.mutate()}>
-          <Plus className="h-4 w-4" />
+      {/* ── Adding one ──
+          This was a <Select> listing the whole catalogue. That worked at
+          twenty-five movements and is unusable at six hundred and fifty-seven:
+          a coach who wants a Reformer Short Spine has to scroll for it, in
+          alphabetical-by-insertion order, with no search.
+
+          It is now the same picker the member uses — same search, same ranking,
+          same group and category chips. One picker, both sides: a coach
+          prescribing and a member logging are doing the same thing to the same
+          catalogue, and the coach should not get the worse tool. */}
+      <div className="space-y-2">
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => setPicking(true)}
+          data-testid="select-add-lift"
+        >
+          <Plus className="h-4 w-4 mr-1.5" />
+          Add a movement or practice
         </Button>
       </div>
+
+      <Dialog open={picking} onOpenChange={(o) => !o && setPicking(false)}>
+        <DialogContent className="max-w-md max-h-[88svh] flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="font-display text-xl">Prescribe</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 flex flex-col">
+            <MovementPicker
+              picked={already}
+              placeholder="Search the whole catalogue…"
+              onPick={(m) => {
+                add.mutate(m);
+                setPicking(false);
+              }}
+              onClose={() => setPicking(false)}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </Panel>
   );
 }
@@ -601,11 +654,30 @@ function Catalogue() {
                   different questions.
                 </InfoTip>
               </Label>
-              <Select value={draft.category} onValueChange={(v) => setDraft({ ...draft, category: v })}>
+              {/* Family named alongside the category. Forty flat labels is a
+                  list where "Flows", "Classes" and "Practices" read as three
+                  unrelated things rather than three shelves of one cupboard.
+
+                  Choosing a practice category also sets what a practice is:
+                  duration, no load. Leaving those to be set separately is how
+                  a yoga class ends up in the catalogue asking for kilograms —
+                  and nothing downstream would ever have questioned it. */}
+              <Select
+                value={draft.category}
+                onValueChange={(v) =>
+                  setDraft(
+                    isPracticeCategory(v)
+                      ? { ...draft, category: v, trackingType: "duration", takesLoad: false }
+                      : { ...draft, category: v },
+                  )
+                }
+              >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {EXERCISE_CATEGORIES.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
+                    <SelectItem key={c.id} value={c.id}>
+                      {GROUP_LABEL.get(c.group) ?? c.group} · {c.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>

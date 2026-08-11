@@ -795,6 +795,9 @@ export function registerTrainingRoutes(app: Express) {
           name: exercises.name,
           equipment: exercises.equipment,
           trackingType: exercises.trackingType,
+          // So the builder can stop offering "4 × 3–5" for a yoga class.
+          category: exercises.category,
+          takesLoad: exercises.takesLoad,
           orderIndex: habitExercises.orderIndex,
           targetSets: habitExercises.targetSets,
           targetRepsLow: habitExercises.targetRepsLow,

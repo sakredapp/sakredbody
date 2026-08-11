@@ -194,6 +194,9 @@ check(
 check("a class is a practice", isPracticeCategory("class"));
 check("basketball is a practice", isPracticeCategory("sport"));
 check("a barbell row is not", !isPracticeCategory("back"));
+// `full_body` is where every member-created movement lands. Classing it as a
+// practice would ask somebody how many minutes of their own deadlift they did.
+check("the bucket every custom movement lands in is not", !isPracticeCategory("full_body"));
 check("a reformer movement is not — a sequence can prescribe it", !isPracticeCategory("pilates"));
 check(
   "the studio takes springs, not kilograms",
