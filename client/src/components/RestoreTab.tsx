@@ -25,8 +25,11 @@
  * category of app.
  */
 
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Moon, Wind, HeartPulse } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { FreeSession } from "@/components/build/FreeSession";
 import { Panel, SectionHeading } from "@/components/portal/Panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -72,6 +75,31 @@ function hoursMinutes(mins: number): string {
 export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
   const terrain = useQuery<Reading>({ queryKey: ["/api/terrain/today"] });
   const health = useHealthSummary(7);
+  const qc = useQueryClient();
+
+  /**
+   * A restorative session, started here and logged by the Build engine.
+   *
+   * Held in component state rather than read from `/api/training/sessions/open`
+   * because that endpoint is what Build resumes from — a sauna started on this
+   * screen and a workout started on that one are the same row, and whichever
+   * screen the member is looking at should be the one showing it.
+   */
+  const [session, setSession] = useState<{ id: string; title: string } | null>(null);
+
+  const prefs = useQuery<{ weightUnit?: "kg" | "lb" }>({ queryKey: ["/api/auth/user"] });
+  const unit = prefs.data?.weightUnit === "kg" ? "kg" : "lb";
+
+  const start = useMutation({
+    mutationFn: async (label: string) => {
+      const res = await apiRequest("POST", "/api/training/sessions", { title: label });
+      return (await res.json()) as { id: string; title: string | null };
+    },
+    onSuccess: (row, label) => {
+      setSession({ id: row.id, title: row.title ?? label });
+      qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
+    },
+  });
 
   const days = (health.data?.days ?? []) as Array<Record<string, unknown>>;
   const sleep = mean(days, "sleepMinutes");
@@ -190,27 +218,56 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
       </Panel>
 
       {/* ── Restoring is something you do, not only something you skip ── */}
-      <Panel
-        title="Movement that restores"
-        action="Open Build"
-        onAction={() => onOpen("build")}
-        data-testid="restore-movement"
-      >
-        <p className="text-sm text-muted-foreground mb-3">
-          Rest is not the only way to give capacity back. These are logged the
-          same as anything else, and they count on the other side of the ledger.
-        </p>
-        <div className="flex flex-wrap gap-1.5">
-          {RESTORATIVE.map((c) => (
-            <span
-              key={c.id}
-              className="rounded-full border border-[hsl(var(--gold))]/20 px-2.5 py-1 text-xs text-muted-foreground"
-            >
-              {c.label}
-            </span>
-          ))}
-        </div>
-      </Panel>
+      {session ? (
+        /*
+          The same engine Build uses, on this screen.
+          
+          Not a second implementation and not a redirect. `workout_sessions`
+          and `workout_sets` already treat a sauna and a set of squats
+          identically — the catalogue's own load numbers are what decide which
+          side of the ledger something lands on — so the only thing Restore
+          needed was a way in.
+        */
+        <FreeSession
+          sessionId={session.id}
+          title={session.title}
+          unit={unit}
+          onDone={() => {
+            setSession(null);
+            qc.invalidateQueries({ queryKey: ["/api/terrain/today"] });
+            qc.invalidateQueries({ queryKey: ["/api/today"] });
+          }}
+        />
+      ) : (
+        <Panel title="Movement that restores" data-testid="restore-movement">
+          <p className="text-sm text-muted-foreground mb-3">
+            Rest is not the only way to give capacity back. These are logged the
+            same as anything else, and they count on the other side of the ledger.
+          </p>
+          {/*
+            Tappable, because "Open Build" was the wrong answer twice over: it
+            sent somebody to the other half of the product to do the thing this
+            half is about, and it made Restore a screen you read rather than
+            one you use.
+          */}
+          <div className="flex flex-wrap gap-1.5">
+            {RESTORATIVE.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => start.mutate(c.label)}
+                disabled={start.isPending}
+                className="rounded-full border border-[hsl(var(--gold))]/20 px-2.5 py-1 text-xs text-muted-foreground tap-clean hover:border-[hsl(var(--gold))]/50 hover:text-foreground transition-colors disabled:opacity-50"
+                data-testid={`restore-start-${c.id}`}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-3">
+            Tap one to start logging it.
+          </p>
+        </Panel>
+      )}
 
       {/* ── The reading from the inside ── */}
       <Panel

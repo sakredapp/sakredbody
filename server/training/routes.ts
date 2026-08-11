@@ -58,7 +58,10 @@ import {
   summariseSession,
   CATALOGUE_FETCH_LIMIT,
   coachingMessages,
+  channels,
+  communityMessages,
 } from "../../shared/schema.js";
+import { visibleChannelIds } from "../community/routes.js";
 import {
   bestEstimates,
   progressionSeries,
@@ -232,6 +235,95 @@ async function shareSessionWithCoach(userId: string, sessionId: string): Promise
     content,
     metadata: JSON.stringify({ sessionId, sets: working.length, source: "build" }),
   });
+}
+
+/**
+ * Say it in the room.
+ *
+ * ── Why the server composes the message ───────────────────────────────────
+ *
+ * The client could format "Bench Press — 3 × 8 @ 185 lb" itself, and then
+ * there would be two functions describing one session, drifting apart the
+ * first time somebody adds a movement type. `summariseSession` already writes
+ * the coach's copy and the member's own history; the room gets the same words.
+ *
+ * ── Why the channel is chosen here ────────────────────────────────────────
+ *
+ * A member sharing a workout means "the general room", not "a room I have to
+ * pick from a list" — and the client has no business knowing which channel
+ * that is for a given tier. So: the lowest-ranked room they can actually post
+ * in. An announcements channel is read-only and a private room is somebody's
+ * invitation, and neither is where a workout goes.
+ */
+async function shareSessionWithRoom(
+  userId: string,
+  sessionId: string,
+): Promise<{ ok: true; messageId: string } | { ok: false; reason: string }> {
+  const unit = await unitFor(userId);
+
+  const [session] = await db
+    .select()
+    .from(workoutSessions)
+    .where(and(eq(workoutSessions.id, sessionId), eq(workoutSessions.userId, userId)));
+  if (!session) return { ok: false, reason: "No such session" };
+
+  const rows = await db
+    .select({
+      name: exercises.name,
+      trackingType: exercises.trackingType,
+      category: exercises.category,
+      reps: workoutSets.reps,
+      durationSeconds: workoutSets.durationSeconds,
+      weightKg: workoutSets.weightKg,
+      isWarmup: workoutSets.isWarmup,
+    })
+    .from(workoutSets)
+    .innerJoin(exercises, eq(exercises.id, workoutSets.exerciseId))
+    .where(eq(workoutSets.sessionId, sessionId))
+    .orderBy(asc(workoutSets.setIndex));
+
+  const working = rows.filter((r) => !r.isWarmup);
+  if (working.length === 0) return { ok: false, reason: "Nothing logged in that session yet." };
+
+  const visible = await visibleChannelIds(userId);
+  if (!visible.length) return { ok: false, reason: "You're not in a room yet." };
+
+  const [room] = await db
+    .select({ id: channels.id })
+    .from(channels)
+    .where(
+      and(
+        inArray(channels.id, visible),
+        eq(channels.isActive, true),
+        eq(channels.isReadOnly, false),
+        eq(channels.isPrivate, false),
+      ),
+    )
+    .orderBy(asc(channels.minTierRank), asc(channels.sortOrder))
+    .limit(1);
+  if (!room) return { ok: false, reason: "You're not in a room yet." };
+
+  const lines = summariseSession(
+    working.map((r) => ({ ...r, weight: out(r.weightKg, unit) })),
+    unit,
+  );
+  const title = session.title?.trim() || "Training";
+  const body = [`${title} — ${working.length} sets`, "", ...lines].join("\n");
+
+  const [message] = await db
+    .insert(communityMessages)
+    .values({ channelId: room.id, userId, body })
+    .returning({ id: communityMessages.id });
+
+  // A top-level message is its own root. Matching what the community handler
+  // does rather than leaving a null that its reply logic would then have to
+  // special-case.
+  await db
+    .update(communityMessages)
+    .set({ rootId: message.id })
+    .where(eq(communityMessages.id, message.id));
+
+  return { ok: true, messageId: message.id };
 }
 
 export function registerTrainingRoutes(app: Express) {
@@ -573,6 +665,26 @@ export function registerTrainingRoutes(app: Express) {
 
       track("training.session_finish", { userId, surface: "build", subjectId: row.id });
       res.json(row);
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
+  /**
+   * Put a finished session in the room.
+   *
+   * Separate from `finish` and never automatic. Telling a coach is part of the
+   * arrangement a member signed up for; telling forty other people is a
+   * decision, and one somebody makes after they see what they actually did
+   * rather than before.
+   */
+  app.post("/api/training/sessions/:id/share", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      const result = await shareSessionWithRoom(userId, param(req, "id"));
+      if (!result.ok) return res.status(400).json({ message: result.reason });
+      track("training.session_shared", { userId, surface: "community", subjectId: result.messageId });
+      res.status(201).json({ messageId: result.messageId });
     } catch (err) {
       fail(res, err);
     }

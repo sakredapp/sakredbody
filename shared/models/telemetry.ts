@@ -137,6 +137,8 @@ export const EVENT_NAMES = [
   // prescribed logging actually works.
   "training.session_start",
   "training.session_finish",
+  /** Put in the room. Deliberate and separate from finishing — see the route. */
+  "training.session_shared",
   /** How many kinds of movement somebody says are part of their life. */
   "training.modalities",
 
