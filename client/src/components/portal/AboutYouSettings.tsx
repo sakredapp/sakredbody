@@ -94,7 +94,6 @@ export function AboutYouSettings() {
         saving={save.isPending}
         error={save.isError ? "That didn't save. Try again." : null}
         onSubmit={(v) => save.mutate(v)}
-        onSkip={() => setSaved(false)}
       />
 
       {saved && (

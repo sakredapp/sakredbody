@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetHeader,
   SheetTitle,
@@ -169,14 +170,16 @@ export function MemberBottomNav({
             </SheetHeader>
 
             <div className="mt-4 -mx-2">
+              {/* Wrapped in SheetClose, because the comment that used to sit
+                  here was wrong: Radix does NOT close a Dialog on an arbitrary
+                  click inside it. Only an explicit Close, an outside click or
+                  Escape does. So picking a section navigated underneath and
+                  left the sheet sitting over the page it had just opened, and
+                  the member had to dismiss it themselves to see anything. */}
               {SECONDARY.map(({ id, label, icon: Icon, note }) => (
+                <SheetClose asChild key={id}>
                 <button
-                  key={id}
-                  onClick={() => {
-                    onChange(id);
-                    // Radix closes the sheet on any click inside it that
-                    // isn't prevented, so no explicit close is needed.
-                  }}
+                  onClick={() => onChange(id)}
                   className={cn(
                     "w-full flex items-center gap-3 px-4 py-3 rounded-md text-left tap-clean",
                     section === id ? "bg-[hsl(var(--gold))]/10" : "hover:bg-muted/50",
@@ -196,6 +199,7 @@ export function MemberBottomNav({
                     )}
                   </span>
                 </button>
+                </SheetClose>
               ))}
             </div>
           </SheetContent>

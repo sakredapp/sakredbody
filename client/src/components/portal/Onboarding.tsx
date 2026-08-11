@@ -26,7 +26,8 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { HeartPulse, Bell, LayoutGrid, Check, Sparkles, Camera } from "lucide-react";
+import { Check } from "lucide-react";
+import { StarMark } from "./StarMark";
 import { Capacitor } from "@capacitor/core";
 import { useAuth } from "@/hooks/use-auth";
 import { useHealthSummary, useHealthSync } from "@/hooks/use-health";
@@ -353,9 +354,7 @@ export function Onboarding() {
         {step === "intake" && (
           <>
             <DialogHeader>
-              <div className="h-11 w-11 rounded-full bg-[hsl(var(--gold))]/10 grid place-items-center mb-2">
-                <Sparkles className="h-5 w-5 text-[hsl(var(--gold))]" />
-              </div>
+              <StarMark seed="intake" className="h-11 w-11 mb-2" />
               <DialogTitle className="font-display text-xl">Let's make this yours</DialogTitle>
               <DialogDescription className="text-sm leading-relaxed">
                 Your name and birth date are what the daily reading is built from. Without them
@@ -378,10 +377,6 @@ export function Onboarding() {
                 answers.current.intake = true;
                 saveIntake.mutate(values);
               }}
-              onSkip={() => {
-                answers.current.intake = false;
-                setStep("photo");
-              }}
             />
           </>
         )}
@@ -389,9 +384,7 @@ export function Onboarding() {
         {step === "photo" && (
           <>
             <DialogHeader>
-              <div className="h-11 w-11 rounded-full bg-[hsl(var(--gold))]/10 grid place-items-center mb-2">
-                <Camera className="h-5 w-5 text-[hsl(var(--gold))]" />
-              </div>
+              <StarMark seed="photo" className="h-11 w-11 mb-2" />
               <DialogTitle className="font-display text-xl">Put a face to it</DialogTitle>
               <DialogDescription className="text-sm leading-relaxed">
                 Your coach sees this, and so does the room. Initials work fine if you'd rather.
@@ -421,9 +414,7 @@ export function Onboarding() {
         {step === "health" && (
           <>
             <DialogHeader>
-              <div className="h-11 w-11 rounded-full bg-[hsl(var(--gold))]/10 grid place-items-center mb-2">
-                <HeartPulse className="h-5 w-5 text-[hsl(var(--gold))]" />
-              </div>
+              <StarMark seed="health" className="h-11 w-11 mb-2" />
               <DialogTitle className="font-display text-xl">Bring your body into it</DialogTitle>
               <DialogDescription className="text-sm leading-relaxed">
                 Your phone already measures your sleep, recovery and movement. Connect{" "}
@@ -474,9 +465,7 @@ export function Onboarding() {
         {step === "notifications" && (
           <>
             <DialogHeader>
-              <div className="h-11 w-11 rounded-full bg-[hsl(var(--gold))]/10 grid place-items-center mb-2">
-                <Bell className="h-5 w-5 text-[hsl(var(--gold))]" />
-              </div>
+              <StarMark seed="notifications" className="h-11 w-11 mb-2" />
               <DialogTitle className="font-display text-xl">Your morning brief</DialogTitle>
               <DialogDescription className="text-sm leading-relaxed">
                 One notification a day, at 7am — your protocol, your practices, your sleep.
@@ -540,9 +529,7 @@ export function Onboarding() {
         {step === "widget" && (
           <>
             <DialogHeader>
-              <div className="h-11 w-11 rounded-full bg-[hsl(var(--gold))]/10 grid place-items-center mb-2">
-                <LayoutGrid className="h-5 w-5 text-[hsl(var(--gold))]" />
-              </div>
+              <StarMark seed="widget" className="h-11 w-11 mb-2" />
               <DialogTitle className="font-display text-xl">Put it on your home screen</DialogTitle>
               <DialogDescription className="text-sm leading-relaxed">
                 A widget shows today's practices and last night's sleep without opening anything.

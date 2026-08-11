@@ -73,6 +73,22 @@ type Plugin = typeof import("@capgo/capacitor-health").Health;
  * needs and short enough that a member does not conclude the button is dead —
  * which, until now, it was.
  */
+/**
+ * Is a native implementation registered under this name?
+ *
+ * Wrapped because it is called before every `try` in this file, so anything it
+ * throws rejects the whole probe before a single guarded line runs — and the
+ * caller's catch then reports nothing, because the failure happened outside
+ * the code that knows how to describe it.
+ */
+function pluginRegistered(): boolean {
+  try {
+    return Capacitor.isPluginAvailable("Health");
+  } catch {
+    return false;
+  }
+}
+
 let cached: Plugin | null = null;
 async function plugin(): Promise<Plugin | null> {
   if (!healthPlatform()) return null;
@@ -128,7 +144,7 @@ export async function healthAvailability(): Promise<HealthAvailability> {
   const platform = healthPlatform();
   if (!platform) return { available: false, platform: null, reason: "Not a phone app." };
 
-  const bridged = Capacitor.isPluginAvailable("Health");
+  const bridged = pluginRegistered();
   const p = await plugin();
   if (!p) {
     return {
@@ -179,7 +195,7 @@ export async function healthAvailability(): Promise<HealthAvailability> {
  */
 export async function healthProbeDetail(): Promise<Record<string, unknown>> {
   const platform = healthPlatform();
-  const bridged = Capacitor.isPluginAvailable("Health");
+  const bridged = pluginRegistered();
   let loaded = false;
   let raw: unknown = null;
   let error: string | null = null;

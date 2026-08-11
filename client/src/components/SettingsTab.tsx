@@ -84,7 +84,7 @@ export function SettingsTab({
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="Settings" subtitle="You, rather than what you're doing." />
+      <SectionHeading title="Settings" />
 
       {/* ── About you ──────────────────────────────────────────────────────
           First, because it is the one panel that changes what the app says

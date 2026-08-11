@@ -55,13 +55,11 @@ export function IntakeStep({
   saving,
   error,
   onSubmit,
-  onSkip,
 }: {
   initial: Partial<IntakeValues>;
   saving: boolean;
   error?: string | null;
   onSubmit: (values: IntakeValues) => void;
-  onSkip: () => void;
 }) {
   const [firstName, setFirstName] = useState(initial.firstName ?? "");
   const [middleName, setMiddleName] = useState(initial.middleName ?? "");
@@ -96,17 +94,29 @@ export function IntakeStep({
     <div className="space-y-4">
       <div className="space-y-3">
         <div className="space-y-1.5">
+          {/* Your full name, said as a heading, with each field labelled
+              underneath. A placeholder is not a label: the moment somebody
+              types, "First name" vanishes and three stacked boxes become
+              three anonymous ones — which is exactly how it read on a device,
+              where the only visible words were "Name at birth" and "Middle
+              name" and the other two fields explained nothing. */}
           <label className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-            Name at birth
+            Your full name at birth
           </label>
-          <Input
-            placeholder="First name"
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            autoComplete="given-name"
-            data-testid="intake-first-name"
-          />
           <div className="space-y-1">
+            <span className="block text-[11px] text-muted-foreground">First</span>
+            <Input
+              placeholder="First name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              autoComplete="given-name"
+              data-testid="intake-first-name"
+            />
+          </div>
+          <div className="space-y-1">
+            <span className="block text-[11px] text-muted-foreground">
+              Middle <em className="text-[hsl(var(--gold))] not-italic">— recommended</em>
+            </span>
             <Input
               placeholder="Middle name"
               value={middleName}
@@ -118,17 +128,19 @@ export function IntakeStep({
                 name genuinely changes the expression number, and a member who
                 knows why is far more likely to type it. */}
             <p className="text-[11px] text-muted-foreground">
-              <em className="text-[hsl(var(--gold))]">Recommended</em> — the middle name changes
-              your expression number. Leave it out if you'd rather.
+              The middle name changes your expression number. Leave it out if you'd rather.
             </p>
           </div>
-          <Input
+          <div className="space-y-1">
+            <span className="block text-[11px] text-muted-foreground">Last</span>
+            <Input
             placeholder="Last name"
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
             autoComplete="family-name"
             data-testid="intake-last-name"
           />
+          </div>
           <p className="text-[11px] text-muted-foreground">
             As it appears on your birth certificate — not your married or chosen name. Changing
             what we call you later won't change this.
@@ -222,8 +234,9 @@ export function IntakeStep({
         {/* Says what the optional field buys, so it reads as an offer rather
             than as another box to fill. */}
         <p className="text-[11px] text-muted-foreground">
-          Time of birth is what makes a rising sign possible. Skip it if you don't know — most
-          people don't, and everything else works without it.
+          Your time of birth is what makes the full astrological alignment possible — the sign
+          on the horizon at the moment you were born, which the date alone cannot give. Skip it
+          if you don't know; most people don't, and everything else works without it.
         </p>
       </div>
 
@@ -235,9 +248,6 @@ export function IntakeStep({
           data-testid="intake-save"
         >
           {saving ? "Saving…" : "Continue"}
-        </Button>
-        <Button variant="ghost" onClick={onSkip} className="text-muted-foreground">
-          I'll do this later
         </Button>
       </div>
     </div>

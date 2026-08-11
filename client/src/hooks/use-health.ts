@@ -102,9 +102,29 @@ export function useHealthSync() {
      * Only on a phone: a browser reporting "not a phone app" is noise.
      */
     if (Capacitor.isNativePlatform()) {
-      void healthProbeDetail()
-        .then((detail) => track("health.probe", { surface: "health", props: detail }))
-        .catch(() => {});
+      /**
+       * Reported whatever happens, including nothing happening.
+       *
+       * Two rounds of fixes went in and this event still never arrived — and
+       * an absent event cannot distinguish "the code did not run" from "the
+       * code ran and hung" from "the send failed". Racing it against a timer
+       * removes the first two possibilities: something is always posted, and
+       * `stage` says how far it got.
+       */
+      const stalled = new Promise<Record<string, unknown>>((resolve) =>
+        setTimeout(() => resolve({ stage: "stalled" }), 6_000),
+      );
+      void Promise.race([
+        healthProbeDetail().then((d) => ({ stage: "resolved", ...d })),
+        stalled,
+      ])
+        .catch((err) => ({ stage: "threw", error: String(err?.message ?? err) }))
+        .then((props) =>
+          track("health.probe", {
+            surface: "health",
+            props: { ...props, platform: Capacitor.getPlatform() },
+          }),
+        );
     }
 
     healthAvailability()
