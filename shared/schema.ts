@@ -74,6 +74,8 @@ export const retreats = pgTable("retreats", {
   startDate: text("start_date").notNull(),
   endDate: text("end_date").notNull(),
   capacity: integer("capacity").notNull().default(12),
+  /** 'yin' | 'yang' | null — see shared/models/terrain.ts. Null = not themed. */
+  emphasis: text("emphasis"),
   imageUrl: text("image_url"),
   active: boolean("active").notNull().default(true),
 });

@@ -80,15 +80,21 @@ interface Pillar {
  *
  * The second guess turned out to be the useful one. What was missing here was
  * never a name for the condition — that is the reading at the top — it was the
- * plan somebody is actually on. Hence Protocol.
+ * plan somebody is actually on. Hence the coach's plan.
  *
- * ── Protocol leads; Restore and Build are equals ──────────────────────────
+ * ── The coach's plan leads; Restore and Build are equals ──────────────────
  *
  * The lead card was removed an hour ago because it made Restore visually
  * senior to Build on the one screen whose job is presenting them as a pair.
- * That reasoning was right and does not apply to Protocol: it is not one of
- * the two forces, it is what a member is currently following, so it can sit
+ * That reasoning was right and does not apply here: the coach's plan is not
+ * one of the two forces, it is what somebody has been assigned, so it can sit
  * above both without ranking them against each other.
+ *
+ * It is called the coach's plan and not Protocol because that is what it is —
+ * a plan a person wrote for this member. "Protocol" is what the business calls
+ * it internally, and it is also what a member would reasonably expect to cover
+ * everything they do, which it does not: it is deliberately partial, and the
+ * lifestyle habits either side of it are the member's own.
  *
  * The nine centres stay reachable from Restore and from the More sheet.
  *
@@ -110,7 +116,8 @@ interface Pillar {
  *
  * ── Order is the argument ─────────────────────────────────────────────────
  *
- * Protocol first, because it is the answer to "what am I meant to be doing".
+ * The coach's plan first, because it is the answer to "what am I meant to be
+ * doing".
  * Then Restore and Build, in that order, because you cannot load a body that
  * cannot yet recover. Then Gather and Library, which are what surrounds the
  * practice rather than what it is.
@@ -121,8 +128,8 @@ interface Pillar {
 const PILLARS: Pillar[] = [
   {
     key: "protocol",
-    title: "Protocol",
-    blurb: "The plan you're on right now.",
+    title: "Coach's Plan",
+    blurb: "What your coach has you on.",
     image: "/images/rugged-cliffs.webp",
     section: "coaching",
     tab: "routines",
@@ -177,7 +184,9 @@ const PILLARS: Pillar[] = [
  * already work.
  */
 function useCounts() {
-  const today = useQuery<{ habits: Array<{ completed: boolean }> }>({
+  const today = useQuery<{
+    habits: Array<{ completed: boolean; emphasis: string | null }>;
+  }>({
     queryKey: ["/api/habits/today"],
     queryFn: async () => {
       const r = await fetch("/api/habits/today", { credentials: "include" });
@@ -341,25 +350,42 @@ export function PillarHome({
         const name = protocol.data?.routine?.name;
         return name ? name : "Nothing active";
       }
-      case "restore": {
-        if (today.isLoading) return undefined;
-        const list = today.data?.habits ?? [];
-        if (list.length === 0) return "Nothing scheduled today";
-        const done = list.filter((h) => h.completed).length;
-        return `${done} of ${list.length} done today`;
-      }
+      /**
+       * Each card counts its own habits.
+       *
+       * Restore and Build are the two halves of a lifestyle, not two views of
+       * one list: sleep, minerals and magnesium on one side; steps, sunlight
+       * and intake on the other. Until habits carried a direction, the only
+       * number available was the whole checklist — so this card asked "is your
+       * body rested?" and answered "4 of 6 done today", which is the count of
+       * everything ticked, most of it about something else entirely.
+       *
+       * A habit with no emphasis is counted by neither. That is deliberate:
+       * it is a habit nobody has assigned a direction to, and inventing one
+       * to make a number look complete is how the number stops being true.
+       */
+      case "restore":
       case "build": {
-        if (build.isLoading) return undefined;
-        const n = build.data?.sessions?.length ?? 0;
-        // "Prescribed" is the one word this app cannot use. Every legal page
-        // we publish says we do not diagnose, treat, cure or prescribe — and
-        // then the home screen told a member what had been prescribed for
-        // them today. A reviewer reading both sees a health app claiming
-        // medical authority its own disclaimer denies. "Planned" says the
-        // same thing about the same data and claims nothing.
-        if (n === 0) return "Nothing planned today";
-        const lifts = build.data!.sessions.reduce((t, s) => t + s.exercises.length, 0);
-        return `${lifts} ${lifts === 1 ? "lift" : "lifts"} today`;
+        if (today.isLoading) return undefined;
+        const want = key === "restore" ? "yin" : "yang";
+        const mine = (today.data?.habits ?? []).filter((h) => h.emphasis === want);
+
+        if (mine.length === 0) {
+          // Build has a second thing to say when no habits are set for it;
+          // Restore has nothing else to count, so it stays quiet rather than
+          // showing a zero that reads as a failure.
+          if (key === "build" && !build.isLoading) {
+            const n = build.data?.sessions?.length ?? 0;
+            if (n > 0) {
+              const lifts = build.data!.sessions.reduce((t, s) => t + s.exercises.length, 0);
+              return `${lifts} ${lifts === 1 ? "lift" : "lifts"} today`;
+            }
+          }
+          return undefined;
+        }
+
+        const done = mine.filter((h) => h.completed).length;
+        return `${done} of ${mine.length} today`;
       }
       case "retreats": {
         if (offerings.isLoading) return undefined;

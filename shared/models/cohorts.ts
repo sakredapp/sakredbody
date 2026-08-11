@@ -36,6 +36,12 @@ export const cohorts = pgTable(
     endDate: date("end_date"),
     /** 'in_person' | 'virtual' | 'hybrid' */
     format: text("format").notNull().default("hybrid"),
+    /**
+     * 'yin' | 'yang' | null. Orthogonal to `kind` and `format`: a Yin
+     * mastermind and a Yang mastermind are both masterminds. See
+     * shared/models/terrain.ts.
+     */
+    emphasis: text("emphasis"),
     location: text("location"),
     capacity: integer("capacity").notNull().default(12),
     /**

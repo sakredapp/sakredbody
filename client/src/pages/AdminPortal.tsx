@@ -289,7 +289,7 @@ const emptyRoutineForm: RoutineFormData = {
 interface HabitFormData {
   title: string; shortDescription: string; detailedDescription: string;
   instructions: string; scienceExplanation: string; tips: string;
-  expectToNotice: string; cadence: string; recommendedTime: string;
+  expectToNotice: string; cadence: string; recommendedTime: string; emphasis: string;
   durationMinutes: number | null; dayStart: number | null; dayEnd: number | null;
   orderIndex: number; icon: string; routineId: string;
   terrainTags: string; searchKeywords: string;
@@ -297,7 +297,7 @@ interface HabitFormData {
 const emptyHabitForm: HabitFormData = {
   title: "", shortDescription: "", detailedDescription: "",
   instructions: "", scienceExplanation: "", tips: "",
-  expectToNotice: "", cadence: "daily", recommendedTime: "Morning",
+  expectToNotice: "", cadence: "daily", recommendedTime: "Morning", emphasis: "",
   durationMinutes: null, dayStart: 1, dayEnd: null,
   orderIndex: 0, icon: "", routineId: "",
   terrainTags: "", searchKeywords: "",
@@ -480,6 +480,24 @@ function HabitFormDialog({
             <Textarea value={form.instructions} onChange={(e) => set("instructions", e.target.value)} className="resize-none" rows={2} />
           </div>
           <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              {/* Which half of the member's day this belongs to. "Neither" is
+                  the default and a real answer — the two home cards count only
+                  habits that have been given a direction, and guessing one to
+                  make a count look complete is how the count stops being true. */}
+              <label className="text-sm font-medium">Direction</label>
+              <Select
+                value={form.emphasis || "_none"}
+                onValueChange={(v) => set("emphasis", v === "_none" ? "" : v)}
+              >
+                <SelectTrigger data-testid="select-habit-emphasis"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">Neither</SelectItem>
+                  <SelectItem value="yin">Restore (Yin) — clears and rebuilds</SelectItem>
+                  <SelectItem value="yang">Build (Yang) — loads and challenges</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-1">
               <label className="text-sm font-medium">Cadence</label>
               <Select value={form.cadence} onValueChange={(v) => set("cadence", v)}>
@@ -1292,6 +1310,10 @@ export default function AdminPortal() {
       terrainTags: tags(d.terrainTags),
       searchKeywords: tags(d.searchKeywords),
       icon: d.icon.trim() || null,
+      // "" is what the "Neither" option leaves behind, and the column's CHECK
+      // constraint only permits 'yin', 'yang' or NULL — an empty string would
+      // be rejected by Postgres, not silently ignored.
+      emphasis: d.emphasis || null,
     };
     if (!d.routineId) delete payload.routineId;
     return payload;
@@ -1744,6 +1766,7 @@ export default function AdminPortal() {
                     scienceExplanation: editingHabit.scienceExplanation || "",
                     tips: editingHabit.tips || "", expectToNotice: editingHabit.expectToNotice || "",
                     cadence: editingHabit.cadence, recommendedTime: editingHabit.recommendedTime || "Morning",
+                    emphasis: editingHabit.emphasis || "",
                     durationMinutes: editingHabit.durationMinutes, dayStart: editingHabit.dayStart,
                     dayEnd: editingHabit.dayEnd, orderIndex: editingHabit.orderIndex,
                     icon: editingHabit.icon || "",

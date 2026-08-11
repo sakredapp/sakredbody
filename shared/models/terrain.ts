@@ -36,6 +36,43 @@
 
 import { categoryLoad, type MovementLoad } from "./training.js";
 
+// ─── The direction a thing runs ────────────────────────────────────────────
+
+/**
+ * Yin or Yang, and nothing else.
+ *
+ * One vocabulary for every table that carries a direction — habits, retreats
+ * and cohorts — so the three cannot drift into three slightly different
+ * spellings of the same idea.
+ *
+ * There is no `balanced` member on purpose. That is what `null` is, and two
+ * ways to say the same thing is how a filter starts missing rows. Null also
+ * means the honest thing for every row that predates the idea: nobody has
+ * said.
+ */
+export const EMPHASES = ["yin", "yang"] as const;
+export type Emphasis = (typeof EMPHASES)[number];
+
+/**
+ * What each direction is called, and what it means, in one place.
+ *
+ * Two labels because the app and the site are talking to people at different
+ * moments. The site is teaching a philosophy and says Yin and Yang. The app is
+ * a screen somebody uses before breakfast, and says Restore and Build — which
+ * are the same two things, named for what you would do rather than what the
+ * tradition calls it.
+ */
+export const EMPHASIS_META: Readonly<
+  Record<Emphasis, { label: string; appLabel: string; blurb: string }>
+> = {
+  yin: { label: "Yin", appLabel: "Restore", blurb: "Clears and rebuilds" },
+  yang: { label: "Yang", appLabel: "Build", blurb: "Loads and challenges" },
+};
+
+export function isEmphasis(v: unknown): v is Emphasis {
+  return v === "yin" || v === "yang";
+}
+
 /**
  * Which direction today's inputs argue for.
  *

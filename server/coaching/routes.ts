@@ -392,6 +392,10 @@ export function registerCoachingRoutes(app: Express): void {
           recommendedTime: routineHabits.recommendedTime,
           durationMinutes: routineHabits.durationMinutes,
           icon: routineHabits.icon,
+          // Which half of the day this belongs to — Restore or Build. Comes
+          // from the template, so a habit somebody wrote themselves has none,
+          // which is the honest answer rather than a guessed one.
+          emphasis: routineHabits.emphasis,
         })
         .from(habits)
         .leftJoin(routineHabits, eq(habits.routineHabitId, routineHabits.id))
@@ -402,6 +406,7 @@ export function registerCoachingRoutes(app: Express): void {
         recommendedTime: r.recommendedTime,
         durationMinutes: r.durationMinutes,
         icon: r.icon,
+        emphasis: r.emphasis,
       }));
 
       // Group by cadence

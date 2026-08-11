@@ -82,6 +82,21 @@ export const routineHabits = pgTable(
     orderIndex: integer("order_index").notNull().default(0),
     intensity: text("intensity").notNull().default("lite"), // 'lite' | 'intense'
     icon: text("icon"),
+
+    /**
+     * Which direction this habit runs: 'yin' | 'yang' | null.
+     *
+     * Yin is sleep, minerals, magnesium, downshifting — the things that give
+     * capacity back. Yang is steps, sunlight, protein, output — the things
+     * that ask for it. Null means nobody has said, which is true of every
+     * habit written before the idea existed and is why this is not back-filled.
+     *
+     * The member home counts today's habits by this, so Restore and Build each
+     * show their own progress instead of both showing one undifferentiated
+     * checklist. See shared/models/terrain.ts for the vocabulary.
+     */
+    emphasis: text("emphasis"),
+
     terrainTags: text("terrain_tags").array(),
     searchKeywords: text("search_keywords").array(),
     isFree: boolean("is_free").notNull().default(true),
