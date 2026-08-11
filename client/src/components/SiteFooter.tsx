@@ -12,7 +12,6 @@ import {
 const PATH_LINKS = [
   { label: "Restore", href: "/restore" },
   { label: "Build", href: "/build" },
-  { label: "Embody", href: "/embody" },
   { label: "Gather — Retreats", href: "/retreats" },
 ];
 

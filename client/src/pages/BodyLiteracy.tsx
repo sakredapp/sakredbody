@@ -7,6 +7,8 @@ import { Section } from "@/components/Section";
 import { Deck } from "@/components/Deck";
 import { PageHero, SectionHeader } from "@/components/PageHero";
 import { ResonantRing } from "@/components/ResonantRing";
+import { BreathPacer } from "@/components/BreathPacer";
+import { EMBODIED_PRACTICE } from "@/data/territories";
 import { Button } from "@/components/ui/button";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
@@ -155,6 +157,47 @@ export default function BodyLiteracy() {
               provider, not a checklist.
             </p>
           </motion.div>
+        </motion.div>
+      </Section>
+
+      {/* ── The practice ─────────────────────────────────────
+          Rehoused from the retired Embody page. Reading your state and doing
+          something about it are the same skill at two ranges, and splitting
+          them across two destinations was the thing that made "Embody" look
+          like a fourth pillar rather than the result of the other three. */}
+      <Section tone="ink" width="max-w-4xl">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={viewportOnce}
+          variants={stagger}
+        >
+          <motion.div variants={fadeInUp}>
+            <SectionHeader
+              eyebrow="The Practice"
+              title={<>Reading it is half. <span className="text-gold">Living it is the rest.</span></>}
+              intro={EMBODIED_PRACTICE.promise}
+              onInk
+            />
+          </motion.div>
+
+          <div className="grid md:grid-cols-2 gap-10 items-center">
+            <motion.div variants={fadeInUp}>
+              <p className="text-muted-foreground leading-relaxed mb-6">{EMBODIED_PRACTICE.body}</p>
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+                {EMBODIED_PRACTICE.domains.map((d) => (
+                  <li key={d} className="text-sm text-muted-foreground flex gap-2.5">
+                    <span className="text-gold shrink-0" aria-hidden="true">·</span>
+                    {d}
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+
+            <motion.div variants={fadeInUp}>
+              <BreathPacer className="w-full" />
+            </motion.div>
+          </div>
         </motion.div>
       </Section>
 

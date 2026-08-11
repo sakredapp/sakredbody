@@ -157,13 +157,13 @@ export default function Build() {
             <span className="text-gold">is just potential energy.</span>
           </motion.h2>
           <motion.p variants={fadeInUp} className="text-muted-foreground max-w-xl mx-auto mb-9 leading-relaxed">
-            Knowing what to do has never been the hard part. Becoming the kind of person who does it — on a
-            bad week, in a bad mood, without supervision — is the whole game.
+            Knowing what to do has never been the hard part. Doing it on a bad week, in a bad mood, without
+            supervision — that depends on what surrounds you more than on what you know.
           </motion.p>
           <motion.div variants={fadeInUp}>
-            <Link href="/embody">
-              <Button size="lg" className="gold-metallic-btn px-8" data-testid="button-next-embody">
-                Next: Embody <ArrowRight className="ml-2 h-5 w-5" />
+            <Link href="/retreats">
+              <Button size="lg" className="gold-metallic-btn px-8" data-testid="button-next-gather">
+                Next: Gather <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
           </motion.div>

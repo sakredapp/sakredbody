@@ -229,12 +229,12 @@ export default function Home() {
           <motion.div variants={fadeInUp}>
             <SectionHeader
               eyebrow="The Architecture"
-              title={<><span className="text-gold">Four Territories.</span></>}
+              title={<><span className="text-gold">Three Territories.</span></>}
               testId="text-territories-headline"
             />
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-10 gap-y-10">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-10">
             {TERRITORIES.map((t, i) => (
               <motion.div variants={fadeInUp} key={t.key}>
                 <Link href={t.href}>

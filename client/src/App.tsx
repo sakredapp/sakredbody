@@ -12,7 +12,6 @@ import Home from "@/pages/Home";
 const Philosophy = lazyRoute("Philosophy", () => import("@/pages/Philosophy"));
 const Restore = lazyRoute("Restore", () => import("@/pages/Restore"));
 const Build = lazyRoute("Build", () => import("@/pages/Build"));
-const Embody = lazyRoute("Embody", () => import("@/pages/Embody"));
 const Terrain = lazyRoute("Terrain", () => import("@/pages/Terrain"));
 const BodyLiteracy = lazyRoute("BodyLiteracy", () => import("@/pages/BodyLiteracy"));
 const Retreats = lazyRoute("Retreats", () => import("@/pages/Retreats"));
@@ -72,7 +71,6 @@ const MARKETING_PATHS: [string, React.ComponentType][] = [
   ["/philosophy", Philosophy],
   ["/restore", Restore],
   ["/build", Build],
-  ["/embody", Embody],
   ["/the-terrain", Terrain],
   ["/body-literacy", BodyLiteracy],
   ["/retreats", Retreats],
@@ -101,6 +99,12 @@ function Router() {
           {() => (isAppHost ? <Redirect to="/member" /> : <Page />)}
         </Route>
       ))}
+      {/* Embodiment is what living the system produces, not a destination.
+          The page retired into Body Literacy, which teaches the same thing —
+          reading your own state and choosing a direction. Redirected rather
+          than dropped: it sat in the primary nav for months. */}
+      <Route path="/embody">{() => <Redirect to="/body-literacy" />}</Route>
+
       {/* The app and the portal are the same product. Old /app links land there. */}
       <Route path="/app">{() => <Redirect to="/member" />}</Route>
 

@@ -1,7 +1,22 @@
 /**
- * The four territories are the spine of the whole site. Every pillar page,
- * nav entry, and homepage section hangs off this order — it's a sequence,
- * not a menu: you can't load a body that can't yet drain.
+ * The spine of the whole site: two directions and the room they happen in.
+ *
+ * It's a sequence, not a menu — you can't load a body that can't yet drain.
+ *
+ * ── Why there are three and not four ──────────────────────────────────────
+ *
+ * There was a fourth, Embody, sitting between Restore and Build with the
+ * force "Where the two forces meet". That is the one entry that was never a
+ * force at all: it described the *relationship* between the other two, which
+ * makes it a bad sibling and a good idea. Listed alongside them it asked a
+ * visitor to hold four categories when the actual model has two directions
+ * and the judgement of which one you currently need.
+ *
+ * So the relationship keeps its name — balance — and moves to the pages whose
+ * job is teaching it: /the-terrain explains why either direction can be right
+ * or wrong depending on state, and /body-literacy teaches you to tell which
+ * one you're in. Embody's own material went to Body Literacy rather than to
+ * the bin; see EMBODIED_PRACTICE below.
  */
 
 export interface Territory {
@@ -59,26 +74,6 @@ export const TERRITORIES: Territory[] = [
     ],
   },
   {
-    key: "embody",
-    name: "Embody",
-    href: "/embody",
-    verb: "Live inside it consciously.",
-    force: "Where the two forces meet",
-    color: "var(--element-earth)",
-    promise: "Information is not enough. Health has to become perception, practice, and relationship.",
-    body: "The body you inhabit becomes the life you are capable of living. This is the part almost nobody teaches: attention, standards, rhythm, and the judgment to know when to push and when to yield.",
-    domains: [
-      "Habits and discipline",
-      "Body awareness and literacy",
-      "Personal standards",
-      "Morning and evening rhythms",
-      "Attention and digital hygiene",
-      "Environment design",
-      "Stress capacity",
-      "Seasonal rhythms",
-    ],
-  },
-  {
     key: "gather",
     name: "Gather",
     href: "/retreats",
@@ -99,6 +94,30 @@ export const TERRITORIES: Territory[] = [
     ],
   },
 ];
+
+/**
+ * What Embody used to carry, rehoused.
+ *
+ * Embodiment is the outcome of living the system, not a fourth thing to buy
+ * into — so this is no longer a destination in the nav. The material itself
+ * was never the problem, and Body Literacy is where it belongs: that page's
+ * job is teaching somebody to read their own state and pick a direction, and
+ * this is the practice half of exactly that.
+ */
+export const EMBODIED_PRACTICE = {
+  promise: "Information is not enough. Health has to become perception, practice, and relationship.",
+  body: "The body you inhabit becomes the life you are capable of living. This is the part almost nobody teaches: attention, standards, rhythm, and the judgment to know when to push and when to yield.",
+  domains: [
+    "Habits and discipline",
+    "Body awareness and literacy",
+    "Personal standards",
+    "Morning and evening rhythms",
+    "Attention and digital hygiene",
+    "Environment design",
+    "Stress capacity",
+    "Seasonal rhythms",
+  ],
+};
 
 /** Health → Resilience → Capacity → Expression. */
 export const CAPACITY_MODEL = [

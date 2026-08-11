@@ -12,32 +12,55 @@ export interface NavEntry {
   children?: { label: string; href: string; note?: string }[];
 }
 
-/** Primary site navigation — shared by the header on every page. */
+/**
+ * Primary site navigation — shared by the header on every page.
+ *
+ * ── Why the groups are these groups ───────────────────────────────────────
+ *
+ * "The Path" used to hold five things that were not the same kind of thing:
+ * two directions (Restore, Build), a relationship dressed as a destination
+ * (Embody), a sales page (Gather → /retreats) and a tool (Food Chart). A menu
+ * that mixes categories teaches the visitor that the model is complicated,
+ * before they have read a word of it.
+ *
+ * The three groups below are the model:
+ *
+ *   The Practice     — the interface. Two items, because the body has two
+ *                      directions and that is the whole first idea.
+ *   The Intelligence — why either direction can be right or wrong, and how to
+ *                      tell. Seasons and elements live in here, one level
+ *                      down, where they read as depth rather than as a
+ *                      prerequisite.
+ *   Gather           — where the practice becomes an experience with other
+ *                      people. Already a coherent trio in WaysToWork.tsx.
+ *
+ * Embody is not here. Embodiment is what living the system produces, not a
+ * fourth thing to choose; its material moved to Body Literacy, whose job is
+ * teaching you which direction you currently need. See data/territories.ts.
+ */
 export const SITE_NAV: NavEntry[] = [
   {
-    label: "Philosophy",
+    label: "The Practice",
     children: [
+      { label: "Restore", href: "/restore", note: "Yin — clear the terrain" },
+      { label: "Build", href: "/build", note: "Yang — build its capacity" },
+    ],
+  },
+  {
+    label: "The Intelligence",
+    children: [
+      { label: "The Terrain", href: "/the-terrain", note: "Why the same input helps or harms" },
+      { label: "Body Literacy", href: "/body-literacy", note: "Learn which direction you need" },
       { label: "What Is a Sakred Body?", href: "/philosophy", note: "The manifesto" },
-      { label: "The Terrain", href: "/the-terrain", note: "The body as an environment" },
-      { label: "Body Literacy", href: "/body-literacy", note: "Learn to read the signals" },
+      { label: "Food Chart", href: "/food-chart", note: "What food actually does" },
     ],
   },
   {
-    label: "The Path",
+    label: "Gather",
     children: [
-      { label: "Restore", href: "/restore", note: "Clear the terrain" },
-      { label: "Build", href: "/build", note: "Build its capacity" },
-      { label: "Embody", href: "/embody", note: "Live inside it consciously" },
-      { label: "Gather", href: "/retreats", note: "Environment that holds" },
-    ],
-  },
-  { label: "Food Chart", href: "/food-chart" },
-  {
-    label: "Work With Us",
-    children: [
-      { label: "Sakred Executive", href: "/executive", note: "Private coaching · application only" },
-      { label: "Mastermind", href: "/mastermind", note: "Membership + retreats" },
       { label: "Retreats", href: "/retreats", note: "Six formats, three days to two weeks" },
+      { label: "Mastermind", href: "/mastermind", note: "Membership + retreats" },
+      { label: "Sakred Executive", href: "/executive", note: "Private coaching · application only" },
     ],
   },
 ];

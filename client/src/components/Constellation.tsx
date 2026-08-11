@@ -21,7 +21,7 @@ interface Pt {
   vy: number;
 }
 
-const DEFAULT_LABELS = ["Restore", "Build", "Embody", "Gather"];
+const DEFAULT_LABELS = ["Restore", "Build", "Gather"];
 
 export function Constellation({
   className,

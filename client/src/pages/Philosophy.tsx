@@ -102,7 +102,7 @@ export default function Philosophy() {
           <motion.div variants={fadeInUp}>
             <SectionHeader
               eyebrow="The Architecture"
-              title={<>Restore. Build. <span className="text-gold">Embody. Gather.</span></>}
+              title={<>Restore. Build. <span className="text-gold">Gather.</span></>}
               testId="text-territories-headline"
             />
           </motion.div>
