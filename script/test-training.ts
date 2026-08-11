@@ -27,6 +27,8 @@ import {
   CATALOGUE_FETCH_LIMIT,
   isPracticeCategory,
   summariseSession,
+  BUILD_MODALITIES,
+  categoriesForModalities,
   type LoggedSet,
 } from "../shared/models/training.js";
 import { catalogueRows, slug, arrayLiteral } from "../shared/data/exerciseCatalogue.js";
@@ -182,6 +184,35 @@ check(
 check(
   "every tracking type is one the schema allows",
   rows.every((r) => ["reps", "duration", "distance"].includes(r.tracking ?? "reps")),
+);
+
+// The answer to "what kinds of movement are part of your life" narrows what
+// the picker browses. A category behind none of the choices is a shelf of the
+// catalogue that becomes unreachable by browsing for anybody who answers.
+console.log("\nEvery category is reachable through some modality\n");
+
+const reachable = new Set(BUILD_MODALITIES.flatMap((m) => m.categories as readonly string[]));
+check(
+  "no category is orphaned by the modality mapping",
+  EXERCISE_CATEGORIES.every((c) => reachable.has(c.id)),
+  EXERCISE_CATEGORIES.filter((c) => !reachable.has(c.id)).map((c) => c.id).join(", "),
+);
+check(
+  "no modality points at a category that doesn't exist",
+  Array.from(reachable).every((c) => knownCategories.has(c)),
+  Array.from(reachable).filter((c) => !knownCategories.has(c)).join(", "),
+);
+check(
+  "picking everything is the same as no filter at all",
+  categoriesForModalities(BUILD_MODALITIES.map((m) => m.id)).size === EXERCISE_CATEGORIES.length,
+);
+check("picking nothing narrows nothing", categoriesForModalities([]).size === 0);
+check(
+  "a Pilates member gets the reformer and not the squat rack",
+  (() => {
+    const c = categoriesForModalities(["pilates", "mobility"]);
+    return c.has("pilates") && c.has("mobility") && !c.has("legs") && !c.has("sport");
+  })(),
 );
 
 console.log("\nA practice is a duration, and never a weight\n");

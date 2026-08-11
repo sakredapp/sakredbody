@@ -137,6 +137,8 @@ export const EVENT_NAMES = [
   // prescribed logging actually works.
   "training.session_start",
   "training.session_finish",
+  /** How many kinds of movement somebody says are part of their life. */
+  "training.modalities",
 
   // Support. Worth counting because the category breakdown says where the
   // product is confusing, and a spike in "technical" usually arrives before

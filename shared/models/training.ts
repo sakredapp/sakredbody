@@ -297,6 +297,121 @@ export type ExerciseGroup = (typeof EXERCISE_GROUPS)[number]["id"];
  * says it, and a second source of truth is a second thing to keep in sync.
  */
 /**
+ * ── What somebody actually does ───────────────────────────────────────────
+ *
+ * Six hundred and fifty-seven movements is the right catalogue and the wrong
+ * first impression. A member who does Pilates, walks and stretches should not
+ * open Build and find a bodybuilding app; a member who only lifts should not
+ * be scrolling past reformer work to reach a squat rack.
+ *
+ * So one question, once: what kinds of movement are part of your life? The
+ * answer narrows what is *shown by default* and nothing else. Search still
+ * spans the whole catalogue, every group chip is still there, and nothing is
+ * hidden in a way that cannot be undone with one tap — because the failure
+ * mode of a preference like this is somebody unable to find a movement they
+ * know exists, which is worse than a long list.
+ *
+ * Fourteen choices rather than forty categories. A member does not think "I do
+ * neck and grip work"; they think "I lift". The mapping from a choice to the
+ * categories behind it lives here, and a test asserts every category is
+ * reachable through at least one of them — otherwise a whole shelf of the
+ * catalogue becomes invisible to anybody who answers this question.
+ */
+export const BUILD_MODALITIES = [
+  {
+    id: "lifting",
+    label: "Lifting",
+    hint: "Barbells, dumbbells, machines",
+    categories: [
+      "chest", "back", "shoulders", "arms", "legs", "glutes", "calves", "core",
+      "olympic", "landmine", "neck_grip", "isometric", "full_body",
+    ],
+  },
+  {
+    id: "calisthenics",
+    label: "Calisthenics",
+    hint: "Your own bodyweight, rings",
+    categories: ["calisthenics", "rings"],
+  },
+  {
+    id: "athletic",
+    label: "Athletic",
+    hint: "Sprints, jumps, agility, carries",
+    categories: [
+      "explosive", "plyometric", "agility", "rotation", "balance", "ground",
+      "carry", "kettlebell", "locomotion",
+    ],
+  },
+  {
+    id: "endurance",
+    label: "Running, cycling, swimming",
+    hint: "Anything with a distance or a clock",
+    categories: ["endurance", "cardio"],
+  },
+  { id: "sport", label: "Sports", hint: "Ball games, martial arts, climbing", categories: ["sport"] },
+  { id: "pilates", label: "Pilates", hint: "Mat, reformer, apparatus", categories: ["pilates"] },
+  { id: "lagree", label: "Lagree", hint: "Megaformer", categories: ["lagree"] },
+  { id: "barre", label: "Barre", hint: "", categories: ["barre"] },
+  { id: "yoga", label: "Yoga", hint: "Poses and flows", categories: ["yoga"] },
+  {
+    id: "mobility",
+    label: "Mobility",
+    hint: "Stretching, joints, feet",
+    categories: ["mobility", "feet", "corrective"],
+  },
+  {
+    id: "fascia",
+    label: "Fascia & elastic",
+    hint: "Springiness, tissue work, somatics",
+    categories: ["fascia", "somatic", "tissue"],
+  },
+  {
+    id: "recovery",
+    label: "Breath & recovery",
+    hint: "Breathwork, sauna, easy movement",
+    categories: ["breath", "recovery"],
+  },
+  { id: "classes", label: "Classes", hint: "Anything taught in a room", categories: ["class"] },
+  { id: "flows", label: "Flows", hint: "Whole practices, logged by time", categories: ["practice"] },
+] as const;
+
+export type BuildModality = (typeof BUILD_MODALITIES)[number]["id"];
+
+/** The categories behind a set of chosen modalities. Empty means "all of it". */
+export function categoriesForModalities(chosen: readonly string[]): Set<string> {
+  const out = new Set<string>();
+  for (const m of BUILD_MODALITIES) {
+    if (chosen.includes(m.id)) for (const c of m.categories) out.add(c);
+  }
+  return out;
+}
+
+/**
+ * Where the answer lives.
+ *
+ * Its own table rather than a column on `users` because it is Build's, and
+ * because this is the first row of what will become a member's Build profile —
+ * goals, equipment, limitations, the things a recommendation would need. A
+ * text array rather than rows-per-choice: it is read whole, written whole, and
+ * never joined against.
+ */
+export const memberBuildProfile = pgTable(
+  "member_build_profile",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull(),
+    /** Empty or absent means the question has not been answered — not "none". */
+    modalities: text("modalities").array(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (t) => [uniqueIndex("uq_member_build_profile").on(t.userId)],
+);
+
+export const modalitiesSchema = z.object({
+  modalities: z.array(z.string().max(40)).max(BUILD_MODALITIES.length),
+});
+
+/**
  * How many rows `GET /api/training/exercises` will return.
  *
  * Here rather than in the route because the picker's correctness depends on it:

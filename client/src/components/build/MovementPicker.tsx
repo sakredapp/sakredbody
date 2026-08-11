@@ -32,7 +32,13 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Search, Plus, X, Check } from "lucide-react";
-import { EXERCISE_CATEGORIES, EXERCISE_GROUPS, isPracticeCategory } from "@shared/schema";
+import {
+  EXERCISE_CATEGORIES,
+  EXERCISE_GROUPS,
+  isPracticeCategory,
+  categoriesForModalities,
+} from "@shared/schema";
+import { useModalities } from "./Modalities";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -80,6 +86,7 @@ export function MovementPicker({
   picked,
   only,
   placeholder,
+  ignoreModalities,
 }: {
   onPick: (m: Movement) => void;
   onClose?: () => void;
@@ -95,8 +102,18 @@ export function MovementPicker({
    */
   only?: "practices" | "movements";
   placeholder?: string;
+  /**
+   * Ignore the viewer's own modality preferences.
+   *
+   * True wherever the picker is used on somebody else's behalf — a coach
+   * prescribing for a member should see the whole catalogue, because what the
+   * coach happens to do on a Tuesday has nothing to do with it.
+   */
+  ignoreModalities?: boolean;
 }) {
   const { data, isLoading } = useCatalogue();
+  const { data: prefs } = useModalities();
+  const modalities = prefs?.modalities ?? null;
   const [q, setQ] = useState("");
   const [group, setGroup] = useState<string | null>(null);
   const [category, setCategory] = useState<string | null>(null);
@@ -132,11 +149,31 @@ export function MovementPicker({
 
   const query = q.trim().toLowerCase();
 
+  /**
+   * ── What they said they do ────────────────────────────────────────────
+   *
+   * Applied to the browse and never to the search. Somebody who did not tick
+   * "Pilates" and then types "reformer" wants the reformer, not an empty list
+   * and a lesson about their preferences — a filter that hides what you asked
+   * for by name is the one thing this must never do.
+   *
+   * It also steps aside the moment a group or category chip is tapped, because
+   * tapping "Studio" is itself a statement that you want to see the studio.
+   */
+  const preferred = useMemo(() => {
+    if (ignoreModalities) return null;
+    const chosen = modalities ?? [];
+    return chosen.length ? categoriesForModalities(chosen) : null;
+  }, [modalities, ignoreModalities]);
+
+  const narrowed = !query && !activeGroup && !category && preferred !== null;
+
   const results = useMemo(() => {
     const scored: { row: Indexed; r: number }[] = [];
     for (const row of indexed) {
       if (category && row.category !== category) continue;
       if (!category && activeGroup && GROUP_OF.get(row.category) !== activeGroup) continue;
+      if (narrowed && !preferred!.has(row.category) && !row.ownerUserId) continue;
       const r = rank(row, query);
       if (r < 0) continue;
       scored.push({ row, r });
@@ -144,7 +181,7 @@ export function MovementPicker({
     scored.sort((a, b) => a.r - b.r || a.row.name.length - b.row.name.length);
     // Nobody scrolls past this many; the rest are reachable by typing more.
     return scored.slice(0, 80).map((s) => s.row);
-  }, [indexed, query, activeGroup, category]);
+  }, [indexed, query, activeGroup, category, narrowed, preferred]);
 
   /** Categories worth showing: only those with something in them right now. */
   const categoriesInGroup = useMemo(() => {
@@ -281,6 +318,23 @@ export function MovementPicker({
           </ul>
         )}
       </div>
+
+      {/* Said out loud, with the way out next to it. A filtered list that does
+          not admit it is filtered is how somebody concludes the catalogue is
+          missing half of what they do. */}
+      {narrowed && (
+        <p className="shrink-0 text-[11px] text-muted-foreground">
+          Showing what you said you do.{" "}
+          <button
+            onClick={() => setGroup(EXERCISE_GROUPS[0].id)}
+            className="underline underline-offset-2 hover:text-foreground"
+            data-testid="movement-show-all"
+          >
+            Browse everything
+          </button>{" "}
+          — or just search for it.
+        </p>
+      )}
 
       {/* Always reachable, not only when a search comes up empty — somebody who
           knows the catalogue lacks their machine should not have to search for

@@ -159,7 +159,15 @@ export function BuildTab() {
   });
 
   const finish = useMutation({
-    mutationFn: async () => apiRequest("POST", `/api/training/sessions/${sessionId}/finish`, {}),
+    // Shared, and not optionally.
+    //
+    // This sent `{}`, so `shareWithCoach` was undefined and a prescribed
+    // session never reached the coach — while a member's own ad-hoc session
+    // and logged practices share by default. The coach was seeing everything
+    // except the work they themselves wrote, which is exactly backwards: the
+    // whole point of prescribing a session is finding out what happened in it.
+    mutationFn: async () =>
+      apiRequest("POST", `/api/training/sessions/${sessionId}/finish`, { shareWithCoach: true }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/training/today"] });
       setSessionId(null);

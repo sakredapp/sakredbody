@@ -1,10 +1,3 @@
-import {
-  EXERCISE_CATEGORIES,
-  EXERCISE_GROUPS,
-  MOVEMENT_PATTERNS,
-  EQUIPMENT,
-  isPracticeCategory,
-} from "@shared/schema";
 /**
  * Admin — Build.
  *
@@ -30,6 +23,13 @@ import {
  * at RPE 7" is a real prescription that does not reduce to a number.
  */
 
+import {
+  EXERCISE_CATEGORIES,
+  EXERCISE_GROUPS,
+  MOVEMENT_PATTERNS,
+  EQUIPMENT,
+  isPracticeCategory,
+} from "@shared/schema";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -522,6 +522,7 @@ function Prescription({ habitId }: { habitId: string }) {
           </DialogHeader>
           <div className="flex-1 min-h-0 flex flex-col">
             <MovementPicker
+              ignoreModalities
               picked={already}
               placeholder="Search the whole catalogue…"
               onPick={(m) => {

@@ -27,8 +27,12 @@ import {
   exercises,
   memberWorkouts,
   memberWorkoutExercises,
+  memberBuildProfile,
   exerciseCategoryEnum,
+  modalitiesSchema,
+  BUILD_MODALITIES,
 } from "../../shared/schema.js";
+import { track } from "../telemetry/index.js";
 import { catalogueRows, slug, arrayLiteral } from "../../shared/data/exerciseCatalogue.js";
 
 function fail(res: Response, err: unknown) {
@@ -335,6 +339,57 @@ export function registerMemberWorkoutRoutes(app: Express): void {
         sql`select count(*)::text as count from exercises where owner_user_id is null`,
       );
       res.json({ synced: rows.length, catalogue: Number(counted.rows[0]?.count ?? 0) });
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
+  // ─── What kinds of movement are part of your life ─────────────────────────
+
+  /**
+   * Null modalities is "never asked"; an empty array is "asked, chose nothing".
+   * The client needs to tell those apart — the first is a question worth
+   * putting on screen, the second is a question already declined.
+   */
+  app.get("/api/training/modalities", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      const [row] = await db
+        .select()
+        .from(memberBuildProfile)
+        .where(eq(memberBuildProfile.userId, userId));
+      res.json({ modalities: row?.modalities ?? null });
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
+  app.put("/api/training/modalities", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      const input = modalitiesSchema.parse(req.body ?? {});
+
+      // Anything not on the list is dropped rather than rejected: this is a
+      // preference, and a stale client sending a modality that has since been
+      // renamed should not be unable to save the rest of its answer.
+      const known = new Set(BUILD_MODALITIES.map((m) => m.id as string));
+      const modalities = input.modalities.filter((m) => known.has(m));
+
+      const [row] = await db
+        .insert(memberBuildProfile)
+        .values({ userId, modalities, updatedAt: new Date() })
+        .onConflictDoUpdate({
+          target: memberBuildProfile.userId,
+          set: { modalities, updatedAt: new Date() },
+        })
+        .returning();
+
+      track("training.modalities", {
+        userId,
+        surface: "build",
+        props: { count: modalities.length, chosen: modalities },
+      });
+      res.json({ modalities: row.modalities ?? [] });
     } catch (err) {
       fail(res, err);
     }

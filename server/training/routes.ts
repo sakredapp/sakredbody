@@ -534,12 +534,16 @@ export function registerTrainingRoutes(app: Express) {
 
       const [row] = await db
         .update(workoutSessions)
+        // Only what was actually sent. The rule was already applied to `title`
+        // one line down, with the reason written out — a finish call that
+        // omits a field must not blank it — and the other two were left as
+        // `?? null` anyway, which is the same bug wearing a different name.
         .set({
           finishedAt: new Date(),
-          durationMinutes: input.durationMinutes ?? null,
-          note: input.note ?? null,
-          // Only when one was sent: a prescribed session already has its title
-          // and must not be blanked by a finish call that omits it.
+          ...(input.durationMinutes !== undefined
+            ? { durationMinutes: input.durationMinutes }
+            : {}),
+          ...(input.note !== undefined ? { note: input.note } : {}),
           ...(input.title !== undefined ? { title: input.title } : {}),
         })
         .where(and(eq(workoutSessions.id, param(req, "id")), eq(workoutSessions.userId, userId)))
