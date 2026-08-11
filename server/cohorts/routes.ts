@@ -34,6 +34,7 @@ import {
   COHORT_SEAT_TAKEN,
   type CohortMember,
 } from "../../shared/models/cohorts.js";
+import { EMPHASES } from "../../shared/models/terrain.js";
 import { users } from "../../shared/models/auth.js";
 import { isAuthenticated } from "../auth/sessionAuth.js";
 import { isAdmin } from "../routes.js";
@@ -47,6 +48,8 @@ const cohortSchema = z.object({
   startDate: z.string().trim().max(30).nullable().optional(),
   endDate: z.string().trim().max(30).nullable().optional(),
   format: z.enum(COHORT_FORMATS).default("hybrid"),
+  /** Direction this cohort runs to. Orthogonal to kind and format. */
+  emphasis: z.enum(EMPHASES).nullable().optional(),
   location: z.string().trim().max(200).nullable().optional(),
   capacity: z.number().int().min(1).max(500).default(12),
   /** Cents. See the note on the column in shared/models/cohorts.ts. */

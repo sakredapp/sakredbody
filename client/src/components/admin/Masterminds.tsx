@@ -16,6 +16,7 @@ import {
   COHORT_STATUSES,
   COHORT_MEMBER_STATUSES,
 } from "@shared/models/cohorts";
+import { EMPHASES, EMPHASIS_META } from "@shared/models/terrain";
 
 /**
  * Masterminds.
@@ -38,6 +39,7 @@ interface Cohort {
   startDate: string | null;
   endDate: string | null;
   format: string;
+  emphasis: "yin" | "yang" | null;
   location: string | null;
   capacity: number;
   priceCents: number | null;
@@ -78,6 +80,7 @@ const BLANK: {
   name: string;
   kind: string;
   format: string;
+  emphasis: "yin" | "yang" | null;
   status: string;
   capacity: number;
   startDate: string;
@@ -89,6 +92,7 @@ const BLANK: {
   name: "",
   kind: "mastermind",
   format: "hybrid",
+  emphasis: null,
   status: "draft",
   capacity: 12,
   startDate: "",
@@ -331,6 +335,11 @@ export function MastermindsAdmin({ enabled }: { enabled: boolean }) {
                       <Badge variant="outline" className={cn("text-[10px] capitalize", STATUS_STYLES[c.status])}>
                         {c.status}
                       </Badge>
+                      {c.emphasis && (
+                        <Badge variant="outline" className="text-[10px]">
+                          {EMPHASIS_META[c.emphasis].label}
+                        </Badge>
+                      )}
                       {c.pendingApplications > 0 && (
                         <Badge variant="outline" className="text-[10px] border-gold/50 text-gold">
                           {c.pendingApplications} to review
@@ -633,6 +642,25 @@ function Settings({
             <SelectContent>
               {COHORT_FORMATS.map((f) => (
                 <SelectItem key={f} value={f}>{FORMAT_LABELS[f]}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+        {/* Direction. Orthogonal to Kind and Format — a Yin mastermind and a
+            Yang mastermind are both masterminds — so it sits beside them
+            rather than replacing either. */}
+        <Field label="Direction" hint="Leave balanced if it isn't themed">
+          <Select
+            value={cohort.emphasis ?? "none"}
+            onValueChange={(v) => onSave({ emphasis: v === "none" ? null : v })}
+          >
+            <SelectTrigger data-testid={`select-cohort-emphasis-${cohort.id}`}><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Balanced</SelectItem>
+              {EMPHASES.map((e) => (
+                <SelectItem key={e} value={e}>
+                  {EMPHASIS_META[e].label} — {EMPHASIS_META[e].blurb}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>

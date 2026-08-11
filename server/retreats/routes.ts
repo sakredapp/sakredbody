@@ -14,6 +14,7 @@
 
 import type { Express, Request, Response } from "express";
 import { z } from "zod";
+import { EMPHASES } from "../../shared/models/terrain.js";
 import { isAuthenticated } from "../auth/sessionAuth.js";
 import { isAdmin } from "../routes.js";
 import { storage } from "../storage.js";
@@ -31,6 +32,8 @@ const retreatSchema = z.object({
   startDate: z.string().trim().min(1, "Start date is required").max(60),
   endDate: z.string().trim().min(1, "End date is required").max(60),
   capacity: z.number().int().min(1).max(200).default(12),
+  /** Direction this retreat runs to. Null = balanced / not themed. */
+  emphasis: z.enum(EMPHASES).nullable().optional(),
   imageUrl: z.string().trim().max(500).nullable().optional(),
   active: z.boolean().default(true),
 });

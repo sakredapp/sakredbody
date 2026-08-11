@@ -10,6 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { EMPHASES, EMPHASIS_META } from "@shared/models/terrain";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 /**
  * Retreats, and the properties inside them.
@@ -33,6 +35,7 @@ interface Retreat {
   endDate: string;
   capacity: number;
   imageUrl: string | null;
+  emphasis: "yin" | "yang" | null;
   active: boolean;
 }
 
@@ -59,6 +62,7 @@ const BLANK_RETREAT = {
   endDate: "",
   capacity: 12,
   imageUrl: "",
+  emphasis: null as "yin" | "yang" | null,
   active: false,
 };
 
@@ -322,6 +326,11 @@ export function RetreatsAdmin({ enabled }: { enabled: boolean }) {
                       >
                         {r.active ? "live" : "draft"}
                       </Badge>
+                      {r.emphasis && (
+                        <Badge variant="outline" className="text-[10px]">
+                          {EMPHASIS_META[r.emphasis].label}
+                        </Badge>
+                      )}
                       {props.length > 0 && (
                         <Badge variant="outline" className="text-[10px] text-muted-foreground">
                           {props.length} {props.length === 1 ? "property" : "properties"}
@@ -385,6 +394,32 @@ export function RetreatsAdmin({ enabled }: { enabled: boolean }) {
                             updateRetreat.mutate({ id: r.id, capacity: Number(e.target.value) || 0 })
                           }
                         />
+                      </Field>
+                      {/* Direction. A retreat that runs to one is the whole
+                          reason the field exists; leaving it unset is a real
+                          answer, not a missing one. */}
+                      <Field label="Direction" hint="Leave balanced if it isn't themed">
+                        <Select
+                          value={r.emphasis ?? "none"}
+                          onValueChange={(v) =>
+                            updateRetreat.mutate({
+                              id: r.id,
+                              emphasis: v === "none" ? null : (v as "yin" | "yang"),
+                            })
+                          }
+                        >
+                          <SelectTrigger data-testid={`select-emphasis-${r.id}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Balanced</SelectItem>
+                            {EMPHASES.map((e) => (
+                              <SelectItem key={e} value={e}>
+                                {EMPHASIS_META[e].label} — {EMPHASIS_META[e].blurb}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </Field>
                       <Field label="Image URL">
                         <Input
