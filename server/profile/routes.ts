@@ -121,7 +121,13 @@ export function registerProfileRoutes(app: Express): void {
       // itself is the version.
       res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
       res.setHeader("Content-Type", row.mime);
-      res.send(row.bytes);
+
+      // Normalised rather than trusted. Postgres drivers disagree about
+      // whether bytea comes back as a Buffer or a Uint8Array, and `res.send`
+      // JSON-encodes the second one — which serves a photo as a few hundred
+      // kilobytes of `{"0":255,"1":216,…}` with an image content type on it.
+      const bytes = row.bytes as unknown;
+      res.send(Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes as Uint8Array));
     } catch (err) {
       trackError("profile.photoServe", err);
       res.status(500).end();
