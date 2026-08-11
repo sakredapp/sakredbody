@@ -5,7 +5,7 @@ import { hash01, mountStage } from "@/lib/canvasStage";
 /**
  * Four territories drawn as one figure.
  *
- * Restore, Build, Embody and Gather are four stations of a single sequence, so
+ * Restore, Build and Gather are three stations of a single sequence, so
  * a field that links them is a truer picture than four cards in a row. Points
  * drift on their own paths; a line strikes between any two that come close
  * enough and brightens as they near.

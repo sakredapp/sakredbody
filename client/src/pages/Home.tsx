@@ -141,8 +141,8 @@ const FOOD_SAMPLES = [
 
 export default function Home() {
   usePageMeta(
-    "Sakred Body — Restore the Body. Build the Body. Embody the Life.",
-    "Human capacity, not wellness. Restore the terrain, build real strength, embody the practice, and gather with people who hold the same standard.",
+    "Sakred Body — Restore the Body. Build the Body. Live the Life.",
+    "Human capacity, not wellness. Yin clears and restores, Yang loads and builds — and the skill is knowing which one you need. Gather with people who hold the same standard.",
   );
 
   return (
@@ -222,14 +222,22 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── The Four Territories ─────────────────────────── */}
+      {/* ── The two directions ───────────────────────────────
+          This counted territories — "Four Territories", then briefly three.
+          Counting was never the message: a number tells a visitor how much
+          there is to learn, not what any of it is. The body has two
+          directions and the skill is knowing which one you're in. Gather is
+          the third card because it is where both get practised, not because
+          it is a third direction. */}
       <Section id="territories" tone="ink" className="overflow-hidden pt-16 md:pt-24">
         <Constellation className="absolute inset-0 w-full h-full z-0 opacity-90" />
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
               eyebrow="The Architecture"
-              title={<><span className="text-gold">Three Territories.</span></>}
+              title={<>The body has <span className="text-gold">two directions.</span></>}
+              intro="Yin clears and restores. Yang loads and builds. Health is not one or the other — it's the judgement to know which one you need right now, and a terrain able to do both."
+              onInk
               testId="text-territories-headline"
             />
           </motion.div>
@@ -249,7 +257,7 @@ export default function Home() {
                     data-testid={`card-territory-${t.key}`}
                   >
                     <GemStone
-                      stone={TERRITORY_STONES[t.key] ?? TERRITORY_STONES.embody}
+                      stone={TERRITORY_STONES[t.key] ?? TERRITORY_STONES.restore}
                       spinRate={0.2}
                       className="h-20 w-20 mx-auto mb-2"
                     />
@@ -297,32 +305,6 @@ export default function Home() {
             <LessonSlideshow lessons={LESSONS} />
           </motion.div>
         </motion.div>
-      </Section>
-
-      {/* ── Five Elements ────────────────────────────────────── */}
-      <Section id="elements" tone="ink" className="py-12 md:py-16 overflow-hidden">
-        <StarDust className="absolute inset-0 w-full h-full z-0" density={0.7} />
-        <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
-          <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-8">
-            <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
-              Eastern Traditional Medicine
-            </p>
-            <h2 className="text-4xl md:text-5xl font-display font-normal mb-6 tracking-tight leading-[1.08]" data-testid="text-elements-headline">
-              The Body, <span className="text-gold">The Way Tradition Reads It</span>
-            </h2>
-            <p className="text-muted-foreground leading-relaxed">
-              Traditional Chinese Medicine organizes the body into five elements — each with its own organs,
-              its own season, and its own way of going wrong. It's a map refined over two thousand years, and
-              it keeps lining up with what modern research rediscovers a piece at a time. We built our
-              protocols on it.
-            </p>
-          </motion.div>
-
-          <motion.div variants={fadeInUp}>
-            <ElementOrbit elements={ELEMENTS} />
-          </motion.div>
-
-       </motion.div>
       </Section>
 
       {/* ── The Member Portal ────────────────────────────────── */}
@@ -419,6 +401,45 @@ export default function Home() {
         </motion.div>
       </Section>
 
+
+      {/* ── Five Elements ─────────────────────────────────────
+          Deliberately this far down.
+
+          It used to sit third, directly under the two directions — which
+          meant the second idea a visitor met was Wood / Fire / Earth / Metal
+          / Water and five organ pairs. That reads as a syllabus: something
+          you have to learn before you are allowed to understand the rest,
+          and it is the single heaviest thing on the page.
+
+          Yin and Yang are the simplification of exactly this material, and
+          they now carry the top of the page on their own. By the time anyone
+          reaches here they already have the model, so the elements land as
+          what they are — the older, more precise version underneath, and the
+          evidence that the simple version came from somewhere. */}
+      <Section id="elements" tone="ink" className="py-12 md:py-16 overflow-hidden">
+        <StarDust className="absolute inset-0 w-full h-full z-0" density={0.7} />
+        <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
+          <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-8">
+            <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">
+              Eastern Traditional Medicine
+            </p>
+            <h2 className="text-4xl md:text-5xl font-display font-normal mb-6 tracking-tight leading-[1.08]" data-testid="text-elements-headline">
+              The Body, <span className="text-gold">The Way Tradition Reads It</span>
+            </h2>
+            <p className="text-muted-foreground leading-relaxed">
+              Traditional Chinese Medicine organizes the body into five elements — each with its own organs,
+              its own season, and its own way of going wrong. It's a map refined over two thousand years, and
+              it keeps lining up with what modern research rediscovers a piece at a time. We built our
+              protocols on it.
+            </p>
+          </motion.div>
+
+          <motion.div variants={fadeInUp}>
+            <ElementOrbit elements={ELEMENTS} />
+          </motion.div>
+
+       </motion.div>
+      </Section>
 
       {/* ── Mastermind teaser ────────────────────────────────── */}
       <Section tone="ink" className="overflow-hidden">

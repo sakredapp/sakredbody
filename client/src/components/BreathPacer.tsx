@@ -6,7 +6,7 @@ import { mountStage } from "@/lib/canvasStage";
  * The site's clock, made visible — and usable.
  *
  * Concentric rings expand on a four-count inhale and contract on a six-count
- * exhale, with the seconds printed in the middle. Embody is the daily-practice
+ * exhale, with the seconds printed in the middle. Body Literacy is the daily-practice
  * page, and a pacer that actually paces a breath is the most on-brand object
  * the site can carry: useful rather than ornamental, and it states out loud the
  * rhythm every other animation here is already following.

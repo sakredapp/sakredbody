@@ -36,7 +36,7 @@ const DEFINITION = [
 export default function Philosophy() {
   usePageMeta(
     "What Is a Sakred Body? — The Philosophy | Sakred Body",
-    "Restore, Build, Embody, Gather. The philosophy behind Sakred Body: human capacity, the terrain, the capacity model, and the loop that runs underneath all of it.",
+    "Restore, Build, Gather. The philosophy behind Sakred Body: human capacity, the terrain, Yin and Yang, the capacity model, and the loop that runs underneath all of it.",
   );
 
   return (
