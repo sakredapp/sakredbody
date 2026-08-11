@@ -389,8 +389,14 @@ export interface NoteContext {
     /** prepare | clear | rebuild, inferred from position. */
     phase: string;
   } | null;
-  /** The energy centre their protocol works, or the season's. */
+  /** The energy centre in focus. */
   centre?: { id: string; name: string; aspect: string | null } | null;
+  /**
+   * Where that centre came from. The two are not the same claim: "you marked
+   * this" is about them, "it is late summer" is about the calendar, and a note
+   * that blurs them sounds like it knows something it does not.
+   */
+  centreSource?: "reading" | "season";
   /** What they wrote as their own intention, if they've set one. */
   intention?: string | null;
   /** Their last few days' completion, so the note can notice. */
@@ -567,7 +573,13 @@ export function buildUserPrompt(ctx: NoteContext): string {
     lines.push("No protocol running.");
   }
   if (ctx.centre) {
-    lines.push(`Energy centre in focus: ${ctx.centre.name}${ctx.centre.aspect ? ` — ${ctx.centre.aspect}` : ""}.`);
+    lines.push(
+      `Energy centre in focus: ${ctx.centre.name}${ctx.centre.aspect ? ` — ${ctx.centre.aspect}` : ""}` +
+        (ctx.centreSource === "reading"
+          ? " — because they marked it themselves. You may refer to that."
+          : " — seasonal context only. They have not marked anything, so do not imply they told you this.") +
+        ".",
+    );
   }
   if (ctx.recentCompletion && ctx.recentCompletion.total > 0) {
     lines.push(

@@ -15,7 +15,7 @@
  */
 
 import { db } from "../db.js";
-import { eq, and, gte, sql, count } from "drizzle-orm";
+import { eq, and, gte, sql, count, desc, inArray } from "drizzle-orm";
 import {
   dailyNotes,
   dailyIntentions,
@@ -24,6 +24,7 @@ import {
   userRoutines,
   wellnessRoutines,
   energyCentres,
+  userCentreReadings,
   habits,
   type DailyNote,
 } from "../../shared/schema.js";
@@ -121,10 +122,48 @@ export async function buildContext(userId: string, onDate: string): Promise<Note
     }
   }
 
-  // The centre in focus: the season's, since protocol↔centre links are content
-  // the admin sets and may not exist yet.
-  const [y, m, d] = onDate.split("-").map(Number);
-  centreId = elementalSeason(new Date(Date.UTC(y, m - 1, d, 12))).centreId;
+  /**
+   * The centre in focus — the member's own reading first, the season only if
+   * they have not given one.
+   *
+   * This used to be the season and nothing else: the date mapped to a Chinese
+   * five-phase element, and that element's centre became what the day was
+   * about. It reads as thoughtful and it is the wrong way round. A calendar
+   * cannot know anything about this person, and letting one tradition's
+   * seasonal map *select* the subject makes it the master ontology of the
+   * product rather than one of the lenses it draws on.
+   *
+   * So: if somebody has marked a centre blocked or stirring, that is what the
+   * day is about, because they said so. An open centre is not a focus — it is
+   * the absence of one — so those are skipped rather than treated as a signal.
+   * Only when there is no reading at all does the season choose, and then it
+   * is a starting point rather than a verdict.
+   *
+   * `centreSource` travels with it so the writing layer can tell the two
+   * apart. "You flagged this last week" and "it is late summer" are not the
+   * same claim, and a note that mixes them up sounds like it knows something
+   * it does not.
+   */
+  const [reading] = await db
+    .select({ centreId: userCentreReadings.centreId })
+    .from(userCentreReadings)
+    .where(
+      and(
+        eq(userCentreReadings.userId, userId),
+        inArray(userCentreReadings.state, ["blocked", "stirring"]),
+      ),
+    )
+    .orderBy(desc(userCentreReadings.recordedAt))
+    .limit(1);
+
+  let centreSource: "reading" | "season" = "reading";
+  if (reading?.centreId) {
+    centreId = reading.centreId;
+  } else {
+    const [y, m, d] = onDate.split("-").map(Number);
+    centreId = elementalSeason(new Date(Date.UTC(y, m - 1, d, 12))).centreId;
+    centreSource = "season";
+  }
 
   let centre: NoteContext["centre"] = null;
   if (centreId) {
@@ -171,6 +210,7 @@ export async function buildContext(userId: string, onDate: string): Promise<Note
     polarity: chart?.polarity ?? null,
     protocol,
     centre,
+    centreSource,
     intention: intention?.intention ?? null,
     recentCompletion:
       recent && Number(recent.total) > 0
