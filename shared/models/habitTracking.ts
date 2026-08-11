@@ -35,6 +35,8 @@ export const TRACKING_TYPES = [
   { id: "servings", label: "Servings", unit: null, decimals: 0 },
   { id: "rating", label: "Rating out of 10", unit: "/10", decimals: 0 },
   { id: "time-of-day", label: "Time of day", unit: null, decimals: 0 },
+  { id: "calories", label: "Calories", unit: "kcal", decimals: 0 },
+  { id: "meals", label: "Meals", unit: null, decimals: 0 },
 ] as const;
 
 export type TrackingType = (typeof TRACKING_TYPES)[number]["id"];
@@ -78,7 +80,20 @@ export function autoTrackEligible(healthMetric: string | null | undefined): bool
   return Boolean(healthMetric);
 }
 
-export const POLARITY_STRENGTHS = ["strong", "contextual"] as const;
+/**
+ * How settled a habit's direction is.
+ *
+ *   strong      sleep is Yin, a protein target is Yang. No argument.
+ *   moderate    easy walking leans Yin, a brisk hill walk leans Yang — true
+ *               enough to show, not firm enough to weigh heavily.
+ *   contextual  sauna, fasting, breathwork. Fasting sounds clearing and is a
+ *               substantial stressor; sauna is demand now and recovery later.
+ *
+ * Three rather than two because the middle case is real and common, and
+ * collapsing it into "strong" is how the model starts overstating what a
+ * gentle walk proves about somebody's week.
+ */
+export const POLARITY_STRENGTHS = ["strong", "moderate", "contextual"] as const;
 export type PolarityStrength = (typeof POLARITY_STRENGTHS)[number];
 
 /**
@@ -92,6 +107,20 @@ export type PolarityStrength = (typeof POLARITY_STRENGTHS)[number];
  */
 export function countsTowardLean(polarityStrength: string): boolean {
   return polarityStrength !== "contextual";
+}
+
+/**
+ * How much a habit weighs in the terrain reading.
+ *
+ * Contextual habits are shown and not counted; moderate ones count for half,
+ * because "she walked" is evidence and it is not the same evidence as "she
+ * squatted". A single weight for everything is what makes a polarity model
+ * sound confident about a day it has misread.
+ */
+export function leanWeight(polarityStrength: string): number {
+  if (polarityStrength === "contextual") return 0;
+  if (polarityStrength === "moderate") return 0.5;
+  return 1;
 }
 
 /**

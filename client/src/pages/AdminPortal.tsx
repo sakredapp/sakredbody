@@ -554,8 +554,9 @@ function HabitFormDialog({
               <Select value={form.polarityStrength} onValueChange={(v) => set("polarityStrength", v)}>
                 <SelectTrigger data-testid="select-habit-polarityStrength"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="strong">Settled — counts toward the reading</SelectItem>
-                  <SelectItem value="contextual">Contextual — depends on the day</SelectItem>
+                  <SelectItem value="strong">Settled — counts fully</SelectItem>
+                  <SelectItem value="moderate">Leans that way — counts half</SelectItem>
+                  <SelectItem value="contextual">Contextual — shown, not counted</SelectItem>
                 </SelectContent>
               </Select>
             </div>
