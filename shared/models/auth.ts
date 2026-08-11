@@ -31,6 +31,21 @@ export const users = pgTable("users", {
   isAdmin: varchar("is_admin").default("false"),
   /** 'member' | 'coach' | 'moderator' | 'admin' | 'owner' — see access.ts. */
   role: varchar("role").notNull().default("member"),
+  /**
+   * 'male' | 'female', or null when the member has not answered.
+   *
+   * Here rather than in user_cosmology because it is physiology, not birth
+   * data: several readings mean different things by it, resting heart rate and
+   * HRV baselines most of all, and reading those without it means comparing a
+   * member to a population that may not include them.
+   *
+   * Nullable with no default, and that is the whole point. Everyone who signed
+   * up before this column existed genuinely has not answered, and defaulting
+   * them to either value would be inventing a fact about a person — the same
+   * rule health_days follows for a day nobody wore a watch. Code that reads
+   * this must handle null rather than assume.
+   */
+  sex: varchar("sex"),
   // IANA zone, e.g. "America/Los_Angeles". The server has no other way to know
   // when this member's day starts, and every habit is scheduled by calendar
   // date — get this wrong and completions land on the wrong day.

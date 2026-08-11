@@ -260,6 +260,51 @@ import HealthKit
         let value: Double
     }
 
+    /// A stretch of wall-clock time a source claims the member was in some state.
+    private struct Span {
+        let start: Date
+        let end: Date
+    }
+
+    /**
+     Total minutes covered by these spans, counting overlaps once.
+
+     HealthKit hands back every source separately. A member wearing a watch and
+     running a sleep-tracking app gets the same night reported twice, a member
+     who also has a ring gets it three times, and summing the durations turns
+     one eight-hour night into sixteen or nineteen hours. That is not a display
+     problem — the wrong number reaches the database and everything downstream
+     reasons from it.
+
+     So the question is never "how much sleep was reported" but "how much of the
+     clock was covered", which is the union of the intervals. Two sources
+     agreeing about the same 3am add nothing to each other, which is the whole
+     point: agreement is not extra sleep.
+
+     Sort by start, then walk once, extending the open span while the next one
+     begins before the current one ends.
+     */
+    private static func unionedMinutes(_ spans: [Span]) -> Double {
+        guard !spans.isEmpty else { return 0 }
+        let sorted = spans.sorted { $0.start < $1.start }
+        var total: Double = 0
+        var openStart = sorted[0].start
+        var openEnd = sorted[0].end
+
+        for span in sorted.dropFirst() {
+            if span.start > openEnd {
+                total += openEnd.timeIntervalSince(openStart)
+                openStart = span.start
+                openEnd = span.end
+            } else if span.end > openEnd {
+                // Overlapping or touching — absorb it rather than add it.
+                openEnd = span.end
+            }
+        }
+        total += openEnd.timeIntervalSince(openStart)
+        return total / 60
+    }
+
     private struct WorkoutRow {
         let externalId: String
         let workoutType: String
@@ -378,42 +423,50 @@ import HealthKit
                 return
             }
 
-            var totals: [String: [String: Double]] = [:]
+            // Intervals, not durations — see `unionedMinutes`. A member with a
+            // watch *and* a sleep app has every minute reported twice, and
+            // adding those durations is how a normal night becomes 16h31m.
+            var spans: [String: [String: [Span]]] = [:]
+            func record(_ date: String, _ metric: String, _ sample: HKCategorySample) {
+                spans[date, default: [:]][metric, default: []]
+                    .append(Span(start: sample.startDate, end: sample.endDate))
+            }
+
             for sample in results {
-                let minutes = sample.endDate.timeIntervalSince(sample.startDate) / 60
-                guard minutes > 0 else { continue }
+                guard sample.endDate > sample.startDate else { continue }
                 let date = Self.localDate(sample.endDate)
-                var day = totals[date] ?? [:]
 
                 if #available(iOS 16.0, *) {
                     switch sample.value {
                     case HKCategoryValueSleepAnalysis.asleepDeep.rawValue:
-                        day["sleepMinutes", default: 0] += minutes
-                        day["sleepDeepMinutes", default: 0] += minutes
+                        record(date, "sleepMinutes", sample)
+                        record(date, "sleepDeepMinutes", sample)
                     case HKCategoryValueSleepAnalysis.asleepREM.rawValue:
-                        day["sleepMinutes", default: 0] += minutes
-                        day["sleepRemMinutes", default: 0] += minutes
+                        record(date, "sleepMinutes", sample)
+                        record(date, "sleepRemMinutes", sample)
                     case HKCategoryValueSleepAnalysis.asleepCore.rawValue,
                          HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue:
-                        day["sleepMinutes", default: 0] += minutes
+                        record(date, "sleepMinutes", sample)
                     case HKCategoryValueSleepAnalysis.awake.rawValue:
-                        day["sleepAwakeMinutes", default: 0] += minutes
+                        record(date, "sleepAwakeMinutes", sample)
                     default:
                         break // inBed
                     }
                 } else {
                     // Before iOS 16 there are no stages: asleep or in bed.
                     if sample.value == HKCategoryValueSleepAnalysis.asleep.rawValue {
-                        day["sleepMinutes", default: 0] += minutes
+                        record(date, "sleepMinutes", sample)
                     }
                 }
-                totals[date] = day
             }
 
             var out: [Sample] = []
-            for (date, metrics) in totals {
-                for (metric, value) in metrics {
-                    out.append(Sample(onDate: date, metric: metric, value: (value * 100).rounded() / 100))
+            for (date, metrics) in spans {
+                for (metric, intervals) in metrics {
+                    let minutes = Self.unionedMinutes(intervals)
+                    guard minutes > 0 else { continue }
+                    out.append(Sample(onDate: date, metric: metric,
+                                      value: (minutes * 100).rounded() / 100))
                 }
             }
             completion(out)

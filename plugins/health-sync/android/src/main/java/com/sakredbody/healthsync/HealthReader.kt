@@ -170,48 +170,88 @@ class HealthReader(private val context: Context) {
      */
     private suspend fun sleep(client: HealthConnectClient, start: Instant, end: Instant): List<Sample> {
         val sessions = read(client, SleepSessionRecord::class, start, end)
-        val totals = HashMap<String, HashMap<String, Double>>()
 
-        fun add(date: String, metric: String, minutes: Double) {
-            if (minutes <= 0 || !minutes.isFinite()) return
-            val day = totals.getOrPut(date) { HashMap() }
-            day[metric] = (day[metric] ?: 0.0) + minutes
+        // Intervals rather than durations — see `unionedMinutes`. Health
+        // Connect returns every writing app's copy of the same night, so
+        // adding the durations multiplies a member's sleep by however many
+        // apps they happen to have installed.
+        val spans = HashMap<String, HashMap<String, MutableList<Span>>>()
+
+        fun record(date: String, metric: String, from: Instant, to: Instant) {
+            if (!to.isAfter(from)) return
+            spans.getOrPut(date) { HashMap() }
+                .getOrPut(metric) { mutableListOf() }
+                .add(Span(from, to))
         }
 
         for (session in sessions) {
             val date = localDate(session.endTime)
             if (session.stages.isNotEmpty()) {
                 for (stage in session.stages) {
-                    val minutes = (stage.endTime.epochSecond - stage.startTime.epochSecond) / 60.0
                     when (stage.stage) {
                         SleepSessionRecord.STAGE_TYPE_DEEP -> {
-                            add(date, "sleepMinutes", minutes)
-                            add(date, "sleepDeepMinutes", minutes)
+                            record(date, "sleepMinutes", stage.startTime, stage.endTime)
+                            record(date, "sleepDeepMinutes", stage.startTime, stage.endTime)
                         }
                         SleepSessionRecord.STAGE_TYPE_REM -> {
-                            add(date, "sleepMinutes", minutes)
-                            add(date, "sleepRemMinutes", minutes)
+                            record(date, "sleepMinutes", stage.startTime, stage.endTime)
+                            record(date, "sleepRemMinutes", stage.startTime, stage.endTime)
                         }
                         SleepSessionRecord.STAGE_TYPE_LIGHT,
-                        SleepSessionRecord.STAGE_TYPE_SLEEPING -> add(date, "sleepMinutes", minutes)
+                        SleepSessionRecord.STAGE_TYPE_SLEEPING ->
+                            record(date, "sleepMinutes", stage.startTime, stage.endTime)
                         SleepSessionRecord.STAGE_TYPE_AWAKE,
-                        SleepSessionRecord.STAGE_TYPE_AWAKE_IN_BED -> add(date, "sleepAwakeMinutes", minutes)
+                        SleepSessionRecord.STAGE_TYPE_AWAKE_IN_BED ->
+                            record(date, "sleepAwakeMinutes", stage.startTime, stage.endTime)
                         // OUT_OF_BED and UNKNOWN are neither sleep nor time
                         // awake in the session, so they are counted as neither.
                         else -> Unit
                     }
                 }
             } else {
-                val minutes = (session.endTime.epochSecond - session.startTime.epochSecond) / 60.0
-                add(date, "sleepMinutes", minutes)
+                record(date, "sleepMinutes", session.startTime, session.endTime)
             }
         }
 
-        return totals.flatMap { (date, metrics) ->
-            metrics.map { (metric, value) ->
-                Sample(date, metric, Math.round(value * 100.0) / 100.0)
+        return spans.flatMap { (date, metrics) ->
+            metrics.mapNotNull { (metric, intervals) ->
+                val minutes = unionedMinutes(intervals)
+                if (minutes <= 0) null
+                else Sample(date, metric, Math.round(minutes * 100.0) / 100.0)
             }
         }
+    }
+
+    /** A stretch of wall-clock time a source claims the member was in some state. */
+    private data class Span(val start: Instant, val end: Instant)
+
+    /**
+     * Total minutes covered by these spans, counting overlaps once.
+     *
+     * The question is never "how much sleep was reported" but "how much of the
+     * clock was covered". Two apps agreeing about the same 3am add nothing to
+     * each other — agreement is not extra sleep. Sort by start, walk once,
+     * extending the open span while the next begins before the current ends.
+     */
+    private fun unionedMinutes(spans: List<Span>): Double {
+        if (spans.isEmpty()) return 0.0
+        val sorted = spans.sortedBy { it.start }
+        var total = 0L
+        var openStart = sorted[0].start
+        var openEnd = sorted[0].end
+
+        for (span in sorted.drop(1)) {
+            if (span.start.isAfter(openEnd)) {
+                total += openEnd.epochSecond - openStart.epochSecond
+                openStart = span.start
+                openEnd = span.end
+            } else if (span.end.isAfter(openEnd)) {
+                // Overlapping or touching — absorb it rather than add it.
+                openEnd = span.end
+            }
+        }
+        total += openEnd.epochSecond - openStart.epochSecond
+        return total / 60.0
     }
 
     companion object {

@@ -195,6 +195,7 @@ export function Onboarding() {
       await apiRequest("PATCH", "/api/profile", {
         firstName: v.firstName.trim(),
         lastName: v.lastName.trim() || null,
+        sex: v.sex,
       });
       const res = await apiRequest("PUT", "/api/energy/cosmology", {
         birthName,
@@ -369,6 +370,7 @@ export function Onboarding() {
                 middleName: intakeInitial.middleName,
                 birthDate: intakeInitial.birthDate,
                 birthTime: intakeInitial.birthTime,
+                sex: (user?.sex as "male" | "female" | null) ?? null,
                 yOverrides: intakeInitial.yOverrides,
               }}
               saving={saveIntake.isPending}

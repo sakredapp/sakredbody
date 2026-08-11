@@ -51,6 +51,13 @@ const upload = multer({
 const nameSchema = z.object({
   firstName: z.string().trim().min(1, "First name is required").max(80),
   lastName: z.string().trim().max(80).optional().nullable(),
+  /**
+   * Optional in the payload and nullable in the column, which are two
+   * different things and both wanted: a caller that omits `sex` leaves it
+   * alone, and a caller that sends null clears it. Making it merely optional
+   * would give a member no way to take the answer back.
+   */
+  sex: z.enum(["male", "female"]).optional().nullable(),
 });
 
 export function registerProfileRoutes(app: Express): void {
@@ -124,6 +131,10 @@ export function registerProfileRoutes(app: Express): void {
         .set({
           firstName: input.firstName,
           lastName: input.lastName ?? null,
+          // Only written when the key is present. `undefined` means the
+          // caller said nothing about sex and the stored answer stands;
+          // an explicit null clears it. See the note on the schema.
+          ...(input.sex !== undefined ? { sex: input.sex } : {}),
           updatedAt: new Date(),
         })
         .where(eq(users.id, req.session!.userId!))

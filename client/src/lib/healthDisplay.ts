@@ -336,12 +336,26 @@ export const SWATCH_PRIORITY: HealthMetric[] = [
  *
  * Anything absent here simply never renders as a ring. That is the mechanism,
  * not an oversight — see planTiles.
+ *
+ * ── Why sleep is not here ─────────────────────────────────────────────────
+ *
+ * Everything above is something a member *does*: they walk, they train, they
+ * sit, they drink. Effort moves the number, so a ring filling up is a fair
+ * account of the day, and going past 100% is a real thing to have done.
+ *
+ * Sleep is not that. Nobody hits 150% of a sleep goal by trying harder — a
+ * night that reads well over target is either an unusual night or, far more
+ * often, a measurement artefact. We shipped exactly that: overlapping sources
+ * were being summed, and a normal night rendered as a triumphant 237%.
+ *
+ * A ring on a passive measurement turns every reading into a grade, and grades
+ * the one thing a member has least control over. Sleep renders as the number
+ * it is, with its trend beside it, and lets them draw the conclusion.
  */
 export const METRIC_TARGET: Partial<Record<HealthMetric, number>> = {
   steps: 10_000,
   exerciseMinutes: 30,
   activeCalories: 500,
-  sleepMinutes: 8 * 60,
   mindfulnessMinutes: 10,
   waterMl: 2500,
   flightsClimbed: 10,

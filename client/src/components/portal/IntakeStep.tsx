@@ -34,7 +34,6 @@
  */
 
 import { useMemo, useState } from "react";
-import { Sparkles } from "lucide-react";
 import { explainY } from "@shared/utils/almanac";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +45,14 @@ export type IntakeValues = {
   lastName: string;
   birthDate: string;
   birthTime: string;
+  /**
+   * Male or female, or null when not yet answered.
+   *
+   * Nullable because everyone who signed up before this field existed has no
+   * answer, and defaulting them to either one would be inventing data about a
+   * person — the same rule the health tables follow.
+   */
+  sex: "male" | "female" | null;
   /** Per-Y overrides, keyed `word:index`, when the member disagrees with us. */
   yOverrides: Record<string, boolean>;
 };
@@ -66,6 +73,7 @@ export function IntakeStep({
   const [lastName, setLastName] = useState(initial.lastName ?? "");
   const [birthDate, setBirthDate] = useState(initial.birthDate ?? "");
   const [birthTime, setBirthTime] = useState(initial.birthTime ?? "");
+  const [sex, setSex] = useState<"male" | "female" | null>(initial.sex ?? null);
   const [yOverrides, setYOverrides] = useState<Record<string, boolean>>(
     initial.yOverrides ?? {},
   );
@@ -152,12 +160,13 @@ export function IntakeStep({
             never see it at all. */}
         {ys.length > 0 && (
           <div className="rounded-xl border border-[hsl(var(--gold))]/20 bg-[hsl(var(--gold))]/[0.04] p-3 space-y-2">
-            <div className="flex items-center gap-1.5">
-              <Sparkles className="h-3 w-3 text-[hsl(var(--gold))] shrink-0" />
-              <p className="text-xs uppercase tracking-[0.18em] text-[hsl(var(--gold))]">
-                The Y in your name
-              </p>
-            </div>
+            {/* Quoted, because a bare letter next to "The" reads as the word
+                "They" at a glance — which is a different sentence entirely.
+                The icon that used to sit here made it worse by pulling the eye
+                past the gap. */}
+            <p className="text-xs uppercase tracking-[0.18em] text-[hsl(var(--gold))]">
+              The &ldquo;Y&rdquo; in your name
+            </p>
             <p className="text-[11px] text-muted-foreground leading-snug">
               A Y can sound like a vowel or a consonant, and the two give different numbers.
               Here's our reading — correct it if it's wrong.
@@ -196,8 +205,14 @@ export function IntakeStep({
           </div>
         )}
 
-        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-2">
-          <div className="space-y-1.5">
+        {/* `min-w-0` on both columns is load-bearing, not tidying. A grid item
+            defaults to min-width:auto, so a native date picker — which carries
+            a chunky intrinsic width on iOS — refuses to shrink below it and
+            spills over the neighbouring column instead of wrapping. The two
+            controls end up drawn on top of each other. Letting them shrink is
+            the fix; the wider gap is what keeps them apart once they do. */}
+        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-x-4 gap-y-3">
+          <div className="min-w-0 space-y-1.5">
             <label
               htmlFor="intake-birth-date"
               className="text-xs uppercase tracking-[0.18em] text-muted-foreground"
@@ -210,11 +225,11 @@ export function IntakeStep({
               value={birthDate}
               max={today}
               onChange={(e) => setBirthDate(e.target.value)}
-              className="[color-scheme:dark]"
+              className="w-full [color-scheme:dark]"
               data-testid="intake-birth-date"
             />
           </div>
-          <div className="space-y-1.5">
+          <div className="min-w-0 space-y-1.5">
             <label
               htmlFor="intake-birth-time"
               className="text-xs uppercase tracking-[0.18em] text-muted-foreground"
@@ -226,9 +241,37 @@ export function IntakeStep({
               type="time"
               value={birthTime}
               onChange={(e) => setBirthTime(e.target.value)}
-              className="[color-scheme:dark]"
+              className="w-full [color-scheme:dark]"
               data-testid="intake-birth-time"
             />
+          </div>
+        </div>
+
+        {/* Sex, because several health readings mean different things by it —
+            resting heart rate and HRV baselines especially. Asked rather than
+            read from Apple Health on purpose: HealthKit exposes it, but
+            reading it would mean requesting another permission and another
+            prompt for one value the member can give us in a single tap. */}
+        <div className="space-y-1.5">
+          <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Sex</span>
+          <div className="grid grid-cols-2 gap-2">
+            {(["male", "female"] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => setSex(option)}
+                aria-pressed={sex === option}
+                className={cn(
+                  "rounded-lg border px-3 py-2.5 text-sm capitalize transition-colors",
+                  sex === option
+                    ? "border-primary bg-primary/10 text-foreground"
+                    : "border-border/60 text-muted-foreground hover:text-foreground",
+                )}
+                data-testid={`intake-sex-${option}`}
+              >
+                {option}
+              </button>
+            ))}
           </div>
         </div>
         {/* Says what the optional field buys, so it reads as an offer rather
@@ -243,7 +286,7 @@ export function IntakeStep({
       {error && <p className="text-[11px] text-destructive">{error}</p>}
 
       <div className="flex flex-col gap-2">
-        <Button onClick={() => onSubmit({ firstName, middleName, lastName, birthDate, birthTime, yOverrides })}
+        <Button onClick={() => onSubmit({ firstName, middleName, lastName, birthDate, birthTime, sex, yOverrides })}
           disabled={!canSubmit}
           data-testid="intake-save"
         >
