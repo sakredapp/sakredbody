@@ -86,6 +86,25 @@ export default function FoodChart() {
               Both ends of the scale have a place in a balanced diet — awareness is the goal, not
               restriction.
             </p>
+            {/* Naming the axis rather than rebuilding it.
+                The seven-point scale was already a polarity — one end cools
+                and settles, the other heats and aggravates — which is the
+                same shape as Yin and Yang everywhere else on the site. It
+                needed a sentence, not a new data model.
+
+                Carefully worded: "traditions describe" and "read as", not
+                "changes your pH". Acid/alkaline is a useful traditional lens
+                and a poor physiological claim — the body holds blood pH in a
+                narrow band regardless of lunch — and this site disclaims
+                medical advice on every page. Stating it as a lens is both
+                honest and the thing that is actually true. */}
+            <p className="text-muted-foreground leading-relaxed max-w-2xl mx-auto text-sm md:text-base mt-5">
+              It's one axis, and it's the same one running through everything else here. One end cools and
+              settles; the other heats and aggravates. Older traditions read the same split as alkaline and
+              acidic, or as <span className="text-gold">Yin and Yang</span> — different vocabulary, the same
+              observation. Neither end is good or bad. A body clearing a load wants one; a body being asked
+              to adapt can use the other.
+            </p>
           </motion.div>
         </div>
       </section>

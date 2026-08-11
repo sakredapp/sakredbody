@@ -153,6 +153,12 @@ export default function Executive() {
               longer fund it. Nothing about the output changes on the day that happens. What changes is that
               it starts being paid for out of capital instead of income.
             </p>
+            <p className="text-foreground">
+              There is an older name for this. Yang is the advancing force — drive, heat, output, everything
+              you are good at. Yin is what refills it: sleep, drainage, minerals, the downshift. A decade of
+              Yang with no Yin behind it doesn't look like illness. It looks like a person who is still
+              performing, on borrowed capacity, with nothing underneath.
+            </p>
             <p>
               We're not going to tell you you're burned out. You'd reject that, and you'd probably be right.
               The more useful question is narrower and harder to dismiss:
