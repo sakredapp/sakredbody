@@ -61,7 +61,10 @@ import {
   channels,
   communityMessages,
 } from "../../shared/schema.js";
-import { visibleChannelIds } from "../community/routes.js";
+// Through the barrel, as wins/routes.ts already does. It is the single place
+// that answers "which rooms can they see", and reaching past index.js for it
+// would be the second import path to that answer.
+import { visibleChannelIds } from "../community/index.js";
 import {
   bestEstimates,
   progressionSeries,
