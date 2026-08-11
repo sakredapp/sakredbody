@@ -337,6 +337,13 @@ export function PillarHome({
   const { today, offerings, ebooks, build, protocol } = useCounts();
 
   /**
+   * Resolved, not assumed. `null` is what /api/routines/active returns for
+   * somebody not enrolled, so the card is hidden only once we actually know —
+   * showing it and then removing it a moment later reads as a glitch.
+   */
+  const hasPlan = !protocol.isLoading && Boolean(protocol.data?.routine?.name);
+
+  /**
    * The live line under each title.
    *
    * `undefined` while loading so the card renders its blurb and doesn't
@@ -345,11 +352,9 @@ export function PillarHome({
    */
   function factFor(key: string): string | undefined {
     switch (key) {
-      case "protocol": {
-        if (protocol.isLoading) return undefined;
-        const name = protocol.data?.routine?.name;
-        return name ? name : "Nothing active";
-      }
+      case "protocol":
+        // The card only renders when there is one, so this is always a name.
+        return protocol.data?.routine?.name ?? undefined;
       /**
        * Each card counts its own habits.
        *
@@ -422,7 +427,13 @@ export function PillarHome({
 
       {/* The lead, then a 2x2 of equals. One Door component for both, so the
           only difference between them is height. */}
-      {lead && <Door pillar={lead} fact={factFor(lead.key)} onOpen={onOpen} />}
+      {/* No plan, no card.
+          Same rule the terrain reading follows: a door that says "Nothing
+          active" is an empty promise taking up the largest slot on the screen,
+          and most members will not have a coach. It appears the moment one
+          assigns them something, and until then Restore and Build are simply
+          the top row. */}
+      {lead && hasPlan && <Door pillar={lead} fact={factFor(lead.key)} onOpen={onOpen} />}
 
       <div className="grid grid-cols-2 gap-3">
         {rest.map((p) => (
