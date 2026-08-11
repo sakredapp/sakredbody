@@ -104,25 +104,28 @@ export default function FoodChart() {
               acidic, or as <span className="text-gold">Yin and Yang</span> — different vocabulary, the same
               observation.
             </p>
-            {/* The instruction, without the mechanism claim.
-                This read "Alkaline to heal. Acidic to build." — which is the
-                practical rule, and also exactly the shape of a claim the brand
-                document rules out: that health is controlled by making the
-                body systemically alkaline, and that building is pathological
-                acidity. Neither is true. The body holds blood pH in a narrow
-                band whatever is on the plate.
+            {/* The correspondence, stated plainly — and the line to hold.
+                Yin/alkaline and Yang/acidic is a real mapping and consistent
+                across traditions, so it is said flatly rather than hedged.
+                Founder call, and the right one: hedging your own framework's
+                vocabulary reads as not believing it.
 
-                What survives is the part that was always doing the work: how
-                to weight a plate, and when. Alkaline and acidic stay as the
-                traditional shorthand for the two ends — a polarity and a
-                terrain metaphor, which is what they are. */}
+                What is deliberately not said is the mechanism — that eating
+                alkaline makes the body systemically alkaline and that this is
+                how healing works. Blood pH is held at 7.35–7.45 whatever is
+                on the plate; urine shifts, blood does not. That is the claim
+                section 3 of the brand document rules out, and it is the same
+                category of exposure as "prescribed" for a health app in store
+                review with a medical-advice disclaimer on every page.
+
+                So: the correspondence, and what to eat when. Not a physiology
+                claim about pH. Anyone editing this should keep that split. */}
             <p className="text-foreground leading-relaxed max-w-2xl mx-auto text-sm md:text-base mt-4">
-              Which makes the rule simple.{" "}
-              <span className="text-gold">Weight the plate to the clearing end while the body is clearing a
-              load, and to the building end when you're asking it to adapt.</span>{" "}
-              What older traditions called eating alkaline is mostly this end of the chart; what they called
-              acidic is mostly the other. Neither is good or bad — the mistake is living permanently at one
-              of them, whichever one it is.
+              <span className="text-gold">Yin is the alkaline end. Yang is the acidic end.</span> That
+              correspondence is old and it holds across traditions — cooling and clearing on one side,
+              heating and building on the other. Which makes the rule simple: eat alkaline while the body is
+              clearing a load, and acidic while you're asking it to build. Neither is good or bad — the
+              mistake is living permanently at one of them, whichever one it is.
             </p>
           </motion.div>
         </div>
