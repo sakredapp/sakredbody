@@ -64,6 +64,21 @@ export type MemberSection =
   | "masterclass"
   | "settings";
 
+/**
+ * The sub-tabs under Coaching.
+ *
+ * Exported so Home can deep-link into one — the Protocol door opens
+ * `coaching`/`routines` rather than dropping somebody on Today and leaving
+ * them to find the tab.
+ */
+export type CoachingTab =
+  | "today"
+  | "journey"
+  | "routines"
+  | "catalog"
+  | "analytics"
+  | "coach";
+
 interface Destination {
   id: MemberSection;
   label: string;

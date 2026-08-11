@@ -148,8 +148,11 @@ check(
 
 console.log("\nThe headline\n");
 
-check("depleted reads as asking", terrainHeadline(depleted).includes("asking to be restored"));
-check("fresh reads as capable", terrainHeadline(read({ daysSinceLastSession: 6 })).includes("take demand"));
+check("depleted reads as asking for rest", terrainHeadline(depleted).includes("asking for rest"));
+check(
+  "fresh reads as having room",
+  terrainHeadline(read({ daysSinceLastSession: 6 })).includes("room for more movement"),
+);
 check(
   "unknown says so rather than inventing",
   terrainHeadline(
@@ -163,6 +166,15 @@ check(
       daysSinceLastSession: null,
     }),
   ).startsWith("Not enough yet"),
+);
+
+// The word failed a readability test twice, on the two people most likely to
+// understand it. It stays the name of the model and leaves the screen.
+check(
+  "no headline says 'terrain' to a member",
+  (["restore", "build", "either", "unknown"] as const).every((lean) =>
+    !/terrain/i.test(terrainHeadline({ ...read(), lean })),
+  ),
 );
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);

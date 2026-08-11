@@ -69,8 +69,11 @@ export function TerrainToday({ onOpenRestore }: { onOpenRestore?: () => void }) 
       )}
       data-testid="terrain-today"
     >
+      {/* Was "Today's terrain". Two readers in a row asked what that meant and
+          guessed diet, then protocols — so the label says what the card is for
+          instead of what the model is called. */}
       <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-        Today's terrain
+        How you're doing
       </p>
 
       <p className="font-display text-lg leading-snug mt-1">{data.headline}</p>

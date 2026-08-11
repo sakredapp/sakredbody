@@ -1,5 +1,5 @@
 /**
- * Home — the terrain, then four doors.
+ * Home — how you're doing, then where you go.
  *
  * The launcher from the second round of mockups. It replaces opening straight
  * onto Today, and the reason is about how the app *reads* rather than what it
@@ -27,10 +27,11 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
+import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HealthSwatches } from "@/components/portal/HealthSwatches";
 import { TerrainToday } from "@/components/TerrainToday";
-import type { MemberSection } from "@/components/MemberNav";
+import type { MemberSection, CoachingTab } from "@/components/MemberNav";
 
 interface Pillar {
   key: string;
@@ -40,6 +41,10 @@ interface Pillar {
   image: string;
   /** Where tapping goes. Null means it isn't open yet. */
   section: MemberSection | null;
+  /** The sub-tab to land on, where the section has them. */
+  tab?: CoachingTab;
+  /** Full width, above the grid. At most one. */
+  lead?: boolean;
 }
 
 /**
@@ -60,25 +65,40 @@ interface Pillar {
  *
  * ── And why Terrain did not simply take its slot ──────────────────────────
  *
- * It did, for about an hour, and it was wrong for a reason worth keeping:
- * renaming the fourth door Terrain fixed the word and kept the mistake. The
- * brief is explicit that terrain "sits underneath all three" and that there
- * must not be four competing pillars — and a tile in the same grid, the same
- * size, with the same treatment, is a competing pillar no matter what it says
- * on it. The first person to see it asked "what is terrain?", which is the
- * only test that matters.
+ * It did, for about an hour, and it was wrong twice over.
  *
- * So terrain is the *reading at the top* — TerrainToday, above these doors,
- * framing them — and the nine centres go back to being reachable from Restore
- * and from the More sheet. One word, one meaning, and it is not a place you
- * go: it is the condition the places are chosen against.
+ * First, it fixed the word and kept the mistake: the brief is explicit that
+ * terrain "sits underneath all three" and that there must not be four
+ * competing pillars — and a tile in the same grid, at the same size, with the
+ * same treatment is a competing pillar whatever it says on it.
  *
- * ── Four doors, no hero ───────────────────────────────────────────────────
+ * Second, and worse, nobody knew what it meant. Asked cold, two readers
+ * guessed diet, then protocols. A door a member cannot resolve is worse than
+ * the one it replaced, because at least Embody was a word they had been
+ * taught. Terrain survives as the name of the model, the endpoint and the
+ * philosophy; it does not survive as one word on a phone.
  *
- * Restore and Build now sit side by side at the same size. A hero row would
- * have made one of the two forces visually senior to the other on the screen
- * that introduces them as a pair, which is the same fault as the redirect
- * below, drawn instead of coded.
+ * The second guess turned out to be the useful one. What was missing here was
+ * never a name for the condition — that is the reading at the top — it was the
+ * plan somebody is actually on. Hence Protocol.
+ *
+ * ── Protocol leads; Restore and Build are equals ──────────────────────────
+ *
+ * The lead card was removed an hour ago because it made Restore visually
+ * senior to Build on the one screen whose job is presenting them as a pair.
+ * That reasoning was right and does not apply to Protocol: it is not one of
+ * the two forces, it is what a member is currently following, so it can sit
+ * above both without ranking them against each other.
+ *
+ * The nine centres stay reachable from Restore and from the More sheet.
+ *
+ * ── Say what the screen is about, in the words people use ─────────────────
+ *
+ * The blurbs are close to how the product's own author described these out
+ * loud when asked what they were for: Restore is "is the body well rested",
+ * Build is "are you getting enough movement in". Those beat anything written
+ * to sound considered, because they are what somebody actually wants to know
+ * before tapping.
  *
  * ── Restore is a place now ────────────────────────────────────────────────
  *
@@ -90,32 +110,42 @@ interface Pillar {
  *
  * ── Order is the argument ─────────────────────────────────────────────────
  *
- * Restore, then Build, because you cannot load a terrain that cannot yet
- * drain. Then Gather and Library, which are what surrounds the practice
- * rather than what it is.
+ * Protocol first, because it is the answer to "what am I meant to be doing".
+ * Then Restore and Build, in that order, because you cannot load a body that
+ * cannot yet recover. Then Gather and Library, which are what surrounds the
+ * practice rather than what it is.
  *
  * Kept as a single array because that is the whole point: this is a brand
  * decision, so changing it should be one edit and never a refactor.
  */
 const PILLARS: Pillar[] = [
   {
+    key: "protocol",
+    title: "Protocol",
+    blurb: "The plan you're on right now.",
+    image: "/images/rugged-cliffs.webp",
+    section: "coaching",
+    tab: "routines",
+    lead: true,
+  },
+  {
     key: "restore",
     title: "Restore",
-    blurb: "Sleep, nervous system, and giving capacity back.",
+    blurb: "Is your body rested?",
     image: "/images/zen-sand-garden.webp",
     section: "restore",
   },
   {
     key: "build",
     title: "Build",
-    blurb: "Strength, movement and resilience.",
+    blurb: "Are you moving enough?",
     image: "/images/training-focus.webp",
     section: "build",
   },
   {
     key: "retreats",
     title: "Gather",
-    blurb: "Retreats, masterminds, and the people around you.",
+    blurb: "Retreats, masterminds and the room.",
     image: "/images/retreat-mountain.webp",
     section: "retreat",
   },
@@ -125,7 +155,7 @@ const PILLARS: Pillar[] = [
     // Was "Knowledge", which named the category rather than the thing. Nobody
     // opens an app looking for knowledge; they look for the guide they were
     // sent. It opens the library, so it says Library.
-    blurb: "Courses, guides and tools for growth.",
+    blurb: "Guides, courses and tools.",
     image: "/images/stone-villa.webp",
     section: "library",
   },
@@ -183,11 +213,109 @@ function useCounts() {
     },
   });
 
+  /**
+   * `null` is a real answer here, not an error: /api/routines/active returns
+   * it for somebody not enrolled in anything. So the fact says "Nothing
+   * active" rather than staying blank, which is the difference between a door
+   * that looks broken and one that tells you why it is empty.
+   */
+  const protocol = useQuery<{ routine?: { name?: string | null } | null } | null>({
+    queryKey: ["/api/routines/active"],
+    queryFn: async () => {
+      const r = await fetch("/api/routines/active", { credentials: "include" });
+      if (!r.ok) throw new Error("no");
+      return r.json();
+    },
+  });
+
   // The centres query left with the Terrain door. It was the only caller, and
   // a request whose result nothing renders is a request nobody will notice is
   // still being made.
 
-  return { today, offerings, ebooks, build };
+  return { today, offerings, ebooks, build, protocol };
+}
+
+const lead = PILLARS.find((p) => p.lead) ?? null;
+const rest = PILLARS.filter((p) => !p.lead);
+
+/**
+ * One door. Identical in every respect except height, which is the point —
+ * the lead card is bigger, not different, so the grid still reads as one set.
+ */
+function Door({
+  pillar,
+  fact,
+  onOpen,
+}: {
+  pillar: Pillar;
+  fact?: string;
+  onOpen: (section: MemberSection, tab?: CoachingTab) => void;
+}) {
+  const open = pillar.section !== null;
+
+  return (
+    <button
+      onClick={() => pillar.section && onOpen(pillar.section, pillar.tab)}
+      disabled={!open}
+      className={cn(
+        "group relative w-full overflow-hidden rounded-xl border border-[hsl(var(--gold))]/12 text-left tap-clean",
+        pillar.lead ? "h-28 sm:h-32" : "col-span-1 h-36 sm:h-40",
+        open ? "hover:border-[hsl(var(--gold))]/30 transition-colors" : "opacity-60",
+      )}
+      data-testid={`pillar-${pillar.key}`}
+    >
+      <img
+        src={pillar.image}
+        alt=""
+        loading="lazy"
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+      {/* Bottom-up on the square cards, because they have no room to clear
+          space beside the text — the words sit on the scrim rather than next
+          to it. The lead card is wide enough to read left-to-right, so it
+          clears its left third instead and keeps more of the photograph. */}
+      <div
+        className={cn(
+          "absolute inset-0",
+          pillar.lead
+            ? "bg-gradient-to-r from-[hsl(var(--ink))] via-[hsl(var(--ink))]/85 to-[hsl(var(--ink))]/20"
+            : "bg-gradient-to-t from-[hsl(var(--ink))] via-[hsl(var(--ink))]/80 to-[hsl(var(--ink))]/10",
+        )}
+      />
+
+      <div
+        className={cn(
+          "relative h-full flex gap-3 px-4",
+          pillar.lead ? "items-center" : "items-end pb-3",
+        )}
+      >
+        <div className="min-w-0 flex-1">
+          <h2
+            className={cn(
+              "font-display tracking-wide uppercase text-white",
+              pillar.lead ? "text-xl" : "text-base",
+            )}
+          >
+            {pillar.title}
+          </h2>
+          {/* The blurb used to be lead-only, on the grounds that two lines of
+              small type under a title made these read as dense. It is on every
+              card now because the first person to use the version without them
+              asked what one of the doors was — dense beats unexplained. */}
+          <p className="text-[11px] leading-snug text-white/55 mt-0.5 line-clamp-2">
+            {pillar.blurb}
+          </p>
+          {fact && <p className="text-[11px] text-[hsl(var(--gold))] mt-1">{fact}</p>}
+        </div>
+
+        {open && pillar.lead && (
+          <span className="shrink-0 h-7 w-7 rounded-full border border-[hsl(var(--gold))]/40 grid place-items-center group-hover:border-[hsl(var(--gold))] transition-colors">
+            <ChevronRight className="h-3.5 w-3.5 text-[hsl(var(--gold))]" />
+          </span>
+        )}
+      </div>
+    </button>
+  );
 }
 
 export function PillarHome({
@@ -195,9 +323,9 @@ export function PillarHome({
   onOpen,
 }: {
   firstName?: string | null;
-  onOpen: (section: MemberSection) => void;
+  onOpen: (section: MemberSection, tab?: CoachingTab) => void;
 }) {
-  const { today, offerings, ebooks, build } = useCounts();
+  const { today, offerings, ebooks, build, protocol } = useCounts();
 
   /**
    * The live line under each title.
@@ -208,6 +336,11 @@ export function PillarHome({
    */
   function factFor(key: string): string | undefined {
     switch (key) {
+      case "protocol": {
+        if (protocol.isLoading) return undefined;
+        const name = protocol.data?.routine?.name;
+        return name ? name : "Nothing active";
+      }
       case "restore": {
         if (today.isLoading) return undefined;
         const list = today.data?.habits ?? [];
@@ -261,62 +394,14 @@ export function PillarHome({
       {/* Their own numbers, before the menu. */}
       <HealthSwatches onOpenStats={() => onOpen("coaching")} />
 
-      {/* A 2x2 grid of equals.
+      {/* The lead, then a 2x2 of equals. One Door component for both, so the
+          only difference between them is height. */}
+      {lead && <Door pillar={lead} fact={factFor(lead.key)} onOpen={onOpen} />}
 
-          This was one hero above a 2x2, which was right when there were five
-          doors and the first was the obvious front. With four it made Restore
-          senior to Build on the one screen whose job is to present them as two
-          directions of the same thing. */}
       <div className="grid grid-cols-2 gap-3">
-        {PILLARS.map((p) => {
-          const fact = factFor(p.key);
-          const open = p.section !== null;
-
-          return (
-            <button
-              key={p.key}
-              onClick={() => p.section && onOpen(p.section)}
-              disabled={!open}
-              className={cn(
-                "group relative w-full overflow-hidden rounded-xl border border-[hsl(var(--gold))]/12 text-left tap-clean",
-                "col-span-1 h-36 sm:h-40",
-                open ? "hover:border-[hsl(var(--gold))]/30 transition-colors" : "opacity-60",
-              )}
-              data-testid={`pillar-${p.key}`}
-            >
-              <img
-                src={p.image}
-                alt=""
-                loading="lazy"
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-              {/* Bottom-up, because a square card has no room to clear space
-                  beside the text — the words sit on the scrim rather than
-                  next to it. A flat scrim over the whole card would dim the
-                  photograph without making anything more legible. */}
-              <div className="absolute inset-0 bg-gradient-to-t from-[hsl(var(--ink))] via-[hsl(var(--ink))]/80 to-[hsl(var(--ink))]/10" />
-
-              <div className="relative h-full flex items-end gap-3 px-4 pb-3">
-                <div className="min-w-0 flex-1">
-                  <h2 className="font-display tracking-wide uppercase text-white text-base">
-                    {p.title}
-                  </h2>
-                  {/* The blurb used to be hero-only, on the grounds that two
-                      lines of small type under a title made these read as
-                      dense. It is back on every card because the first person
-                      to use the four-door version asked what one of them was —
-                      dense beats unexplained. One line, clamped. */}
-                  <p className="text-[11px] leading-snug text-white/55 mt-0.5 line-clamp-2">
-                    {p.blurb}
-                  </p>
-                  {fact && (
-                    <p className="text-[11px] text-[hsl(var(--gold))] mt-1">{fact}</p>
-                  )}
-                </div>
-              </div>
-            </button>
-          );
-        })}
+        {rest.map((p) => (
+          <Door key={p.key} pillar={p} fact={factFor(p.key)} onOpen={onOpen} />
+        ))}
       </div>
     </div>
   );

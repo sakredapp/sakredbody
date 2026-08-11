@@ -185,19 +185,34 @@ export function readTerrain(input: TerrainInputs): TerrainReading {
 /**
  * The line the app shows.
  *
- * One sentence, no number, and it never tells somebody what to do — "asking
- * for" rather than "you should", because this reads signals, it does not know
- * about the member's day.
+ * ── The word "terrain" does not appear here, on purpose ───────────────────
+ *
+ * It used to: "Your terrain is asking to be restored." The first two people to
+ * read that asked what terrain meant, and guessed diet, then protocols. When
+ * the person who owns the brand cannot resolve a word on his own home screen,
+ * no member is going to.
+ *
+ * Terrain stays as the concept — it is the name of this file, the endpoint and
+ * the model, and the marketing site has the room to teach it properly. What it
+ * cannot be is a label doing work in four words on a phone.
+ *
+ * So the sentences say the plain thing instead, and they are close to how the
+ * product's own author described the two halves out loud: Restore is "is the
+ * body well rested", Build is "are you getting enough movement in".
+ *
+ * One sentence, no number, and it never gives an instruction — "asking for"
+ * rather than "you should", because this reads signals and knows nothing about
+ * the member's actual day.
  */
 export function terrainHeadline(reading: TerrainReading): string {
   switch (reading.lean) {
     case "restore":
-      return "Your terrain is asking to be restored";
+      return "Your body is asking for rest";
     case "build":
-      return "Your terrain can take demand";
+      return "You have room for more movement";
     case "either":
-      return "Your terrain can take what today asks of it";
+      return "Rested enough for whatever today asks";
     case "unknown":
-      return "Not enough yet to read your terrain";
+      return "Not enough yet to tell";
   }
 }

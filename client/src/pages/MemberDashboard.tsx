@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -49,6 +49,7 @@ import {
   MemberBottomNav,
   BottomNavSpacer,
   type MemberSection,
+  type CoachingTab,
 } from "@/components/MemberNav";
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 import { useInkSurface } from "@/hooks/use-ink-surface";
@@ -191,7 +192,19 @@ export default function MemberDashboard() {
   // member browses repeatedly; designing a bespoke retreat is something they
   // do once, and it was standing in front of everything else.
   const [retreatView, setRetreatView] = useState<"book" | "services" | "my-bookings" | "masterminds">("masterminds");
-  const [coachingTab, setCoachingTab] = useState<"today" | "journey" | "routines" | "catalog" | "analytics" | "coach">("today");
+  const [coachingTab, setCoachingTab] = useState<CoachingTab>("today");
+
+  /**
+   * Open a section, and optionally land on one of its sub-tabs.
+   *
+   * Home's Protocol door needs `coaching`/`routines`. Without the second
+   * argument it would drop somebody on Today and leave them to notice that a
+   * sub-navigation exists and that the thing they tapped is inside it.
+   */
+  const openSection = useCallback((next: MemberSection, tab?: CoachingTab) => {
+    setSection(next);
+    if (tab) setCoachingTab(tab);
+  }, []);
   const [showBookingDialog, setShowBookingDialog] = useState(false);
 
   // Health syncs when the app comes to the foreground, throttled — neither
@@ -483,7 +496,7 @@ export default function MemberDashboard() {
             transition={{ duration: 0.2 }}
             className={`${PORTAL_COLUMN} py-6`}
           >
-            <PillarHome firstName={user?.firstName} onOpen={setSection} />
+            <PillarHome firstName={user?.firstName} onOpen={openSection} />
           </motion.div>
         )}
 
