@@ -14,6 +14,7 @@ import {
   text,
   uuid,
   integer,
+  doublePrecision,
   boolean,
   date,
   timestamp,
@@ -96,6 +97,48 @@ export const routineHabits = pgTable(
      * checklist. See shared/models/terrain.ts for the vocabulary.
      */
     emphasis: text("emphasis"),
+
+    /**
+     * How this habit is measured, and against what.
+     *
+     * ── Four columns, not seven ───────────────────────────────────────────
+     *
+     * The spec asked for trackingType, unit, defaultTarget, healthDataSource,
+     * autoTrackEligible, polarityStrength and contextDependent. Three of those
+     * are derivable, and a derivable column is a column that can disagree with
+     * the thing it was derived from:
+     *
+     *   unit              → TRACKING_TYPES. Hours are always hours.
+     *   autoTrackEligible → healthMetric !== null. That IS the eligibility.
+     *   contextDependent  → polarityStrength === "contextual".
+     *
+     * See shared/models/habitTracking.ts for the lookups.
+     */
+    trackingType: text("tracking_type").notNull().default("boolean"),
+
+    /** The number to hit. Null for a boolean habit, required for every other. */
+    defaultTarget: doublePrecision("default_target"),
+
+    /**
+     * The health metric that can satisfy this without anybody tapping — one of
+     * healthMetricEnum, or null when only a person can say it happened.
+     *
+     * "Hit your step target" is answered by the phone. "Have one honest
+     * conversation" is not, and never will be.
+     */
+    healthMetric: text("health_metric"),
+
+    /**
+     * 'strong' | 'contextual'.
+     *
+     * Sleep is strongly Yin and protein is strongly Yang. Walking, breathwork,
+     * heat and fasting are not: fasting sounds clearing and is a substantial
+     * physiological stressor, and heat creates demand now and supports
+     * recovery later. Marking those contextual keeps the reading honest —
+     * they still carry an emphasis, but nothing downstream should treat them
+     * as settled evidence of which way a day leaned.
+     */
+    polarityStrength: text("polarity_strength").notNull().default("strong"),
 
     terrainTags: text("terrain_tags").array(),
     searchKeywords: text("search_keywords").array(),

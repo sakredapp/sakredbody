@@ -110,6 +110,7 @@ import {
 
 import type { Partner, PartnerService, BookingRequest } from "@shared/schema";
 import type { MasterclassCategory, MasterclassVideo } from "@shared/models/masterclass";
+import { TRACKING_TYPES, AUTO_TRACKABLE } from "@shared/models/habitTracking";
 import {
   SERVICE_CATEGORIES,
   getCategoryLabel,
@@ -290,6 +291,7 @@ interface HabitFormData {
   title: string; shortDescription: string; detailedDescription: string;
   instructions: string; scienceExplanation: string; tips: string;
   expectToNotice: string; cadence: string; recommendedTime: string; emphasis: string;
+  trackingType: string; defaultTarget: number | null; healthMetric: string; polarityStrength: string;
   durationMinutes: number | null; dayStart: number | null; dayEnd: number | null;
   orderIndex: number; icon: string; routineId: string;
   terrainTags: string; searchKeywords: string;
@@ -298,6 +300,7 @@ const emptyHabitForm: HabitFormData = {
   title: "", shortDescription: "", detailedDescription: "",
   instructions: "", scienceExplanation: "", tips: "",
   expectToNotice: "", cadence: "daily", recommendedTime: "Morning", emphasis: "",
+  trackingType: "boolean", defaultTarget: null, healthMetric: "", polarityStrength: "strong",
   durationMinutes: null, dayStart: 1, dayEnd: null,
   orderIndex: 0, icon: "", routineId: "",
   terrainTags: "", searchKeywords: "",
@@ -495,6 +498,64 @@ function HabitFormDialog({
                   <SelectItem value="_none">Neither</SelectItem>
                   <SelectItem value="yin">Restore (Yin) — clears and rebuilds</SelectItem>
                   <SelectItem value="yang">Build (Yang) — loads and challenges</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Tracked as</label>
+              <Select value={form.trackingType} onValueChange={(v) => set("trackingType", v)}>
+                <SelectTrigger data-testid="select-habit-trackingType"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {TRACKING_TYPES.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              {/* Required for everything except a boolean, and forbidden on
+                  one — the column has a CHECK constraint saying so, because a
+                  step target of NULL and a journal entry with a target of 3
+                  are both nonsense the app would have to render. */}
+              <label className="text-sm font-medium">Target</label>
+              <Input
+                type="number"
+                value={form.defaultTarget ?? ""}
+                disabled={form.trackingType === "boolean"}
+                placeholder={form.trackingType === "boolean" ? "Not applicable" : "e.g. 8"}
+                onChange={(e) => set("defaultTarget", e.target.value === "" ? null : Number(e.target.value))}
+                data-testid="input-habit-defaultTarget"
+              />
+            </div>
+            <div className="space-y-1">
+              {/* Setting this is what makes a habit tick itself off. Left
+                  unset, only the member can say it happened — which is the
+                  right answer for "have one honest conversation". */}
+              <label className="text-sm font-medium">Answered by health data</label>
+              <Select
+                value={form.healthMetric || "_none"}
+                onValueChange={(v) => set("healthMetric", v === "_none" ? "" : v)}
+              >
+                <SelectTrigger data-testid="select-habit-healthMetric"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">Nothing — the member says so</SelectItem>
+                  {AUTO_TRACKABLE.map((m) => (
+                    <SelectItem key={m} value={m}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              {/* Contextual habits still show on their card; they just do not
+                  count as evidence of which way the day leaned. Fasting sounds
+                  clearing and is a real stressor; heat is demand now and
+                  recovery later. */}
+              <label className="text-sm font-medium">Direction is</label>
+              <Select value={form.polarityStrength} onValueChange={(v) => set("polarityStrength", v)}>
+                <SelectTrigger data-testid="select-habit-polarityStrength"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="strong">Settled — counts toward the reading</SelectItem>
+                  <SelectItem value="contextual">Contextual — depends on the day</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1314,6 +1375,10 @@ export default function AdminPortal() {
       // constraint only permits 'yin', 'yang' or NULL — an empty string would
       // be rejected by Postgres, not silently ignored.
       emphasis: d.emphasis || null,
+      healthMetric: d.healthMetric || null,
+      // The CHECK constraint pairs these: a boolean habit must have no target,
+      // and every measured one must have a number.
+      defaultTarget: d.trackingType === "boolean" ? null : d.defaultTarget,
     };
     if (!d.routineId) delete payload.routineId;
     return payload;
@@ -1767,6 +1832,10 @@ export default function AdminPortal() {
                     tips: editingHabit.tips || "", expectToNotice: editingHabit.expectToNotice || "",
                     cadence: editingHabit.cadence, recommendedTime: editingHabit.recommendedTime || "Morning",
                     emphasis: editingHabit.emphasis || "",
+                    trackingType: editingHabit.trackingType || "boolean",
+                    defaultTarget: editingHabit.defaultTarget ?? null,
+                    healthMetric: editingHabit.healthMetric || "",
+                    polarityStrength: editingHabit.polarityStrength || "strong",
                     durationMinutes: editingHabit.durationMinutes, dayStart: editingHabit.dayStart,
                     dayEnd: editingHabit.dayEnd, orderIndex: editingHabit.orderIndex,
                     icon: editingHabit.icon || "",
