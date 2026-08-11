@@ -110,7 +110,7 @@ export default function Retreats() {
       <PageHero
         eyebrow="Gather · The Social Terrain"
         title={<>Gather.</>}
-        intro="Your terrain is not only biological. The room you're in, the standard the people around you hold, and whether your week contains any real quiet are inputs like any other — and they are the ones hardest to change from inside your own life. A retreat changes them all at once, on purpose."
+        intro="Your terrain is not only biological. The room you're in, the standard the people around you hold, and whether your week contains any real quiet are inputs like any other — and they are the ones hardest to change from inside your own life. A retreat changes them all at once, on purpose. Each one runs to a direction: a Yin retreat clears and rebuilds, a Yang retreat loads and challenges. Which one you should be on depends on where you currently are, not on which sounds better."
         testId="text-retreats-headline"
         image="/images/estate-vineyard.webp"
         imageAlt="A stone estate set among vineyards and low green hills"
