@@ -74,6 +74,24 @@ case "${1:-all}" in
     unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
     # -derivedDataPath keeps this out of the shared DerivedData that Xcode.app
     # uses, so a CLI build here never invalidates an archive in progress.
+    #
+    # Signing is left alone deliberately, and that took two tries to get right.
+    #
+    # CODE_SIGNING_ALLOWED=NO is the usual incantation for a simulator build,
+    # and it stood here until the first run that ever reached HealthKit — which
+    # died on "Missing com.apple.developer.healthkit entitlement". HealthKit is
+    # an entitlement, and that flag drops the entitlements file on the floor.
+    #
+    # Forcing an ad-hoc identity with an empty team was worse, not better: for a
+    # simulator destination Xcode builds *two* entitlement files, App.app.xcent
+    # and App.app-Simulated.xcent, and only the Simulated one carries the real
+    # keys. Overriding CODE_SIGN_STYLE pushed the build onto the empty one, so
+    # it signed successfully with a dict containing nothing at all.
+    #
+    # The project's own automatic signing already does the right thing here, so
+    # the correct amount of intervention is none. Verified by dumping the
+    # embedded entitlements rather than by the build succeeding — an empty dict
+    # signs perfectly well.
     xcodebuild \
       -project ios/App/App.xcodeproj \
       -scheme App \
@@ -81,7 +99,6 @@ case "${1:-all}" in
       -sdk iphonesimulator \
       -destination "platform=iOS Simulator,name=$DEVICE" \
       -derivedDataPath "$DERIVED" \
-      CODE_SIGNING_ALLOWED=NO \
       build
     ;;
   install)

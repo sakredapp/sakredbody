@@ -16,3 +16,6 @@ plugins/**/.swiftpm/
 
 # Gradle output from the local plugin module.
 plugins/**/build/
+
+# Simulator builds from script/sim.sh — a full DerivedData tree, never shipped.
+.sim-build/
