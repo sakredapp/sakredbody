@@ -296,6 +296,20 @@ export type ExerciseGroup = (typeof EXERCISE_GROUPS)[number]["id"];
  * Derived from the group rather than stored as a column: the group already
  * says it, and a second source of truth is a second thing to keep in sync.
  */
+/**
+ * How many rows `GET /api/training/exercises` will return.
+ *
+ * Here rather than in the route because the picker's correctness depends on it:
+ * it fetches the catalogue once and filters in memory, so anything past this
+ * line does not exist as far as a member is concerned.
+ *
+ * It was 300, set when the picker searched server-side, and stayed 300 after
+ * the picker stopped. Nothing connected the two, so the catalogue silently
+ * truncated at 300 of 657 in declaration order — and the cut fell exactly
+ * across the newest categories. A test asserts the catalogue fits.
+ */
+export const CATALOGUE_FETCH_LIMIT = 2000;
+
 export function isPracticeCategory(category: string): boolean {
   return PRACTICE_CATEGORIES.has(category);
 }

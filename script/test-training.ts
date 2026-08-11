@@ -24,6 +24,7 @@ import {
   EXERCISE_GROUPS,
   MOVEMENT_PATTERNS,
   EQUIPMENT,
+  CATALOGUE_FETCH_LIMIT,
   isPracticeCategory,
 } from "../shared/models/training.js";
 import { catalogueRows, slug, arrayLiteral } from "../shared/data/exerciseCatalogue.js";
@@ -131,6 +132,14 @@ check(
 check(
   "slugs are unique",
   new Set(rows.map((r) => slug(r.name))).size === rows.length,
+);
+// The picker fetches once and filters in memory, so a catalogue larger than
+// the endpoint returns is a catalogue that is partly invisible — silently,
+// with every other test still green. It truncated at 300 of 657 for a day.
+check(
+  "the whole catalogue fits in one fetch, with room for a member's own",
+  rows.length + 200 < CATALOGUE_FETCH_LIMIT,
+  `${rows.length} rows vs a ${CATALOGUE_FETCH_LIMIT} limit`,
 );
 check(
   "every barbell lift names its equipment",

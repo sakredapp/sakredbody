@@ -55,6 +55,7 @@ import {
   type WeightUnit,
   EXERCISE_CATEGORIES,
   isPracticeCategory,
+  CATALOGUE_FETCH_LIMIT,
   coachingMessages,
 } from "../../shared/schema.js";
 import {
@@ -314,9 +315,26 @@ export function registerTrainingRoutes(app: Express) {
         .from(exercises)
         .where(and(...filters))
         .orderBy(asc(exercises.sortOrder), asc(exercises.name))
-        // Only ever a search result or one category at a time, so this is a
-        // guard against a pathological query rather than a page size.
-        .limit(300);
+        /**
+         * The whole catalogue, on purpose.
+         *
+         * This was 300, with a comment explaining that a caller only ever asks
+         * for a search result or one category — which was true when the picker
+         * searched server-side. It does not any more: it fetches once and
+         * filters in memory, so that typing cannot lag behind the keystroke.
+         *
+         * The two changed a week apart and nothing connected them, so the
+         * catalogue silently truncated at 300 of 657 in `sort_order` order —
+         * and `sort_order` follows the order categories are declared, so the
+         * cut fell exactly across the new work. Every Pilates, Lagree, barre,
+         * class, sport and endurance row was invisible in the app while being
+         * present in the database and correct in every test.
+         *
+         * The limit is a ceiling against a pathological query, not a page size,
+         * and lives in the model beside a test asserting the catalogue fits
+         * inside it — so the two cannot drift apart again.
+         */
+        .limit(CATALOGUE_FETCH_LIMIT);
 
       res.json(rows);
     } catch (err) {
