@@ -104,22 +104,12 @@ export default function FoodChart() {
               acidic, or as <span className="text-gold">Yin and Yang</span> — different vocabulary, the same
               observation.
             </p>
-            {/* The correspondence, stated plainly — and the line to hold.
-                Yin/alkaline and Yang/acidic is a real mapping and consistent
-                across traditions, so it is said flatly rather than hedged.
-                Founder call, and the right one: hedging your own framework's
-                vocabulary reads as not believing it.
-
-                What is deliberately not said is the mechanism — that eating
-                alkaline makes the body systemically alkaline and that this is
-                how healing works. Blood pH is held at 7.35–7.45 whatever is
-                on the plate; urine shifts, blood does not. That is the claim
-                section 3 of the brand document rules out, and it is the same
-                category of exposure as "prescribed" for a health app in store
-                review with a medical-advice disclaimer on every page.
-
-                So: the correspondence, and what to eat when. Not a physiology
-                claim about pH. Anyone editing this should keep that split. */}
+            {/* Alkaline is Yin, acidic is Yang. Settled — don't re-hedge it.
+                It is a real correspondence, consistent across traditions, and
+                it is the brand's own vocabulary. An earlier pass softened it
+                to "what older traditions called eating alkaline"; that was
+                overcorrection, and hedging your own framework reads as not
+                believing it. Founder decision, made twice. */}
             <p className="text-foreground leading-relaxed max-w-2xl mx-auto text-sm md:text-base mt-4">
               <span className="text-gold">Yin is the alkaline end. Yang is the acidic end.</span> That
               correspondence is old and it holds across traditions — cooling and clearing on one side,
