@@ -12,6 +12,7 @@
  */
 
 import { Capacitor } from "@capacitor/core";
+import { withTimeout, BridgeTimeout } from "./bridgeTimeout";
 import { apiRequest } from "./queryClient";
 import {
   METRIC_PLANS,
@@ -27,6 +28,13 @@ const FALLBACK_OVERLAP_DAYS = 7;
 const FALLBACK_BACKFILL_DAYS = 90;
 /** One POST body. See the note on healthSyncSchema — a mobile network drops big ones. */
 const PAGE = 1_000;
+/**
+ * Longer than the probe's deadline. A ninety-day aggregate read genuinely
+ * takes time on a phone with years of history, and cutting it short would turn
+ * a slow first sync into a permanent failure. Still finite: an unanswered read
+ * must eventually become an error somebody can see.
+ */
+const READ_TIMEOUT_MS = 45_000;
 
 export type HealthPlatform = "healthkit" | "healthconnect";
 
@@ -65,31 +73,6 @@ type Plugin = typeof import("@capgo/capacitor-health").Health;
  * needs and short enough that a member does not conclude the button is dead —
  * which, until now, it was.
  */
-const BRIDGE_TIMEOUT_MS = 4_000;
-
-export class BridgeTimeout extends Error {
-  constructor(public readonly label: string) {
-    super(`${label} did not answer in ${BRIDGE_TIMEOUT_MS}ms`);
-    this.name = "BridgeTimeout";
-  }
-}
-
-function withTimeout<T>(work: Promise<T>, label: string, ms = BRIDGE_TIMEOUT_MS): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new BridgeTimeout(label)), ms);
-    work.then(
-      (v) => {
-        clearTimeout(timer);
-        resolve(v);
-      },
-      (e) => {
-        clearTimeout(timer);
-        reject(e);
-      },
-    );
-  });
-}
-
 let cached: Plugin | null = null;
 async function plugin(): Promise<Plugin | null> {
   if (!healthPlatform()) return null;
@@ -413,13 +396,20 @@ export async function syncHealth(): Promise<SyncResult> {
 
   for (const plan of METRIC_PLANS) {
     try {
-      const res = await p.queryAggregated({
+      // Wrapped like every other crossing. A read that never answers hangs
+      // the whole sync — the same failure as the probe, one screen further in,
+      // and the member watches a spinner instead of a dead button.
+      const res = await withTimeout(
+        p.queryAggregated({
         dataType: plan.dataType as never,
         startDate,
         endDate,
         bucket: "day",
         aggregation: plan.aggregation,
-      });
+        }),
+        `Health.queryAggregated(${plan.dataType})`,
+        READ_TIMEOUT_MS,
+      );
       let kept = 0;
       for (const bucket of res.samples ?? []) {
         const row = toCanonical(plan, {
@@ -447,13 +437,17 @@ export async function syncHealth(): Promise<SyncResult> {
   // breakdown only exists on the samples — and deep and REM minutes are the
   // part a coach actually reads.
   try {
-    const res = await p.readSamples({
+    const res = await withTimeout(
+      p.readSamples({
       dataType: "sleep" as never,
       startDate,
       endDate,
       limit: 2_000,
       ascending: true,
-    });
+      }),
+      "Health.readSamples(sleep)",
+      READ_TIMEOUT_MS,
+    );
     const folded = foldSleep(res.samples ?? []);
     samples.push(...folded);
     if (folded.length) granted.push("sleepMinutes");
@@ -473,7 +467,11 @@ export async function syncHealth(): Promise<SyncResult> {
     sourceApp?: string | null;
   }[] = [];
   try {
-    const res = await p.queryWorkouts({ startDate, endDate, limit: 300 });
+    const res = await withTimeout(
+      p.queryWorkouts({ startDate, endDate, limit: 300 }),
+      "Health.queryWorkouts()",
+      READ_TIMEOUT_MS,
+    );
     for (const w of res.workouts ?? []) {
       // No platform id means no idempotency key, and re-syncing would add the
       // same session again every time. Skipping is the lesser wrong.

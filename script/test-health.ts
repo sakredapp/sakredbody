@@ -9,6 +9,7 @@
  */
 
 import { readFileSync } from "fs";
+import { withTimeout, BridgeTimeout } from "../client/src/lib/bridgeTimeout.js";
 import { HEALTH_UNITS, HEALTH_RANGES, healthMetricEnum } from "../shared/models/health.js";
 import {
   METRIC_PLANS,
@@ -1337,6 +1338,86 @@ check(
   "only the full brief pays for the health fetch",
   /depth === "full"[\s\S]{0,120}api\/health\/summary/.test(NOTICE_LIB)
 );
+
+
+
+// ── The bridge deadline ─────────────────────────────────────────────────────
+//
+// This is the mechanism that turns the failure that cost this app its entire
+// health feature into a visible error. The failure is a promise that never
+// settles — not one that rejects — so it is invisible to `try/catch` and to
+// every ordinary test, which is exactly why it survived so long.
+//
+// A test that never resolved would hang the suite, which is the point: these
+// assert the deadline fires, and the suite finishing at all is part of the
+// proof.
+
+console.log("\nA native call that never answers becomes an error\n");
+
+{
+  const started = Date.now();
+  let outcome = "still pending";
+  try {
+    // The exact shape of the bug: a promise nobody will ever settle.
+    await withTimeout(new Promise<string>(() => {}), "hanging call", 60);
+    outcome = "resolved";
+  } catch (err) {
+    outcome = err instanceof BridgeTimeout ? "BridgeTimeout" : `other: ${err}`;
+  }
+  const elapsed = Date.now() - started;
+
+  check("a promise that never settles rejects instead of hanging", outcome === "BridgeTimeout", outcome);
+  check("it rejects near the deadline, not later", elapsed >= 55 && elapsed < 1500, `${elapsed}ms`);
+}
+
+{
+  const value = await withTimeout(Promise.resolve({ available: true }), "fine", 500);
+  check("a working call passes its value straight through", (value as { available: boolean }).available === true);
+}
+
+{
+  let caught: unknown = null;
+  try {
+    await withTimeout(Promise.reject(new Error("plugin said no")), "rejecting", 500);
+  } catch (err) {
+    caught = err;
+  }
+  check(
+    "a genuine rejection is passed through unchanged, not relabelled",
+    caught instanceof Error && !(caught instanceof BridgeTimeout) && caught.message === "plugin said no",
+  );
+}
+
+{
+  // A timer left armed on the happy path keeps a Node process alive and, in a
+  // WebView, holds a closure over whatever the call captured — a small leak on
+  // every single sync.
+  const before = process.getActiveResourcesInfo?.().filter((r) => r === "Timeout").length ?? 0;
+  await withTimeout(Promise.resolve(1), "quick", 30_000);
+  const after = process.getActiveResourcesInfo?.().filter((r) => r === "Timeout").length ?? 0;
+  check("the timer is cleared when the call succeeds", after <= before, `${before} → ${after}`);
+}
+
+/**
+ * And the rule, enforced rather than remembered.
+ *
+ * Three data reads were still awaiting the bridge bare after the probe was
+ * fixed — the same bug, one screen further in, where it would hang a sync
+ * instead of a button. A grep is the only thing that catches the fourth.
+ */
+{
+  const HEALTH_SRC = readFileSync("client/src/lib/health.ts", "utf8");
+  const bare = stripComments(HEALTH_SRC).match(/await\s+p\.\w+\(/g) ?? [];
+  check(
+    "no call crosses into native without a deadline",
+    bare.length === 0,
+    bare.join(", "),
+  );
+  check(
+    "the probe reports a timeout distinctly from an error",
+    /timedOut/.test(HEALTH_SRC),
+  );
+}
 
 
 console.log(`\n${passed} passed, ${failed} failed`);
