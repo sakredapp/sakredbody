@@ -32,6 +32,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useHealthSummary } from "@/hooks/use-health";
 import { EXERCISE_CATEGORIES, CATEGORY_LOAD } from "@shared/models/training";
+import { HabitPanel } from "@/components/habits/HabitPanel";
+import { TerrainCheckin } from "@/components/habits/TerrainCheckin";
 import type { MemberSection } from "@/components/MemberNav";
 import { cn } from "@/lib/utils";
 
@@ -85,6 +87,17 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
           Capacity is not only built. It is also returned.
         </p>
       </div>
+
+      {/* The list comes first. Everything below it is context for the
+          decisions on it, and context that sits above the thing it informs is
+          a screen a member scrolls past. */}
+      <HabitPanel
+        emphasis="yin"
+        title="What gives it back"
+        emptyLine="Nothing here yet. Sleep, minerals and downshifting are where most people start."
+      />
+
+      <TerrainCheckin />
 
       {/* ── What the terrain is asking for ── */}
       <Panel title="Your terrain" data-testid="restore-terrain">

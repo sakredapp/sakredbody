@@ -35,6 +35,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { InfoTip } from "@/components/ui/info-tip";
 import { SectionHeading, Panel, StatTile } from "@/components/portal/Panel";
+import { HabitPanel } from "@/components/habits/HabitPanel";
 import { MemberBuild } from "@/components/build/MemberBuild";
 import { FreeSession } from "@/components/build/FreeSession";
 import { Dumbbell, Check, Plus, Trophy, Loader2 } from "lucide-react";
@@ -194,6 +195,16 @@ export function BuildTab() {
     return (
       <div className="space-y-6">
         <SectionHeading title="Build" subtitle="Strength, movement and resilience." />
+
+      {/* The lifestyle half of Build — protein, steps, sunlight. Separate from
+          the workout builder on purpose: a session is an event with sets and
+          weights, and "hit 165g" is a standing target. Collapsing them would
+          make one of the two lie about the other. */}
+      <HabitPanel
+        emphasis="yang"
+        title="What asks for capacity"
+        emptyLine="Nothing here yet. Protein, steps and daylight are where most people start."
+      />
         {/* ── No panel announcing an absence ──
             This screen used to open with a bordered box, a greyed-out
             dumbbell and "Nothing prescribed today" — the first thing a member
@@ -267,6 +278,16 @@ export function BuildTab() {
   return (
     <div className="space-y-6">
       <SectionHeading title="Build" subtitle="Strength, movement and resilience." />
+
+      {/* The lifestyle half of Build — protein, steps, sunlight. Separate from
+          the workout builder on purpose: a session is an event with sets and
+          weights, and "hit 165g" is a standing target. Collapsing them would
+          make one of the two lie about the other. */}
+      <HabitPanel
+        emphasis="yang"
+        title="What asks for capacity"
+        emptyLine="Nothing here yet. Protein, steps and daylight are where most people start."
+      />
 
       {sessions.map((s) => {
         const active = sessionId !== null;

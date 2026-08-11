@@ -31,72 +31,20 @@ import { routineHabits } from "../../shared/models/coaching.js";
 import { healthDays } from "../../shared/models/health.js";
 import {
   scheduleFromColumns,
-  describeSchedule,
   expectedOn,
-  phaseDay,
-  weeklyQuota,
   type Expectation,
-  type Schedule,
 } from "../../shared/models/habitSchedule.js";
 import {
   resolveDailyValue,
   progressStateOf,
-  describeProgress,
-  manualFallbackAllowed,
-  defaultEntryOp,
   aggregationOf,
   type ProgressState,
   type ValueSource,
 } from "../../shared/models/habitMeasurement.js";
-import { itemTypeOf, unitFor, type ItemType } from "../../shared/models/habitTracking.js";
+import { resolveRow, type ResolvedHabit } from "../../shared/models/habitResolve.js";
 
-export type ResolvedHabit = {
-  trackedHabitId: string;
-  routineHabitId: string;
-  phaseId: string;
-
-  title: string;
-  shortDescription: string | null;
-  emphasis: string;
-  icon: string | null;
-
-  itemType: ItemType;
-  trackingType: string;
-  unit: string | null;
-  /** 'add' for cumulative habits, 'set' for observed ones. The client obeys it. */
-  entryOp: "add" | "set";
-
-  target: number | null;
-  currentValue: number;
-  progressState: ProgressState;
-  progressLabel: string;
-  valueSource: ValueSource;
-
-  expected: Expectation;
-  schedule: Schedule;
-  scheduleLabel: string;
-  weeklyQuota: number | null;
-  recommendedTime: string | null;
-
-  phaseType: string;
-  phaseSource: string;
-  phaseDay: number | null;
-  phaseLength: number | null;
-  /** A fixed phase past its last day, still open. The member owes it an answer. */
-  awaitingReview: boolean;
-  memberReason: string | null;
-
-  healthBacked: boolean;
-  healthMetric: string | null;
-  manualFallbackAllowed: boolean;
-  /** The phone could have answered this and didn't — permission, or no sync yet. */
-  healthMissing: boolean;
-
-  loadClass: string | null;
-  polarityStrength: string;
-  /** 'plan' | 'cohort' | 'retreat' memberships. A habit can be in several. */
-  contexts: { type: string; id: string }[];
-};
+export { resolveRow };
+export type { ResolvedHabit };
 
 /**
  * Everything a member is on, resolved for one of their local dates.
@@ -186,95 +134,6 @@ export async function resolveDay(userId: string, onDate: string): Promise<Resolv
       contexts: linksBy.get(r.tracked.id) ?? [],
     }),
   );
-}
-
-/**
- * The pure part, exported so tests can drive it without a database.
- *
- * Everything above this is fetching. Everything a screen depends on is here.
- */
-export function resolveRow(input: {
-  tracked: typeof trackedHabits.$inferSelect;
-  phase: typeof trackedHabitPhases.$inferSelect;
-  habit: typeof routineHabits.$inferSelect;
-  onDate: string;
-  entries: readonly { value: number; op: string; kind: string }[];
-  healthValue: number | null;
-  contexts: { type: string; id: string }[];
-}): ResolvedHabit {
-  const { tracked, phase, habit, onDate } = input;
-
-  const schedule = scheduleFromColumns({
-    scheduleKind: phase.scheduleKind,
-    scheduleDays: phase.scheduleDays ?? null,
-    scheduleCount: phase.scheduleCount ?? null,
-  });
-
-  // A paused *relationship* pauses every phase under it. The status lives on
-  // the tracked habit because pausing is about the member, not the contract.
-  const window = {
-    startsOn: phase.startsOn,
-    endsOn: phase.endsOn ?? null,
-    closedOn: phase.closedOn ?? null,
-    status: tracked.status === "paused" ? "paused" : phase.status,
-  };
-
-  const expected = expectedOn(schedule, window, onDate);
-  const day = phaseDay(window, onDate);
-
-  const target = phase.target ?? habit.defaultTarget ?? null;
-  const resolved = resolveDailyValue({
-    trackingType: habit.trackingType,
-    healthMetric: habit.healthMetric,
-    healthValue: input.healthValue,
-    entries: input.entries,
-  });
-
-  return {
-    trackedHabitId: tracked.id,
-    routineHabitId: habit.id,
-    phaseId: phase.id,
-
-    title: habit.title,
-    shortDescription: habit.shortDescription ?? null,
-    emphasis: tracked.emphasis,
-    icon: habit.icon ?? null,
-
-    itemType: itemTypeOf(habit.trackingType, habit.healthMetric),
-    trackingType: habit.trackingType,
-    unit: unitFor(habit.trackingType),
-    entryOp: defaultEntryOp(habit.trackingType),
-
-    target,
-    currentValue: resolved.value,
-    progressState: progressStateOf(habit.trackingType, resolved.value, target),
-    progressLabel: describeProgress(habit.trackingType, resolved.value, target),
-    valueSource: resolved.source,
-
-    expected,
-    schedule,
-    scheduleLabel: describeSchedule(schedule),
-    weeklyQuota: weeklyQuota(schedule),
-    recommendedTime: phase.recommendedTime ?? habit.recommendedTime ?? null,
-
-    phaseType: phase.phaseType,
-    phaseSource: phase.source,
-    phaseDay: day?.day ?? null,
-    phaseLength: day?.of ?? null,
-    awaitingReview: Boolean(
-      phase.endsOn && onDate > phase.endsOn && phase.status === "active",
-    ),
-    memberReason: phase.memberReason ?? null,
-
-    healthBacked: Boolean(habit.healthMetric),
-    healthMetric: habit.healthMetric ?? null,
-    manualFallbackAllowed: manualFallbackAllowed(habit.healthMetric),
-    healthMissing: resolved.healthExpectedButMissing,
-
-    loadClass: habit.loadClass ?? null,
-    polarityStrength: habit.polarityStrength,
-    contexts: input.contexts,
-  };
 }
 
 /**

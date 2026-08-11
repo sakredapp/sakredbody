@@ -19,6 +19,7 @@
 
 import { useState } from "react";
 import { MemberHealth } from "@/components/admin/MemberHealth";
+import { MemberHabits } from "@/components/admin/MemberHabits";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -230,6 +231,11 @@ export function MembersAdmin() {
                         Streaks measure whether they logged; this measures what
                         actually happened. */}
                     <MemberHealth userId={m.id} />
+
+                    {/* What they're actually on, and where a coach changes it.
+                        Assigning writes a phase on this member; the shared
+                        catalogue default is never touched. */}
+                    <MemberHabits userId={m.id} />
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
                       {[

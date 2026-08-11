@@ -35,10 +35,16 @@ ALTER TABLE routine_habits ADD COLUMN IF NOT EXISTS published      boolean NOT N
 
 -- Titles are copy and copy gets rewritten. A loader keyed on title inserts a
 -- duplicate the day somebody improves the wording, and every member tracking
--- the old row quietly stops matching. Partial so the 120 rows that predate the
--- key don't all collide on NULL.
-CREATE UNIQUE INDEX IF NOT EXISTS uq_routine_habits_key
-  ON routine_habits (habit_key) WHERE habit_key IS NOT NULL;
+-- the old row quietly stops matching.
+--
+-- A plain UNIQUE constraint rather than a partial index, and the difference
+-- matters: ON CONFLICT cannot use a partial index without repeating its
+-- predicate at every call site, and a loader that has to remember an index
+-- predicate is a loader that will forget it. Postgres treats NULLs as distinct
+-- by default, so rows an admin creates without a key still don't collide.
+DO $$ BEGIN
+  ALTER TABLE routine_habits ADD CONSTRAINT uq_routine_habits_key UNIQUE (habit_key);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE routine_habits ADD CONSTRAINT routine_habits_load_class_chk

@@ -262,7 +262,13 @@ export function describeProgress(
     meta.decimals === 0 ? Math.round(n).toLocaleString() : n.toFixed(meta.decimals);
   const unit = meta.unit ? ` ${meta.unit}` : "";
   if (trackingType === "hours") {
-    const hm = (n: number) => `${Math.floor(n)}h ${Math.round((n - Math.floor(n)) * 60)}m`;
+    // A whole number of hours drops the minutes: an 8h target reads "8h", not
+    // "8h 0m", which is the kind of detail that makes a card look generated.
+    const hm = (n: number) => {
+      const h = Math.floor(n);
+      const m = Math.round((n - h) * 60);
+      return m === 0 ? `${h}h` : `${h}h ${m}m`;
+    };
     return target ? `${hm(value)} / ${hm(target)}` : hm(value);
   }
   return target ? `${fmt(value)} / ${fmt(target)}${unit}` : `${fmt(value)}${unit}`;

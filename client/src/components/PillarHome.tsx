@@ -27,6 +27,7 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
+import { useTrackedHabits } from "@/components/habits/useHabits";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HealthSwatches } from "@/components/portal/HealthSwatches";
@@ -184,16 +185,14 @@ const PILLARS: Pillar[] = [
  * already work.
  */
 function useCounts() {
-  const today = useQuery<{
-    habits: Array<{ completed: boolean; emphasis: string | null }>;
-  }>({
-    queryKey: ["/api/habits/today"],
-    queryFn: async () => {
-      const r = await fetch("/api/habits/today", { credentials: "include" });
-      if (!r.ok) throw new Error("no");
-      return r.json();
-    },
-  });
+  // Restore and Build count from the resolved day.
+  //
+  // This used to read /api/habits/today, which is the Coach's Plan checklist —
+  // a different question, and the reason the Restore card once answered "is
+  // your body rested?" with "4 of 6 done". That request is gone rather than
+  // left in place: a fetch whose result nothing renders is a fetch nobody will
+  // notice is still being made.
+  const tracked = useTrackedHabits();
 
   const offerings = useQuery<Array<unknown>>({
     queryKey: ["/api/offerings"],
@@ -241,7 +240,7 @@ function useCounts() {
   // a request whose result nothing renders is a request nobody will notice is
   // still being made.
 
-  return { today, offerings, ebooks, build, protocol };
+  return { tracked, offerings, ebooks, build, protocol };
 }
 
 const lead = PILLARS.find((p) => p.lead) ?? null;
@@ -334,7 +333,7 @@ export function PillarHome({
   firstName?: string | null;
   onOpen: (section: MemberSection, tab?: CoachingTab) => void;
 }) {
-  const { today, offerings, ebooks, build, protocol } = useCounts();
+  const { tracked, offerings, ebooks, build, protocol } = useCounts();
 
   /**
    * Resolved, not assumed. `null` is what /api/routines/active returns for
@@ -371,9 +370,12 @@ export function PillarHome({
        */
       case "restore":
       case "build": {
-        if (today.isLoading) return undefined;
-        const want = key === "restore" ? "yin" : "yang";
-        const mine = (today.data?.habits ?? []).filter((h) => h.emphasis === want);
+        if (tracked.isLoading) return undefined;
+        // Only what is actually due today. A Mon/Wed/Fri sauna on a Tuesday is
+        // neither done nor missed, and counting it into the denominator would
+        // make every Tuesday read as a shortfall.
+        const mine = (key === "restore" ? tracked.data?.restore : tracked.data?.build ?? [])
+          ?.filter((h) => h.expected !== "off") ?? [];
 
         if (mine.length === 0) {
           // Build has a second thing to say when no habits are set for it;
@@ -389,7 +391,9 @@ export function PillarHome({
           return undefined;
         }
 
-        const done = mine.filter((h) => h.completed).length;
+        const done = mine.filter(
+          (h) => h.progressState === "met" || h.progressState === "over",
+        ).length;
         return `${done} of ${mine.length} today`;
       }
       case "retreats": {
