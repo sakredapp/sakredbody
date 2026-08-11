@@ -25,7 +25,7 @@
  * the day somebody starts.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -133,6 +133,44 @@ export function BuildTab() {
   /** An ad-hoc or template-started session, which has no prescription behind it. */
   const [freeSession, setFreeSession] = useState<{ id: string; title: string } | null>(null);
 
+  /**
+   * What is actually still running, according to the server.
+   *
+   * This used to be `freeSession` alone, and that was the bug: navigating to
+   * Home unmounted this component, React threw the id away, and coming back
+   * showed an empty Build screen. Nothing had been lost — the session row and
+   * every set were exactly where they were left — but from the member's side
+   * the workout had simply vanished, which is worse than an error.
+   *
+   * A session ends when somebody presses Finish. Nothing else ends it, and
+   * certainly not looking at your step count mid-workout.
+   */
+  const openSession = useQuery<{
+    session: { id: string; title: string | null; startedAt: string; sets: number } | null;
+  }>({
+    queryKey: ["/api/training/sessions/open"],
+    queryFn: async () => {
+      const r = await fetch("/api/training/sessions/open", { credentials: "include" });
+      if (!r.ok) throw new Error("no");
+      return r.json();
+    },
+    // Cheap, and the answer changes when the member acts on another device.
+    staleTime: 15_000,
+  });
+
+  useEffect(() => {
+    const open = openSession.data?.session;
+    if (open && !freeSession) {
+      setFreeSession({ id: open.id, title: open.title ?? "Your session" });
+    }
+  }, [openSession.data, freeSession]);
+
+  /** Finishing is the only thing that clears it, on the server and here. */
+  const clearSession = () => {
+    setFreeSession(null);
+    qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
+  };
+
   const today = useQuery<TodayBuild>({
     queryKey: ["/api/training/today"],
     queryFn: async () => {
@@ -222,11 +260,14 @@ export function BuildTab() {
             sessionId={freeSession.id}
             title={freeSession.title}
             unit={unit}
-            onDone={() => setFreeSession(null)}
+            onDone={clearSession}
           />
         ) : (
           <>
-            <MemberBuild onStarted={(id, t) => setFreeSession({ id, title: t })} />
+            <MemberBuild onStarted={(id, t) => {
+              setFreeSession({ id, title: t });
+              qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
+            }} />
             <p className="text-[11px] text-muted-foreground text-center max-w-sm mx-auto">
               When your coach plans a session for today, it appears at the top of this screen with
               its targets already worked out.
@@ -547,10 +588,13 @@ export function BuildTab() {
           sessionId={freeSession.id}
           title={freeSession.title}
           unit={unit}
-          onDone={() => setFreeSession(null)}
+          onDone={clearSession}
         />
       ) : (
-        <MemberBuild onStarted={(id, t) => setFreeSession({ id, title: t })} />
+        <MemberBuild onStarted={(id, t) => {
+              setFreeSession({ id, title: t });
+              qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
+            }} />
       )}
 
       <p className="text-xs text-muted-foreground text-center">

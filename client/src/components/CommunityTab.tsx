@@ -122,6 +122,11 @@ function Composer({
         className="resize-none min-h-0"
         data-testid="input-community-composer"
       />
+      {/* One action row.
+          Record used to sit in its own block underneath, which read as a
+          separate feature rather than the other way to say the same thing —
+          and left a band of empty space between the two ways of doing one
+          job. They are alternatives, so they sit side by side. */}
       <div className="flex items-center gap-2">
         <Button
           size="sm"
@@ -132,6 +137,20 @@ function Composer({
         >
           {submitLabel}
         </Button>
+
+        {/* A memo sends on its own — it does not wait for the text box,
+            because the whole point is not having to type. Any words already
+            written go with it, which is why it is not disabled on empty. */}
+        {allowVoice && (
+          <VoiceRecorderControl
+            disabled={pending}
+            onSend={(audio) => {
+              onSubmit(body.trim(), audio);
+              setBody("");
+            }}
+          />
+        )}
+
         {onCancel && (
           <Button size="sm" variant="ghost" onClick={onCancel}>
             Cancel
@@ -141,19 +160,6 @@ function Composer({
           Enter to send · Shift+Enter for a new line
         </span>
       </div>
-
-      {/* A memo sends on its own — it does not wait for the text box, because
-          the whole point is not having to type. Any words already written go
-          with it. */}
-      {allowVoice && (
-        <VoiceRecorderControl
-          disabled={pending}
-          onSend={(audio) => {
-            onSubmit(body.trim(), audio);
-            setBody("");
-          }}
-        />
-      )}
     </div>
   );
 }

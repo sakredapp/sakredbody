@@ -31,7 +31,7 @@
 import type { Express, Request, Response } from "express";
 import { zodMessage } from "../../shared/utils/zodMessage.js";
 import { db } from "../db.js";
-import { and, asc, desc, eq, gte, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { isAuthenticated } from "../auth/index.js";
 import { storage } from "../storage.js";
@@ -573,6 +573,56 @@ export function registerTrainingRoutes(app: Express) {
 
       track("training.session_finish", { userId, surface: "build", subjectId: row.id });
       res.json(row);
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
+  /**
+   * The session still running, if there is one.
+   *
+   * ── Why this exists ───────────────────────────────────────────────────
+   *
+   * The client used to hold the active session in component state. Navigating
+   * to Home unmounted the Build tab, React discarded the id, and coming back
+   * showed an empty screen — so a member who checked their steps mid-workout
+   * appeared to have lost the workout. The sets were never lost; nothing on
+   * the server had changed. The client had simply forgotten where it was.
+   *
+   * State that must survive navigation cannot live in a component. It lives
+   * here, where it already did: `finished_at IS NULL` has always meant "in
+   * progress", because sessions are finished explicitly so that a workout
+   * abandoned halfway keeps its sets.
+   *
+   * Reading it from the server rather than from local storage also means the
+   * session survives a force-quit, a reinstall, and being started on a phone
+   * and finished on a laptop.
+   */
+  app.get("/api/training/sessions/open", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      const [open] = await db
+        .select({
+          id: workoutSessions.id,
+          title: workoutSessions.title,
+          onDate: workoutSessions.onDate,
+          // The timer is derived from this, never from a counter the client
+          // increments — a counter dies with the component it lives in.
+          startedAt: workoutSessions.createdAt,
+        })
+        .from(workoutSessions)
+        .where(and(eq(workoutSessions.userId, userId), isNull(workoutSessions.finishedAt)))
+        .orderBy(desc(workoutSessions.createdAt))
+        .limit(1);
+
+      if (!open) return res.json({ session: null });
+
+      const [{ sets }] = await db
+        .select({ sets: sql<number>`count(*)::int` })
+        .from(workoutSets)
+        .where(eq(workoutSets.sessionId, open.id));
+
+      res.json({ session: { ...open, sets: Number(sets) || 0 } });
     } catch (err) {
       fail(res, err);
     }
