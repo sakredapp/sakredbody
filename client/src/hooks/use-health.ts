@@ -111,11 +111,12 @@ export function useHealthSync() {
        * removes the first two possibilities: something is always posted, and
        * `stage` says how far it got.
        */
+      const progress = { stage: "start" };
       const stalled = new Promise<Record<string, unknown>>((resolve) =>
-        setTimeout(() => resolve({ stage: "stalled" }), 6_000),
+        setTimeout(() => resolve({ stage: `stalled:${progress.stage}` }), 6_000),
       );
       void Promise.race([
-        healthProbeDetail().then((d) => ({ stage: "resolved", ...d })),
+        healthProbeDetail(progress).then((d) => ({ stage: "resolved", ...d })),
         stalled,
       ])
         .catch((err) => ({ stage: "threw", error: String(err?.message ?? err) }))

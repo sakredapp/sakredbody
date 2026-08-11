@@ -11,7 +11,7 @@
  * entry chunk. It is ~40kB of bridge code that can only ever no-op there.
  */
 
-import { Capacitor } from "@capacitor/core";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 import { withTimeout, BridgeTimeout } from "./bridgeTimeout";
 import { apiRequest } from "./queryClient";
 import {
@@ -46,33 +46,42 @@ export function healthPlatform(): HealthPlatform | null {
   return null;
 }
 
-type Plugin = typeof import("@capgo/capacitor-health").Health;
-
 /**
- * ── Never await the native bridge without a clock ─────────────────────────
+ * The bridge, obtained without loading anything.
  *
- * A Capacitor call is a message posted to native code that answers by
- * resolving a promise held in a map. If the native side never answers — the
- * method is missing on that platform, it throws before its completion block
- * runs, it waits on a service that is not installed — the promise is not
- * rejected. It simply stays pending, forever.
+ * ── What the dynamic import actually cost ────────────────────────────────
  *
- * `try/catch` does nothing about that, and this file had two of them guarding
- * exactly that shape. The result was reported from a real device twice: the
- * health step never appeared, the Connect button did nothing at all, and no
- * error was logged anywhere, because nothing had gone wrong — something had
- * merely never finished.
+ * This module used to `await import("@capgo/capacitor-health")`, to keep ~40kB
+ * of bridge code out of the web entry chunk. On a real iOS build that import
+ * never settled — proven by staged telemetry from a simulator, which reported
+ * `stalled:importing` on every launch while a deadline self-test in the same
+ * function confirmed timers were firing normally. So the health feature was
+ * dead on arrival for a saving of forty kilobytes on a platform that does not
+ * use the feature at all.
  *
- * The telemetry proved it rather than suggesting it. `health.probe` is fired
- * inside the resolution of `healthAvailability()`, and across every session on
- * every device it had never once been recorded, while `healthAvailable` was
- * null in every onboarding event ever written. Not false. Null.
+ * The package it was loading is three lines:
  *
- * So every crossing into native code now has a deadline, and a timeout is an
- * answer rather than a hang. Four seconds is far longer than a working bridge
- * needs and short enough that a member does not conclude the button is dead —
- * which, until now, it was.
+ *     const Health = registerPlugin('Health', { web: () => import('./web')… })
+ *
+ * `registerPlugin` comes from @capacitor/core, which is statically loaded on
+ * every platform already. Calling it directly is the same object with no chunk,
+ * no loader, and nothing to hang on — and it is what the package would have
+ * given us. The types come from the package as a `import type`, which vanishes
+ * at build time and pulls in no code.
+ *
+ * No web fallback is registered on purpose. A browser genuinely cannot read
+ * HealthKit; the proxy rejecting is the honest answer, and `healthPlatform()`
+ * returns null there long before anything calls it.
  */
+import type { HealthPlugin } from "@capgo/capacitor-health";
+
+type Plugin = HealthPlugin;
+
+let cached: Plugin | null = null;
+
+/** Kept only so the probe can report why, if this ever fails again. */
+let lastLoadError: string | null = null;
+
 /**
  * Is a native implementation registered under this name?
  *
@@ -89,18 +98,15 @@ function pluginRegistered(): boolean {
   }
 }
 
-let cached: Plugin | null = null;
-async function plugin(): Promise<Plugin | null> {
+function plugin(): Plugin | null {
   if (!healthPlatform()) return null;
   if (cached) return cached;
   try {
-    // The import is a network-shaped operation against the app's own bundle,
-    // and a chunk that never arrives hangs exactly like a silent bridge does.
-    const mod = await withTimeout(import("@capgo/capacitor-health"), "loading the Health plugin");
-    cached = mod.Health;
+    cached = registerPlugin<Plugin>("Health");
+    lastLoadError = null;
     return cached;
   } catch (err) {
-    console.warn("[health] plugin unavailable", err);
+    lastLoadError = String((err as Error)?.message ?? err);
     return null;
   }
 }
@@ -145,7 +151,7 @@ export async function healthAvailability(): Promise<HealthAvailability> {
   if (!platform) return { available: false, platform: null, reason: "Not a phone app." };
 
   const bridged = pluginRegistered();
-  const p = await plugin();
+  const p = plugin();
   if (!p) {
     return {
       available: false,
@@ -193,19 +199,55 @@ export async function healthAvailability(): Promise<HealthAvailability> {
  * developer cannot hold the phone, and an hour went into guessing at exactly
  * this because nothing was ever recorded. Sent once per app open.
  */
-export async function healthProbeDetail(): Promise<Record<string, unknown>> {
+export async function healthProbeDetail(
+  /**
+   * Written to as the probe advances, so a caller that gives up on it can
+   * still say how far it got.
+   *
+   * The probe reported `stalled` and nothing else, which narrows the fault to
+   * "somewhere in this function" — three awaits, each supposedly guarded by a
+   * deadline, so the answer should be impossible. When the impossible is what
+   * the telemetry says, the instrument needs finer graduations, not another
+   * theory.
+   */
+  progress: { stage: string } = { stage: "start" },
+): Promise<Record<string, unknown>> {
+  /**
+   * Does the deadline mechanism work in this runtime at all?
+   *
+   * The import stalls past a deadline that the unit tests prove fires — an
+   * impossibility, which means one of the two things I believe is false. This
+   * runs the exact shape of the unit test inside the app: a promise nobody
+   * settles, raced against a 300ms deadline. If it reports "fires", the
+   * mechanism is sound and the import path is doing something specific; if it
+   * reports "broken", setTimeout or the timer is not what it appears to be
+   * here, and every other conclusion drawn from a deadline is void.
+   */
+  let deadlineWorks = "untested";
+  try {
+    await withTimeout(new Promise<void>(() => {}), "self-test", 300);
+    deadlineWorks = "resolved-impossibly";
+  } catch (err) {
+    deadlineWorks = err instanceof BridgeTimeout ? "fires" : `other:${String(err)}`;
+  }
+
+  progress.stage = "platform";
   const platform = healthPlatform();
+  progress.stage = "registered";
   const bridged = pluginRegistered();
   let loaded = false;
   let raw: unknown = null;
   let error: string | null = null;
   let timedOut = false;
   try {
-    const p = await plugin();
+    progress.stage = "importing";
+    const p = plugin();
     loaded = Boolean(p);
+    progress.stage = loaded ? "calling" : "no-plugin";
     // This awaited the bridge unguarded too — so the one call whose job is to
     // report a hanging bridge would itself hang, and the report never arrived.
     if (p) raw = await withTimeout(p.isAvailable(), "Health.isAvailable() [probe]");
+    progress.stage = "answered";
   } catch (err) {
     timedOut = err instanceof BridgeTimeout;
     error = String(err);
@@ -218,6 +260,8 @@ export async function healthProbeDetail(): Promise<Record<string, unknown>> {
     probe: raw,
     timedOut,
     error,
+    loadError: lastLoadError,
+    deadlineWorks,
   };
 }
 
@@ -237,7 +281,7 @@ export async function requestHealthAccess(): Promise<{
   denied: string[];
   historyAccess?: boolean;
 }> {
-  const p = await plugin();
+  const p = plugin();
   if (!p) throw new Error("This build has no Health plugin.");
   // Longer than the probe's deadline on purpose: this one legitimately waits
   // for a human to read a system sheet and tap it. What it must not do is wait
@@ -332,7 +376,7 @@ export async function backgroundSyncStatus(): Promise<{
 
 /** Android only — deep link into Health Connect so a member can change grants. */
 export async function openHealthSettings(): Promise<void> {
-  const p = await plugin();
+  const p = plugin();
   await p?.openHealthConnectSettings().catch(() => {});
 }
 
@@ -367,7 +411,7 @@ export async function syncHealth(): Promise<SyncResult> {
   };
   if (!platform) return { ...empty, message: "Health data only syncs from the phone app." };
 
-  const p = await plugin();
+  const p = plugin();
   if (!p) return { ...empty, message: "Health is unavailable on this device." };
 
   // Where to read from. The server owns the watermark — the phone can be
