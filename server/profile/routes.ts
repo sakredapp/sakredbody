@@ -58,6 +58,8 @@ const nameSchema = z.object({
    * would give a member no way to take the answer back.
    */
   sex: z.enum(["male", "female"]).optional().nullable(),
+  /** `private` means asked and declined — distinct from null, which is unasked. */
+  relationshipStatus: z.enum(["single", "dating", "married", "private"]).optional().nullable(),
 });
 
 export function registerProfileRoutes(app: Express): void {
@@ -135,6 +137,9 @@ export function registerProfileRoutes(app: Express): void {
           // caller said nothing about sex and the stored answer stands;
           // an explicit null clears it. See the note on the schema.
           ...(input.sex !== undefined ? { sex: input.sex } : {}),
+          ...(input.relationshipStatus !== undefined
+            ? { relationshipStatus: input.relationshipStatus }
+            : {}),
           updatedAt: new Date(),
         })
         .where(eq(users.id, req.session!.userId!))

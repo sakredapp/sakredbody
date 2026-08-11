@@ -53,6 +53,11 @@ export type IntakeValues = {
    * person — the same rule the health tables follow.
    */
   sex: "male" | "female" | null;
+  /**
+   * 'private' means asked and declined, which is different from null meaning
+   * never asked — so nothing prompts a member who already said no.
+   */
+  relationshipStatus: "single" | "dating" | "married" | "private" | null;
   /** Per-Y overrides, keyed `word:index`, when the member disagrees with us. */
   yOverrides: Record<string, boolean>;
 };
@@ -74,6 +79,9 @@ export function IntakeStep({
   const [birthDate, setBirthDate] = useState(initial.birthDate ?? "");
   const [birthTime, setBirthTime] = useState(initial.birthTime ?? "");
   const [sex, setSex] = useState<"male" | "female" | null>(initial.sex ?? null);
+  const [relationshipStatus, setRelationshipStatus] = useState<
+    "single" | "dating" | "married" | "private" | null
+  >(initial.relationshipStatus ?? null);
   const [yOverrides, setYOverrides] = useState<Record<string, boolean>>(
     initial.yOverrides ?? {},
   );
@@ -274,6 +282,44 @@ export function IntakeStep({
             ))}
           </div>
         </div>
+
+        {/* Relationship, because the lifestyle guidance that actually helps
+            differs when somebody else is in the week. "Prefer not to say" is
+            stored as a real answer rather than left empty — it means asked and
+            declined, so nothing asks again. */}
+        <div className="space-y-1.5">
+          <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            Relationship <span className="normal-case tracking-normal">(optional)</span>
+          </span>
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                ["single", "Single"],
+                ["dating", "Dating"],
+                ["married", "Married"],
+                ["private", "Prefer not to say"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() =>
+                  setRelationshipStatus((prev) => (prev === value ? null : value))
+                }
+                aria-pressed={relationshipStatus === value}
+                className={cn(
+                  "rounded-lg border px-3 py-2.5 text-sm transition-colors",
+                  relationshipStatus === value
+                    ? "border-primary bg-primary/10 text-foreground"
+                    : "border-border/60 text-muted-foreground hover:text-foreground",
+                )}
+                data-testid={`intake-relationship-${value}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
         {/* Says what the optional field buys, so it reads as an offer rather
             than as another box to fill. */}
         <p className="text-[11px] text-muted-foreground">
@@ -286,7 +332,7 @@ export function IntakeStep({
       {error && <p className="text-[11px] text-destructive">{error}</p>}
 
       <div className="flex flex-col gap-2">
-        <Button onClick={() => onSubmit({ firstName, middleName, lastName, birthDate, birthTime, sex, yOverrides })}
+        <Button onClick={() => onSubmit({ firstName, middleName, lastName, birthDate, birthTime, sex, relationshipStatus, yOverrides })}
           disabled={!canSubmit}
           data-testid="intake-save"
         >

@@ -24,3 +24,16 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS sex varchar;
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_sex_check;
 ALTER TABLE users ADD CONSTRAINT users_sex_check
   CHECK (sex IS NULL OR sex IN ('male', 'female'));
+
+-- Relationship status, same shape and for the same reason.
+--
+-- The lifestyle guidance that actually helps differs when there is another
+-- person in someone's week. 'private' is stored as a real value rather than
+-- left null: null means never asked, 'private' means asked and declined, and
+-- only the second one should stop us ever prompting again.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS relationship_status varchar;
+
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_relationship_status_check;
+ALTER TABLE users ADD CONSTRAINT users_relationship_status_check
+  CHECK (relationship_status IS NULL
+         OR relationship_status IN ('single', 'dating', 'married', 'private'));

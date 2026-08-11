@@ -46,6 +46,15 @@ export const users = pgTable("users", {
    * this must handle null rather than assume.
    */
   sex: varchar("sex"),
+  /**
+   * 'single' | 'dating' | 'married' | 'private', or null when unanswered.
+   *
+   * Asked because the useful lifestyle guidance differs: what helps somebody
+   * living alone is not what helps somebody whose week has another person in
+   * it. `private` is a real answer and not a synonym for null — it means the
+   * member was asked and declined, so nothing should ask again.
+   */
+  relationshipStatus: varchar("relationship_status"),
   // IANA zone, e.g. "America/Los_Angeles". The server has no other way to know
   // when this member's day starts, and every habit is scheduled by calendar
   // date — get this wrong and completions land on the wrong day.

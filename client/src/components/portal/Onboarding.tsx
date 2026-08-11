@@ -196,6 +196,7 @@ export function Onboarding() {
         firstName: v.firstName.trim(),
         lastName: v.lastName.trim() || null,
         sex: v.sex,
+        relationshipStatus: v.relationshipStatus,
       });
       const res = await apiRequest("PUT", "/api/energy/cosmology", {
         birthName,
@@ -371,6 +372,13 @@ export function Onboarding() {
                 birthDate: intakeInitial.birthDate,
                 birthTime: intakeInitial.birthTime,
                 sex: (user?.sex as "male" | "female" | null) ?? null,
+                relationshipStatus:
+                  (user?.relationshipStatus as
+                    | "single"
+                    | "dating"
+                    | "married"
+                    | "private"
+                    | null) ?? null,
                 yOverrides: intakeInitial.yOverrides,
               }}
               saving={saveIntake.isPending}
