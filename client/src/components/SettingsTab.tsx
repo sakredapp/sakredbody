@@ -22,6 +22,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SectionHeading, Panel } from "@/components/portal/Panel";
 import { HealthSettings } from "@/components/portal/HealthSettings";
 import { AboutYouSettings } from "@/components/portal/AboutYouSettings";
+import { MovementSettings } from "@/components/portal/MovementSettings";
 import { InfoTip } from "@/components/ui/info-tip";
 import { EyeOff, Scale, LogOut, ShieldOff } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -92,6 +93,15 @@ export function SettingsTab({
           for good. */}
       <Panel title="About you">
         <AboutYouSettings />
+      </Panel>
+
+      {/* ── What Build opens on ────────────────────────────────────────────
+          The Build screen asks this once and then never again, which is the
+          right amount of asking and the wrong amount if there is nowhere to
+          change the answer. People take up Pilates; people stop playing
+          basketball. */}
+      <Panel title="Movement you do">
+        <MovementSettings />
       </Panel>
 
       {/* ── Health, reminders and the widget ───────────────────────────────
