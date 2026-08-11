@@ -31,6 +31,7 @@ import { almanacFor, elementalSeason } from "../../shared/utils/almanac.js";
 import { memberRef } from "./memberRef.js";
 import { sanitisePrompt } from "./redact.js";
 import { healthSignals } from "./healthSignals.js";
+import { trainingSignals } from "./trainingSignals.js";
 import { addDaysToString, routineDayNumber } from "../../shared/utils/dates.js";
 import {
   SYSTEM_PROMPT,
@@ -39,6 +40,7 @@ import {
   anchorsFor,
   fallbackNote,
   type Candidate,
+  trainingPromptLines,
   type NoteContext,
 } from "./voice.js";
 import { getModelClient } from "./model.js";
@@ -165,6 +167,7 @@ export async function buildContext(userId: string, onDate: string): Promise<Note
     // See the note in buildContext above the query.
     identifiers: [user?.firstName, user?.lastName, user?.email],
     health: await healthSignals(userId),
+    training: trainingPromptLines(await trainingSignals(userId, onDate)),
     polarity: chart?.polarity ?? null,
     protocol,
     centre,

@@ -8,7 +8,13 @@
  *   npx tsx script/test-voice.ts
  */
 
-import { judge, anchorsFor, fallbackNote, type Candidate } from "../server/daily/voice.js";
+import {
+  judge,
+  anchorsFor,
+  fallbackNote,
+  trainingPromptLines,
+  type Candidate,
+} from "../server/daily/voice.js";
 import { almanacFor } from "../shared/utils/almanac.js";
 
 let passed = 0;
@@ -316,6 +322,54 @@ if (!v.ok) {
 } else {
   passed++;
 }
+
+
+// ── What they have been training ─────────────────────────────────────────
+//
+// These sentences go straight into a prompt, so a wrong one is a note that
+// tells a member something untrue about their own week. Nothing here may
+// contain member-typed text: only counts and catalogue family labels.
+
+function tcheck(name: string, cond: boolean, detail?: string) {
+  if (cond) passed++;
+  else {
+    failed++;
+    console.log(`  \u2717 ${name}${detail ? ` — ${detail}` : ""}`);
+  }
+}
+
+tcheck("no training data says nothing at all", trainingPromptLines(null).length === 0);
+
+const trained = trainingPromptLines({
+  sessionsThisWeek: 3,
+  daysSinceLast: 0,
+  recent: ["strength", "practices"],
+  neglected: ["mobility"],
+}).join(" ");
+tcheck("today is 'today', not '0 days ago'", trained.includes("They trained today."));
+tcheck("the week is counted", trained.includes("3 sessions in the last seven days."));
+tcheck("what they did is named", trained.includes("This week: strength, practices."));
+tcheck("what is missing is named", trained.includes("mobility"));
+
+const one = trainingPromptLines({
+  sessionsThisWeek: 1,
+  daysSinceLast: 1,
+  recent: ["strength"],
+  neglected: [],
+}).join(" ");
+tcheck("one session is singular", one.includes("1 session in the last seven days."));
+tcheck("yesterday is 'yesterday'", one.includes("They trained yesterday."));
+tcheck("nothing missing is not mentioned", !one.includes("Not touched"));
+
+const stale = trainingPromptLines({
+  sessionsThisWeek: 0,
+  daysSinceLast: 12,
+  recent: [],
+  neglected: ["strength", "mobility"],
+}).join(" ");
+tcheck("a gap is stated plainly", stale.includes("Last trained 12 days ago."));
+tcheck("an empty week says so", stale.includes("Nothing logged in the last seven days."));
+tcheck("no empty 'This week:' line", !stale.includes("This week:"));
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);
 process.exit(failed === 0 ? 0 : 1);

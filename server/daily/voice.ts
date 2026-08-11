@@ -110,6 +110,53 @@ const FUSION_TAILS = new Set([
   "are", "was", "were", "will", "can", "does", "has", "have", "belongs",
 ]);
 
+export type TrainingSignals = {
+  /** Sessions finished in the last seven days. */
+  sessionsThisWeek: number;
+  /** Whole days since the most recent finished session. 0 is today. */
+  daysSinceLast: number | null;
+  /** Families trained in the last seven days, most recent first. */
+  recent: string[];
+  /**
+   * Families they have not touched in a while.
+   *
+   * Only ever families they have trained at some point in the window's
+   * history — telling somebody who has never done studio work that they are
+   * neglecting the reformer is a recommendation, not an observation, and this
+   * file only makes observations.
+   */
+  neglected: string[];
+};
+
+/**
+ * The prompt lines, or none.
+ *
+ * Written as sentences rather than a table because the surrounding prompt is
+ * sentences, and because the model's job is to say what follows from a fact —
+ * which is easier from "three sessions, none of them mobility" than from a
+ * count in a column.
+ */
+export function trainingPromptLines(t: TrainingSignals | null): string[] {
+  if (!t) return [];
+  const lines: string[] = ["WHAT THEY HAVE BEEN TRAINING (computed, all true)"];
+
+  if (t.daysSinceLast === 0) lines.push("They trained today.");
+  else if (t.daysSinceLast === 1) lines.push("They trained yesterday.");
+  else if (t.daysSinceLast !== null) lines.push(`Last trained ${t.daysSinceLast} days ago.`);
+
+  lines.push(
+    t.sessionsThisWeek === 0
+      ? "Nothing logged in the last seven days."
+      : `${t.sessionsThisWeek} session${t.sessionsThisWeek === 1 ? "" : "s"} in the last seven days.`,
+  );
+
+  if (t.recent.length) lines.push(`This week: ${t.recent.join(", ")}.`);
+  if (t.neglected.length) {
+    lines.push(`Not touched in over a week, though they normally do: ${t.neglected.join(", ")}.`);
+  }
+  return lines;
+}
+
 export interface Candidate {
   headline: string;
   body: string;
@@ -348,6 +395,12 @@ export interface NoteContext {
   intention?: string | null;
   /** Their last few days' completion, so the note can notice. */
   recentCompletion?: { done: number; total: number } | null;
+  /**
+   * Prompt-ready sentences about what they have been training, from
+   * server/daily/trainingSignals.ts. Already reduced and already free of
+   * anything a member typed — see the note at the top of that file.
+   */
+  training?: string[] | null;
 }
 
 export const SYSTEM_PROMPT = `You write one short daily note for a member of Sakred Body — a private health practice for a small number of people paying a great deal for attention. Every member has a coach. You are not the coach; you are the thing they read before they see one.
@@ -456,6 +509,25 @@ export function buildUserPrompt(ctx: NoteContext): string {
       "These are measurements, not a diagnosis. You may notice one of them. " +
         "Do not give medical advice, do not name a condition, and do not tell " +
         "them a number is good or bad — say what it suggests about today.",
+    );
+  }
+
+  /**
+   * What they have actually been doing.
+   *
+   * The one input where Sakred knows more than the wearable does: a watch can
+   * say the heart rate went up, and only Build knows it was pulling, that it
+   * was heavy, and that nothing elastic has happened in three weeks. Placed
+   * directly after the measurements because the two are read together — a low
+   * night after four hard days means something a low night alone does not.
+   */
+  if (ctx.training?.length) {
+    lines.push("");
+    lines.push(...ctx.training);
+    lines.push(
+      "You may name one of these. Do not prescribe a workout, do not tell them " +
+        "to rest, and do not congratulate them on a number. If a whole kind of " +
+        "movement has been missing, saying so plainly is enough.",
     );
   }
 
