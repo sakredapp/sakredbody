@@ -104,11 +104,25 @@ export default function FoodChart() {
               acidic, or as <span className="text-gold">Yin and Yang</span> — different vocabulary, the same
               observation.
             </p>
+            {/* The instruction, without the mechanism claim.
+                This read "Alkaline to heal. Acidic to build." — which is the
+                practical rule, and also exactly the shape of a claim the brand
+                document rules out: that health is controlled by making the
+                body systemically alkaline, and that building is pathological
+                acidity. Neither is true. The body holds blood pH in a narrow
+                band whatever is on the plate.
+
+                What survives is the part that was always doing the work: how
+                to weight a plate, and when. Alkaline and acidic stay as the
+                traditional shorthand for the two ends — a polarity and a
+                terrain metaphor, which is what they are. */}
             <p className="text-foreground leading-relaxed max-w-2xl mx-auto text-sm md:text-base mt-4">
-              Which makes the rule simple. <span className="text-gold">Alkaline to heal. Acidic to build.</span>{" "}
-              Weight the plate to the cooling end while the body is clearing a load, and to the building end
-              when you're asking it to adapt. Neither end is good or bad — the mistake is staying at one of
-              them permanently, whichever one it is.
+              Which makes the rule simple.{" "}
+              <span className="text-gold">Weight the plate to the clearing end while the body is clearing a
+              load, and to the building end when you're asking it to adapt.</span>{" "}
+              What older traditions called eating alkaline is mostly this end of the chart; what they called
+              acidic is mostly the other. Neither is good or bad — the mistake is living permanently at one
+              of them, whichever one it is.
             </p>
           </motion.div>
         </div>
