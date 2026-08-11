@@ -57,6 +57,7 @@ import { useAccess } from "@/hooks/use-access";
 import { PortalBackdrop } from "@/components/portal/PortalBackdrop";
 import { PillarHome } from "@/components/PillarHome";
 import { BuildTab } from "@/components/BuildTab";
+import { RestoreTab } from "@/components/RestoreTab";
 import { SettingsTab } from "@/components/SettingsTab";
 import { useHealthAutoSync } from "@/hooks/use-health";
 import { Onboarding } from "@/components/portal/Onboarding";
@@ -496,6 +497,21 @@ export default function MemberDashboard() {
             className={`${PORTAL_COLUMN} py-6`}
           >
             <SettingsTab weightUnit={user?.weightUnit} onLogout={() => logout()} />
+          </motion.div>
+        )}
+
+        {/* Restore before Build, here as everywhere: you cannot load a terrain
+            that cannot yet drain. */}
+        {section === "restore" && (
+          <motion.div
+            key="restore"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className={`${PORTAL_COLUMN} py-6`}
+          >
+            <RestoreTab onOpen={setSection} />
           </motion.div>
         )}
 

@@ -29,6 +29,10 @@ import {
   summariseSession,
   BUILD_MODALITIES,
   categoriesForModalities,
+  CATEGORY_LOAD,
+  categoryLoad,
+  categoryOrientation,
+  orientationOfLoad,
   type LoggedSet,
 } from "../shared/models/training.js";
 import { catalogueRows, slug, arrayLiteral } from "../shared/data/exerciseCatalogue.js";
@@ -334,6 +338,43 @@ check(
   "every alias in the catalogue renders",
   rows.every((r) => (r.aliases?.length ? arrayLiteral(r.aliases)!.startsWith("{") : true)),
 );
+
+console.log("\nWhat a category asks of the body\n");
+
+// The whole point of keeping the loads beside the categories is that they
+// cannot drift apart. A category added without a load would silently become
+// neutral — invisible to the terrain reading and impossible to notice.
+check(
+  "every category has a load",
+  EXERCISE_CATEGORIES.every((c) => CATEGORY_LOAD[c.id] !== undefined),
+  EXERCISE_CATEGORIES.filter((c) => !CATEGORY_LOAD[c.id]).map((c) => c.id).join(", "),
+);
+check(
+  "no load is invented for a category that does not exist",
+  Object.keys(CATEGORY_LOAD).every((id) => EXERCISE_CATEGORIES.some((c) => c.id === id)),
+  Object.keys(CATEGORY_LOAD)
+    .filter((id) => !EXERCISE_CATEGORIES.some((c) => c.id === id))
+    .join(", "),
+);
+check(
+  "every load is inside the scale",
+  Object.values(CATEGORY_LOAD).every(
+    (l) => l.stress >= 0 && l.stress <= 3 && l.restoration >= 0 && l.restoration <= 3,
+  ),
+);
+
+check("demanding and restoring is both", orientationOfLoad({ stress: 3, restoration: 3 }) === "both");
+check("demanding alone is yang", orientationOfLoad({ stress: 3, restoration: 0 }) === "yang");
+check("restoring alone is yin", orientationOfLoad({ stress: 0, restoration: 3 }) === "yin");
+check("neither is neutral", orientationOfLoad({ stress: 1, restoration: 1 }) === "neutral");
+
+// The cases the single-label version would have got wrong.
+check("a deadlift's category builds", categoryOrientation("legs") === "yang");
+check("fascia restores", categoryOrientation("fascia") === "yin");
+check("Lagree is not gentle because it happens on a carriage", categoryOrientation("lagree") === "yang");
+check("Pilates is both", categoryOrientation("pilates") === "both");
+check("an unknown category is neutral, not guessed", categoryOrientation("nonsense") === "neutral");
+check("an unknown category has no load", categoryLoad("nonsense").stress === 0);
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

@@ -34,6 +34,7 @@ import {
   CalendarDays,
   MoreHorizontal,
   Leaf,
+  Moon,
   BookOpen,
   Activity,
   GraduationCap,
@@ -52,6 +53,7 @@ import { cn } from "@/lib/utils";
 export type MemberSection =
   | "home"
   | "coaching"
+  | "restore"
   | "build"
   | "community"
   | "wins"
@@ -91,7 +93,28 @@ export const PRIMARY: Destination[] = [
 
 export const SECONDARY: Destination[] = [
   { id: "retreat", label: "What's On", icon: CalendarDays, note: "Retreats, masterminds and talks" },
+  /**
+   * Restore sits immediately above Build, and that adjacency is the point.
+   *
+   * They are the two directions the whole product is built on, so a sheet that
+   * listed one of them and sent the other somewhere else was quietly saying
+   * they aren't a pair. Restore first, because you cannot load a terrain that
+   * cannot yet drain.
+   */
+  { id: "restore", label: "Restore", icon: Moon, note: "Sleep, breath and giving capacity back" },
   { id: "build", label: "Build", icon: Dumbbell, note: "Today's lifts, and what you hit" },
+  /**
+   * "The Body", and not "Terrain".
+   *
+   * It was Terrain for an hour. The word is right for the *reading* on Home —
+   * what condition you are in — and wrong as a destination, because a member
+   * looking at a menu item called Terrain cannot tell whether it holds their
+   * stats, their protocol or a philosophy page. The first person to see it
+   * asked exactly that.
+   *
+   * One word, one meaning: terrain is the reading, The Body is the screen
+   * where you take it yourself.
+   */
   { id: "body", label: "The Body", icon: Activity, note: "Nine centres, read in sequence" },
   { id: "apothecary", label: "Apothecary", icon: Leaf, note: "What each protocol asks for" },
   { id: "library", label: "Library", icon: BookOpen, note: "Guides paired to your protocol" },

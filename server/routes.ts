@@ -25,6 +25,7 @@ import { registerMemberRoutes } from "./members/index.js";
 import { registerTrainingRoutes } from "./training/index.js";
 import { registerMemberWorkoutRoutes } from "./training/memberWorkouts.js";
 import { registerHealthRoutes } from "./health/index.js";
+import { registerTerrainRoutes } from "./terrain/index.js";
 import { registerModerationRoutes } from "./moderation/index.js";
 import { requireRole } from "./auth/roles.js";
 import {
@@ -496,6 +497,9 @@ export async function registerRoutes(
 
   // Health — what the phone measured. Read-only to us; the device owns it.
   registerHealthRoutes(app);
+
+  // Terrain — the two above, read together: what condition the body is in.
+  registerTerrainRoutes(app);
 
   // Reporting and blocking — required by both app stores for UGC.
   registerModerationRoutes(app);

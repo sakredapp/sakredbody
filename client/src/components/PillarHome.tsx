@@ -1,10 +1,10 @@
 /**
- * Home — five doors.
+ * Home — the terrain, then four doors.
  *
  * The launcher from the second round of mockups. It replaces opening straight
  * onto Today, and the reason is about how the app *reads* rather than what it
  * does: Today opens onto an empty checklist, which looks broken. A launcher of
- * five doors is supposed to be sparse, so the same absence of content reads as
+ * a few doors is supposed to be sparse, so the same absence of content reads as
  * a product waiting for you rather than one that failed.
  *
  * ── Every card states a fact, not a tagline ───────────────────────────────
@@ -27,9 +27,9 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HealthSwatches } from "@/components/portal/HealthSwatches";
+import { TerrainToday } from "@/components/TerrainToday";
 import type { MemberSection } from "@/components/MemberNav";
 
 interface Pillar {
@@ -43,17 +43,56 @@ interface Pillar {
 }
 
 /**
- * The five doors, in one place on purpose.
+ * The doors, in one place on purpose.
  *
- * ── Embody, not Executive ─────────────────────────────────────────────────
+ * ── Why Embody is no longer one of them ───────────────────────────────────
  *
- * A round of mockups proposed Restore / Build / Executive / Retreats /
- * Knowledge. The brand already had an answer and it wasn't that: the meta
- * description reads "Restore the Body. Build the Body. Embody the Life.", and
- * the constellation on the landing page is drawn with four named anchors —
- * Restore, Build, Embody, Gather. Executive is a product tier here, not a
- * stage of the sequence, and promoting it to a pillar would have put a
- * customer segment where a practice belongs.
+ * It used to sit third, between Build and Retreats, and the note here argued
+ * for it: the brand line reads "Restore the Body. Build the Body. Embody the
+ * Life." That argument was about the *site*, and the site has since answered
+ * it — territories.ts is three now, not four, on the grounds that Embody was
+ * never a force alongside the other two. It described the relationship
+ * *between* them, which makes it a fine idea and a bad sibling.
+ *
+ * The app had the same fault with a sharper edge, because a door is not a
+ * paragraph: tapping Embody opened the nine centres, which is a reading of
+ * your own terrain.
+ *
+ * ── And why Terrain did not simply take its slot ──────────────────────────
+ *
+ * It did, for about an hour, and it was wrong for a reason worth keeping:
+ * renaming the fourth door Terrain fixed the word and kept the mistake. The
+ * brief is explicit that terrain "sits underneath all three" and that there
+ * must not be four competing pillars — and a tile in the same grid, the same
+ * size, with the same treatment, is a competing pillar no matter what it says
+ * on it. The first person to see it asked "what is terrain?", which is the
+ * only test that matters.
+ *
+ * So terrain is the *reading at the top* — TerrainToday, above these doors,
+ * framing them — and the nine centres go back to being reachable from Restore
+ * and from the More sheet. One word, one meaning, and it is not a place you
+ * go: it is the condition the places are chosen against.
+ *
+ * ── Four doors, no hero ───────────────────────────────────────────────────
+ *
+ * Restore and Build now sit side by side at the same size. A hero row would
+ * have made one of the two forces visually senior to the other on the screen
+ * that introduces them as a pair, which is the same fault as the redirect
+ * below, drawn instead of coded.
+ *
+ * ── Restore is a place now ────────────────────────────────────────────────
+ *
+ * The larger fault was quieter. Restore pointed at `coaching`, which is Today
+ * — so of the two forces the whole product is built on, one was a screen and
+ * the other was a redirect to the daily checklist. On a home screen that
+ * presents them as a pair, that asymmetry is the product telling you which
+ * half it actually built.
+ *
+ * ── Order is the argument ─────────────────────────────────────────────────
+ *
+ * Restore, then Build, because you cannot load a terrain that cannot yet
+ * drain. Then Gather and Library, which are what surrounds the practice
+ * rather than what it is.
  *
  * Kept as a single array because that is the whole point: this is a brand
  * decision, so changing it should be one edit and never a refactor.
@@ -62,9 +101,9 @@ const PILLARS: Pillar[] = [
   {
     key: "restore",
     title: "Restore",
-    blurb: "Nervous system, recovery and inner balance.",
+    blurb: "Sleep, nervous system, and giving capacity back.",
     image: "/images/zen-sand-garden.webp",
-    section: "coaching",
+    section: "restore",
   },
   {
     key: "build",
@@ -74,26 +113,18 @@ const PILLARS: Pillar[] = [
     section: "build",
   },
   {
-    key: "embody",
-    title: "Embody",
-    // Their own line: the body is the terrain you live your whole life
-    // through. This door opens onto the nine centres, which is the closest
-    // thing the app has to reading your own body — and which was otherwise
-    // buried in the More sheet with no front door at all.
-    blurb: "The terrain you live in, read from the inside.",
-    image: "/images/rugged-cliffs.webp",
-    section: "body",
-  },
-  {
     key: "retreats",
-    title: "Retreats",
-    blurb: "Transformative experiences in sacred locations.",
+    title: "Gather",
+    blurb: "Retreats, masterminds, and the people around you.",
     image: "/images/retreat-mountain.webp",
     section: "retreat",
   },
   {
     key: "knowledge",
-    title: "Knowledge",
+    title: "Library",
+    // Was "Knowledge", which named the category rather than the thing. Nobody
+    // opens an app looking for knowledge; they look for the guide they were
+    // sent. It opens the library, so it says Library.
     blurb: "Courses, guides and tools for growth.",
     image: "/images/stone-villa.webp",
     section: "library",
@@ -152,16 +183,11 @@ function useCounts() {
     },
   });
 
-  const centres = useQuery<Array<{ reading?: unknown | null }>>({
-    queryKey: ["/api/energy/centres"],
-    queryFn: async () => {
-      const r = await fetch("/api/energy/centres", { credentials: "include" });
-      if (!r.ok) throw new Error("no");
-      return r.json();
-    },
-  });
+  // The centres query left with the Terrain door. It was the only caller, and
+  // a request whose result nothing renders is a request nobody will notice is
+  // still being made.
 
-  return { today, offerings, ebooks, centres, build };
+  return { today, offerings, ebooks, build };
 }
 
 export function PillarHome({
@@ -171,7 +197,7 @@ export function PillarHome({
   firstName?: string | null;
   onOpen: (section: MemberSection) => void;
 }) {
-  const { today, offerings, ebooks, centres, build } = useCounts();
+  const { today, offerings, ebooks, build } = useCounts();
 
   /**
    * The live line under each title.
@@ -202,16 +228,6 @@ export function PillarHome({
         const lifts = build.data!.sessions.reduce((t, s) => t + s.exercises.length, 0);
         return `${lifts} ${lifts === 1 ? "lift" : "lifts"} today`;
       }
-      case "embody": {
-        if (centres.isLoading) return undefined;
-        const all = centres.data ?? [];
-        if (all.length === 0) return undefined;
-        // Centres carry their latest reading, not today's, so this counts how
-        // much of the map has ever been read rather than claiming a daily
-        // figure the data can't support.
-        const read = all.filter((c) => c.reading).length;
-        return read === 0 ? "Not read yet" : `${read} of ${all.length} read`;
-      }
       case "retreats": {
         if (offerings.isLoading) return undefined;
         const n = offerings.data?.length ?? 0;
@@ -238,17 +254,23 @@ export function PillarHome({
         </p>
       </div>
 
+      {/* What condition they are in, before what they could do about it —
+          the doors mean something different once you have read this. */}
+      <TerrainToday onOpenRestore={() => onOpen("restore")} />
+
       {/* Their own numbers, before the menu. */}
       <HealthSwatches onOpenStats={() => onOpen("coaching")} />
 
-      {/* One hero, then a 2x2 grid. Five identical full-width slabs gave every
-          door the same weight and made the screen read as a list of links —
-          and at that height, four of them were mostly photograph. */}
+      {/* A 2x2 grid of equals.
+
+          This was one hero above a 2x2, which was right when there were five
+          doors and the first was the obvious front. With four it made Restore
+          senior to Build on the one screen whose job is to present them as two
+          directions of the same thing. */}
       <div className="grid grid-cols-2 gap-3">
-        {PILLARS.map((p, i) => {
+        {PILLARS.map((p) => {
           const fact = factFor(p.key);
           const open = p.section !== null;
-          const hero = i === 0;
 
           return (
             <button
@@ -257,7 +279,7 @@ export function PillarHome({
               disabled={!open}
               className={cn(
                 "group relative w-full overflow-hidden rounded-xl border border-[hsl(var(--gold))]/12 text-left tap-clean",
-                hero ? "col-span-2 h-28 sm:h-32" : "col-span-1 h-32 sm:h-36",
+                "col-span-1 h-36 sm:h-40",
                 open ? "hover:border-[hsl(var(--gold))]/30 transition-colors" : "opacity-60",
               )}
               data-testid={`pillar-${p.key}`}
@@ -268,49 +290,29 @@ export function PillarHome({
                 loading="lazy"
                 className="absolute inset-0 h-full w-full object-cover"
               />
-              {/* Read left-to-right: opaque where the words are, image where
-                  they aren't. A flat scrim over the whole card would dim the
-                  photograph without making the text any more legible. */}
-              <div
-                className={cn(
-                  "absolute inset-0",
-                  hero
-                    ? "bg-gradient-to-r from-[hsl(var(--ink))] via-[hsl(var(--ink))]/85 to-[hsl(var(--ink))]/20"
-                    // A square card has no room to clear space beside the text,
-                    // so the scrim runs bottom-up and the words sit on it.
-                    : "bg-gradient-to-t from-[hsl(var(--ink))] via-[hsl(var(--ink))]/80 to-[hsl(var(--ink))]/10",
-                )}
-              />
+              {/* Bottom-up, because a square card has no room to clear space
+                  beside the text — the words sit on the scrim rather than
+                  next to it. A flat scrim over the whole card would dim the
+                  photograph without making anything more legible. */}
+              <div className="absolute inset-0 bg-gradient-to-t from-[hsl(var(--ink))] via-[hsl(var(--ink))]/80 to-[hsl(var(--ink))]/10" />
 
-              <div
-                className={cn(
-                  "relative h-full flex gap-3 px-4",
-                  hero ? "items-center" : "items-end pb-3",
-                )}
-              >
+              <div className="relative h-full flex items-end gap-3 px-4 pb-3">
                 <div className="min-w-0 flex-1">
-                  <h2
-                    className={cn(
-                      "font-display tracking-wide uppercase text-white",
-                      hero ? "text-xl" : "text-base",
-                    )}
-                  >
+                  <h2 className="font-display tracking-wide uppercase text-white text-base">
                     {p.title}
                   </h2>
-                  {/* The blurb is the first thing to go when the card narrows —
-                      two lines of small type under a title is what made these
-                      read as dense rather than considered. */}
-                  {hero && <p className="text-xs text-white/60 mt-0.5 line-clamp-2">{p.blurb}</p>}
+                  {/* The blurb used to be hero-only, on the grounds that two
+                      lines of small type under a title made these read as
+                      dense. It is back on every card because the first person
+                      to use the four-door version asked what one of them was —
+                      dense beats unexplained. One line, clamped. */}
+                  <p className="text-[11px] leading-snug text-white/55 mt-0.5 line-clamp-2">
+                    {p.blurb}
+                  </p>
                   {fact && (
                     <p className="text-[11px] text-[hsl(var(--gold))] mt-1">{fact}</p>
                   )}
                 </div>
-
-                {open && hero && (
-                  <span className="shrink-0 h-7 w-7 rounded-full border border-[hsl(var(--gold))]/40 grid place-items-center group-hover:border-[hsl(var(--gold))] transition-colors">
-                    <ChevronRight className="h-3.5 w-3.5 text-[hsl(var(--gold))]" />
-                  </span>
-                )}
               </div>
             </button>
           );

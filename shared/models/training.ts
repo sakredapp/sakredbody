@@ -438,6 +438,138 @@ export const exerciseCategoryEnum = z.enum(
   EXERCISE_CATEGORIES.map((c) => c.id) as [ExerciseCategory, ...ExerciseCategory[]],
 );
 
+// ─── 1a-ii. WHAT A CATEGORY ASKS OF THE BODY ───────────────────────────────
+
+/**
+ * Two loads per category, and orientation derived from them.
+ *
+ * ── Why two numbers rather than one label ─────────────────────────────────
+ *
+ * The obvious shape is a single `orientation: "yin" | "yang"` column, and it
+ * is wrong for the cases that matter most. A sauna is a genuine cardiovascular
+ * stressor *and* genuinely restorative; so is a long easy ride; so is a hard
+ * yoga class. Forcing one label makes the model pick a side, and it will pick
+ * the wrong one exactly where a member most needs it to be right — the brief
+ * makes this point about fasting, which is "cleansing" and also one of the
+ * larger stressors a person can apply to themselves.
+ *
+ * Two independent loads say the true thing: sauna is high on both. Orientation
+ * then *falls out* rather than being asserted, which means it can never
+ * disagree with the numbers it came from.
+ *
+ * ── Scale ─────────────────────────────────────────────────────────────────
+ *
+ *   0  none        1  mild        2  moderate        3  substantial
+ *
+ * These are per *category*, not per movement, because a category is the level
+ * at which the claim is defensible. "Plyometrics are demanding" is true of
+ * every plyometric; "this particular box jump is a 2" is a number nobody can
+ * check. Per-movement overrides can come later if a real case appears — the
+ * lookup below is already the only thing that would have to change.
+ *
+ * Deliberately not a database column. There are 34 categories and one correct
+ * answer per category; a column would mean 657 rows to backfill, 657 chances
+ * to disagree with each other, and a migration every time a judgement changes.
+ * This is a constant because it is a decision, not data.
+ */
+export type MovementLoad = { stress: 0 | 1 | 2 | 3; restoration: 0 | 1 | 2 | 3 };
+
+export const CATEGORY_LOAD: Readonly<Record<string, MovementLoad>> = {
+  // ── Strength — demand, with little restorative value of its own ──
+  chest: { stress: 3, restoration: 0 },
+  back: { stress: 3, restoration: 0 },
+  shoulders: { stress: 2, restoration: 0 },
+  arms: { stress: 2, restoration: 0 },
+  legs: { stress: 3, restoration: 0 },
+  glutes: { stress: 2, restoration: 0 },
+  calves: { stress: 1, restoration: 0 },
+  core: { stress: 2, restoration: 0 },
+  olympic: { stress: 3, restoration: 0 },
+  landmine: { stress: 2, restoration: 0 },
+  calisthenics: { stress: 2, restoration: 0 },
+  rings: { stress: 3, restoration: 0 },
+  neck_grip: { stress: 1, restoration: 0 },
+  // Isometrics load hard and leave the tissue calmer than they found it, which
+  // is why they survive in rehab where nothing else does.
+  isometric: { stress: 2, restoration: 1 },
+  full_body: { stress: 2, restoration: 0 },
+
+  // ── Athletic ──
+  explosive: { stress: 3, restoration: 0 },
+  plyometric: { stress: 3, restoration: 0 },
+  agility: { stress: 2, restoration: 0 },
+  locomotion: { stress: 2, restoration: 1 },
+  carry: { stress: 3, restoration: 0 },
+  kettlebell: { stress: 2, restoration: 0 },
+  rotation: { stress: 2, restoration: 1 },
+  balance: { stress: 1, restoration: 1 },
+  ground: { stress: 1, restoration: 2 },
+  cardio: { stress: 2, restoration: 1 },
+
+  // ── Mobility — the clearest Yin in the catalogue ──
+  mobility: { stress: 0, restoration: 3 },
+  feet: { stress: 0, restoration: 2 },
+  corrective: { stress: 1, restoration: 2 },
+  // Yoga is the case the single-label version gets wrong: a restorative class
+  // and a led ashtanga class are the same category and not the same demand.
+  yoga: { stress: 1, restoration: 3 },
+
+  // ── Studio ──
+  pilates: { stress: 2, restoration: 2 },
+  // Lagree is not Pilates for this purpose. It is deliberately taken close to
+  // failure under constant tension, and treating it as gentle because it
+  // happens on a carriage would understate a member's week considerably.
+  lagree: { stress: 3, restoration: 1 },
+  barre: { stress: 2, restoration: 1 },
+
+  // ── Fascia ──
+  fascia: { stress: 1, restoration: 3 },
+  somatic: { stress: 0, restoration: 3 },
+  tissue: { stress: 0, restoration: 3 },
+  breath: { stress: 0, restoration: 3 },
+  recovery: { stress: 0, restoration: 3 },
+
+  // ── Whole sessions ──
+  practice: { stress: 1, restoration: 2 },
+  class: { stress: 2, restoration: 1 },
+  sport: { stress: 3, restoration: 0 },
+  endurance: { stress: 3, restoration: 1 },
+};
+
+/**
+ * Which direction something leans, or that it genuinely does both.
+ *
+ * `both` is not a hedge and not the same as `neutral`: a sauna is both, a
+ * gentle walk is neither, and telling a member they are the same thing would
+ * be worse than saying nothing.
+ */
+export type Orientation = "yin" | "yang" | "both" | "neutral";
+
+export function orientationOfLoad({ stress, restoration }: MovementLoad): Orientation {
+  const demanding = stress >= 2;
+  const restoring = restoration >= 2;
+  if (demanding && restoring) return "both";
+  if (demanding) return "yang";
+  if (restoring) return "yin";
+  return "neutral";
+}
+
+/** Unknown categories are neutral — an absent judgement, not a guessed one. */
+export function categoryLoad(category: string): MovementLoad {
+  return CATEGORY_LOAD[category] ?? { stress: 0, restoration: 0 };
+}
+
+export function categoryOrientation(category: string): Orientation {
+  return orientationOfLoad(categoryLoad(category));
+}
+
+export const ORIENTATION_LABEL: Readonly<Record<Orientation, string>> = {
+  yin: "Restore",
+  yang: "Build",
+  both: "Both",
+  neutral: "Neutral",
+};
+
 // ─── 1b. THE MEMBER'S OWN SESSIONS ─────────────────────────────────────────
 
 /**
