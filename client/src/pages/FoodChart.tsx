@@ -102,8 +102,13 @@ export default function FoodChart() {
               It's one axis, and it's the same one running through everything else here. One end cools and
               settles; the other heats and aggravates. Older traditions read the same split as alkaline and
               acidic, or as <span className="text-gold">Yin and Yang</span> — different vocabulary, the same
-              observation. Neither end is good or bad. A body clearing a load wants one; a body being asked
-              to adapt can use the other.
+              observation.
+            </p>
+            <p className="text-foreground leading-relaxed max-w-2xl mx-auto text-sm md:text-base mt-4">
+              Which makes the rule simple. <span className="text-gold">Alkaline to heal. Acidic to build.</span>{" "}
+              Weight the plate to the cooling end while the body is clearing a load, and to the building end
+              when you're asking it to adapt. Neither end is good or bad — the mistake is staying at one of
+              them permanently, whichever one it is.
             </p>
           </motion.div>
         </div>
