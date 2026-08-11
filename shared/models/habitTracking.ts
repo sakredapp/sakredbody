@@ -109,3 +109,38 @@ export const AUTO_TRACKABLE: readonly HealthMetric[] = [
   "waterMl",
   "dietaryCalories",
 ] as const;
+
+// ─── Practice · Target · Metric ────────────────────────────────────────────
+
+/**
+ * The three shapes a catalogue item takes, derived rather than stored.
+ *
+ *   practice  "Take magnesium before bed"   — done or not
+ *   target    "Hit 160g protein"            — a number the member enters
+ *   metric    "Sleep 7h 42m"                — a number the phone already knows
+ *
+ * A fourth column would only restate `trackingType` and `healthMetric`, and
+ * could then contradict them — a row claiming to be a metric with nothing to
+ * read from, or a practice carrying a target. Same reasoning as `unit`,
+ * `autoTrackEligible` and `contextDependent`: derive it, don't duplicate it.
+ *
+ * All three live equally inside Restore or Build. That is the point of the
+ * split: a Restore list reading "Sleep 7h 42m / 8h · Water 2.4 / 3L ·
+ * Magnesium ✓" is a terrain readout, not a checklist, and the item type is
+ * what lets one screen render all three.
+ */
+export type ItemType = "practice" | "target" | "metric";
+
+export function itemTypeOf(
+  trackingType: string,
+  healthMetric: string | null | undefined,
+): ItemType {
+  if (trackingType === "boolean") return "practice";
+  return healthMetric ? "metric" : "target";
+}
+
+export const ITEM_TYPE_LABEL: Readonly<Record<ItemType, string>> = {
+  practice: "Practice",
+  target: "Target",
+  metric: "Metric",
+};
