@@ -26,6 +26,7 @@ import { registerTrainingRoutes } from "./training/index.js";
 import { registerMemberWorkoutRoutes } from "./training/memberWorkouts.js";
 import { registerHealthRoutes } from "./health/index.js";
 import { registerTerrainRoutes } from "./terrain/index.js";
+import { registerHabitRoutes } from "./habits/index.js";
 import { registerModerationRoutes } from "./moderation/index.js";
 import { requireRole } from "./auth/roles.js";
 import {
@@ -500,6 +501,9 @@ export async function registerRoutes(
 
   // Terrain — the two above, read together: what condition the body is in.
   registerTerrainRoutes(app);
+
+  // The habit loop: catalogue → tracked → phase → entry → resolved day.
+  registerHabitRoutes(app);
 
   // Reporting and blocking — required by both app stores for UGC.
   registerModerationRoutes(app);

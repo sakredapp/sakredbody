@@ -144,6 +144,54 @@ export const routineHabits = pgTable(
     searchKeywords: text("search_keywords").array(),
     isFree: boolean("is_free").notNull().default(true),
     copyBlockId: text("copy_block_id"),
+
+    /**
+     * The stable identity of a catalogue item — "magnesium-glycinate-evening".
+     *
+     * Titles are copy. Copy gets rewritten, and the day somebody improves
+     * "Magnesium before bed" to "Evening magnesium", a loader keyed on title
+     * inserts a second row and every member tracking the first one quietly
+     * stops matching. The key never changes; everything else may.
+     */
+    habitKey: text("habit_key"),
+
+    /**
+     * What this does to the body, as opposed to which way it runs.
+     *
+     * `emphasis` is Yin or Yang — the half of a member's life it belongs to
+     * and the language they see. This is physiological role: what it costs and
+     * what it gives back. A cold plunge is Yang and an adaptive stressor; a
+     * late night is neither Yin nor Yang and squarely depleting. Two axes,
+     * because the catalogue has items in every quadrant.
+     *
+     * See shared/models/loadClass.ts.
+     */
+    loadClass: text("load_class"),
+    /**
+     * The other true things about it. Hard strength work is primarily
+     * `building` and also an `adaptive-stressor`, and the tempting shortcut —
+     * "building,adaptive-stressor" in the enum column — is a value no query
+     * can filter and no constraint can check.
+     */
+    loadTags: text("load_tags").array(),
+
+    /** 'foundational' | 'supportive' | 'advanced'. Sleep before cold plunges. */
+    priorityLevel: text("priority_level"),
+    /** A ceiling that is about the thing, not the person. Sauna is not a daily. */
+    maxPerWeek: integer("max_per_week"),
+    /** Which terrain reading this suits: 'restore' | 'build' | 'either'. */
+    terrainFit: text("terrain_fit"),
+
+    /**
+     * Retired without being destroyed.
+     *
+     * Unpublishing takes an item out of the pickers. It must not take it out
+     * of the history of everyone who ever did it — deleting the row would
+     * orphan live phases and blank out finished ones, which is a member
+     * losing their own record because somebody tidied a catalogue.
+     */
+    published: boolean("published").notNull().default(true),
+
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
   },

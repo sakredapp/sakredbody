@@ -20,6 +20,8 @@ export * from "./models/training.js";
 export * from "./models/moderation.js";
 export * from "./models/cohorts.js";
 export * from "./models/health.js";
+export * from "./models/trackedHabits.js";
+export * from "./models/terrainSignals.js";
 
 /**
  * The intake form behind ApplicationModal, on the Mastermind page.

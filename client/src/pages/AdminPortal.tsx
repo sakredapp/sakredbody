@@ -111,6 +111,7 @@ import {
 import type { Partner, PartnerService, BookingRequest } from "@shared/schema";
 import type { MasterclassCategory, MasterclassVideo } from "@shared/models/masterclass";
 import { TRACKING_TYPES, AUTO_TRACKABLE } from "@shared/models/habitTracking";
+import { LOAD_CLASSES, LOAD_CLASS_META } from "@shared/models/loadClass";
 import {
   SERVICE_CATEGORIES,
   getCategoryLabel,
@@ -292,6 +293,8 @@ interface HabitFormData {
   instructions: string; scienceExplanation: string; tips: string;
   expectToNotice: string; cadence: string; recommendedTime: string; emphasis: string;
   trackingType: string; defaultTarget: number | null; healthMetric: string; polarityStrength: string;
+  habitKey: string; loadClass: string; loadTags: string; priorityLevel: string;
+  maxPerWeek: number | null; terrainFit: string; published: boolean;
   durationMinutes: number | null; dayStart: number | null; dayEnd: number | null;
   orderIndex: number; icon: string; routineId: string;
   terrainTags: string; searchKeywords: string;
@@ -301,6 +304,8 @@ const emptyHabitForm: HabitFormData = {
   instructions: "", scienceExplanation: "", tips: "",
   expectToNotice: "", cadence: "daily", recommendedTime: "Morning", emphasis: "",
   trackingType: "boolean", defaultTarget: null, healthMetric: "", polarityStrength: "strong",
+  habitKey: "", loadClass: "", loadTags: "", priorityLevel: "",
+  maxPerWeek: null, terrainFit: "", published: true,
   durationMinutes: null, dayStart: 1, dayEnd: null,
   orderIndex: 0, icon: "", routineId: "",
   terrainTags: "", searchKeywords: "",
@@ -458,7 +463,7 @@ function HabitFormDialog({
   routines: WellnessRoutine[];
 }) {
   const [form, setForm] = useState(initial);
-  const set = (k: keyof HabitFormData, v: string | number | null) =>
+  const set = (k: keyof HabitFormData, v: string | number | boolean | null) =>
     setForm((p) => ({ ...p, [k]: v }));
 
   return (
@@ -557,6 +562,116 @@ function HabitFormDialog({
                   <SelectItem value="strong">Settled — counts fully</SelectItem>
                   <SelectItem value="moderate">Leans that way — counts half</SelectItem>
                   <SelectItem value="contextual">Contextual — shown, not counted</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              {/* The stable identity. Titles are copy and copy gets rewritten;
+                  the loader matches on this, so a reworded habit updates in
+                  place instead of arriving as a second row that every member
+                  tracking the first one silently stops matching. */}
+              <label className="text-sm font-medium">Key</label>
+              <Input
+                value={form.habitKey}
+                placeholder="magnesium-glycinate-evening"
+                onChange={(e) => set("habitKey", e.target.value.trim().toLowerCase())}
+                data-testid="input-habit-habitKey"
+              />
+            </div>
+            <div className="space-y-1">
+              {/* What it does to the body, which is not the same question as
+                  which way it runs. A cold plunge is Yang and an adaptive
+                  stressor; a late night is neither Yin nor Yang and squarely
+                  depleting. */}
+              <label className="text-sm font-medium">Load</label>
+              <Select
+                value={form.loadClass || "_none"}
+                onValueChange={(v) => set("loadClass", v === "_none" ? "" : v)}
+              >
+                <SelectTrigger data-testid="select-habit-loadClass"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">Not said</SelectItem>
+                  {LOAD_CLASSES.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {LOAD_CLASS_META[c].label} — {LOAD_CLASS_META[c].blurb}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              {/* The other true things about it. Hard strength work is
+                  primarily building and also an adaptive stressor. */}
+              <label className="text-sm font-medium">Also (comma separated)</label>
+              <Input
+                value={form.loadTags}
+                placeholder="adaptive-stressor"
+                onChange={(e) => set("loadTags", e.target.value)}
+                data-testid="input-habit-loadTags"
+              />
+            </div>
+            <div className="space-y-1">
+              {/* Sleep before cold plunges. A member on five hours does not
+                  need a stressor, and a catalogue with no way to say so will
+                  cheerfully recommend one. */}
+              <label className="text-sm font-medium">Priority</label>
+              <Select
+                value={form.priorityLevel || "_none"}
+                onValueChange={(v) => set("priorityLevel", v === "_none" ? "" : v)}
+              >
+                <SelectTrigger data-testid="select-habit-priorityLevel"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">Not said</SelectItem>
+                  <SelectItem value="foundational">Foundational — everything else assumes it</SelectItem>
+                  <SelectItem value="supportive">Supportive</SelectItem>
+                  <SelectItem value="advanced">Advanced — only pays off on a foundation</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              {/* A ceiling about the thing, not the person. Sauna is not a
+                  daily; the member's own schedule is theirs to choose beneath
+                  this. */}
+              <label className="text-sm font-medium">Most per week</label>
+              <Input
+                type="number"
+                value={form.maxPerWeek ?? ""}
+                placeholder="No ceiling"
+                onChange={(e) => set("maxPerWeek", e.target.value === "" ? null : Number(e.target.value))}
+                data-testid="input-habit-maxPerWeek"
+              />
+            </div>
+            <div className="space-y-1">
+              {/* Which terrain reading it suits — an input for the day
+                  something is suggested rather than listed. */}
+              <label className="text-sm font-medium">Suits</label>
+              <Select
+                value={form.terrainFit || "_none"}
+                onValueChange={(v) => set("terrainFit", v === "_none" ? "" : v)}
+              >
+                <SelectTrigger data-testid="select-habit-terrainFit"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">Not said</SelectItem>
+                  <SelectItem value="restore">A body asking for rest</SelectItem>
+                  <SelectItem value="build">A body with room</SelectItem>
+                  <SelectItem value="either">Either</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              {/* Unpublishing takes it out of the pickers and out of nobody's
+                  history. Deleting the row would orphan live phases and blank
+                  out finished ones — a member losing their own record because
+                  somebody tidied a catalogue. */}
+              <label className="text-sm font-medium">In the pickers</label>
+              <Select
+                value={form.published ? "yes" : "no"}
+                onValueChange={(v) => set("published", v === "yes")}
+              >
+                <SelectTrigger data-testid="select-habit-published"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="yes">Published</SelectItem>
+                  <SelectItem value="no">Retired — kept for everyone already on it</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1380,6 +1495,15 @@ export default function AdminPortal() {
       // The CHECK constraint pairs these: a boolean habit must have no target,
       // and every measured one must have a number.
       defaultTarget: d.trackingType === "boolean" ? null : d.defaultTarget,
+      // Same reasoning as `emphasis` above: every one of these columns has a
+      // CHECK constraint that permits its vocabulary or NULL, and "" is in
+      // neither list.
+      habitKey: d.habitKey.trim() || null,
+      loadClass: d.loadClass || null,
+      loadTags: tags(d.loadTags)?.length ? tags(d.loadTags) : null,
+      priorityLevel: d.priorityLevel || null,
+      terrainFit: d.terrainFit || null,
+      maxPerWeek: d.maxPerWeek || null,
     };
     if (!d.routineId) delete payload.routineId;
     return payload;
@@ -1837,6 +1961,13 @@ export default function AdminPortal() {
                     defaultTarget: editingHabit.defaultTarget ?? null,
                     healthMetric: editingHabit.healthMetric || "",
                     polarityStrength: editingHabit.polarityStrength || "strong",
+                    habitKey: editingHabit.habitKey || "",
+                    loadClass: editingHabit.loadClass || "",
+                    loadTags: (editingHabit.loadTags || []).join(", "),
+                    priorityLevel: editingHabit.priorityLevel || "",
+                    maxPerWeek: editingHabit.maxPerWeek ?? null,
+                    terrainFit: editingHabit.terrainFit || "",
+                    published: editingHabit.published !== false,
                     durationMinutes: editingHabit.durationMinutes, dayStart: editingHabit.dayStart,
                     dayEnd: editingHabit.dayEnd, orderIndex: editingHabit.orderIndex,
                     icon: editingHabit.icon || "",
