@@ -12,24 +12,25 @@ import { Plus } from "lucide-react";
 import { Panel } from "@/components/portal/Panel";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { HabitList } from "./HabitList";
-import { HabitPicker } from "./HabitPicker";
+import { HabitPicker, Configure } from "./HabitPicker";
 import { ProposalInbox } from "./ProposalInbox";
-import { useTrackedHabits, type ResolvedHabit } from "./useHabits";
+import { useTrackedHabits, useReconfigureHabit, type ResolvedHabit } from "./useHabits";
 
 export function HabitPanel({
   emphasis,
   title,
   emptyLine,
-  onConfigure,
 }: {
   emphasis: "yin" | "yang";
   title: string;
   emptyLine: string;
-  onConfigure?: (h: ResolvedHabit) => void;
 }) {
   const [picking, setPicking] = useState(false);
+  const [editing, setEditing] = useState<ResolvedHabit | null>(null);
   const today = useTrackedHabits();
+  const reconfigure = useReconfigureHabit();
 
   const mine = emphasis === "yin" ? today.data?.restore : today.data?.build;
   const adviceAt = today.data?.adviceAt ?? 5;
@@ -50,7 +51,7 @@ export function HabitPanel({
             We couldn't reach your list just now. It'll be here when the connection is.
           </p>
         ) : (
-          <HabitList habits={mine ?? []} emptyLine={emptyLine} onConfigure={onConfigure} />
+          <HabitList habits={mine ?? []} emptyLine={emptyLine} onConfigure={setEditing} />
         )}
 
         <Button
@@ -73,6 +74,39 @@ export function HabitPanel({
       </Panel>
 
       <HabitPicker open={picking} onClose={() => setPicking(false)} emphasis={emphasis} />
+
+      {/* Changing the plan opens a new phase rather than editing the old one,
+          which is why the copy says so out loud: what they've already logged
+          keeps grading against what they were asked for at the time. */}
+      <Dialog open={Boolean(editing)} onOpenChange={() => setEditing(null)}>
+        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl">{editing?.title}</DialogTitle>
+          </DialogHeader>
+          {editing && (
+            <Configure
+              item={{
+                trackingType: editing.trackingType,
+                unit: editing.unit,
+                defaultTarget: editing.target,
+                recommendedTime: editing.recommendedTime,
+                shortDescription: editing.shortDescription,
+                healthMetric: editing.healthMetric,
+              }}
+              initialSchedule={editing.schedule}
+              pending={reconfigure.isPending}
+              saveLabel="Save the change"
+              note="This starts fresh from today. Everything you've already logged stays as it was."
+              onSave={(config) =>
+                reconfigure.mutate(
+                  { id: editing.trackedHabitId, config },
+                  { onSuccess: () => setEditing(null) },
+                )
+              }
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

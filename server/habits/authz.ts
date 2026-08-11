@@ -45,11 +45,11 @@ import {
   habitEntries,
   habitProposals,
 } from "../../shared/models/trackedHabits.js";
-import { atLeast, effectiveRole, type Role } from "../../shared/models/access.js";
+import { atLeast, effectiveRole } from "../../shared/models/access.js";
+import type { Actor as SharedActor } from "../../shared/models/habitAccess.js";
 
-export type Actor = {
-  userId: string;
-  role: Role;
+export type Actor = SharedActor & {
+  /** Coach level or above. Attached so a handler can branch without a lookup. */
   isStaff: boolean;
 };
 
@@ -76,35 +76,19 @@ export async function actorFrom(req: Request, res: Response): Promise<Actor | nu
 }
 
 // ─── The four questions ────────────────────────────────────────────────────
+//
+// The decisions themselves live in shared/models/habitAccess.ts, pure and
+// exhaustively tested. They were here, and could not be tested here: this file
+// reaches the database to resolve a role, so importing it opens a connection —
+// and an authorization rule that only runs against live Postgres is one nobody
+// exercises. Re-exported so route handlers still import one module.
 
-/** Any coach-or-above, for any member. One place to narrow when rosters land. */
-export function canCoachAccessMember(actor: Actor, memberId: string): boolean {
-  if (actor.userId === memberId) return true;
-  return atLeast(actor.role, "coach");
-}
-
-/** Assigning, proposing and reconfiguring somebody else's habits. */
-export function canCoachModifyMemberHabit(actor: Actor, memberId: string): boolean {
-  if (actor.userId === memberId) return true;
-  return atLeast(actor.role, "coach");
-}
-
-/** Editing the shared catalogue every member draws from. */
-export function canAdminManageCatalogue(actor: Actor): boolean {
-  return atLeast(actor.role, "admin");
-}
-
-/**
- * The member whose habits this request is about.
- *
- * A member's own routes carry no id at all — the actor is the subject, so
- * there is nothing to tamper with. Coach routes carry `:userId`, and this is
- * the single gate they pass through.
- */
-export function subjectOf(actor: Actor, paramUserId?: string | null): string | null {
-  if (!paramUserId || paramUserId === actor.userId) return actor.userId;
-  return canCoachAccessMember(actor, paramUserId) ? paramUserId : null;
-}
+export {
+  canCoachAccessMember,
+  canCoachModifyMemberHabit,
+  canAdminManageCatalogue,
+  subjectOf,
+} from "../../shared/models/habitAccess.js";
 
 // ─── Scoped loaders ────────────────────────────────────────────────────────
 //

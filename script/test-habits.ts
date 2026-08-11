@@ -48,7 +48,13 @@ import {
 import { TRACKING_TYPES, itemTypeOf } from "../shared/models/habitTracking.js";
 import { signalLean, TERRAIN_SIGNALS, SIGNAL_KEYS } from "../shared/models/terrainSignals.js";
 import { habitConfigSchema, logEntrySchema } from "../shared/models/trackedHabits.js";
-import { resolveRow } from "../shared/models/habitResolve.js";
+import { resolveRow, weekAdherence } from "../shared/models/habitResolve.js";
+import {
+  canCoachAccessMember,
+  canCoachModifyMemberHabit,
+  canAdminManageCatalogue,
+  subjectOf,
+} from "../shared/models/habitAccess.js";
 
 let passed = 0;
 let failed = 0;
@@ -543,6 +549,69 @@ check("no member-facing string contains a snake_case enum",
   memberFacing.every((s) => !/[a-z]_[a-z]/.test(s)));
 check("no member-facing string says 'terrain'",
   memberFacing.every((s) => !s.toLowerCase().includes("terrain")));
+
+
+// ─── Authorization ─────────────────────────────────────────────────────────
+
+console.log("\nWho may act on whose habits\n");
+
+const nick = { userId: "nick", role: "member" as const };
+const otherMember = { userId: "sam", role: "member" as const };
+const coach = { userId: "gerard", role: "coach" as const };
+const admin = { userId: "jace", role: "admin" as const };
+const owner = { userId: "owner", role: "owner" as const };
+
+check("a member reaches their own habits", canCoachAccessMember(nick, "nick"));
+check("a member cannot reach another member's", !canCoachAccessMember(nick, "sam"));
+check("a member cannot write to another member's",
+  !canCoachModifyMemberHabit(otherMember, "nick"));
+check("a coach reaches a member's", canCoachAccessMember(coach, "nick"));
+check("a coach may write to a member's", canCoachModifyMemberHabit(coach, "nick"));
+check("an admin reaches a member's", canCoachAccessMember(admin, "nick"));
+check("an owner does too", canCoachAccessMember(owner, "nick"));
+
+check("a member cannot edit the shared catalogue", !canAdminManageCatalogue(nick));
+check("nor can a coach — one member's target is not everybody's default",
+  !canAdminManageCatalogue(coach));
+check("an admin can", canAdminManageCatalogue(admin));
+check("an owner can", canAdminManageCatalogue(owner));
+
+console.log("\nA tampered id in a path resolves to a refusal, not to somebody else\n");
+
+check("no id at all means the actor themselves", subjectOf(nick) === "nick");
+check("an empty id means the actor themselves", subjectOf(nick, "") === "nick");
+check("their own id is fine", subjectOf(nick, "nick") === "nick");
+check("somebody else's id from a member is refused", subjectOf(nick, "sam") === null);
+check("a made-up id from a member is refused", subjectOf(nick, "../../admin") === null);
+check("a coach passing a member id gets that member", subjectOf(coach, "nick") === "nick");
+check("an unknown role is refused rather than defaulted",
+  subjectOf({ userId: "x", role: "ghost" as never }, "nick") === null);
+
+// ─── Weekly quotas ─────────────────────────────────────────────────────────
+
+console.log("\nA 3x-a-week habit is graded by the week, not the day\n");
+
+const week = (states: string[]) =>
+  states.map((s) => ({
+    expected: (s === "-" ? "off" : "open") as "off" | "open",
+    progressState: (s === "y" ? "met" : "none") as "met" | "none",
+  }));
+
+check(
+  "three done out of a quota of three",
+  JSON.stringify(
+    weekAdherence({ kind: "times_per_week", count: 3 }, week(["y", "n", "y", "n", "y", "n", "n"])),
+  ) === JSON.stringify({ done: 3, of: 3 }),
+);
+check(
+  "as-needed has nothing to be behind on",
+  weekAdherence({ kind: "as_needed" }, week(["n", "n", "n", "n", "n", "n", "n"])) === null,
+);
+check(
+  "days the habit was off never count against the quota",
+  weekAdherence({ kind: "days_of_week", days: [1, 3, 5] }, week(["-", "y", "-", "y", "-", "y", "-"]))
+    ?.done === 3,
+);
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

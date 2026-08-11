@@ -176,24 +176,41 @@ export function HabitPicker({
  * Defaults come from the catalogue so that somebody who wants none of this can
  * press Add and get something sensible; every field is here so that somebody
  * who does can say it once and have it hold.
+ *
+ * Exported because reconfiguring is the same act: it produces a phase, from the
+ * same fields, with the same rules. Two forms would be two chances for one path
+ * to allow something the other refuses.
  */
-function Configure({
+export function Configure({
   item,
   onBack,
   onSave,
   pending,
+  saveLabel = "Add it",
+  note,
+  initialSchedule,
 }: {
-  item: CatalogueItem;
-  onBack: () => void;
+  item: Pick<
+    CatalogueItem,
+    "trackingType" | "unit" | "defaultTarget" | "recommendedTime" | "shortDescription" | "healthMetric"
+  >;
+  onBack?: () => void;
   onSave: (c: HabitConfig) => void;
   pending: boolean;
+  saveLabel?: string;
+  note?: string;
+  initialSchedule?: Schedule;
 }) {
   const [target, setTarget] = useState<string>(
     item.defaultTarget != null ? String(item.defaultTarget) : "",
   );
-  const [kind, setKind] = useState<Schedule["kind"]>("daily");
-  const [days, setDays] = useState<number[]>([1, 3, 5]);
-  const [count, setCount] = useState(3);
+  const [kind, setKind] = useState<Schedule["kind"]>(initialSchedule?.kind ?? "daily");
+  const [days, setDays] = useState<number[]>(
+    initialSchedule?.kind === "days_of_week" ? initialSchedule.days : [1, 3, 5],
+  );
+  const [count, setCount] = useState(
+    initialSchedule?.kind === "times_per_week" ? initialSchedule.count : 3,
+  );
   const [fixed, setFixed] = useState(false);
   const [durationDays, setDurationDays] = useState(21);
   const [time, setTime] = useState(item.recommendedTime ?? "");
@@ -211,13 +228,17 @@ function Configure({
 
   return (
     <div className="space-y-4">
-      <button
-        type="button"
-        onClick={onBack}
-        className="flex items-center gap-1 text-xs text-muted-foreground"
-      >
-        <ArrowLeft className="h-3 w-3" /> Back to the list
-      </button>
+      {onBack && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex items-center gap-1 text-xs text-muted-foreground"
+        >
+          <ArrowLeft className="h-3 w-3" /> Back to the list
+        </button>
+      )}
+
+      {note && <p className="text-[11px] text-muted-foreground">{note}</p>}
 
       {item.shortDescription && (
         <p className="text-sm text-muted-foreground">{item.shortDescription}</p>
@@ -356,7 +377,7 @@ function Configure({
         }
         data-testid="habit-config-save"
       >
-        {pending ? "Adding…" : "Add it"}
+        {pending ? "Saving…" : saveLabel}
       </Button>
     </div>
   );
