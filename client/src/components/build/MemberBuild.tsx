@@ -30,6 +30,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Panel } from "@/components/portal/Panel";
 import { MovementPicker, type Movement } from "./MovementPicker";
 import { LogPractice } from "./LogPractice";
+import { RecentSessions } from "./RecentSessions";
 import { cn } from "@/lib/utils";
 
 type SavedExercise = {
@@ -192,6 +193,8 @@ export function MemberBuild({ onStarted }: { onStarted: (sessionId: string, titl
           )}
         </div>
       </Panel>
+
+      <RecentSessions />
 
       {logging && <LogPractice onClose={() => setLogging(false)} />}
 

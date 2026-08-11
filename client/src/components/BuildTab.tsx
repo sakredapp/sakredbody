@@ -498,6 +498,28 @@ export function BuildTab() {
         );
       })}
 
+      {/* ── And whatever else they did ──
+          MemberBuild used to render only on days with nothing prescribed,
+          which meant a member with a session on the calendar had no way to log
+          anything else: no ad-hoc session, no saved workout, no activity, and
+          no sight of their own week. Its own file has said since it was
+          written that "a member can also do all this on a day that does have a
+          prescription, and that is deliberate" — that was the intent and it
+          was never wired to a screen.
+
+          Squats in the morning and a Pilates class in the evening is an
+          ordinary Tuesday, not an edge case. */}
+      {freeSession ? (
+        <FreeSession
+          sessionId={freeSession.id}
+          title={freeSession.title}
+          unit={unit}
+          onDone={() => setFreeSession(null)}
+        />
+      ) : (
+        <MemberBuild onStarted={(id, t) => setFreeSession({ id, title: t })} />
+      )}
+
       <p className="text-xs text-muted-foreground text-center">
         Weights are in {unit}.{" "}
         <InfoTip label="About units" title="Change it anywhere">

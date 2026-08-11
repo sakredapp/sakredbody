@@ -55,6 +55,7 @@ import {
   type WeightUnit,
   EXERCISE_CATEGORIES,
   isPracticeCategory,
+  summariseSession,
   CATALOGUE_FETCH_LIMIT,
   coachingMessages,
 } from "../../shared/schema.js";
@@ -214,40 +215,12 @@ async function shareSessionWithCoach(userId: string, sessionId: string): Promise
   if (working.length === 0) return;
 
   // Collapsed per movement: "Bench Press — 3 × 8 @ 185 lb" reads in a glance,
-  // and one line per set does not.
-  type Logged = (typeof working)[number];
-  const byMovement = new Map<string, Logged[]>();
-  for (const r of working) {
-    const list = byMovement.get(r.name) ?? [];
-    list.push(r);
-    byMovement.set(r.name, list);
-  }
-
-  const lines: string[] = [];
-  // Array.from rather than iterating the Map directly — this file targets a
-  // build without downlevelIteration.
-  for (const [name, sets] of Array.from(byMovement.entries())) {
-    const first = sets[0];
-    // A class is one line and the honest unit is minutes. Reading "Reformer
-    // Pilates — 1 × 2700s" in a coaching thread is the sort of detail that
-    // makes a coach stop trusting the summary.
-    if (isPracticeCategory(first.category)) {
-      const total = sets.reduce((t: number, s: Logged) => t + (s.durationSeconds ?? 0), 0);
-      lines.push(`${name} — ${Math.round(total / 60)} min`);
-    } else if (first.trackingType === "duration") {
-      const total = sets.reduce((t: number, s: Logged) => t + (s.durationSeconds ?? 0), 0);
-      lines.push(`${name} — ${sets.length} × ${Math.round(total / sets.length)}s`);
-    } else {
-      const reps = sets.map((s: Logged) => s.reps ?? 0);
-      const sameReps = reps.every((n: number) => n === reps[0]);
-      const loads = sets.map((s: Logged) => out(s.weightKg, unit) ?? 0).filter((n: number) => n > 0);
-      const top = loads.length ? Math.max(...loads) : null;
-      lines.push(
-        `${name} — ${sets.length} × ${sameReps ? reps[0] : reps.join("/")}` +
-          (top ? ` @ ${top}${unit}` : ""),
-      );
-    }
-  }
+  // and one line per set does not. The same function draws the member's own
+  // history, so the two cannot describe one session differently.
+  const lines = summariseSession(
+    working.map((r) => ({ ...r, weight: out(r.weightKg, unit) })),
+    unit,
+  );
 
   const title = session.title?.trim() || "Training";
   const content = [`${title} — ${working.length} sets`, "", ...lines].join("\n");

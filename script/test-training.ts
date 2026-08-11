@@ -26,6 +26,8 @@ import {
   EQUIPMENT,
   CATALOGUE_FETCH_LIMIT,
   isPracticeCategory,
+  summariseSession,
+  type LoggedSet,
 } from "../shared/models/training.js";
 import { catalogueRows, slug, arrayLiteral } from "../shared/data/exerciseCatalogue.js";
 
@@ -213,6 +215,81 @@ check(
     .filter((r) => ["pilates", "lagree", "barre"].includes(r.category))
     .every((r) => !r.load),
 );
+
+// One function draws both the member's history and the message posted into the
+// coaching thread. A coach reading "3 × 8 @ 185" while the member's screen says
+// something else is how somebody stops trusting both.
+console.log("\nA session reads the same to a member and to their coach\n");
+
+const set = (o: Partial<LoggedSet> & { name: string }): LoggedSet => ({
+  category: "back",
+  trackingType: "reps",
+  reps: null,
+  durationSeconds: null,
+  weight: null,
+  isWarmup: false,
+  ...o,
+});
+
+check(
+  "reps and a top load",
+  summariseSession(
+    [
+      set({ name: "Barbell Row", reps: 8, weight: 60 }),
+      set({ name: "Barbell Row", reps: 8, weight: 70 }),
+    ],
+    "kg",
+  )[0] === "Barbell Row — 2 × 8 @ 70kg",
+);
+check(
+  "uneven reps are listed rather than averaged",
+  summariseSession(
+    [set({ name: "Pull-Up", reps: 8 }), set({ name: "Pull-Up", reps: 6 })],
+    "kg",
+  )[0] === "Pull-Up — 2 × 8/6",
+);
+check(
+  "a hold is seconds",
+  summariseSession(
+    [
+      set({ name: "Plank", category: "core", trackingType: "duration", durationSeconds: 40 }),
+      set({ name: "Plank", category: "core", trackingType: "duration", durationSeconds: 50 }),
+    ],
+    "kg",
+  )[0] === "Plank — 2 × 45s",
+);
+check(
+  "a class is minutes, never 1 × 2700s",
+  summariseSession(
+    [
+      set({
+        name: "Reformer Pilates",
+        category: "class",
+        trackingType: "duration",
+        durationSeconds: 2700,
+      }),
+    ],
+    "kg",
+  )[0] === "Reformer Pilates — 45 min",
+);
+check(
+  "warm-ups are not in the summary",
+  summariseSession(
+    [
+      set({ name: "Squat", reps: 5, weight: 40, isWarmup: true }),
+      set({ name: "Squat", reps: 5, weight: 100 }),
+    ],
+    "kg",
+  )[0] === "Squat — 1 × 5 @ 100kg",
+);
+check(
+  "movements keep the order they were done in",
+  summariseSession(
+    [set({ name: "Squat", reps: 5 }), set({ name: "Row", reps: 8 }), set({ name: "Squat", reps: 5 })],
+    "kg",
+  ).join(" | ") === "Squat — 2 × 5 | Row — 1 × 8",
+);
+check("an empty session summarises to nothing", summariseSession([], "kg").length === 0);
 
 console.log("\nAn alias array survives the trip to Postgres\n");
 

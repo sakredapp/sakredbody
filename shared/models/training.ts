@@ -608,6 +608,75 @@ export function volumeKg(reps: number, loadKg: number): number {
   return reps * loadKg;
 }
 
+// ─── Reading a session back ────────────────────────────────────────────────
+
+/**
+ * What a set looks like once it has been read back and converted.
+ * `weight` is already in the member's own unit; nothing here converts.
+ */
+export type LoggedSet = {
+  name: string;
+  category: string;
+  trackingType: string;
+  reps: number | null;
+  durationSeconds: number | null;
+  weight: number | null;
+  isWarmup: boolean;
+};
+
+/**
+ * One line per movement, collapsed.
+ *
+ *   Barbell Bench Press — 3 × 8 @ 185 lb
+ *   Plank — 3 × 45s
+ *   Reformer Pilates — 45 min
+ *
+ * Here rather than on the server because two places render it: the message
+ * posted into the coaching thread, and the member's own history. Those had
+ * better not disagree — a coach reading "3 × 8 @ 185" while the member's
+ * screen says something else is the kind of small mismatch that makes somebody
+ * stop trusting both.
+ *
+ * Warm-ups are dropped, the same way every derived number in this file drops
+ * them. Order follows first appearance, which is the order it was done in.
+ */
+export function summariseSession(sets: LoggedSet[], unit: WeightUnit): string[] {
+  const working = sets.filter((s) => !s.isWarmup);
+  const byMovement = new Map<string, LoggedSet[]>();
+  for (const s of working) {
+    const list = byMovement.get(s.name) ?? [];
+    list.push(s);
+    byMovement.set(s.name, list);
+  }
+
+  // Array.from rather than iterating the Map directly — this targets a build
+  // without downlevelIteration.
+  return Array.from(byMovement.entries()).map(([name, group]) => {
+    const first = group[0];
+
+    // A class is one line and the honest unit is minutes. "Reformer Pilates —
+    // 1 × 2700s" is the sort of detail that makes a coach stop reading.
+    if (isPracticeCategory(first.category)) {
+      const total = group.reduce((t, s) => t + (s.durationSeconds ?? 0), 0);
+      return `${name} — ${Math.round(total / 60)} min`;
+    }
+
+    if (first.trackingType === "duration") {
+      const total = group.reduce((t, s) => t + (s.durationSeconds ?? 0), 0);
+      return `${name} — ${group.length} × ${Math.round(total / group.length)}s`;
+    }
+
+    const reps = group.map((s) => s.reps ?? 0);
+    const same = reps.every((n) => n === reps[0]);
+    const loads = group.map((s) => s.weight ?? 0).filter((n) => n > 0);
+    const top = loads.length ? Math.max(...loads) : null;
+    return (
+      `${name} — ${group.length} × ${same ? reps[0] : reps.join("/")}` +
+      (top ? ` @ ${top}${unit}` : "")
+    );
+  });
+}
+
 // ─── Units ─────────────────────────────────────────────────────────────────
 
 export const KG_PER_LB = 0.45359237;
