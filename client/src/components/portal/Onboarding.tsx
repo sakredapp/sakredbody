@@ -68,16 +68,63 @@ const keyFor = (userId: string, kind: "done" | "snoozed") =>
 /** Long enough that a second ask reads as a different moment, not a nag. */
 const SNOOZE_MS = 14 * 24 * 60 * 60 * 1000;
 
-function shouldAsk(userId: string): boolean {
+/**
+ * A shorter snooze while the intake is still blank.
+ *
+ * Fourteen days is right for "no thanks, I don't want widgets". It is wrong
+ * for the one step the whole app is personalised from — a member who taps past
+ * it on a Tuesday should be asked again this week, not next fortnight.
+ */
+const INTAKE_SNOOZE_MS = 20 * 60 * 60 * 1000;
+
+/**
+ * @param intakeOutstanding the account has no birth date on the server.
+ *
+ * ── Why the server gets a vote ────────────────────────────────────────────
+ *
+ * These keys record a decision about *this device* — its notification
+ * permission, its widgets, its Health store — and that is still the right
+ * scope for those three. The intake is different in kind: it is a fact about
+ * the person, it lives on the server, and a phone's localStorage has no
+ * business declaring it answered.
+ *
+ * It did anyway. Observed on a real account: onboarding recorded itself
+ * "done" on one device and "snoozed" on another, `intake: false` in both,
+ * while `user_cosmology` had no row at all — no birth date, no birth name, no
+ * life path. The app had marked its own most important question complete and
+ * would not have raised it again for a fortnight, on a device where it was
+ * marked done, never.
+ *
+ * So an outstanding intake overrides "done" entirely and shortens the snooze.
+ * That is what "every account has answered, no matter if it is their third
+ * login" has to mean if it is to mean anything.
+ */
+function shouldAsk(userId: string, intakeOutstanding: boolean): boolean {
   try {
-    if (localStorage.getItem(keyFor(userId, "done"))) return false;
+    if (!intakeOutstanding && localStorage.getItem(keyFor(userId, "done"))) return false;
     const snoozed = localStorage.getItem(keyFor(userId, "snoozed"));
-    if (snoozed && Date.now() - Number(snoozed) < SNOOZE_MS) return false;
+    const window = intakeOutstanding ? INTAKE_SNOOZE_MS : SNOOZE_MS;
+    if (snoozed && Date.now() - Number(snoozed) < window) return false;
     return true;
   } catch {
     // Storage disabled. Ask rather than never ask — a thrown getItem should
     // not silently remove the only moment this feature is introduced.
     return true;
+  }
+}
+
+/**
+ * Wipe this device's memory of having asked, so setup runs again on demand.
+ *
+ * Exported for Settings. The alternative a member reaches for otherwise is
+ * deleting their account to see a screen, which is a spectacularly bad trade.
+ */
+export function replayOnboarding(userId: string): void {
+  try {
+    localStorage.removeItem(keyFor(userId, "done"));
+    localStorage.removeItem(keyFor(userId, "snoozed"));
+  } catch {
+    /* nothing to clear */
   }
 }
 
@@ -205,7 +252,11 @@ export function Onboarding() {
     //
     // Native is the only real precondition. All three things this asks about
     // are things only a phone can do.
-    if (!isNative || isLoading || !userId || !shouldAsk(userId) || openedRef.current) return;
+    // Wait for the cosmology read before deciding. Asking `shouldAsk` while
+    // it is still in flight would treat "we don't know yet" as "answered".
+    if (cosmology === undefined) return;
+    const intakeOutstanding = !cosmology?.birthDate;
+    if (!isNative || isLoading || !userId || !shouldAsk(userId, intakeOutstanding) || openedRef.current) return;
 
     const t = setTimeout(() => {
       openedRef.current = true;
@@ -221,7 +272,7 @@ export function Onboarding() {
       setOpen(true);
     }, 900);
     return () => clearTimeout(t);
-  }, [isNative, available, isLoading, connected, userId]);
+  }, [isNative, available, isLoading, connected, userId, cosmology]);
 
   /**
    * What this account actually answered, reported once at the end.

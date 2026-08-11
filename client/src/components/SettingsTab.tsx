@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SectionHeading, Panel } from "@/components/portal/Panel";
 import { HealthSettings } from "@/components/portal/HealthSettings";
+import { ReplaySetup } from "@/components/portal/ReplaySetup";
 import { AboutYouSettings } from "@/components/portal/AboutYouSettings";
 import { MovementSettings } from "@/components/portal/MovementSettings";
 import { InfoTip } from "@/components/ui/info-tip";
@@ -112,6 +113,13 @@ export function SettingsTab({
           and this panel is the way out of it. */}
       <Panel title="Health &amp; reminders">
         <HealthSettings />
+        {/* ── Run it again ──
+            Onboarding remembers per device that it has asked, which is right
+            for notification and widget choices and leaves no way to simply
+            see the flow again. The alternative a member reaches for is
+            deleting their account to look at a screen, which is a
+            spectacularly bad trade. */}
+        <ReplaySetup />
       </Panel>
 
       {/* ── Blocked ────────────────────────────────────────────────────────── */}

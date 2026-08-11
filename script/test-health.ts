@@ -1113,9 +1113,33 @@ check(
   /keyFor\(\s*userId/.test(ONBOARD_SRC) && /\$\{userId\}/.test(ONBOARD_SRC),
   "a flat key means the second account on a phone is never asked"
 );
+// Matched loosely on purpose: the assertion is that the user id is checked
+// before shouldAsk is consulted, not that shouldAsk has one argument. It
+// gained a second — whether the intake is still outstanding on the server —
+// and a regex pinned to the old arity failed on a change that strengthened
+// exactly what it was written to protect.
 check(
   "nothing is asked before we know who is asking",
-  /!userId \|\| !shouldAsk\(userId\)/.test(ONBOARD_SRC)
+  /!userId \|\| !shouldAsk\(userId[,)]/.test(ONBOARD_SRC)
+);
+
+/**
+ * And a device cannot declare the intake answered.
+ *
+ * localStorage records a decision about a handset — its notifications, its
+ * widgets, its Health store. The intake is a fact about the person, held on
+ * the server, and a real account had it marked "done" on one device and
+ * "snoozed" on another while `user_cosmology` held no row at all.
+ */
+check(
+  "an unanswered intake outranks this device's memory",
+  /intakeOutstanding/.test(ONBOARD_SRC) &&
+    /!intakeOutstanding && localStorage\.getItem\(keyFor\(userId, "done"\)\)/.test(ONBOARD_SRC),
+  "a device-local 'done' must not suppress an intake the server says is blank",
+);
+check(
+  "setup can be run again without deleting an account",
+  /export function replayOnboarding/.test(ONBOARD_SRC),
 );
 
 /**

@@ -194,20 +194,18 @@ export function BuildTab() {
     return (
       <div className="space-y-6">
         <SectionHeading title="Build" subtitle="Strength, movement and resilience." />
-        {/* This used to be the end of the road: one paragraph explaining that
-            sessions arrive with a protocol, and nothing to do. For a member
-            already dialled on their own training — which is most people who
-            train seriously — that was the app saying it had no interest in
-            what they were doing. */}
-        <Panel>
-          <div className="py-8 text-center space-y-2">
-            <Dumbbell className="h-6 w-6 mx-auto text-muted-foreground/40" />
-            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-              Nothing prescribed today. When a protocol is running and today is a lifting day,
-              the lifts appear here with their targets already worked out.
-            </p>
-          </div>
-        </Panel>
+        {/* ── No panel announcing an absence ──
+            This screen used to open with a bordered box, a greyed-out
+            dumbbell and "Nothing prescribed today" — the first thing a member
+            saw on most days, since most days have no prescription. It reads as
+            an error, and it is not one: it is a Tuesday.
+
+            The fix is not softer wording. It is that the member's own training
+            IS the screen, and a prescription is the addition when there is
+            one. So the panel is gone, and the single line about where
+            prescribed sessions appear sits underneath the things they can
+            actually do, in the size of a footnote, because that is its
+            importance on a day it does not apply. */}
         {freeSession ? (
           <FreeSession
             sessionId={freeSession.id}
@@ -216,7 +214,13 @@ export function BuildTab() {
             onDone={() => setFreeSession(null)}
           />
         ) : (
-          <MemberBuild onStarted={(id, t) => setFreeSession({ id, title: t })} />
+          <>
+            <MemberBuild onStarted={(id, t) => setFreeSession({ id, title: t })} />
+            <p className="text-[11px] text-muted-foreground text-center max-w-sm mx-auto">
+              When your coach plans a session for today, it appears at the top of this screen with
+              its targets already worked out.
+            </p>
+          </>
         )}
       </div>
     );

@@ -88,19 +88,40 @@ export function useHealthSync() {
 
   useEffect(() => {
     let alive = true;
-    healthAvailability().then((a) => {
-      if (!alive) return;
-      setAvailable(a.available);
-      setReason(a.reason);
-      // Recorded once per mount, and only on a phone — a browser reporting
-      // "not a phone app" is noise. This is the evidence that was missing
-      // while the feature was silently unavailable on a real device.
-      if (Capacitor.isNativePlatform()) {
-        void healthProbeDetail().then((detail) =>
-          track("health.probe", { surface: "health", props: { ...detail, resolved: a.available } })
-        );
-      }
-    });
+
+    /**
+     * The probe is fired independently of the answer, not inside it.
+     *
+     * It used to sit in the `.then()` of `healthAvailability()`, which meant
+     * the one piece of evidence that would explain a broken probe could only
+     * be recorded when the probe worked. It never fired once, on any device,
+     * ever — and that absence turned out to *be* the finding: the call was
+     * hanging rather than failing. Instrumentation that can only report
+     * success is not instrumentation.
+     *
+     * Only on a phone: a browser reporting "not a phone app" is noise.
+     */
+    if (Capacitor.isNativePlatform()) {
+      void healthProbeDetail()
+        .then((detail) => track("health.probe", { surface: "health", props: detail }))
+        .catch(() => {});
+    }
+
+    healthAvailability()
+      .then((a) => {
+        if (!alive) return;
+        setAvailable(a.available);
+        setReason(a.reason);
+      })
+      // `available` staying null is the state that hid this feature on every
+      // device: null reads as "still deciding", and everything downstream
+      // waits politely and forever. A rejection is a definite no.
+      .catch((err) => {
+        if (!alive) return;
+        setAvailable(false);
+        setReason(String(err?.message ?? err));
+      });
+
     return () => {
       alive = false;
     };

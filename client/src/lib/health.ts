@@ -40,12 +40,64 @@ export function healthPlatform(): HealthPlatform | null {
 
 type Plugin = typeof import("@capgo/capacitor-health").Health;
 
+/**
+ * ── Never await the native bridge without a clock ─────────────────────────
+ *
+ * A Capacitor call is a message posted to native code that answers by
+ * resolving a promise held in a map. If the native side never answers — the
+ * method is missing on that platform, it throws before its completion block
+ * runs, it waits on a service that is not installed — the promise is not
+ * rejected. It simply stays pending, forever.
+ *
+ * `try/catch` does nothing about that, and this file had two of them guarding
+ * exactly that shape. The result was reported from a real device twice: the
+ * health step never appeared, the Connect button did nothing at all, and no
+ * error was logged anywhere, because nothing had gone wrong — something had
+ * merely never finished.
+ *
+ * The telemetry proved it rather than suggesting it. `health.probe` is fired
+ * inside the resolution of `healthAvailability()`, and across every session on
+ * every device it had never once been recorded, while `healthAvailable` was
+ * null in every onboarding event ever written. Not false. Null.
+ *
+ * So every crossing into native code now has a deadline, and a timeout is an
+ * answer rather than a hang. Four seconds is far longer than a working bridge
+ * needs and short enough that a member does not conclude the button is dead —
+ * which, until now, it was.
+ */
+const BRIDGE_TIMEOUT_MS = 4_000;
+
+export class BridgeTimeout extends Error {
+  constructor(public readonly label: string) {
+    super(`${label} did not answer in ${BRIDGE_TIMEOUT_MS}ms`);
+    this.name = "BridgeTimeout";
+  }
+}
+
+function withTimeout<T>(work: Promise<T>, label: string, ms = BRIDGE_TIMEOUT_MS): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new BridgeTimeout(label)), ms);
+    work.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
+}
+
 let cached: Plugin | null = null;
 async function plugin(): Promise<Plugin | null> {
   if (!healthPlatform()) return null;
   if (cached) return cached;
   try {
-    const mod = await import("@capgo/capacitor-health");
+    // The import is a network-shaped operation against the app's own bundle,
+    // and a chunk that never arrives hangs exactly like a silent bridge does.
+    const mod = await withTimeout(import("@capgo/capacitor-health"), "loading the Health plugin");
     cached = mod.Health;
     return cached;
   } catch (err) {
@@ -109,12 +161,27 @@ export async function healthAvailability(): Promise<HealthAvailability> {
   const iosFallback = platform === "healthkit" && bridged;
 
   try {
-    const res = await p.isAvailable();
+    const res = await withTimeout(p.isAvailable(), "Health.isAvailable()");
     if (res?.available) return { available: true, platform };
     if (iosFallback) return { available: true, platform };
     return { available: false, platform, reason: res?.reason ?? "Health data is unavailable." };
   } catch (err) {
     if (iosFallback) return { available: true, platform };
+    // A silent bridge on Android is not "no health data" — it is Health
+    // Connect not answering, which is usually that it is not installed or
+    // needs updating. Say the thing the member can act on rather than the
+    // stack trace, and never leave this unresolved: an unresolved probe is
+    // what removed the feature from every device in the first place.
+    if (err instanceof BridgeTimeout) {
+      return {
+        available: false,
+        platform,
+        reason:
+          platform === "healthconnect"
+            ? "Health Connect didn't respond. Install or update it from the Play Store, then try again."
+            : "Health didn't respond. Reopen the app and try again.",
+      };
+    }
     return { available: false, platform, reason: String(err) };
   }
 }
@@ -133,11 +200,15 @@ export async function healthProbeDetail(): Promise<Record<string, unknown>> {
   let loaded = false;
   let raw: unknown = null;
   let error: string | null = null;
+  let timedOut = false;
   try {
     const p = await plugin();
     loaded = Boolean(p);
-    if (p) raw = await p.isAvailable();
+    // This awaited the bridge unguarded too — so the one call whose job is to
+    // report a hanging bridge would itself hang, and the report never arrived.
+    if (p) raw = await withTimeout(p.isAvailable(), "Health.isAvailable() [probe]");
   } catch (err) {
+    timedOut = err instanceof BridgeTimeout;
     error = String(err);
   }
   return {
@@ -146,6 +217,7 @@ export async function healthProbeDetail(): Promise<Record<string, unknown>> {
     bridged,
     loaded,
     probe: raw,
+    timedOut,
     error,
   };
 }
@@ -167,14 +239,22 @@ export async function requestHealthAccess(): Promise<{
   historyAccess?: boolean;
 }> {
   const p = await plugin();
-  if (!p) return { granted: [], denied: [] };
-  const status = await p.requestAuthorization({
-    read: READ_TYPES as never[],
-    write: [],
-    // Health Connect caps reads at ~30 days without this, which would make an
-    // Android member's first sync three months shorter than an iPhone's.
-    requestHistoryAccess: true,
-  });
+  if (!p) throw new Error("This build has no Health plugin.");
+  // Longer than the probe's deadline on purpose: this one legitimately waits
+  // for a human to read a system sheet and tap it. What it must not do is wait
+  // forever when no sheet ever appeared — which is what "just a dead button"
+  // looked like from the outside.
+  const status = await withTimeout(
+    p.requestAuthorization({
+      read: READ_TYPES as never[],
+      write: [],
+      // Health Connect caps reads at ~30 days without this, which would make an
+      // Android member's first sync three months shorter than an iPhone's.
+      requestHistoryAccess: true,
+    }),
+    "Health.requestAuthorization()",
+    60_000,
+  );
   return {
     granted: status.readAuthorized ?? [],
     denied: status.readDenied ?? [],
