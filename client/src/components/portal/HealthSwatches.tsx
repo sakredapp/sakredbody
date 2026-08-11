@@ -28,11 +28,14 @@
  * member cannot tell that apart from data they never shared.
  */
 
+import { useState } from "react";
 import { ChevronRight, TrendingDown, TrendingUp } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { useHealthSummary, useHealthSync } from "@/hooks/use-health";
 import { METRIC_DISPLAY, planTiles, trendOf } from "@/lib/healthDisplay";
 import type { DaySeries, Tile } from "@/lib/healthDisplay";
+import type { HealthMetric } from "@shared/models/health";
+import { MetricDetail } from "@/components/portal/MetricDetail";
 import { cn } from "@/lib/utils";
 
 /** Five is what fits above the fold beside a hero without becoming a page. */
@@ -272,6 +275,15 @@ function TileBody({ tile }: { tile: Tile }) {
 // ─── The board ──────────────────────────────────────────────────────────────
 
 export function HealthSwatches({ onOpenStats }: { onOpenStats?: () => void }) {
+  /**
+   * Which tile was tapped.
+   *
+   * Every tile used to call `onOpenStats`, so Sleep and Steps did the same
+   * thing — and neither said what date the number was from. The detail opens
+   * in place rather than navigating, because a member tapping a figure on the
+   * home screen wants the figure explained, not to be moved to another screen.
+   */
+  const [openMetric, setOpenMetric] = useState<HealthMetric | null>(null);
   const { data } = useHealthSummary(30);
   const { available, reason, platform, connect } = useHealthSync();
   const isNative = Capacitor.isNativePlatform();
@@ -366,8 +378,7 @@ export function HealthSwatches({ onOpenStats }: { onOpenStats?: () => void }) {
         {tiles.map((tile) => (
           <button
             key={tile.metric}
-            onClick={onOpenStats}
-            disabled={!onOpenStats}
+            onClick={() => setOpenMetric(tile.metric)}
             className={cn(
               "rounded-xl border border-[hsl(var(--gold))]/12 bg-white/[0.03] p-3 text-left tap-clean",
               onOpenStats && "hover:border-[hsl(var(--gold))]/30 transition-colors",
@@ -380,6 +391,8 @@ export function HealthSwatches({ onOpenStats }: { onOpenStats?: () => void }) {
           </button>
         ))}
       </div>
+
+      <MetricDetail metric={openMetric} days={days} onClose={() => setOpenMetric(null)} />
     </div>
   );
 }

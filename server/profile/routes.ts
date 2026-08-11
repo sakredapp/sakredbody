@@ -16,10 +16,12 @@
 
 import type { Express, Request, Response } from "express";
 import multer from "multer";
+import { randomBytes } from "crypto";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "../db.js";
 import { users } from "../../shared/models/auth.js";
+import { profilePhotos, MAX_STORED_PHOTO_BYTES } from "../../shared/models/profilePhotos.js";
 import { isAuthenticated } from "../auth/index.js";
 import { uploadFile, isStorageConfigured } from "../supabaseStorage.js";
 import { zodMessage } from "../../shared/utils/zodMessage.js";
@@ -62,7 +64,70 @@ const nameSchema = z.object({
   relationshipStatus: z.enum(["single", "dating", "married", "private"]).optional().nullable(),
 });
 
+/**
+ * Keep the photo in our own database, and hand back a URL that serves it.
+ *
+ * The fallback for a deployment with no object-storage credentials — which is
+ * every deployment today. See shared/models/profilePhotos.ts for why bytes in
+ * Postgres is defensible for this one thing and not in general.
+ *
+ * Absolute rather than relative, because `<img src>` in the native shell
+ * resolves against `capacitor://localhost` and never reaches the server. Built
+ * from the request, so it is right in development, on a preview and in
+ * production without another environment variable to get wrong.
+ */
+async function storeLocally(
+  req: Request,
+  userId: string,
+  file: Express.Multer.File,
+): Promise<string | null> {
+  if (file.buffer.length > MAX_STORED_PHOTO_BYTES) return null;
+
+  // New token each time, so a replaced photo cannot be served from a cache
+  // keyed on the old URL — which is the whole reason an avatar update can look
+  // like it silently failed.
+  const token = randomBytes(24).toString("base64url");
+
+  await db
+    .insert(profilePhotos)
+    .values({ userId, token, bytes: file.buffer, mime: file.mimetype, updatedAt: new Date() })
+    .onConflictDoUpdate({
+      target: profilePhotos.userId,
+      set: { token, bytes: file.buffer, mime: file.mimetype, updatedAt: new Date() },
+    });
+
+  return `${req.protocol}://${req.get("host")}/api/photo/${token}`;
+}
+
 export function registerProfileRoutes(app: Express): void {
+  /**
+   * Serve a stored photo.
+   *
+   * Deliberately unauthenticated. Avatars are rendered by `<img>`, which does
+   * not pass through the native fetch wrapper and so cannot carry a bearer
+   * token — the same reason a Supabase public bucket is public. The token is
+   * what protects it, and it is 24 random bytes rather than a user id.
+   */
+  app.get("/api/photo/:token", async (req: Request, res: Response) => {
+    try {
+      const [row] = await db
+        .select({ bytes: profilePhotos.bytes, mime: profilePhotos.mime })
+        .from(profilePhotos)
+        .where(eq(profilePhotos.token, String(req.params.token)))
+        .limit(1);
+      if (!row) return res.status(404).end();
+
+      // Immutable is safe because a new photo gets a new token — the URL
+      // itself is the version.
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      res.setHeader("Content-Type", row.mime);
+      res.send(row.bytes);
+    } catch (err) {
+      trackError("profile.photoServe", err);
+      res.status(500).end();
+    }
+  });
+
   /**
    * Replace the profile photo.
    *
@@ -78,14 +143,24 @@ export function registerProfileRoutes(app: Express): void {
     upload.single("photo"),
     async (req: Request, res: Response) => {
       try {
-        if (!isStorageConfigured()) {
-          return res.status(503).json({ message: "Photo storage isn't set up yet." });
-        }
         const file = (req as Request & { file?: Express.Multer.File }).file;
         if (!file) return res.status(400).json({ message: "No photo provided" });
 
         const userId = req.session!.userId!;
-        const url = await uploadFile(userId, file.buffer, file.originalname, file.mimetype);
+
+        /**
+         * Object storage where it is configured, our own database where it
+         * isn't.
+         *
+         * This route used to 503 with "Photo storage isn't set up yet", which
+         * was an accurate message about a missing credential and a dead end on
+         * the first screen a member sees. Adding the credential is still worth
+         * doing; the member should not be the one waiting for it.
+         */
+        const url = isStorageConfigured()
+          ? await uploadFile(userId, file.buffer, file.originalname, file.mimetype)
+          : await storeLocally(req, userId, file);
+
         if (!url) return res.status(502).json({ message: "That didn't upload. Try again." });
 
         const [saved] = await db
@@ -111,10 +186,17 @@ export function registerProfileRoutes(app: Express): void {
   /** Remove it, and go back to initials. */
   app.delete("/api/profile/photo", isAuthenticated, async (req: Request, res: Response) => {
     try {
+      const userId = req.session!.userId!;
+      // Unlike the storage bucket, a locally-stored photo *is* deleted. It is
+      // one statement against a row we own, and leaving somebody's face in our
+      // database after they asked us to remove it is a different kind of
+      // orphan from an unreferenced object in a bucket.
+      await db.delete(profilePhotos).where(eq(profilePhotos.userId, userId));
+
       const [saved] = await db
         .update(users)
         .set({ profileImageUrl: null, updatedAt: new Date() })
-        .where(eq(users.id, req.session!.userId!))
+        .where(eq(users.id, userId))
         .returning();
       const { password: _, ...safe } = saved;
       res.json(safe);

@@ -15,6 +15,7 @@ import { useRef, useState } from "react";
 import { Camera, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { PhotoCrop } from "./PhotoCrop";
 
 export function PhotoStep({
   initials,
@@ -36,17 +37,45 @@ export function PhotoStep({
   // than after a round trip. Revoked when replaced, or the browser holds every
   // image they tried.
   const [preview, setPreview] = useState<string | null>(null);
+  /**
+   * Held rather than uploaded on selection.
+   *
+   * The note at the top of this file always claimed the member sees the crop
+   * before it is uploaded, and for a long while that was aspirational — the
+   * file went straight up and got a centre crop, which cuts the top off a
+   * portrait about half the time.
+   */
+  const [cropping, setCropping] = useState<File | null>(null);
 
   const choose = (file: File | undefined) => {
     if (!file) return;
-    setPreview((old) => {
-      if (old) URL.revokeObjectURL(old);
-      return URL.createObjectURL(file);
-    });
-    onUpload(file);
+    setCropping(file);
   };
 
   const shown = preview ?? currentUrl ?? null;
+
+  if (cropping) {
+    return (
+      <PhotoCrop
+        file={cropping}
+        saving={saving}
+        onCancel={() => {
+          setCropping(null);
+          if (input.current) input.current.value = "";
+        }}
+        onConfirm={(cropped) => {
+          setPreview((old) => {
+            if (old) URL.revokeObjectURL(old);
+            return URL.createObjectURL(cropped);
+          });
+          setCropping(null);
+          // Cleared so picking the same file again still fires `change`.
+          if (input.current) input.current.value = "";
+          onUpload(cropped);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4">
