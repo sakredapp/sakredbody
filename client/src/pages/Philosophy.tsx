@@ -54,7 +54,7 @@ export default function Philosophy() {
       {/* ── Tonight ──────────────────────────────────────────
           The phase is computed from the date, not chosen. The sky is a
           fact the practice is timed against, so it should be the real one. */}
-      <Section tone="ink" className="py-12 md:py-16 overflow-hidden">
+      <Section tone="ink" className="overflow-hidden">
         <StarDust className="absolute inset-0 w-full h-full z-0" density={1.2} />
         <div className="relative z-10 flex flex-col items-center text-center gap-4">
           <MoonPhase className="h-40 w-40" testId="moon-tonight" />
@@ -239,7 +239,7 @@ export default function Philosophy() {
       </Section>
 
       {/* ── CTA ──────────────────────────────────────────────── */}
-      <Section tone="raised" width="max-w-3xl" className="text-center py-12 md:py-16">
+      <Section tone="raised" width="max-w-3xl" className="text-center">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.h2 variants={fadeInUp} className="text-3xl md:text-4xl font-display font-normal mb-6">
             Start with the <span className="text-gold">terrain.</span>

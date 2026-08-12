@@ -198,7 +198,7 @@ export default function Executive() {
       </Section>
 
       {/* ── Told apart from the other two ──────────────────── */}
-      <Section tone="ink" className="py-10 md:py-14">
+      <Section tone="ink">
         <SectionHeader
           eyebrow="Work With Us"
           title={<>Three Shapes, <span className="text-gold">One Standard</span></>}

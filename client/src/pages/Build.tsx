@@ -6,6 +6,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { PageHero, SectionHeader } from "@/components/PageHero";
 import { EmberField } from "@/components/EmberField";
+import { ImageBand } from "@/components/ImageBand";
 import { CapacityRadar } from "@/components/CapacityRadar";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -27,15 +28,14 @@ const PILLARS = [
   { name: "Hormesis", body: "Heat, cold, fasting. Earn these — they're a garnish." },
 ];
 
-
 const MISTAKES = [
   {
     q: "Training hard on a terrain that can't recover",
-    a: "This is the single most common failure, and it looks like discipline. Hard training on poor sleep, low minerals, and a compromised gut isn't a stimulus — it's another burden on a system already at capacity. You get the fatigue of training with none of the adaptation. If your performance is flat for a month, the answer is almost never more intensity.",
+    a: "The most common failure, and it looks like discipline. Hard training on poor sleep, low minerals and a compromised gut isn't a stimulus — it's another burden on a system already at capacity. You get the fatigue with none of the adaptation. If your performance is flat for a month, the answer is almost never more intensity.",
   },
   {
     q: "Confusing exhaustion with progress",
-    a: "A workout that destroys you is easy to write and easy to feel good about. Adaptation comes from a stimulus you can recover from and then repeat. If you can't repeat it next week at the same or better quality, it wasn't training — it was an event.",
+    a: "A workout that destroys you is easy to write and easy to feel good about. Adaptation comes from a stimulus you can recover from and then repeat. If you can't repeat it next week at the same quality, it wasn't training — it was an event.",
   },
   {
     q: "Skipping strength because it feels vain",
@@ -43,35 +43,36 @@ const MISTAKES = [
   },
   {
     q: "Never training hard at all",
-    a: "The mirror error. Endless zone-two walks, gentle mobility, and restorative everything produces a calm person with no capacity. The body adapts to demand. If you never make one, there is nothing to adapt to.",
+    a: "The mirror error. Endless zone-two walks, gentle mobility and restorative everything produces a calm person with no capacity. The body adapts to demand. If you never make one, there is nothing to adapt to.",
   },
 ];
 
 export default function Build() {
   usePageMeta(
     "Build — Health Should Become Capacity | Sakred Body",
-    "Strength, conditioning, mobility, work capacity, breathing mechanics, and hormetic stress. Not a body that avoids illness — a body that can carry weight and do something.",
+    "Strength, conditioning, mobility, work capacity, breathing mechanics and hormetic stress — logged movement by movement, against a terrain that can actually adapt.",
   );
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
       <SiteHeader overHero={false} />
 
-      {/* Yang, said out loud — and fenced off from hustle culture in the same
-          sentence. "Advancing force" on its own reads as more, harder, now,
-          which is the exact misreading that sends people to a page like this
-          already broken. The qualifier is the point: demand a terrain can
-          actually adapt to. */}
+      {/* No intro paragraph — see the same note on Restore. The three marks
+          were already the best thing in this hero; the Yang essay under them
+          was the page's argument delivered before the page. */}
       <PageHero
         eyebrow="Yang · The Advancing Force"
         title={<>Build.</>}
-        intro="Yang is load, heat, demand and adaptation. Not hustle — hustle is demand a body can't answer, which is just damage on a schedule. This is intelligent challenge applied to a terrain able to adapt to it, which is why Restore comes first."
         testId="text-build-headline"
         ambient={<EmberField className="absolute inset-0 w-full h-full opacity-80" />}
         marks={["Muscle is the organ of longevity", "Load, recover, repeat", "No supplement replaces it"]}
       />
 
-      {/* ── The argument ─────────────────────────────────────── */}
+      {/* ── The argument ─────────────────────────────────────
+          Two paragraphs down to two sentences. The headline was always doing
+          the work; what followed restated it twice, once in the negative and
+          once in the positive, and then explained the relationship to Restore
+          that the previous page already ends by explaining. */}
       <Section tone="raised" width="max-w-4xl">
         <motion.div
           initial="hidden"
@@ -92,19 +93,11 @@ export default function Build() {
             <br />
             <span className="text-gold">something you can do.</span>
           </motion.h2>
-          <motion.div variants={fadeInUp} className="space-y-5 text-muted-foreground leading-relaxed text-base md:text-lg">
-            <p>
-              Ask most health philosophies what success looks like and you get a negative: no disease, no
-              inflammation, no symptoms. All absence. Nothing you could point at and say <em>that</em> —
-              that's what it was for.
-            </p>
-            <p className="text-foreground">
-              We think it should be positive and physical. You can carry your own weight, work a long day,
-              sleep, and do it again. That's competence, not aesthetics — and it's the honest end of the arc
-              Restore begins. Clearing the terrain was never the point. It was clearing the terrain{" "}
-              <em>so that something could be built on it.</em>
-            </p>
-          </motion.div>
+          <motion.p variants={fadeInUp} className="text-muted-foreground leading-relaxed text-base md:text-lg">
+            Most health philosophies define success as an absence — no disease, no inflammation, no symptoms.
+            We think it should be something you can point at: carry your own weight, work a long day, sleep,
+            and do it again.
+          </motion.p>
         </motion.div>
       </Section>
 
@@ -125,6 +118,17 @@ export default function Build() {
           </motion.div>
         </motion.div>
       </Section>
+
+      {/* ── The turn ─────────────────────────────────────────
+          A held moment between the radar and the accordion, and the one place
+          on this page the training photography earns its keep. */}
+      <ImageBand
+        image="/images/training-focus.webp"
+        alt="A lifter set up under a loaded barbell"
+        title={<>The body adapts to demand. <span className="text-gold">Make one worth adapting to.</span></>}
+        tall
+        testId="text-build-turn"
+      />
 
       {/* ── Mistakes ─────────────────────────────────────────── */}
       <Section tone="raised" width="max-w-4xl">
@@ -154,8 +158,36 @@ export default function Build() {
         </motion.div>
       </Section>
 
+      {/* ── What it actually is in the app ───────────────────
+          The page described a training philosophy and never mentioned that
+          Build is a logging instrument — roughly 470 movements across 54
+          categories, sets and loads recorded, personal records surfaced, and
+          every session weighed for how much it demanded against how much it
+          gave back. Someone could read this page end to end and not know the
+          product tracks anything. */}
+      <Section tone="ink">
+        <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
+          <motion.div variants={fadeInUp}>
+            <SectionHeader
+              eyebrow="In the App"
+              title={<>Every session, <span className="text-gold">on the record.</span></>}
+              intro="Around 470 movements across 54 categories — barbell, rings, calisthenics, carries, sprints, mobility. Log the sets, and the app keeps your records, weighs what each session demanded against what it gave back, and reads that against the sleep your phone already has."
+              testId="text-inapp-headline"
+            />
+          </motion.div>
+
+          <motion.div variants={fadeInUp} className="text-center">
+            <Link href="/member">
+              <Button className="gold-metallic-btn px-8" data-testid="button-build-portal">
+                Enter the Portal <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </motion.div>
+        </motion.div>
+      </Section>
+
       {/* ── Next ─────────────────────────────────────────────── */}
-      <Section tone="ink" className="text-center py-14">
+      <Section tone="raised" width="max-w-3xl" className="text-center">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.h2 variants={fadeInUp} className="text-3xl md:text-4xl font-display font-normal mb-6">
             Capacity you never use

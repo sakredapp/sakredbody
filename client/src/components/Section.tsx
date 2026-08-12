@@ -42,11 +42,14 @@ export function Section({
   );
 
   if (resolvedTone === "raised") {
+    // The gap between two adjacent slabs is this wrapper's py, doubled. At
+    // py-3/py-4 that was 24–32px of ink between two lit panels, which read as
+    // one blocky stack rather than as separate sections.
     return (
-      <div className="tone-ink bg-background px-4 sm:px-8 lg:px-14 py-3 sm:py-4">
+      <div className="tone-ink bg-background px-4 sm:px-8 lg:px-14 py-5 sm:py-8">
         <section
           className={cn(
-            "tone-raised mx-auto w-full rounded-2xl sm:rounded-[1.75rem] py-10 md:py-14 relative overflow-hidden",
+            "tone-raised mx-auto w-full rounded-2xl sm:rounded-[1.75rem] py-14 md:py-20 relative overflow-hidden",
             width,
             // Lit from above, like a slab under a low light. The gradient is
             // only four points of lightness end to end — enough to give the
@@ -70,7 +73,7 @@ export function Section({
 
   return (
     <section
-      className={cn("py-12 md:py-20 relative", resolvedTone === "ink" ? "tone-ink bg-background" : "", className)}
+      className={cn("py-16 md:py-28 relative", resolvedTone === "ink" ? "tone-ink bg-background" : "", className)}
       {...props}
     >
       {/* Ink sections often carry a canvas. Fading both edges into the page

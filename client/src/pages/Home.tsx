@@ -518,7 +518,7 @@ export default function Home() {
       {/* No orb behind this one. The aurora is built for an ink ground — its
           blooms are additive, and clipped to a sphere they read as a grey
           disc sitting behind the headline on a cream panel. */}
-      <Section tone="raised" width="max-w-3xl" className="text-center py-12 md:py-16 overflow-hidden">
+      <Section tone="raised" width="max-w-3xl" className="text-center overflow-hidden">
         <motion.div
           initial="hidden"
           whileInView="visible"

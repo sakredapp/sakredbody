@@ -68,7 +68,7 @@ export default function Terrain() {
       />
 
       {/* ── The chain ────────────────────────────────────────── */}
-      <Section tone="ink" className="py-10 md:py-14">
+      <Section tone="ink">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
@@ -112,7 +112,7 @@ export default function Terrain() {
       </Section>
 
       {/* ── CTA ──────────────────────────────────────────────── */}
-      <Section tone="raised" width="max-w-3xl" className="text-center py-12 md:py-16">
+      <Section tone="raised" width="max-w-3xl" className="text-center">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.h2 variants={fadeInUp} className="text-3xl md:text-4xl font-display font-normal mb-6">
             A map is only useful
