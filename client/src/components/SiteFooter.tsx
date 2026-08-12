@@ -42,7 +42,12 @@ const HEALTH_LINKS = [
 
 export function SiteFooter() {
   return (
-    <footer className="tone-ink bg-background border-t border-border mt-10 md:mt-16 pt-28 md:pt-36 pb-10">
+    /* No margin here. A margin is outside the element, so it shows the
+       parent's background — and the page wrapper is `bg-background` without
+       `tone-ink`, which resolves against :root and is the *light* palette.
+       mt-10 painted a cream band across the bottom of every page. Any air
+       above the footer has to be padding inside something already toned. */
+    <footer className="tone-ink bg-background border-t border-border pt-28 md:pt-36 pb-10">
       <div className="container max-w-6xl mx-auto px-4">
         <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-6 mb-14">
           {/* Brand */}
