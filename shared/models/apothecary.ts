@@ -475,7 +475,15 @@ export const supportProducts = pgTable(
      *  library is code, so there is no row to point at. */
     supportId: text("support_id").notNull(),
     productId: uuid("product_id").notNull(),
-    /** "The one we actually use", "loose leaf, not bags". */
+    /**
+     * Member-facing. Rendered under the product on the card.
+     *
+     * "The one we actually use", "loose leaf, not bags". Deliberately not a
+     * curation field — one free-text column must not be both internal context
+     * and member copy, because the moment it is, somebody's private note about
+     * a supplier appears in the app. An internal note, if ever wanted, gets
+     * its own column.
+     */
     note: text("note"),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at").defaultNow(),

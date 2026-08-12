@@ -573,7 +573,12 @@ function GuidanceLinks({
                   >
                     <span className="text-xs flex-1 truncate">{l.name}</span>
                     {l.note && (
-                      <span className="text-[10px] text-muted-foreground truncate">{l.note}</span>
+                      <span
+                        className="text-[10px] text-[hsl(var(--gold))]/70 truncate"
+                        title="Shown to members under this product"
+                      >
+                        “{l.note}”
+                      </span>
                     )}
                     <button
                       onClick={() => l.id && detach.mutate(l.id)}
@@ -604,10 +609,19 @@ function GuidanceLinks({
                       </option>
                     ))}
                 </select>
+                {/*
+                  Member-facing, and named so nobody has to guess.
+
+                  This string is returned by the member endpoint and rendered
+                  under the product on the card. One free-text field must not
+                  become both curation context and member copy — if internal
+                  notes are wanted later they need their own column, not this
+                  one wearing two hats.
+                */}
                 <Input
                   value={note[p.id] ?? ""}
                   onChange={(e) => setNote({ ...note, [p.id]: e.target.value })}
-                  placeholder="Note — “the one we use”"
+                  placeholder="Member note — shown in the app"
                   className="h-8 text-xs flex-1"
                 />
                 <Button
