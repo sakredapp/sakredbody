@@ -258,7 +258,7 @@ export type DaySeries = { onDate: string } & Partial<Record<HealthMetric, number
 export function summarise(
   days: DaySeries[],
   metric: HealthMetric
-): { value: number; baseline: number | null; days: number } | null {
+): { value: number; baseline: number | null; days: number; onDate: string } | null {
   const display = METRIC_DISPLAY[metric];
   if (!display) return null;
 
@@ -293,7 +293,8 @@ export function summarise(
    * tell it apart from the app being stale. The average is not lost — it is
    * the baseline below, which is where a comparison belongs.
    */
-  const value = points[points.length - 1].value;
+  const latest = points[points.length - 1];
+  const value = latest.value;
 
   /**
    * Every other day held, which is what "your usual" means.
@@ -306,7 +307,15 @@ export function summarise(
   const older = points.slice(0, -1);
   const baseline = older.length >= 5 ? mean(older) : null;
 
-  return { value, baseline, days: points.length };
+  /**
+   * The date the value belongs to, returned rather than left to the caller.
+   *
+   * Every caller needs it — to say "Today so far", to suppress a comparison on
+   * a day still being counted, to label the tile at all — and every caller was
+   * previously re-deriving it from the same array, which is how the tile and
+   * the sheet it opens ended up disagreeing about which day they were showing.
+   */
+  return { value, baseline, days: points.length, onDate: latest.onDate };
 }
 
 /** Metrics that actually have data, in display order, grouped. */

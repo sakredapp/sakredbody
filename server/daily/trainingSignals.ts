@@ -27,10 +27,9 @@
  * prompt from here at all. That is a stronger guarantee than scrubbing.
  */
 
-import { and, eq, gte, sql } from "drizzle-orm";
-import { db } from "../db.js";
-import { exercises, workoutSessions, workoutSets, EXERCISE_CATEGORIES } from "../../shared/schema.js";
+import { EXERCISE_CATEGORIES } from "../../shared/schema.js";
 import { addDaysToString } from "../../shared/utils/dates.js";
+import { recentMovement } from "../movement/history.js";
 // The shape and its prompt rendering live in voice.ts, which imports no
 // database and so can be tested directly.
 import type { TrainingSignals } from "./voice.js";
@@ -59,30 +58,31 @@ export async function trainingSignals(
 ): Promise<TrainingSignals | null> {
   const since = addDaysToString(onDate, -WINDOW_DAYS);
 
-  const rows = await db
-    .select({
-      onDate: workoutSessions.onDate,
-      sessionId: workoutSessions.id,
-      category: exercises.category,
-    })
-    .from(workoutSets)
-    .innerJoin(workoutSessions, eq(workoutSessions.id, workoutSets.sessionId))
-    .innerJoin(exercises, eq(exercises.id, workoutSets.exerciseId))
-    .where(
-      and(
-        eq(workoutSessions.userId, userId),
-        gte(workoutSessions.onDate, since),
-        sql`${workoutSessions.finishedAt} is not null`,
-        eq(workoutSets.isWarmup, false),
-      ),
-    );
+  /**
+   * ── Both tables, through the one reader ─────────────────────────────────
+   *
+   * This queried `workout_sessions` alone. So did the terrain read, and so did
+   * Today's readiness — three separate implementations of "what has this member
+   * been doing", two of which could not see a workout the phone recorded.
+   *
+   * The visible result was a note telling somebody their movement was down on
+   * the evening of a five-mile run, while another screen in the same app
+   * correctly counted nine demanding sessions that week. Three copies is how
+   * that happens; `recentMovement` is now the only one.
+   */
+  const rows = await recentMovement(userId, since);
 
   if (rows.length === 0) return null;
 
   const week = addDaysToString(onDate, -7);
-  const sessionsThisWeek = new Set(
-    rows.filter((r) => r.onDate >= week).map((r) => r.sessionId),
-  ).size;
+  /**
+   * Counted per day, not per session id.
+   *
+   * `recentMovement` returns one entry per (day, category) and imported
+   * workouts have no session id at all, so a set of ids is no longer the right
+   * measure — and it would have counted a day of squats and bench as two.
+   */
+  const sessionsThisWeek = new Set(rows.filter((r) => r.onDate >= week).map((r) => r.onDate)).size;
 
   // Most recent day per family, so "recent" and "neglected" fall out of one pass.
   const lastSeen = new Map<string, string>();

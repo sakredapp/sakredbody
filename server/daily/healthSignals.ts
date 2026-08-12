@@ -30,6 +30,13 @@ const TRACKED: {
   format: (v: number) => string;
   /** Which way is worth remarking on; null where there is no such direction. */
   betterHigher: boolean | null;
+  /**
+   * Whether the number grows through the day.
+   *
+   * Steps at 7am are not a low day, they are an early one — see the note above
+   * `healthSignals`.
+   */
+  accumulates?: boolean;
 }[] = [
   {
     metric: "sleepMinutes",
@@ -54,10 +61,36 @@ const TRACKED: {
     label: "Daily movement",
     format: (v) => `${Math.round(v).toLocaleString()} steps`,
     betterHigher: true,
+    accumulates: true,
   },
 ];
 
-export async function healthSignals(userId: string): Promise<Signal[] | null> {
+/**
+ * ── Why today is excluded from the accumulating metrics ───────────────────
+ *
+ * The note is written once and stored for the day, so every claim in it has to
+ * be one that stays true until midnight. A step count does not qualify while it
+ * is still being counted: at 7am the row for today holds a couple of thousand
+ * steps, averaging that into the last seven days drags the mean under the
+ * baseline, and the note goes out saying the member's movement is down.
+ *
+ * It then says so all day. At six in the evening, after sixteen thousand steps
+ * and a five-mile run, Today still read "your sleep and movement are both down
+ * — let today be small", four seconds away from a Stats screen showing the run.
+ * The member is not being told something stale so much as something that was
+ * never true; the note simply read a day that had not happened yet.
+ *
+ * So today's own row is dropped for anything cumulative. What is left is the
+ * member's completed days, and "your movement is down lately" is then a
+ * sentence that survives until the day is over. Sleep, resting heart rate and
+ * HRV keep today's row: those are written once, for the night that finished,
+ * and they are as complete at 7am as they will ever be.
+ */
+export async function healthSignals(
+  userId: string,
+  /** The member's own date. See the note above. */
+  today?: string,
+): Promise<Signal[] | null> {
   const since = new Date();
   since.setUTCDate(since.getUTCDate() - WINDOW_DAYS);
 
@@ -82,9 +115,9 @@ export async function healthSignals(userId: string): Promise<Signal[] | null> {
   const signals: Signal[] = [];
 
   for (const tracked of TRACKED) {
-    const points = (byMetric.get(tracked.metric) ?? []).sort((a, b) =>
-      a.onDate.localeCompare(b.onDate),
-    );
+    const points = (byMetric.get(tracked.metric) ?? [])
+      .filter((p) => !(tracked.accumulates && today && p.onDate === today))
+      .sort((a, b) => a.onDate.localeCompare(b.onDate));
     // Fewer than three readings is not a week of anything. A single night's
     // sleep presented as "lately" is a claim about them that isn't true.
     if (points.length < 3) continue;

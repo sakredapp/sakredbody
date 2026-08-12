@@ -384,7 +384,13 @@ check("neither is neutral", orientationOfLoad({ stress: 1, restoration: 1 }) ===
 check("a deadlift's category builds", categoryOrientation("legs") === "yang");
 check("fascia restores", categoryOrientation("fascia") === "yin");
 check("Lagree is not gentle because it happens on a carriage", categoryOrientation("lagree") === "yang");
-check("Pilates is both", categoryOrientation("pilates") === "both");
+/**
+ * Reformer work is resistance against a spring. It gives something back, which
+ * is what restoration 1 says; it does not give back as much as it asks, which
+ * is why it is not `both` and does not belong on the Restore shelf.
+ */
+check("Pilates builds", categoryOrientation("pilates") === "yang");
+check("and still gives something back", categoryLoad("pilates").restoration === 1);
 check("an unknown category is neutral, not guessed", categoryOrientation("nonsense") === "neutral");
 check("an unknown category has no load", categoryLoad("nonsense").stress === 0);
 
@@ -406,7 +412,18 @@ check("stretching lands in mobility", externalActivityCategory("flexibility") ==
 check("and mobility is Restore", externalActivityOrientation("flexibility") === "yin");
 
 check("strength training is a full-body session", externalActivityCategory("strength") === "full_body");
-check("walking is locomotion", externalActivityCategory("walking") === "locomotion");
+/**
+ * A walk is not a training session. Mapped to `locomotion` it carried stress 2,
+ * which is the definition of demanding, so a member who walks the dog twice a
+ * day accumulated "demanding sessions" without training once — and the same
+ * movement had already been counted in that day's steps, distance and energy.
+ */
+check("a hike is real movement", externalActivityCategory("hiking") === "locomotion");
+check("and it is demanding", DEMANDING_EXTERNAL_TYPES.includes("hiking"));
+check("a walk is easy movement", externalActivityCategory("walking") === "recovery");
+check("and a walk is not a demanding session", !DEMANDING_EXTERNAL_TYPES.includes("walking"));
+/** Four hours of golf is a long walk, not a boxing match. */
+check("golf is not a contact sport", externalActivityCategory("golf") === "locomotion");
 
 /** Case and whitespace come from two different platforms; neither should matter. */
 check("the platform's casing is irrelevant", externalActivityCategory(" Running ") === "endurance");
@@ -476,7 +493,7 @@ console.log("\nHow a session landed, and where the member wants it\n");
 
 check("Sakred reads a run as Build", placementOfOrientation(externalActivityOrientation("running")) === "build");
 check("and yoga as Restore", placementOfOrientation(externalActivityOrientation("yoga")) === "restore");
-check("and pilates as both", placementOfOrientation(externalActivityOrientation("pilates")) === "both");
+check("and pilates as Build", placementOfOrientation(externalActivityOrientation("pilates")) === "build");
 /**
  * Neutral is not a fourth placement. A gentle walk is genuinely neither, and
  * filing it under Build or Restore would be the app asserting something it does

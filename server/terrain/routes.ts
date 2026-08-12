@@ -23,18 +23,10 @@ import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "../db.js";
 import { isAuthenticated } from "../auth/index.js";
 import { memberToday } from "../coaching/enrollment.js";
-import {
-  healthDays,
-  healthWorkouts,
-  exercises,
-  workoutSessions,
-  workoutSets,
-} from "../../shared/schema.js";
+import { healthDays, healthWorkouts, workoutSessions } from "../../shared/schema.js";
 import { readTerrain, terrainHeadline } from "../../shared/models/terrain.js";
-import {
-  externalActivityCategory,
-  DEMANDING_EXTERNAL_TYPES,
-} from "../../shared/models/training.js";
+import { DEMANDING_EXTERNAL_TYPES } from "../../shared/models/training.js";
+import { recentMovement } from "../movement/history.js";
 import { addDaysToString } from "../../shared/utils/dates.js";
 
 /** Matches healthSignals: enough for a baseline, recent enough to be "lately". */
@@ -86,93 +78,20 @@ async function averages(userId: string, onDate: string): Promise<Averages> {
 }
 
 /**
- * One entry per (session, category) in the last seven days.
+ * One entry per (day, category) in the last seven days, from both tables.
  *
- * Per session-category rather than per set: a member who did eight sets of
- * squats did one demanding leg session, and counting the sets would make a
- * normal session look like the heaviest week of their life.
+ * Per day-category rather than per set: a member who did eight sets of squats
+ * did one demanding leg session, and counting the sets would make a normal
+ * session look like the heaviest week of their life.
+ *
+ * The gathering, the dedupe against imported workouts and the classification
+ * all live in `recentMovement` now. They used to live here, and a second copy
+ * of them did not live in `server/today/signals.ts` — which is precisely why
+ * Today and Restore could disagree about whether the member had trained.
  */
 async function trainedCategories(userId: string, onDate: string): Promise<string[]> {
-  const since = addDaysToString(onDate, -RECENT_DAYS);
-
-  const rows = await db
-    .selectDistinct({
-      sessionId: workoutSessions.id,
-      onDate: workoutSessions.onDate,
-      category: exercises.category,
-    })
-    .from(workoutSets)
-    .innerJoin(workoutSessions, eq(workoutSessions.id, workoutSets.sessionId))
-    .innerJoin(exercises, eq(exercises.id, workoutSets.exerciseId))
-    .where(
-      and(
-        eq(workoutSessions.userId, userId),
-        gte(workoutSessions.onDate, since),
-        sql`${workoutSessions.finishedAt} is not null`,
-        eq(workoutSets.isWarmup, false),
-      ),
-    );
-
-  const native = rows.map((r) => r.category);
-
-  /**
-   * Movement the phone knows about and Sakred was never told.
-   *
-   * ── What this fixes ─────────────────────────────────────────────────────
-   *
-   * This function read `workout_sets` and nothing else, which means it only
-   * ever saw sessions logged inside Sakred. A member whose Oura wrote a
-   * 54-minute run into Apple Health, or whose Strava wrote one into Health
-   * Connect, had that run sitting in `health_workouts` — synced, stored,
-   * visible on the health card — and the terrain reading still concluded they
-   * had not trained. It would then tell them they had room for more movement
-   * on the evening of a ten-mile day.
-   *
-   * ── Classified by our own model, not the platform's ─────────────────────
-   *
-   * `externalActivityCategory` translates the platform's word into a Sakred
-   * category, and everything downstream — stress, restoration, Restore or
-   * Build — is then decided by CATEGORY_LOAD exactly as it is for a logged
-   * session. There is no second opinion about what a run costs.
-   *
-   * Anything we cannot place returns null and is dropped here. An unknown
-   * activity contributing an invented load is worse than one contributing
-   * none: the member can see the workout on their health card either way, but
-   * only one of those puts a guess inside a reading they are asked to act on.
-   */
-  const imported = await db
-    .select({ onDate: healthWorkouts.onDate, workoutType: healthWorkouts.workoutType })
-    .from(healthWorkouts)
-    .where(and(eq(healthWorkouts.userId, userId), gte(healthWorkouts.onDate, since)));
-
-  /**
-   * Never twice for the same effort.
-   *
-   * A member who lifts with Sakred open is very likely also wearing a watch
-   * that writes the same hour into Apple Health, and counting both would
-   * double their week. The rule is day-and-category: if a Sakred session that
-   * day already contributed this category, the imported one adds nothing.
-   *
-   * Day-level rather than overlapping timestamps because that is the
-   * resolution the data actually supports — `workout_sessions` records
-   * `on_date` and `finished_at` but never a start time, so a true overlap test
-   * would be comparing against a number we do not have. Two genuinely separate
-   * sessions of the same kind on one day being counted once is the cost, and
-   * it errs toward under-counting load, which is the safer direction for a
-   * reading that decides whether to tell somebody to rest.
-   */
-  const claimed = new Set(rows.map((r) => `${r.onDate}|${r.category}`));
-
-  for (const workout of imported) {
-    const category = externalActivityCategory(workout.workoutType);
-    if (!category) continue;
-    const key = `${workout.onDate}|${category}`;
-    if (claimed.has(key)) continue;
-    claimed.add(key);
-    native.push(category);
-  }
-
-  return native;
+  const moved = await recentMovement(userId, addDaysToString(onDate, -RECENT_DAYS));
+  return moved.map((m) => m.category);
 }
 
 async function daysSinceLastSession(userId: string, onDate: string): Promise<number | null> {

@@ -305,14 +305,28 @@ function TodayHabits() {
     );
   }
 
-  // Quieter than a card. The ritual above is the screen's content, so an empty
-  // habit list is a note rather than an announcement of absence.
+  /**
+   * Nothing at all when there is nothing to say.
+   *
+   * A member on no routine was shown "No routine running. Start one under
+   * Routines and the days fill in." — permanently, at the bottom of Today,
+   * every day. Screen space spent telling somebody what they are not doing is
+   * worse than empty: it makes the page end on an absence, and it is the same
+   * sentence forever, so it stops being read within a week and keeps taking
+   * the room.
+   *
+   * A member who *is* enrolled and has a clear day is a different case. That is
+   * information — their routine has scheduled nothing for today — and it is
+   * worth one quiet line.
+   *
+   * Discovery belongs where somebody is looking for a routine, which is
+   * Routines, not at the foot of a page they opened for something else.
+   */
   if (!todayData || todayData.habits.length === 0) {
+    if (!activeEnrollment) return null;
     return (
       <p className="text-sm text-muted-foreground" data-testid="text-no-habits">
-        {activeEnrollment
-          ? "Nothing scheduled today. Your routine picks up tomorrow."
-          : "No routine running. Start one under Routines and the days fill in."}
+        Nothing scheduled today. Your routine picks up tomorrow.
       </p>
     );
   }

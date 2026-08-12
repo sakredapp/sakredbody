@@ -318,8 +318,20 @@ const SLOTS: Readonly<Record<Readiness, readonly { want: Orientation; headline: 
   ],
 };
 
+/**
+ * Which shelf a suggestion goes on.
+ *
+ * `both` used to fall through to Restore, which put the one thing that is
+ * genuinely demanding *and* genuinely restorative on the shelf that means "this
+ * will give you something back" — with no mention of the half that takes. If a
+ * category asks enough of the body to count as demanding, Build is where a
+ * member should meet it; the restorative half is real but it is not the part
+ * they need to plan around.
+ *
+ * `neutral` and `yin` are Restore. Nothing else reaches here.
+ */
 function sideOf(orientation: Orientation): "restore" | "build" {
-  return orientation === "yang" ? "build" : "restore";
+  return orientation === "yang" || orientation === "both" ? "build" : "restore";
 }
 
 /**

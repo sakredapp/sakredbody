@@ -50,8 +50,8 @@ check("nothing is nothing", weekLoad([]).stress === 0 && weekLoad([]).restoratio
 check("a heavy lift is stress", weekLoad(["legs"]).stress === 3);
 check("fascia is restoration", weekLoad(["fascia"]).restoration === 3);
 check(
-  "Pilates counts on both sides of the ledger",
-  weekLoad(["pilates"]).stress === 2 && weekLoad(["pilates"]).restoration === 2,
+  "Pilates counts on both sides of the ledger, unevenly",
+  weekLoad(["pilates"]).stress === 2 && weekLoad(["pilates"]).restoration === 1,
 );
 check("sessions are counted", weekLoad(["legs", "back", "fascia"]).sessions === 3);
 

@@ -26,14 +26,11 @@
  * below your usual", where "usual" is one other night.
  */
 
-import { and, eq, gte, desc, isNull, or, sql, inArray } from "drizzle-orm";
+import { and, eq, gte, desc, isNull, or, inArray } from "drizzle-orm";
 import { db } from "../db.js";
 import {
   healthDays,
   terrainCheckins,
-  workoutSessions,
-  workoutSets,
-  exercises,
   rhythmSubjects,
   rhythmEvents,
   suggestionDismissals,
@@ -50,6 +47,7 @@ import {
   type RhythmModel,
 } from "../../shared/models/rhythm.js";
 import { categoryLoad } from "../../shared/models/training.js";
+import { recentMovement } from "../movement/history.js";
 
 /** Long enough that a baseline means something, short enough to still be "lately". */
 const BASELINE_DAYS = 28;
@@ -243,34 +241,31 @@ export type TrainingRead = {
  * happen, and counting it would have the app telling somebody to rest because
  * of a workout they opened and walked away from.
  */
+/**
+ * ── Both tables, through one reader ───────────────────────────────────────
+ *
+ * This queried `workout_sessions` alone, which meant Today could only see
+ * movement the member had logged by hand. A five-mile run that Apple Health
+ * recorded and Sakred stored was invisible here — so on the evening of that run
+ * Today said their movement was down and the day should be small, while Restore,
+ * reading the same database through the terrain path, correctly said they had
+ * nine demanding sessions that week.
+ *
+ * Two screens contradicting each other about the same body, four seconds apart.
+ * `recentMovement` is now the only thing that answers "what have they done",
+ * so the next screen to ask cannot inherit half an answer.
+ */
 export async function trainingRead(userId: string, today: string): Promise<TrainingRead> {
   const since = shiftDate(today, -HABIT_WINDOW_DAYS);
-
-  const rows = await db
-    .select({
-      onDate: workoutSessions.onDate,
-      category: exercises.category,
-    })
-    .from(workoutSessions)
-    .leftJoin(workoutSets, eq(workoutSets.sessionId, workoutSessions.id))
-    .leftJoin(exercises, eq(exercises.id, workoutSets.exerciseId))
-    .where(
-      and(
-        eq(workoutSessions.userId, userId),
-        gte(workoutSessions.onDate, since),
-        sql`${workoutSessions.finishedAt} IS NOT NULL`,
-      ),
-    )
-    .orderBy(desc(workoutSessions.onDate));
+  const moved = await recentMovement(userId, since);
 
   const recentCategories: string[] = [];
   const seen = new Set<string>();
   const dates = new Set<string>();
   const hardDates = new Set<string>();
 
-  for (const row of rows) {
+  for (const row of moved) {
     dates.add(row.onDate);
-    if (!row.category) continue;
     if (!seen.has(row.category)) {
       seen.add(row.category);
       recentCategories.push(row.category);

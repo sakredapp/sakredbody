@@ -205,7 +205,9 @@ export async function buildContext(userId: string, onDate: string): Promise<Note
     // Held so the prompt can be scrubbed of them, and for no other purpose.
     // See the note in buildContext above the query.
     identifiers: [user?.firstName, user?.lastName, user?.email],
-    health: await healthSignals(userId),
+    // `onDate` so the still-accumulating metrics can leave today out — a note
+    // written at 7am must not describe a step count that has not happened yet.
+    health: await healthSignals(userId, onDate),
     training: trainingPromptLines(await trainingSignals(userId, onDate)),
     polarity: chart?.polarity ?? null,
     protocol,

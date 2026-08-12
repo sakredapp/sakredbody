@@ -19,8 +19,15 @@
 
 import { RefreshCw, Link2Off, TrendingDown, TrendingUp } from "lucide-react";
 import { useHealthSummary, useHealthSync } from "@/hooks/use-health";
-import { METRIC_DISPLAY, groupsWithData, summarise } from "@/lib/healthDisplay";
+import {
+  METRIC_DISPLAY,
+  groupsWithData,
+  summarise,
+  isStillCounting,
+  localToday,
+} from "@/lib/healthDisplay";
 import type { DaySeries } from "@/lib/healthDisplay";
+import type { HealthMetric } from "@shared/schema";
 import { HealthWorkouts } from "@/components/portal/HealthWorkouts";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -29,13 +36,53 @@ import { cn } from "@/lib/utils";
 /** Under 3%, a trend arrow is noise dressed up as a finding. */
 const TREND_FLOOR = 0.03;
 
+/**
+ * Which day this reading belongs to, in words.
+ *
+ * Sleep is filed to the date the night *ends* on, so today's sleep row is last
+ * night — which is the one piece of naming here counter-intuitive enough that
+ * leaving it unsaid invites a member to read it as a nap.
+ */
+function whenLabel(metric: string, onDate: string | null): string {
+  if (!onDate) return "";
+  const today = localToday();
+  const sleep = metric.startsWith("sleep");
+  if (onDate === today) return sleep ? "Last night" : "Today";
+
+  const days = Math.round(
+    (new Date(`${today}T12:00:00`).getTime() - new Date(`${onDate}T12:00:00`).getTime()) /
+      86_400_000,
+  );
+  if (days === 1) return sleep ? "The night before" : "Yesterday";
+  return new Date(`${onDate}T12:00:00`).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+}
+
 function MetricTile({ days, metric }: { days: DaySeries[]; metric: keyof typeof METRIC_DISPLAY }) {
   const display = METRIC_DISPLAY[metric];
   const stat = summarise(days, metric);
   if (!stat) return null;
 
+  /**
+   * A day still being counted is not a day you can compare.
+   *
+   * At 18:10 this tile read "16,190 steps · 11% down vs earlier" — down against
+   * finished days, with hours of the current one still to run. The percentage
+   * was arithmetically true and told the member something false, which is the
+   * worst kind of number to print: it needs no bug to mislead.
+   *
+   * The same guard exists in the metric detail sheet. It was added there and
+   * not here, so the modal said "Today so far" while the tile behind it was
+   * still quoting a decline — the two disagreed on the same screen.
+   *
+   * Sleep keeps its comparison. Last night is over.
+   */
+  const stillCounting = isStillCounting(metric as HealthMetric, stat.onDate);
+
   let delta: number | null = null;
-  if (stat.baseline !== null && stat.baseline !== 0) {
+  if (!stillCounting && stat.baseline !== null && stat.baseline !== 0) {
     const d = (stat.value - stat.baseline) / stat.baseline;
     if (Math.abs(d) >= TREND_FLOOR) delta = d;
   }
@@ -53,6 +100,15 @@ function MetricTile({ days, metric }: { days: DaySeries[]; metric: keyof typeof 
         {display.label}
       </div>
       <div className="mt-1.5 text-lg font-display">{display.format(stat.value)}</div>
+      {/*
+        What day this is. The tiles never said, so a member could not tell
+        whether they were reading today, last night, or an average of the month.
+      */}
+      {stillCounting ? (
+        <div className="text-[10px] mt-0.5 text-muted-foreground">Today so far</div>
+      ) : (
+        <div className="text-[10px] mt-0.5 text-muted-foreground">{whenLabel(metric, stat.onDate)}</div>
+      )}
       {delta !== null && (
         <div
           className={cn(
@@ -63,7 +119,12 @@ function MetricTile({ days, metric }: { days: DaySeries[]; metric: keyof typeof 
           )}
         >
           {delta > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-          {Math.abs(Math.round(delta * 100))}% vs earlier
+          {/*
+            "vs earlier" named no window at all. It is a comparison against the
+            member's other recent days, and saying so is the difference between
+            a number they can act on and one they have to guess at.
+          */}
+          {Math.abs(Math.round(delta * 100))}% vs your recent days
         </div>
       )}
     </div>

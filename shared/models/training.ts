@@ -515,7 +515,23 @@ export const CATEGORY_LOAD: Readonly<Record<string, MovementLoad>> = {
   yoga: { stress: 1, restoration: 3 },
 
   // ── Studio ──
-  pilates: { stress: 2, restoration: 2 },
+  /**
+   * Build, not Both.
+   *
+   * This was `restoration: 2`, which made Pilates the only category in the
+   * whole table whose orientation came out `both` — and `sideOf` in
+   * recommend.ts sends `both` to Restore, so "Pilates & Reformer" was being
+   * offered under Restore's "Try something different". That is the wrong shelf
+   * for it. Reformer work is resistance against a spring: muscular control,
+   * structural development, training capacity. Somebody who takes it as their
+   * recovery session has not recovered.
+   *
+   * It still gives something back, which is what `restoration: 1` says. What it
+   * no longer claims is that it gives back as much as it asks. A specifically
+   * restorative variant can earn its own category if one ever appears; the
+   * generic word belongs here.
+   */
+  pilates: { stress: 2, restoration: 1 },
   // Lagree is not Pilates for this purpose. It is deliberately taken close to
   // failure under constant tension, and treating it as gentle because it
   // happens on a carriage would understate a member's week considerably.
@@ -615,16 +631,41 @@ export const EXTERNAL_ACTIVITY_CATEGORY: Readonly<Record<string, string>> = {
   strength: "full_body",
   boxing: "sport",
   tennis: "sport",
-  golf: "sport",
   dance: "class",
 
   // ── Both, or contextual ──
-  // Hiking and walking carry a real cost and give something back; locomotion
-  // is the category that already says exactly that.
   hiking: "locomotion",
-  walking: "locomotion",
   pilates: "pilates",
   core: "core",
+
+  /**
+   * Golf is not boxing.
+   *
+   * It sat under `sport`, which is `stress: 3` — the same figure as a boxing
+   * session and a competitive tennis match. Four hours of golf is a long walk
+   * with some rotational work in it, and telling somebody they have spent their
+   * week's capacity on it would be a strange thing for the app to believe.
+   */
+  golf: "locomotion",
+
+  /**
+   * ── Why a walk is not a demanding session ───────────────────────────────
+   *
+   * `walking` mapped to `locomotion`, which is `stress: 2` — and `stress >= 2`
+   * is the definition of demanding everywhere in this file. So every walk Apple
+   * Health recorded counted as a training session: a member who walks the dog
+   * twice a day could reach "9 demanding sessions this week" without training
+   * once, and Restore would then be reasoning about recovery they do not need.
+   *
+   * It is also a double count. A walk has already been recorded in steps,
+   * distance and active energy for that day; counting it again as a session
+   * charges the same movement to the member twice.
+   *
+   * `recovery` is where the modality list already puts easy movement, alongside
+   * breathwork and sauna. Hiking stays under locomotion, because a hike is a
+   * different proposition and the platforms distinguish them.
+   */
+  walking: "recovery",
 
   // ── Yin: these give more than they take ──
   yoga: "yoga",

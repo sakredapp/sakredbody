@@ -92,56 +92,74 @@ export function Sparkline({
 
   return (
     <div className={cn("w-full min-w-0", className)} data-testid={testId}>
-      <svg
-        width="100%"
-        height={height}
-        viewBox={`0 0 ${W} ${height}`}
-        preserveAspectRatio="none"
-        className="overflow-visible"
-      >
-        <path
-          d={path}
-          fill="none"
-          stroke="hsl(var(--gold))"
-          strokeWidth={1.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          // The viewBox is stretched horizontally, which would stretch the
-          // stroke with it. This keeps the line an even weight at any width.
-          vectorEffect="non-scaling-stroke"
-        />
-        {/*
-          Dots drawn as zero-length strokes, not circles.
+      {/*
+        ── Why the dots are not in the SVG ───────────────────────────────────
 
-          The viewBox is 100 units wide and stretched to whatever the container
-          is — around 350px — while the height maps one-to-one. So the whole
-          drawing is scaled about 3.5x horizontally and 1x vertically, and a
-          <circle> came out as a wide flat ellipse. It looked like a rendering
-          fault because it was one.
+        The viewBox is 100 units wide stretched to whatever the container is —
+        about 350px — while the height maps one to one. Every shape inside is
+        therefore scaled roughly 3.5x horizontally and 1x vertically, so a
+        <circle> renders as a wide flat ellipse. That much was diagnosed
+        correctly the first time; the fix was not.
 
-          `vectorEffect="non-scaling-stroke"` already rescued the line, but it
-          only protects a stroke, and a circle's roundness is its geometry. A
-          zero-length subpath with a round linecap draws a dot whose diameter is
-          the stroke width — and stroke width is exactly the thing the transform
-          cannot touch. So these stay round at any container width, with no
-          measuring and no resize handling.
+        The first attempt drew each dot as a zero-length subpath with a round
+        linecap and `vectorEffect="non-scaling-stroke"`, reasoning that stroke
+        width is the one thing a transform cannot touch. On paper that holds.
+        In WebKit it does not: non-scaling-stroke on a degenerate subpath is
+        applied inconsistently, and on the phone the dots stayed oval. Two
+        rounds of clever geometry inside a deliberately distorted coordinate
+        system is a sign the coordinate system is the problem.
 
-          Smaller than the old radii as well: 3px and 5px across, where the
-          circles were 4 and 6 before being stretched to about 14 and 21.
-        */}
-        {points.map((p, i) => (
+        So the markers left it. The line keeps the stretchable viewBox, because
+        stretching is exactly what a line of unknown width wants. The dots are
+        ordinary elements in the page's own coordinates — positioned by
+        percentage across and by pixel down, sized in pixels — where nothing is
+        scaling anything and a circle is round because it is a circle.
+      */}
+      <div className="relative w-full" style={{ height }}>
+        <svg
+          width="100%"
+          height={height}
+          viewBox={`0 0 ${W} ${height}`}
+          preserveAspectRatio="none"
+          className="overflow-visible block"
+        >
           <path
-            key={p.label + i}
-            d={`M ${x(i)} ${y(p.value)} L ${x(i)} ${y(p.value)}`}
-            stroke={i === last ? "hsl(var(--gold-light))" : "hsl(var(--gold))"}
-            strokeOpacity={i === last ? 1 : 0.55}
-            strokeWidth={i === last ? 5 : 3}
-            strokeLinecap="round"
+            d={path}
             fill="none"
+            stroke="hsl(var(--gold))"
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            // The viewBox is stretched horizontally, which would stretch the
+            // stroke with it. This keeps the line an even weight at any width.
             vectorEffect="non-scaling-stroke"
           />
-        ))}
-      </svg>
+        </svg>
+        {points.map((p, i) => {
+          const isLast = i === last;
+          const size = isLast ? 5 : 3;
+          return (
+            <span
+              key={p.label + i}
+              aria-hidden="true"
+              className="absolute rounded-full pointer-events-none"
+              style={{
+                // `x(i)` is already a position in a 100-unit space, which is a
+                // percentage by construction. The vertical axis maps 1:1 to
+                // pixels, so `y` needs no conversion either.
+                left: `${x(i)}%`,
+                top: y(p.value),
+                width: size,
+                height: size,
+                marginLeft: -size / 2,
+                marginTop: -size / 2,
+                background: isLast ? "hsl(var(--gold-light))" : "hsl(var(--gold))",
+                opacity: isLast ? 1 : 0.55,
+              }}
+            />
+          );
+        })}
+      </div>
 
       {showLabels && (
         <div className="flex justify-between gap-2 mt-2 min-w-0">

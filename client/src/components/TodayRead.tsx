@@ -26,7 +26,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { ChevronRight, MoreHorizontal, Moon, Sparkles } from "lucide-react";
+import { ChevronRight, MoreHorizontal, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Suggestion, MoonGuidance, SeasonGuidance, ReadinessRead } from "@shared/models/recommend";
 import type { RelationalGuidance } from "@shared/models/relating";
@@ -210,8 +210,14 @@ function Sky({ moon, season, sky }: { moon: MoonGuidance | null; season: SeasonG
       className="rounded-xl border border-[hsl(var(--gold))]/12 bg-white/[0.03] p-4"
       data-testid="sky-card"
     >
+      {/*
+        No icon. A small line-art moon beside the copy added nothing the words
+        did not already say, and it read as stock wellness decoration next to
+        the celestial artwork this product actually draws. The typography, the
+        gold and the constellation figures are the visual language here; a
+        picked-from-a-set glyph is not part of it.
+      */}
       <div className="flex items-start gap-3">
-        <Moon className="h-4 w-4 text-[hsl(var(--gold))] mt-0.5 shrink-0" />
         <div className="min-w-0">
           <p className="font-display text-base leading-snug">{lead.title}</p>
           <p className="text-[11px] text-muted-foreground mt-1 leading-snug">{lead.detail}</p>
