@@ -53,7 +53,7 @@ import {
   skyLine,
 } from "../../shared/models/recommend.js";
 import { SELF_GUIDE, phaseLabel } from "../../shared/models/rhythm.js";
-import { relationshipGuidance, selfRelationalNote } from "../../shared/models/relating.js";
+import { relationshipGuidance, selfRelationalReads } from "../../shared/models/relating.js";
 import { moonState, elementalSeason } from "../../shared/utils/almanac.js";
 import {
   healthReadings,
@@ -64,6 +64,7 @@ import {
   ownCycleLean,
   excludedCategories,
   toReadinessSignals,
+  toSelfSignals,
   type SubjectRead,
 } from "./signals.js";
 
@@ -215,10 +216,16 @@ export function registerTodayRoutes(app: Express): void {
          * steady day — a card that appears every morning telling somebody to
          * communicate better is a nag.
          */
-        relating: selfRelationalNote(read, {
-          phase: self?.estimate.phase ?? null,
-          phaseConfidence: self?.estimate.confidence,
-        }),
+        relating: selfRelationalReads(
+          read,
+          toSelfSignals({
+            readings: health.readings,
+            sleepHistory: health.sleepHistory,
+            checkin,
+            training,
+          }),
+          { phase: self?.estimate.phase ?? null, phaseConfidence: self?.estimate.confidence },
+        ),
       });
     } catch (err) {
       fail(res, "today.read", err);

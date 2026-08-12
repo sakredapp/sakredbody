@@ -12,6 +12,7 @@ import {
   relationshipGuidance,
   generalRelationshipGuidance,
   selfRelationalNote,
+  selfRelationalReads,
   strongestAuthority,
   subjectName,
   type RelationalGuidance,
@@ -189,15 +190,61 @@ check("a steady day says nothing", steady === null);
 const blind = selfRelationalNote(readReadiness({}));
 check("no signals means no self note", blind === null);
 
-const withCycle = selfRelationalNote(
+/**
+ * A measured signal outranks the cycle, every time.
+ *
+ * She slept two and a half hours under her usual AND is in the late luteal
+ * phase. The card must lead with the sleep, because that is the thing she can
+ * do something about tonight and the thing we actually measured — the phase is
+ * context, not the headline.
+ */
+const withCycle = selfRelationalReads(
   readReadiness({ sleepMinutes: 300, sleepBaselineMinutes: 460, terrainLean: -2 }),
+  { sleepDeficit: 160, shortNightsRunning: 1 },
   { phase: "luteal", phaseConfidence: "likely" },
 );
-check("the cycle can colour her own note", /cycle/i.test(withCycle?.detail ?? ""));
-// But it must never be *only* the cycle. Her own measurements are what the
-// note rests on; the phase says where that landing is likely to be hardest.
-check("her own numbers still lead", /your own numbers are down/i.test(withCycle?.detail ?? ""));
-check("and it never names the phase as the cause", !/you're luteal|because you're/i.test(withCycle?.detail ?? ""));
+check("a measured signal leads over the cycle", /fuse|sleep|slept/i.test(withCycle[0]?.title + withCycle[0]?.detail));
+check("and it names what is actually off", withCycle[0]?.authority === "first_party");
+check("never more than two at once", withCycle.length <= 2);
+
+// The cycle still gets said when nothing measured is standing out.
+const cycleOnly = selfRelationalReads(
+  readReadiness({ terrainLean: -1, sleepMinutes: 450, sleepBaselineMinutes: 455 }),
+  {},
+  { phase: "luteal", phaseConfidence: "likely" },
+);
+check("the cycle is heard when nothing else is off", /bandwidth/i.test(cycleOnly[0]?.title ?? ""));
+check("and it never names the phase as a verdict", !/you're luteal|because you're/i.test(cycleOnly[0]?.detail ?? ""));
+
+/**
+ * THE assertion for the half of this feature that works for everybody.
+ *
+ * A man with three short nights must get something specific and useful — not
+ * a sentence about a setting, which is what the first version gave him.
+ */
+const manThreeShortNights = selfRelationalReads(
+  readReadiness({ sleepMinutes: 330, sleepBaselineMinutes: 450 }),
+  { sleepDeficit: 120, shortNightsRunning: 3, recoveryDown: true },
+);
+check("three short nights is named as such", /three short nights/i.test(manThreeShortNights[0]?.title ?? ""));
+check("with something to actually do", Boolean(manThreeShortNights[0]?.goodMove));
+check("and the physiology underneath it", Boolean(manThreeShortNights[0]?.physiology));
+check("a second signal can also be said", manThreeShortNights.length === 2);
+
+const wiredNervousSystem = selfRelationalReads(
+  readReadiness({ terrainLean: -2, sleepMinutes: 450, sleepBaselineMinutes: 450 }),
+  { nervousSystem: 1 },
+);
+check("a wired nervous system gets its own read", /neutral as hostile/i.test(wiredNervousSystem[0]?.title ?? ""));
+
+const heavyBlock = selfRelationalReads(
+  readReadiness({ hardSessionsRecently: 3 }),
+  { hardSessionsRecently: 3 },
+);
+check("a hard training block is not read as disinterest", /disinterest/i.test(heavyBlock[0]?.title ?? ""));
+
+// Nothing measured, nothing said — the rule the whole file runs on.
+check("no signals still means no self note", selfRelationalReads(readReadiness({}), {}).length === 0);
 
 // ─── Small things ──────────────────────────────────────────────────────────
 

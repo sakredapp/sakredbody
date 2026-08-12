@@ -368,53 +368,210 @@ export function generalRelationshipGuidance(): RelationalGuidance {
  * Returns null on a steady day with nothing to say. A card that appears every
  * morning telling somebody to communicate better is a nag.
  */
+/**
+ * What your own state is doing to how you show up — driven by the signal that
+ * is actually off, not by an aggregate.
+ *
+ * ── Why this replaces a two-state version ─────────────────────────────────
+ *
+ * The first version keyed off the overall readiness level and said one of two
+ * things: "you're running low on bandwidth" or "you've got some to give". Both
+ * true, neither useful, and both said in the same words whatever was actually
+ * wrong. "Your numbers are down" is a sentence a member cannot act on.
+ *
+ * "Your sleep has been low and your nervous system is off, so you'll read
+ * neutral as hostile tonight" is a different kind of statement. It names the
+ * signal, says what it does to a person, and gives them something to do about
+ * it — and it is entirely derivable from measurements the app already holds.
+ *
+ * ── Why this is the half that works for everybody ─────────────────────────
+ *
+ * The relationship layer had a real asymmetry: a woman got a cycle to
+ * understand and a man got a card explaining that phases aren't estimated on
+ * his setting. That is not a limitation of the data — his sleep, resting heart
+ * rate, HRV and training load are all measured, and every one of them changes
+ * how somebody lands on the people around them. It was a limitation of what
+ * had been written.
+ *
+ * So the specific, physiological, grounded content lives here too, for
+ * everybody, and the cycle is one input among several rather than the only one
+ * anybody bothered to write for.
+ *
+ * ── Still first-party only ────────────────────────────────────────────────
+ *
+ * Every line below is about the member's own body, measured. That is what lets
+ * it be stated plainly rather than hedged — and it is exactly the authority
+ * the partner-facing cards do not have. Nothing here claims anything about
+ * anybody else.
+ */
+export type SelfSignals = {
+  /** Minutes below their own usual, positive when short. */
+  sleepDeficit?: number | null;
+  /** Nights in a row below their usual. */
+  shortNightsRunning?: number | null;
+  /** True when HRV is meaningfully down or resting heart rate meaningfully up. */
+  recoveryDown?: boolean;
+  /** Straight from the check-in, 1–5. */
+  nervousSystem?: number | null;
+  hardSessionsRecently?: number;
+};
+
+function selfCard(
+  fields: Omit<RelationalGuidance, "audience" | "authority" | "basis">,
+): RelationalGuidance {
+  return { ...fields, audience: "self", authority: "first_party", basis: BASIS.first_party };
+}
+
+export function selfRelationalReads(
+  read: ReadinessRead,
+  signals: SelfSignals = {},
+  options: { phase?: CyclePhase | null; phaseConfidence?: RhythmConfidence } = {},
+): RelationalGuidance[] {
+  // No signals, no claim. The same rule the readiness copy follows.
+  if (read.confidence === "none") return [];
+
+  const {
+    sleepDeficit = null,
+    shortNightsRunning = null,
+    recoveryDown = false,
+    nervousSystem = null,
+    hardSessionsRecently = 0,
+  } = signals;
+
+  const out: RelationalGuidance[] = [];
+
+  /**
+   * Sleep first, because it is the one with the largest and best-evidenced
+   * effect on how somebody treats other people, and the one they are least
+   * likely to connect to the argument they are about to have.
+   */
+  if (shortNightsRunning != null && shortNightsRunning >= 3) {
+    out.push(
+      selfCard({
+        title: "Three short nights is where people get snappy",
+        detail: `You've been under your usual for ${shortNightsRunning} nights running. That accumulates in a way one bad night doesn't.`,
+        goodMove:
+          "Push anything that needs patience — a hard conversation, a decision about somebody else — to a day after you've slept.",
+        worthAsking: "Am I actually annoyed, or am I just this tired?",
+        dontAssume:
+          "The thing that irritates you on night three often won't on night one. That's worth knowing before you say it.",
+        physiology:
+          "Sleep debt compounds. Two or more short nights measurably reduces emotional regulation and raises how threatening you read neutral faces as being — which is the mechanism behind most tired arguments.",
+      }),
+    );
+  } else if (sleepDeficit != null && sleepDeficit >= 60) {
+    out.push(
+      selfCard({
+        title: "Short fuse tonight, and it isn't about them",
+        detail: `You slept about ${Math.round(sleepDeficit / 60)}h under your usual.`,
+        goodMove: "Keep the evening simple and don't start anything that needs patience.",
+        worthAsking: "Is this worth getting into tonight, or does it keep until tomorrow?",
+        dontAssume: "One short night is a short night. It is not evidence about anybody's behaviour.",
+        physiology:
+          "A single night's shortfall reduces impulse control and raises reactivity the following evening. It resolves with one good night.",
+      }),
+    );
+  }
+
+  // The nervous system, from either side — what she said, or what the sensors
+  // saw. Both describe the same thing and only one needs to be present.
+  if ((nervousSystem != null && nervousSystem <= 2) || recoveryDown) {
+    if (out.length < 2) {
+      out.push(
+        selfCard({
+          title: "You'll read neutral as hostile today",
+          detail:
+            nervousSystem != null && nervousSystem <= 2
+              ? "You checked in wired or on edge, and recovery is tracking with it."
+              : "Your recovery is down on your own baseline, which usually shows up as a lower threshold for irritation.",
+          goodMove:
+            "Assume the flat text and the short reply mean nothing. Ask before you conclude anything about somebody's tone.",
+          worthAsking: "Would I have read that the same way on a good week?",
+          dontAssume:
+            "A body braced for something reads ambiguity as threat. That is a state you are in, not information about the other person.",
+          physiology:
+            "Low heart-rate variability reflects a nervous system biased toward sympathetic activity. In that state ambiguous social signals are more often interpreted as negative — a measurable effect, not a mood.",
+        }),
+      );
+    }
+  }
+
+  // Accumulated training load. The specific misread here is worth naming,
+  // because it is the one that gets called distance.
+  if (hardSessionsRecently >= 3 && out.length < 2) {
+    out.push(
+      selfCard({
+        title: "Low energy this week isn't disinterest",
+        detail: "You've trained hard several times in the last few days.",
+        goodMove:
+          "Say you're wrecked rather than going quiet — quiet is the thing that gets read as something else.",
+        worthAsking: "Have I told anyone I'm in a hard block, or am I expecting them to notice?",
+        dontAssume: "Being flat after a heavy block is recovery working. It doesn't need a reason found for it.",
+        physiology: null,
+      }),
+    );
+  }
+
+  // The cycle, for whoever has one, as one input among these rather than a
+  // separate feature.
+  const cycleApplies =
+    (options.phase === "luteal" || options.phase === "menstrual") &&
+    options.phaseConfidence != null &&
+    options.phaseConfidence !== "uncertain";
+
+  if (cycleApplies && out.length < 2) {
+    out.push(
+      selfCard({
+        title: "Your bandwidth may be lower than usual",
+        detail:
+          "This stretch of your cycle is where a lot of women notice less patience for other people — though how much varies enormously.",
+        goodMove:
+          "If you need space or support, saying it directly beats hoping somebody works it out.",
+        worthAsking: "What do I need this week, and have I actually asked for it?",
+        dontAssume:
+          "A pattern is not a verdict on your day. If you're annoyed, you may simply be right.",
+        physiology:
+          "Progesterone falls through the late luteal phase and core temperature runs slightly higher, which is why sleep quality often drops first and patience second.",
+      }),
+    );
+  }
+
+  // Nothing specific was off, but the day still reads one way or the other.
+  if (!out.length && read.level === "depleted") {
+    out.push(
+      selfCard({
+        title: "You're running low on bandwidth",
+        detail: "Your own numbers are down today, and that shows up in how you are with people before you notice it yourself.",
+        goodMove: "Eat, decompress, and say out loud that you're cooked rather than going quiet.",
+        worthAsking: "What do I actually need tonight, and have I said it?",
+        dontAssume: "Depletion is not a licence, and it isn't the other person's fault.",
+        physiology: null,
+      }),
+    );
+  }
+
+  if (!out.length && read.level === "primed") {
+    out.push(
+      selfCard({
+        title: "You've got some to give today",
+        detail: "You're reading well-recovered, which is worth spending on somebody as well as on training.",
+        goodMove: "Do the thing you've been meaning to do for someone. It costs you least on a day like this.",
+        worthAsking: "Who's had a harder week than me?",
+        dontAssume: "Feeling good yourself says nothing about how anybody else's day is going.",
+        physiology: null,
+      }),
+    );
+  }
+
+  return out.slice(0, 2);
+}
+
+/** The single strongest note, for a surface with room for one. */
 export function selfRelationalNote(
   read: ReadinessRead,
   options: { phase?: CyclePhase | null; phaseConfidence?: RhythmConfidence } = {},
 ): RelationalGuidance | null {
-  // No signals, no claim. The same rule the readiness copy follows.
-  if (read.confidence === "none") return null;
-
-  const { phase, phaseConfidence } = options;
-  const cycleAdds =
-    phase === "luteal" || phase === "menstrual"
-      ? phaseConfidence && phaseConfidence !== "uncertain"
-      : false;
-
-  if (read.level === "depleted") {
-    return {
-      audience: "self",
-      title: "You're running low on bandwidth",
-      detail: cycleAdds
-        ? "Your own numbers are down, and this part of your cycle is often where that lands hardest."
-        : "Your own numbers are down today, and that tends to show up in how you are with people before you notice it yourself.",
-      goodMove:
-        "Eat, decompress, and say out loud that you're cooked — rather than going quiet and letting somebody else work out why.",
-      worthAsking: "What do I actually need tonight, and have I said it?",
-      dontAssume:
-        "Depletion is not a licence, and it isn't the other person's fault. It is worth naming precisely so it doesn't get expressed sideways.",
-      physiology: null,
-      // Their own measurements. The strongest thing in the model.
-      authority: "first_party",
-      basis: BASIS.first_party,
-    };
-  }
-
-  if (read.level === "primed") {
-    return {
-      audience: "self",
-      title: "You've got some to give today",
-      detail: "You're reading well-recovered, which is worth spending on somebody as well as on training.",
-      goodMove: "Do the thing you've been meaning to do for someone. It costs you least on a day like this.",
-      worthAsking: "Who's had a harder week than me?",
-      dontAssume: "Feeling good yourself says nothing about how anybody else's day is going.",
-      physiology: null,
-      authority: "first_party",
-      basis: BASIS.first_party,
-    };
-  }
-
-  return null;
+  return selfRelationalReads(read, {}, options)[0] ?? null;
 }
 
 /** For a card header: "Emma", or a fallback that names the relationship. */

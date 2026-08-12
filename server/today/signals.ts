@@ -97,7 +97,12 @@ const READ_METRICS = ["sleepMinutes", "restingHeartRate", "heartRateVariability"
 export async function healthReadings(
   userId: string,
   today: string,
-): Promise<{ readings: Record<string, Reading>; stats: TodayStat[] }> {
+): Promise<{
+  readings: Record<string, Reading>;
+  stats: TodayStat[];
+  /** Newest first, for counting consecutive short nights. */
+  sleepHistory: { onDate: string; value: number }[];
+}> {
   const since = shiftDate(today, -BASELINE_DAYS);
 
   const rows = await db
@@ -148,7 +153,11 @@ export async function healthReadings(
     if (!readings[metric]) readings[metric] = { today: null, baseline: null };
   }
 
-  return { readings, stats };
+  return {
+    readings,
+    stats,
+    sleepHistory: (byMetric.get("sleepMinutes") ?? []) as { onDate: string; value: number }[],
+  };
 }
 
 // ─── The check-in ──────────────────────────────────────────────────────────
@@ -408,6 +417,62 @@ export async function excludedCategories(userId: string, today: string): Promise
 }
 
 // ─── Assembly ──────────────────────────────────────────────────────────────
+
+/**
+ * The shape the relationship read wants: which signal is off, not a score.
+ *
+ * "Your sleep has been low three nights running" is actionable in a way "your
+ * numbers are down" is not, and the difference is entirely in keeping the
+ * individual signals rather than collapsing them first.
+ */
+export function toSelfSignals(input: {
+  readings: Record<string, Reading>;
+  sleepHistory: { onDate: string; value: number }[];
+  checkin: Partial<Record<TerrainSignalId, number | null>> | null;
+  training: TrainingRead;
+}): {
+  sleepDeficit: number | null;
+  shortNightsRunning: number | null;
+  recoveryDown: boolean;
+  nervousSystem: number | null;
+  hardSessionsRecently: number;
+} {
+  const { readings, sleepHistory, checkin, training } = input;
+
+  const sleep = readings.sleepMinutes;
+  const deficit =
+    sleep?.today != null && sleep.baseline != null ? sleep.baseline - sleep.today : null;
+
+  /**
+   * Consecutive nights under their usual, newest first.
+   *
+   * Counted rather than averaged because the effect being described is
+   * cumulative: night three is where people get short with each other, and an
+   * average over the week hides exactly that.
+   */
+  let running: number | null = null;
+  if (sleep?.baseline != null && sleepHistory.length) {
+    running = 0;
+    for (const night of sleepHistory) {
+      if (night.value < sleep.baseline - 30) running++;
+      else break;
+    }
+  }
+
+  const hrv = readings.heartRateVariability;
+  const rhr = readings.restingHeartRate;
+  const recoveryDown =
+    (hrv?.today != null && hrv.baseline != null && hrv.today / hrv.baseline <= 0.9) ||
+    (rhr?.today != null && rhr.baseline != null && rhr.today - rhr.baseline >= 3);
+
+  return {
+    sleepDeficit: deficit,
+    shortNightsRunning: running,
+    recoveryDown,
+    nervousSystem: typeof checkin?.nervousSystem === "number" ? checkin.nervousSystem : null,
+    hardSessionsRecently: training.hardSessionsRecently,
+  };
+}
 
 export function toReadinessSignals(input: {
   readings: Record<string, Reading>;

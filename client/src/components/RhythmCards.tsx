@@ -337,14 +337,26 @@ function OwnRhythm() {
           Nothing is standing out in your sleep, recovery or recent training.
         </p>
       )}
-      {/* Their own terrain turned into how it lands on other people — built
-          entirely from their own measurements, which is what lets it be stated
-          plainly. Null on an unremarkable day. */}
-      {data.relating && (
-        <p className="text-xs text-[hsl(var(--gold))]/80 leading-snug pt-1">
-          {data.relating.goodMove}
-        </p>
-      )}
+      {/*
+        The half of this feature that works for everybody.
+
+        Their own terrain, turned into how it is likely to land on the people
+        around them — built entirely from their own measurements, which is what
+        lets it be stated plainly rather than hedged. Each card names the signal
+        that is actually off, because "your numbers are down" is not something
+        anybody can act on and "you'll read neutral as hostile today" is.
+      */}
+      {data.relating?.map((note, i) => (
+        <div key={`${note.title}-${i}`} className="pt-2 space-y-1 border-t border-border/30">
+          <p className="text-xs font-medium leading-snug">{note.title}</p>
+          <p className="text-[11px] text-muted-foreground leading-snug">{note.detail}</p>
+          <p className="text-xs leading-snug">{note.goodMove}</p>
+          <p className="text-xs text-[hsl(var(--gold))]/80 leading-snug">
+            Worth asking: “{note.worthAsking}”
+          </p>
+          <p className="text-[11px] text-muted-foreground leading-snug">{note.dontAssume}</p>
+        </div>
+      ))}
     </>
   );
 }

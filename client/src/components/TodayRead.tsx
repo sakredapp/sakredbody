@@ -66,7 +66,11 @@ export type TodayResponse = {
   stats: TodayStat[];
   checkedIn: boolean;
   rhythm: RhythmSubjectView[];
-  relating: RelationalGuidance | null;
+  /**
+   * How their own state is landing on other people — up to two, each naming
+   * the signal that is actually off rather than an aggregate.
+   */
+  relating: RelationalGuidance[];
 };
 
 export function useToday() {
@@ -353,7 +357,9 @@ export function TodayRead({
         ))}
       </div>
 
-      {data.relating && <RelatingCard note={data.relating} />}
+      {data.relating?.map((note, i) => (
+        <RelatingCard key={`${note.title}-${i}`} note={note} />
+      ))}
 
       <Sky moon={data.moon} season={data.season} sky={data.sky} />
     </div>
