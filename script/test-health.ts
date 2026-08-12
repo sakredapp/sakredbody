@@ -1392,7 +1392,7 @@ check(
 // ── 15. The morning banner ─────────────────────────────────────────────────
 section("Morning notification");
 
-const { morningBody, morningDates, morningNotice } = await import(
+const { morningBody, morningDates, morningNotice, sleepAgainst } = await import(
   "../client/src/lib/morningNoticeContent.js"
 );
 
@@ -1485,7 +1485,19 @@ check("brief says nothing about sleep", !/slept/.test(brief?.body ?? ""));
 const full = morningNotice(FACTS as never, "full", 1);
 check("full keeps the practices", /5 practices today/.test(full?.body ?? ""), full?.body);
 check("full adds last night", /slept 6h 40m/.test(full?.body ?? ""), full?.body);
-check("and reads it against their own baseline", /under your usual/.test(full?.body ?? ""));
+check("and reads it against their own baseline", /under your 30-day average/.test(full?.body ?? ""),
+  full?.body);
+/**
+ * The window is named, here as everywhere.
+ *
+ * "under your usual" is unfalsifiable — it does not say what was averaged or
+ * over how long, so a member cannot tell a real shortfall from a baseline made
+ * of six double-counted nights, which is precisely what happened.
+ */
+check("the notification names the window it compared against",
+  /\d+-day average/.test(full?.body ?? ""), full?.body);
+check("the notification does not say the unfalsifiable thing",
+  !/your usual/.test(full?.body ?? ""), full?.body);
 
 const steady = morningNotice(
   { ...FACTS, sleepMinutes: 465, sleepBaseline: 470 } as never,
@@ -1494,9 +1506,29 @@ const steady = morningNotice(
 );
 check(
   "a normal night is not dressed up as a finding",
-  /about your usual/.test(steady?.body ?? ""),
+  /about your 30-day average/.test(steady?.body ?? ""),
   steady?.body
 );
+
+/**
+ * The baseline must exclude the night being judged.
+ *
+ * Both the widget and the notification used to average every night they held,
+ * including the one being compared, so a short night was measured partly
+ * against itself. With a month of data that drags the deviation down by about
+ * a thirtieth — enough to push a genuinely short night under the 8% floor and
+ * out of the notification entirely.
+ */
+const nights = [
+  ...Array.from({ length: 9 }, () => ({ sleepMinutes: 480 })),
+  { sleepMinutes: 300 },
+];
+const against = sleepAgainst(nights, 30);
+check("the last night is the one judged", against.lastNight === 300, String(against.lastNight));
+check("the baseline is every OTHER night", against.baseline === 480, String(against.baseline));
+check("the window is carried through", against.baselineDays === 30);
+check("too little history yields no baseline",
+  sleepAgainst([{ sleepMinutes: 400 }, { sleepMinutes: 500 }], 30).baseline === null);
 
 const noBaseline = morningNotice(
   { ...FACTS, sleepBaseline: null } as never,

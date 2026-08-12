@@ -11,7 +11,8 @@
 
 import { Capacitor } from "@capacitor/core";
 import { apiFetch } from "./apiFetch";
-import { morningBody } from "./morningNoticeContent";
+import { morningBody, sleepAgainst } from "./morningNoticeContent";
+import { HEALTH_WINDOW_DAYS } from "./morningNotice";
 
 function hoursMinutes(minutes: number): string {
   const h = Math.floor(minutes / 60);
@@ -28,7 +29,7 @@ export async function updateWidget(): Promise<boolean> {
     const [routine, habits, health] = await Promise.all([
       apiFetch("/api/routines/active").then((r) => (r.ok ? r.json() : null)).catch(() => null),
       apiFetch("/api/habits/today").then((r) => (r.ok ? r.json() : null)).catch(() => null),
-      apiFetch("/api/health/summary?days=30").then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      apiFetch(`/api/health/summary?days=${HEALTH_WINDOW_DAYS}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
     ]);
 
     const habitCount: number = Array.isArray(habits?.habits) ? habits.habits.length : 0;
@@ -37,20 +38,26 @@ export async function updateWidget(): Promise<boolean> {
     // the night before for tomorrow. Same rules, different day.
     const content = morningBody(routine, habitCount, 0);
 
+    // Through the shared helper, which excludes the night being judged from its
+    // own baseline. This file had its own copy that averaged it in, so a short
+    // night was measured partly against itself and read less short than it was.
     const days: { sleepMinutes?: number }[] = Array.isArray(health?.days) ? health.days : [];
-    const slept = days.map((d) => d.sleepMinutes).filter((v): v is number => typeof v === "number");
-    const last = slept.length ? slept[slept.length - 1] : null;
-    const baseline = slept.length >= 3 ? slept.reduce((a, b) => a + b, 0) / slept.length : null;
+    const { lastNight: last, baseline, baselineDays } = sleepAgainst(days, HEALTH_WINDOW_DAYS);
 
     let sleepNote: string | null = null;
     if (last !== null && baseline) {
       const delta = (last - baseline) / baseline;
       // Same 8% floor as the notification. Two surfaces disagreeing about
       // whether last night was unusual is worse than neither mentioning it.
+      //
+      // The window is named even here, where space is tightest: "under your
+      // usual" on a home-screen widget is the shortest possible way to be
+      // unfalsifiable, and this is the surface a member sees most often.
+      const against = `your ${baselineDays}-day average`;
       if (Math.abs(delta) >= 0.08) {
-        sleepNote = delta > 0 ? "more than usual" : "under your usual";
+        sleepNote = delta > 0 ? `more than ${against}` : `under ${against}`;
       } else {
-        sleepNote = "about your usual";
+        sleepNote = `about ${against}`;
       }
     }
 

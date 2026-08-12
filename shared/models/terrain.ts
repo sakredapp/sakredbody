@@ -104,6 +104,16 @@ export type TerrainInputs = {
   trainedCategories: string[];
   /** Whole days since the last finished session. Null if nothing was ever logged. */
   daysSinceLastSession: number | null;
+  /**
+   * The windows the two averages above were actually taken over.
+   *
+   * Passed in rather than assumed, because the reasons name them out loud now
+   * and a sentence that states the wrong window is worse than one that states
+   * none. The server owns these numbers (`RECENT_DAYS` / `BASELINE_DAYS` in
+   * server/terrain/routes.ts); this only reports them.
+   */
+  recentDays?: number;
+  baselineDays?: number;
 };
 
 export type TerrainReading = {
@@ -146,9 +156,34 @@ export function weekLoad(categories: string[]): MovementLoad & { sessions: numbe
   };
 }
 
+/** 192 → "3h 12m". Nobody reads a three-figure minute count as a duration. */
+function hm(minutes: number): string {
+  const t = Math.round(minutes);
+  const h = Math.floor(t / 60);
+  const m = t % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
 export function readTerrain(input: TerrainInputs): TerrainReading {
   const reasons: TerrainReason[] = [];
   const week = weekLoad(input.trainedCategories);
+
+  /**
+   * Both windows, named in every sentence that compares them.
+   *
+   * "Sleeping 192 minutes less than usual" was the whole complaint: it does
+   * not say what is being averaged, over what, against what — so it cannot be
+   * checked, argued with, or acted on. Worse, "usual" turned out to be a
+   * 28-day average poisoned by six double-counted nights, and nothing on the
+   * card gave the member any way to notice that.
+   *
+   * Naming the windows is what makes the number falsifiable. A member who
+   * reads "your last 7 nights against your 28-day average" and knows he slept
+   * fine all week has somewhere to point.
+   */
+  const recentDays = input.recentDays ?? 7;
+  const baselineDays = input.baselineDays ?? 28;
+  const against = `your ${baselineDays}-day average`;
 
   const hasBody =
     input.sleepRecent !== null || input.hrvRecent !== null || input.rhrRecent !== null;
@@ -159,8 +194,11 @@ export function readTerrain(input: TerrainInputs): TerrainReading {
     input.sleepBaseline !== null &&
     input.sleepBaseline - input.sleepRecent >= SLEEP_DOWN_MIN
   ) {
-    const down = Math.round(input.sleepBaseline - input.sleepRecent);
-    reasons.push({ text: `Sleeping ${down} minutes less than usual`, pulls: "restore" });
+    const down = input.sleepBaseline - input.sleepRecent;
+    reasons.push({
+      text: `Last ${recentDays} nights: ${hm(down)} less sleep than ${against}`,
+      pulls: "restore",
+    });
   }
 
   if (
@@ -169,7 +207,10 @@ export function readTerrain(input: TerrainInputs): TerrainReading {
     input.hrvBaseline > 0 &&
     input.hrvRecent / input.hrvBaseline <= HRV_DOWN_RATIO
   ) {
-    reasons.push({ text: "Heart rate variability below your baseline", pulls: "restore" });
+    reasons.push({
+      text: `Last ${recentDays} days: heart rate variability below ${against}`,
+      pulls: "restore",
+    });
   }
 
   if (
@@ -177,7 +218,10 @@ export function readTerrain(input: TerrainInputs): TerrainReading {
     input.rhrBaseline !== null &&
     input.rhrRecent - input.rhrBaseline >= RHR_UP_BPM
   ) {
-    reasons.push({ text: "Resting heart rate up on your baseline", pulls: "restore" });
+    reasons.push({
+      text: `Last ${recentDays} days: resting heart rate up on ${against}`,
+      pulls: "restore",
+    });
   }
 
   // ── What the week has asked for ──

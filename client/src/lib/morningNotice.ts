@@ -27,10 +27,19 @@ import { apiFetch } from "./apiFetch";
 import {
   morningNotice,
   morningDates,
+  sleepAgainst,
   NOTIFICATION_ID,
   DAYS_AHEAD,
   type NoticeDepth,
 } from "./morningNoticeContent";
+
+/**
+ * The window requested from /api/health/summary, and therefore the window the
+ * baseline is taken over and the copy names. One constant, because the number
+ * in the URL and the number in the sentence being different is the exact bug
+ * this whole pass exists to stop.
+ */
+export const HEALTH_WINDOW_DAYS = 30;
 
 const DEPTH_KEY = "sakred.notice.depth";
 
@@ -96,7 +105,7 @@ export async function scheduleMorningNotice(): Promise<{ scheduled: number; reas
         .catch(() => null),
       // Only the full brief needs this, so only the full brief pays for it.
       depth === "full"
-        ? apiFetch("/api/health/summary?days=30")
+        ? apiFetch(`/api/health/summary?days=${HEALTH_WINDOW_DAYS}`)
             .then((r) => (r.ok ? r.json() : null))
             .catch(() => null)
         : Promise.resolve(null),
@@ -104,11 +113,15 @@ export async function scheduleMorningNotice(): Promise<{ scheduled: number; reas
 
     const habitCount: number = Array.isArray(habits?.habits) ? habits.habits.length : 0;
 
-    // Last night, and their own average to read it against.
+    // Last night, and their own average to read it against. Through the shared
+    // helper so the baseline excludes the night being judged — this used to
+    // average it into its own comparison — and so the copy can name the window.
     const days: { sleepMinutes?: number }[] = Array.isArray(health?.days) ? health.days : [];
-    const slept = days.map((d) => d.sleepMinutes).filter((v): v is number => typeof v === "number");
-    const sleepMinutes = slept.length ? slept[slept.length - 1] : null;
-    const sleepBaseline = slept.length >= 3 ? slept.reduce((a, b) => a + b, 0) / slept.length : null;
+    const {
+      lastNight: sleepMinutes,
+      baseline: sleepBaseline,
+      baselineDays,
+    } = sleepAgainst(days, HEALTH_WINDOW_DAYS);
 
     // Cancel first, always — including when there is nothing to say. A member
     // who finishes a protocol should stop getting yesterday's banner.
@@ -122,7 +135,7 @@ export async function scheduleMorningNotice(): Promise<{ scheduled: number; reas
     const notifications = dates
       .map((at, i) => {
         const content = morningNotice(
-          { routine, habitCount, sleepMinutes, sleepBaseline },
+          { routine, habitCount, sleepMinutes, sleepBaseline, baselineDays },
           depth,
           i + 1,
         );

@@ -147,10 +147,33 @@ export const HEALTH_RANGES: Record<HealthMetric, [number, number]> = {
   restingHeartRate: [20, 220],
   heartRateVariability: [0, 500],
   vo2Max: [5, 100],
-  sleepMinutes: [0, 1_440],
-  sleepDeepMinutes: [0, 1_440],
-  sleepRemMinutes: [0, 1_440],
-  sleepAwakeMinutes: [0, 1_440],
+  /**
+   * Twelve hours, not twenty-four.
+   *
+   * `[0, 1_440]` said "a day has 1,440 minutes in it", which is true and is not
+   * the question. It let six nights of 13h 30m to 17h 05m through in a single
+   * week — the double-counting bug summing overlapping sessions — and because
+   * they were arithmetically possible nothing rejected them. They then sat in
+   * the 28-day baseline inflating "usual" to 10h 31m, so a member sleeping a
+   * normal 7h 19m was told he was three hours down and that his terrain leaned
+   * to Restore. Wrong, on the first card of the home screen, for a month.
+   *
+   * The generating bug is fixed (0482c63, "A night is a session, not a pile of
+   * stages") but a range is the backstop for the next one, and the backstop was
+   * set where it could never fire.
+   *
+   * Twelve hours is above any real night and below every artifact observed. The
+   * cost of the cap is a genuinely enormous sleep-in being rejected; the cost of
+   * not having it was a month of wrong readings. `rejectSample` returns a reason
+   * rather than dropping silently, so a real one that is refused is visible.
+   *
+   * The stages keep a wider bound: they are a subdivision of the total, they
+   * were never affected, and REM alone will never approach it.
+   */
+  sleepMinutes: [0, 720],
+  sleepDeepMinutes: [0, 720],
+  sleepRemMinutes: [0, 720],
+  sleepAwakeMinutes: [0, 720],
   weightKg: [15, 500],
   bodyFatPercent: [1, 80],
   heightCm: [50, 260],

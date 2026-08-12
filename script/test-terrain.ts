@@ -138,8 +138,44 @@ const depleted = read({ sleepRecent: 380, sleepBaseline: 450, hrvRecent: 48, hrv
 check("reasons are given", depleted.reasons.length >= 2);
 check("each reason picks a side", depleted.reasons.every((r) => r.pulls === "restore" || r.pulls === "build"));
 check(
-  "the sleep reason names the size of the change",
-  depleted.reasons.some((r) => /\d+ minutes less/.test(r.text)),
+  "the sleep reason names the size of the change as a duration",
+  depleted.reasons.some((r) => /\dh \d+m less sleep/.test(r.text)),
+  depleted.reasons.map((r) => r.text).join(" | "),
+);
+
+/**
+ * A comparison has to say what it compared.
+ *
+ * "Sleeping 192 minutes less than usual" was the complaint that started this:
+ * it names neither window, so it cannot be checked or argued with — and in the
+ * case that prompted it, "usual" was a 28-day average poisoned by six
+ * double-counted nights, which the member had no way to notice.
+ *
+ * Every reason drawn from the two averages must therefore name both windows,
+ * and must take them from the caller rather than restating them, or the
+ * sentence and the arithmetic drift apart silently.
+ */
+for (const r of depleted.reasons.filter((x) => /average/.test(x.text))) {
+  check(`"${r.text}" names the recent window`, /Last 7 (nights|days)/.test(r.text));
+  check(`"${r.text}" names the baseline window`, /28-day average/.test(r.text));
+}
+
+const custom = readTerrain({
+  sleepRecent: 380,
+  sleepBaseline: 450,
+  hrvRecent: null,
+  hrvBaseline: null,
+  rhrRecent: null,
+  rhrBaseline: null,
+  trainedCategories: [],
+  daysSinceLastSession: null,
+  recentDays: 5,
+  baselineDays: 30,
+});
+check(
+  "the windows come from the caller, not the copy",
+  custom.reasons.some((r) => /Last 5 nights/.test(r.text) && /30-day average/.test(r.text)),
+  custom.reasons.map((r) => r.text).join(" | "),
 );
 check(
   "no reason names a metric the way a database does",

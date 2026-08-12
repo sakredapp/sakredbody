@@ -162,6 +162,10 @@ export function registerTerrainRoutes(app: Express): void {
         rhrBaseline: avg.restingHeartRate.baseline,
         trainedCategories: categories,
         daysSinceLastSession: since,
+        // The reasons name these out loud, so they come from the same two
+        // constants the averages were taken over rather than being restated.
+        recentDays: RECENT_DAYS,
+        baselineDays: BASELINE_DAYS,
       });
 
       res.json({ ...reading, headline: terrainHeadline(reading), onDate });

@@ -60,19 +60,64 @@ export type MorningFacts = {
   sleepMinutes?: number | null;
   /** Their own recent average, so the comparison is theirs and not a norm. */
   sleepBaseline?: number | null;
+  /** Days the baseline was taken over, so the line can say so. */
+  baselineDays?: number;
 };
 
-function sleepLine(minutes: number, baseline: number | null | undefined): string {
+/**
+ * Last night, and the average to read it against — computed once for both the
+ * notification and the home-screen widget.
+ *
+ * ── Two bugs this closes ──────────────────────────────────────────────────
+ *
+ * Both callers had their own copy of `sum(all nights) / count`, which put the
+ * night being judged *inside* its own baseline. With a month of data one night
+ * moves the mean by a thirtieth, so every deviation reads smaller than it is
+ * and a genuinely short night can fall under the 8% floor and go unmentioned.
+ * `summarise()` and MetricDetail both exclude the day being shown for exactly
+ * this reason; these two never got the same treatment.
+ *
+ * Second, neither said what "usual" meant. It is a 30-day average — the window
+ * both callers request — and a member cannot check a comparison whose terms are
+ * unstated. That mattered more than it looked: a batch of double-counted nights
+ * put one member's "usual" at 10h 31m, and nothing on any surface gave him a
+ * way to see what he was being measured against.
+ */
+export function sleepAgainst(
+  days: { sleepMinutes?: number }[],
+  baselineDays: number,
+): { lastNight: number | null; baseline: number | null; baselineDays: number } {
+  const slept = days
+    .map((d) => d.sleepMinutes)
+    .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+
+  const lastNight = slept.length ? slept[slept.length - 1] : null;
+  // Every night except the one being judged.
+  const history = slept.slice(0, -1);
+  const baseline =
+    history.length >= 3 ? history.reduce((a, b) => a + b, 0) / history.length : null;
+
+  return { lastNight, baseline, baselineDays };
+}
+
+function sleepLine(
+  minutes: number,
+  baseline: number | null | undefined,
+  baselineDays = 30,
+): string {
   const h = Math.floor(minutes / 60);
   const m = Math.round(minutes % 60);
   const slept = `${h}h ${m}m`;
   if (!baseline || baseline <= 0) return `You slept ${slept}.`;
   const delta = (minutes - baseline) / baseline;
+  const against = `your ${baselineDays}-day average`;
   // Under 8% is inside a normal night's variation; calling it out would invent
   // a finding, and a member who reads "below your usual" every morning stops
   // reading it at all.
-  if (Math.abs(delta) < 0.08) return `You slept ${slept}, about your usual.`;
-  return delta > 0 ? `You slept ${slept}, more than usual.` : `You slept ${slept}, under your usual.`;
+  if (Math.abs(delta) < 0.08) return `You slept ${slept}, about ${against}.`;
+  return delta > 0
+    ? `You slept ${slept}, more than ${against}.`
+    : `You slept ${slept}, under ${against}.`;
 }
 
 export function morningBody(
@@ -134,7 +179,7 @@ export function morningNotice(
 
   const lines = [base.body];
   if (typeof facts.sleepMinutes === "number" && facts.sleepMinutes > 0) {
-    lines.push(sleepLine(facts.sleepMinutes, facts.sleepBaseline));
+    lines.push(sleepLine(facts.sleepMinutes, facts.sleepBaseline, facts.baselineDays));
   }
   return { title: base.title, body: lines.join(" ") };
 }
