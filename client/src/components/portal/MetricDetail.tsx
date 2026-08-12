@@ -30,7 +30,9 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sparkline } from "@/components/portal/Sparkline";
+import { useState } from "react";
 import { METRIC_DISPLAY, adviceFor, localToday, type DaySeries } from "@/lib/healthDisplay";
+import { selectSupport, type SupportPrimitive } from "@shared/models/apothecary";
 import type { HealthMetric } from "@shared/models/health";
 import { cn } from "@/lib/utils";
 
@@ -94,6 +96,27 @@ export function MetricDetail({
 
   const advice =
     metric && latest ? adviceFor(metric, latest.value, baseline) : null;
+
+  /**
+   * What Sakred would actually do about this reading.
+   *
+   * Conditions come from this metric alone — the screen is about one number,
+   * so it should not imply it has read the whole day. `depleted` is passed
+   * whenever the reading is the bad direction, which is what withholds sauna
+   * and cold from somebody already short. See support.ts.
+   */
+  const conditions =
+    metric === "sleepMinutes" && delta != null && delta <= -45
+      ? (["low_sleep", "trouble_winding_down"] as const)
+      : metric === "heartRateVariability" && baseline && latest && latest.value / baseline <= 0.9
+        ? (["low_recovery", "wired"] as const)
+        : metric === "restingHeartRate" && delta != null && delta >= 3
+          ? (["low_recovery"] as const)
+          : metric === "steps" && delta != null && delta <= -2000
+            ? (["low_movement"] as const)
+            : ([] as const);
+
+  const support = selectSupport({ conditions: [...conditions], depleted: true });
 
   const best = points.length ? Math.max(...points.map((p) => p.value)) : null;
   const worst = points.length ? Math.min(...points.map((p) => p.value)) : null;
@@ -170,6 +193,24 @@ export function MetricDetail({
               </div>
             )}
 
+            {/*
+              What Sakred would do about it — the step that turns a dashboard
+              into a practice.
+
+              Spread across kinds on purpose: something to drink, something to
+              take, something to do. Three teas would be a shop.
+            */}
+            {support.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[10px] uppercase tracking-widest text-[hsl(var(--gold))]/70">
+                  Try tonight
+                </p>
+                {support.map((p) => (
+                  <SupportCard key={p.id} primitive={p} />
+                ))}
+              </div>
+            )}
+
             <div>
               <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">
                 Last {Math.min(points.length, 28)} readings
@@ -204,5 +245,57 @@ export function MetricDetail({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+
+/**
+ * One thing to try, with the lineage folded underneath it.
+ *
+ * The layering rule the whole product runs on, applied here: the action is
+ * what a member reads, the reason is why it fits tonight, and the physiology
+ * and the tradition are behind a tap for whoever wants them. Nobody has to
+ * know what a rasayana is to make the tea.
+ *
+ * Cautions are the exception — they render whenever they exist, never behind
+ * a tap, because somebody on thyroid medication should not have to be curious
+ * to find out that ashwagandha matters to them.
+ */
+function SupportCard({ primitive }: { primitive: SupportPrimitive }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="rounded-xl border border-border/40 p-3 space-y-1.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="text-sm font-medium leading-snug">{primitive.title}</p>
+        <span className="text-[9px] uppercase tracking-widest text-muted-foreground/70 shrink-0">
+          {primitive.type}
+        </span>
+      </div>
+
+      <p className="text-xs leading-snug">{primitive.action}</p>
+      <p className="text-[11px] text-muted-foreground leading-snug">{primitive.why}</p>
+
+      {primitive.cautions && (
+        <p className="text-[11px] text-amber-400/80 leading-snug">{primitive.cautions}</p>
+      )}
+
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="text-[11px] text-[hsl(var(--gold))]/70 tap-clean"
+      >
+        {open ? "Less" : "Why this works"}
+      </button>
+      {open && (
+        <div className="border-l border-[hsl(var(--gold))]/20 pl-3 space-y-1">
+          <p className="text-[11px] text-muted-foreground leading-snug">{primitive.deeper}</p>
+          {primitive.tradition && (
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground/70">
+              {primitive.tradition}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
