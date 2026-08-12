@@ -394,7 +394,45 @@ export type Tile = {
   points: number[];
   /** Only set when METRIC_TARGET has one — a ring cannot exist without it. */
   target: number | null;
+  /**
+   * The date `value` actually came from.
+   *
+   * A number with no date attached is not information. Sync runs when the
+   * phone feels like it, so a tile can easily be showing yesterday — and
+   * showing yesterday's step count unlabelled, on a screen somebody opens in
+   * the morning, is worse than showing nothing: they read it as today and
+   * conclude the app is broken when it doesn't move.
+   */
+  onDate: string | null;
 };
+
+/**
+ * "Today", "yesterday", or the date itself.
+ *
+ * Relative wording only where it is genuinely unambiguous. Past two days it
+ * gives the actual date, because "5 days ago" is arithmetic somebody has to do
+ * to work out whether it matters.
+ */
+export function dayLabel(onDate: string | null, today: string): string {
+  if (!onDate) return "";
+  if (onDate === today) return "Today";
+  const diff = Math.round(
+    (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${onDate}T00:00:00Z`)) / 86_400_000,
+  );
+  if (diff === 1) return "Yesterday";
+  const [y, m, d] = onDate.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+/** The member's own date, as the browser sees it. */
+export function localToday(): string {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+}
 
 /** Below this a line is two dots and a slope, which says nothing. */
 const MIN_SPARK_POINTS = 4;
@@ -457,6 +495,17 @@ export function planTiles(days: DaySeries[], limit = 5): Tile[] {
       baseline: stat.baseline,
       points,
       target,
+      /**
+       * The freshest day this metric actually has, not the freshest day the
+       * member has any data for. Sleep and steps arrive on different
+       * schedules, so one tile can legitimately be a day behind another.
+       */
+      onDate:
+        days
+          .filter((d) => typeof d[metric] === "number")
+          .map((d) => d.onDate)
+          .sort()
+          .pop() ?? null,
     });
   }
 
@@ -516,4 +565,129 @@ export function pickSwatches(days: DaySeries[], limit = 4): HealthMetric[] {
   });
 
   return held.slice(0, limit);
+}
+
+
+// ─── What to do about a reading ────────────────────────────────────────────
+
+/**
+ * Guidance for a metric, given how it compares with the member's own usual.
+ *
+ * ── Why a number alone is a dead end ──────────────────────────────────────
+ *
+ * Tapping Sleep opened a value, a baseline and a chart, and a member's honest
+ * reaction was "it didn't take me to anything about my sleep" — because a
+ * chart of a thing is not information *about* the thing. They already knew
+ * they slept badly. What they wanted was what to do about it.
+ *
+ * ── Why it is written down rather than generated ──────────────────────────
+ *
+ * These are the same curated primitives the rest of the product uses. A model
+ * asked to write sleep advice will produce something plausible and unbounded,
+ * and the failure mode is a health app confidently inventing a protocol. Here
+ * the advice is fixed, the only thing that varies is which one applies, and
+ * that is decided by arithmetic on the member's own trailing average.
+ *
+ * Returns null when the reading is unremarkable. Advice attached to a normal
+ * night is advice people learn to scroll past.
+ */
+export type MetricAdvice = {
+  title: string;
+  body: string;
+  tip: string;
+  /**
+   * The herbal or mineral side of the practice, where there is a real
+   * traditional answer to this particular reading.
+   *
+   * ── Why this belongs on a metric screen ──────────────────────────────────
+   *
+   * It is the half of Sakred that a numbers screen was silently leaving out.
+   * "You slept badly" and a chart is a wearable. "You slept badly, and here is
+   * what has been used for exactly this for a very long time" is the practice
+   * this product is actually about — and it is the point at which the
+   * Apothecary stops being a separate tab nobody opens and starts being the
+   * answer to something the member is already looking at.
+   *
+   * ── The line it must not cross ───────────────────────────────────────────
+   *
+   * Named preparations and how they are traditionally taken. Never a dose,
+   * never a claim to treat anything, never a substitute for care. "Widely used
+   * for" is honest; "will fix your sleep" is not, and one of those is a
+   * medical claim that a health app cannot make.
+   */
+  remedy?: { title: string; body: string };
+};
+
+export function adviceFor(
+  metric: HealthMetric,
+  value: number,
+  baseline: number | null,
+): MetricAdvice | null {
+  if (baseline == null || baseline <= 0) return null;
+  const delta = value - baseline;
+
+  if (metric === "sleepMinutes") {
+    if (delta <= -45) {
+      return {
+        title: "A short night, against your own usual",
+        body: "One is a bad night rather than a problem. What it costs you is patience and appetite control tomorrow, more than it costs you in training.",
+        tip: "The single most effective thing is a consistent wake time — going to bed earlier tonight tends not to work, but getting up at the same hour keeps tomorrow night from drifting too.",
+        remedy: {
+          title: "Worth trying tonight",
+          body: "Chamomile, tulsi or passionflower as a strong evening tea — all long used to settle the nervous system before sleep rather than to sedate. Magnesium glycinate is the form most people tolerate at night; the cheaper oxide mostly reaches the gut instead.",
+        },
+      };
+    }
+    if (delta >= 45) {
+      return {
+        title: "More than you usually get",
+        body: "Often catch-up after a short stretch, and worth noticing what preceded it.",
+        tip: "If you needed it, the debt was real. If this becomes the norm, it is worth asking what changed.",
+      };
+    }
+    return null;
+  }
+
+  if (metric === "restingHeartRate") {
+    if (delta >= 3) {
+      return {
+        title: "Above your own normal",
+        body: "Usually a body still working on something — a hard session, a late meal, alcohol, or something coming on.",
+        tip: "It is a reason to keep today easy rather than a reason to worry. If it stays up for several days without an obvious cause, that is worth mentioning to someone.",
+        remedy: {
+          title: "The traditional read",
+          body: "Warm, simple food and salt with water rather than anything stimulating. Ginger or tulsi tea is the usual answer to a system running hot; coffee on a morning like this tends to buy an hour and cost the evening.",
+        },
+      };
+    }
+    return null;
+  }
+
+  if (metric === "heartRateVariability") {
+    if (value / baseline <= 0.9) {
+      return {
+        title: "Down on your baseline",
+        body: "A nervous system biased toward stress rather than recovery. It moves with sleep, alcohol, training load and how the week is going.",
+        tip: "Absolute numbers mean nothing between two people — only your own trend does. One low reading is noise; a week of them is a signal.",
+        remedy: {
+          title: "Where the adaptogens belong",
+          body: "Ashwagandha and tulsi are the two traditionally used for a stretch like this — taken daily over weeks rather than as a rescue, which is the part most people get wrong. Slow nasal breathing with a longer exhale does more in ten minutes than either.",
+        },
+      };
+    }
+    return null;
+  }
+
+  if (metric === "steps") {
+    if (delta <= -2000) {
+      return {
+        title: "A quieter day than usual",
+        body: "Steps are the easiest thing to get back, and the one most worth protecting on a busy week.",
+        tip: "A walk after your largest meal does more for blood sugar than the same walk at any other time of day.",
+      };
+    }
+    return null;
+  }
+
+  return null;
 }

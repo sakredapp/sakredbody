@@ -30,7 +30,7 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sparkline } from "@/components/portal/Sparkline";
-import { METRIC_DISPLAY, type DaySeries } from "@/lib/healthDisplay";
+import { METRIC_DISPLAY, adviceFor, localToday, type DaySeries } from "@/lib/healthDisplay";
 import type { HealthMetric } from "@shared/models/health";
 import { cn } from "@/lib/utils";
 
@@ -68,10 +68,19 @@ export function MetricDetail({
     : [];
 
   const latest = points.length ? points[points.length - 1] : null;
-  // The most recent day we hold is not necessarily today — sync runs when the
-  // phone feels like it. `today` is only used to word the date, never to claim
-  // the reading is current.
-  const today = new Date().toISOString().slice(0, 10);
+  /**
+   * The member's own date, not UTC.
+   *
+   * This was `new Date().toISOString()`, which is the same off-by-a-day fault
+   * that made Restore claim health data wasn't connected: west of Greenwich,
+   * an evening is already tomorrow in UTC, so a reading taken today would be
+   * labelled "yesterday" from about 20:00 onward.
+   *
+   * The most recent day we hold is still not necessarily today — sync runs
+   * when the phone feels like it — which is exactly why the label has to be
+   * right.
+   */
+  const today = localToday();
 
   const history = latest ? points.filter((p) => p.onDate !== latest.onDate) : [];
   const baseline =
@@ -82,6 +91,9 @@ export function MetricDetail({
     delta === null || display?.higherIsBetter === null || display?.higherIsBetter === undefined
       ? null
       : delta > 0 === display.higherIsBetter;
+
+  const advice =
+    metric && latest ? adviceFor(metric, latest.value, baseline) : null;
 
   const best = points.length ? Math.max(...points.map((p) => p.value)) : null;
   const worst = points.length ? Math.min(...points.map((p) => p.value)) : null;
@@ -125,6 +137,36 @@ export function MetricDetail({
                   Your average over the {history.length} other days we hold — not a target, and not
                   a comparison with anybody else.
                 </p>
+              </div>
+            )}
+
+            {/*
+              What to do about it.
+
+              The first version of this screen was a value, a baseline and a
+              chart — and the reaction to it was "this didn't tell me anything
+              about my sleep". They already knew they slept badly. A chart of a
+              thing is not information about the thing.
+            */}
+            {advice && (
+              <div className="rounded-xl border border-[hsl(var(--gold))]/20 p-3 space-y-1.5">
+                <p className="text-sm font-medium leading-snug">{advice.title}</p>
+                <p className="text-[11px] text-muted-foreground leading-snug">{advice.body}</p>
+                <p className="text-xs text-[hsl(var(--gold))]/85 leading-snug">{advice.tip}</p>
+
+                {/* The herbal half of the practice, where there is a real
+                    traditional answer to this reading. Named preparations and
+                    how they are used — never a dose, never a claim to treat. */}
+                {advice.remedy && (
+                  <div className="pt-2 mt-1 border-t border-[hsl(var(--gold))]/15 space-y-1">
+                    <p className="text-[10px] uppercase tracking-widest text-[hsl(var(--gold))]/70">
+                      {advice.remedy.title}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground leading-snug">
+                      {advice.remedy.body}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 

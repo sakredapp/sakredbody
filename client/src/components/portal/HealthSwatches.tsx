@@ -32,7 +32,7 @@ import { useState } from "react";
 import { ChevronRight, TrendingDown, TrendingUp } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { useHealthSummary, useHealthSync } from "@/hooks/use-health";
-import { METRIC_DISPLAY, planTiles, trendOf } from "@/lib/healthDisplay";
+import { METRIC_DISPLAY, planTiles, trendOf, dayLabel, localToday } from "@/lib/healthDisplay";
 import type { DaySeries, Tile } from "@/lib/healthDisplay";
 import type { HealthMetric } from "@shared/models/health";
 import { MetricDetail } from "@/components/portal/MetricDetail";
@@ -293,6 +293,9 @@ export function HealthSwatches({ onOpenStats }: { onOpenStats?: () => void }) {
   const storeName = platform === "healthconnect" ? "Health Connect" : "Apple Health";
 
   const tiles = planTiles(days, MAX_TILES);
+  const today = localToday();
+  // The most recent day anything arrived for — what the header names.
+  const freshest = tiles.map((t) => t.onDate).filter(Boolean).sort().pop() ?? null;
 
   // A browser cannot read health data, so a prompt there would be an
   // instruction the member cannot follow.
@@ -362,8 +365,17 @@ export function HealthSwatches({ onOpenStats }: { onOpenStats?: () => void }) {
         className="w-full flex items-center justify-between gap-2 mb-2 tap-clean group"
         data-testid="health-swatches-open"
       >
+        {/*
+          What day this is, stated.
+
+          "Your body, lately" told nobody when any of it was from, so a step
+          count that hadn't moved since yesterday read as a broken app rather
+          than as yesterday's number. Sync runs on the phone's schedule, and
+          the honest thing is to say which day arrived rather than to imply
+          it is this one.
+        */}
         <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-          Your body, lately
+          {freshest ? `Your body · ${dayLabel(freshest, today)}` : "Your body, lately"}
         </p>
         {onOpenStats && (
           <ChevronRight className="h-3.5 w-3.5 text-[hsl(var(--gold))] opacity-60 group-hover:opacity-100 transition-opacity" />
@@ -388,6 +400,13 @@ export function HealthSwatches({ onOpenStats }: { onOpenStats?: () => void }) {
             data-testid={`health-tile-${tile.metric}`}
           >
             <TileBody tile={tile} />
+            {/* Only when this tile disagrees with the header — otherwise every
+                card repeats the same word and the row turns into noise. */}
+            {tile.onDate && tile.onDate !== freshest && (
+              <span className="block text-[9px] text-muted-foreground/70 mt-0.5">
+                {dayLabel(tile.onDate, today)}
+              </span>
+            )}
           </button>
         ))}
       </div>
