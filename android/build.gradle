@@ -24,6 +24,74 @@ allprojects {
     }
 }
 
+/**
+ * Compile Kotlin with the version Lint can actually read.
+ *
+ * ── What was happening ────────────────────────────────────────────────────
+ *
+ * Every release build printed a wall of these, one per Kotlin module:
+ *
+ *   e: …/kotlin-stdlib-2.4.10.jar!/META-INF/kotlin-stdlib.kotlin_module
+ *      Module was compiled with an incompatible version of Kotlin.
+ *      The binary version of its metadata is 2.4.0, expected version is 2.2.0.
+ *
+ * They look like compile errors and are not. Every one comes from a
+ * `lintVitalAnalyzeRelease` task — Android Lint, which ships its own Kotlin
+ * analyzer bundled inside AGP. AGP 8.13's is 2.2.0, and the two Kotlin
+ * modules here (@capgo/capacitor-health and our own health-sync plugin) each
+ * hardcode the Kotlin Gradle plugin at 2.4.10. The compiler writes metadata
+ * Lint cannot parse.
+ *
+ * The build still succeeds and the output is correct — the sleep de-dup was
+ * verified present in classes2.dex of the shipped bundle. What is genuinely
+ * lost is Lint's Kotlin analysis of those two modules: it cannot read them, so
+ * its Kotlin checks silently do nothing there. That is the actual cost, and it
+ * is the reason this is worth aligning rather than muting.
+ *
+ * ── Why down and not up ───────────────────────────────────────────────────
+ *
+ * Moving Lint up means AGP 8.13 → 9.x, a major-version migration, to quiet a
+ * log message. Moving the compiler down is one block, reversible, and lands
+ * both modules on metadata Lint understands.
+ *
+ * ── Why it is here and not in the plugins ─────────────────────────────────
+ *
+ * @capgo/capacitor-health lives in node_modules and pins 2.4.10 in its own
+ * buildscript. Editing it works until the next `npm install` and then silently
+ * stops working. Forcing it from the root reaches both modules and is the only
+ * version of this fix that survives a reinstall.
+ *
+ * Remove this once AGP's bundled Lint is on Kotlin 2.4 or newer — at which
+ * point the pin is what is holding the project back rather than together.
+ */
+ext.lintCompatibleKotlin = '2.2.20'
+
+subprojects {
+    buildscript {
+        configurations.matching { it.name == 'classpath' }.configureEach {
+            resolutionStrategy.eachDependency { details ->
+                if (details.requested.group == 'org.jetbrains.kotlin'
+                        && details.requested.name.startsWith('kotlin-gradle-plugin')) {
+                    details.useVersion rootProject.ext.lintCompatibleKotlin
+                    details.because 'AGP 8.13 bundles Lint with Kotlin 2.2; newer metadata is unreadable to it'
+                }
+            }
+        }
+    }
+
+    // The standard library travels with the compiler. Leaving it at 2.4.10
+    // under a 2.2 compiler is the same mismatch pointed the other way.
+    configurations.configureEach {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'org.jetbrains.kotlin'
+                    && details.requested.name.startsWith('kotlin-stdlib')) {
+                details.useVersion rootProject.ext.lintCompatibleKotlin
+                details.because 'Matches the pinned Kotlin compiler above'
+            }
+        }
+    }
+}
+
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
