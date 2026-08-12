@@ -107,7 +107,19 @@ export function FreeSession({
   const { toast } = useToast();
   const qc = useQueryClient();
   const [blocks, setBlocks] = useState<Block[]>([]);
-  const [picking, setPicking] = useState(blocks.length === 0);
+  /**
+   * The picker opens when somebody asks for it, never on arrival.
+   *
+   * This used to open itself on an empty session — `blocks.length === 0`,
+   * which on mount is always true. The intent was helpful: an empty session
+   * needs a movement, so offer the list. What it actually did was put a modal
+   * in front of the screen every single time the Build tab was opened, before
+   * the member had said they wanted to log anything at all.
+   *
+   * A dialog nobody asked for is a dialog to dismiss. The empty state below
+   * already carries the button, and pressing it is one tap.
+   */
+  const [picking, setPicking] = useState(false);
   const [shareWithCoach, setShareWithCoach] = useState(true);
   /**
    * Offered after the fact, never before.

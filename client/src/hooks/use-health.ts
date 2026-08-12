@@ -221,12 +221,42 @@ export function useHealthAutoSync(enabled = true) {
   const lastRun = useRef(0);
   const running = useRef(false);
   const { available, sync } = useHealthSync();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!enabled || !available) return;
     let cancelled = false;
 
+    /**
+     * Re-read the summary on every return, whether or not we sync.
+     *
+     * Two things write health data, and only one of them is this webview. The
+     * native worker posts from a background wake, so the database can move
+     * while the app sits suspended — and queryClient is configured with
+     * `staleTime: Infinity`, which means a fetch made when the app opened is
+     * kept for the life of the process. Nothing expires it.
+     *
+     * That is how a member ends up staring at a number that is not merely
+     * stale but *known to be wrong*: the sync that corrected it ran, the row
+     * in the database is right, and the screen keeps showing the value it read
+     * hours ago. It survives switching tabs, because the tab is not a reload.
+     *
+     * The throttle below makes it worse rather than better. A member who
+     * returns within fifteen minutes gets no sync AND, previously, no refetch
+     * — the one path that could have corrected the screen was skipped as an
+     * optimisation. So invalidation happens here, before the throttle: reading
+     * back thirty days of daily rows is one cheap GET, and it is the only
+     * thing standing between the correct value and the member seeing it.
+     */
+    const refresh = () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/health/status"] });
+      queryClient.invalidateQueries({
+        predicate: (q) => String(q.queryKey[0] ?? "").startsWith("/api/health/summary"),
+      });
+    };
+
     const run = () => {
+      refresh();
       const now = Date.now();
       if (running.current || now - lastRun.current < SYNC_MIN_MS) return;
       running.current = true;
