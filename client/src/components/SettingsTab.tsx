@@ -14,6 +14,7 @@
  * asked for is how people stop being able to find the two that matter.
  */
 
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -209,6 +210,53 @@ export function SettingsTab({
           </a>
         </div>
       </Panel>
+
+      <BuildInfo />
     </div>
+  );
+}
+
+/**
+ * What this phone is actually running.
+ *
+ * ── Why an app needs to tell you its own commit ───────────────────────────
+ *
+ * The native shells bundle the web client rather than fetching it, which is
+ * deliberate — see capacitor.config.ts. The consequence is that pushing a fix
+ * changes the website and does nothing at all to an installed app until
+ * somebody cuts a new build. So "I shipped it" and "I am looking at my phone
+ * and it isn't there" are both true, and telling them apart once cost an hour
+ * of unpacking an .aab to grep its bundled assets for a deleted string.
+ *
+ * Deliberately plain and at the bottom: it is for the two people who need it,
+ * and it should never look like a feature. Tapping copies it, because the
+ * thing anybody actually wants to do with a SHA is paste it.
+ */
+function BuildInfo() {
+  const [copied, setCopied] = useState(false);
+  const built = (() => {
+    try {
+      return new Date(__BUILT_AT__).toLocaleString();
+    } catch {
+      return __BUILT_AT__;
+    }
+  })();
+
+  return (
+    <button
+      onClick={() => {
+        navigator.clipboard?.writeText(`${__BUILD_SHA__} · built ${built}`).then(
+          () => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          },
+          () => undefined,
+        );
+      }}
+      className="w-full text-center text-[10px] text-muted-foreground/60 hover:text-muted-foreground py-2 tap-clean"
+      data-testid="build-info"
+    >
+      {copied ? "Copied" : `Build ${__BUILD_SHA__} · ${built}`}
+    </button>
   );
 }
