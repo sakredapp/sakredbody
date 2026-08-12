@@ -441,7 +441,7 @@ Could this note have been written for anyone, on any day? If yes, it has failed.
 
 "Embrace the cosmic release" is a failure. So is "honour what is shifting" and "today asks you to slow down". They are not wrong; they are about nothing. A member reads them and learns nothing they did not know before.
 
-Every note must refer to at least one thing that is actually true today — the moon's phase, the season and the organ it belongs to, the day number of their protocol, one of their numbers. Name the fact. Then say what follows from it. That is the whole form:
+Every note must refer to at least one thing that is actually true today — the moon's phase, the season, the day number of their protocol, one of their numbers. Name the fact. Then say what follows from it. That is the whole form:
 
     the fact  →  what it means for today's effort
 
@@ -450,7 +450,13 @@ A member should finish reading knowing something concrete: push or rest, begin o
 ON THE ESOTERIC MATERIAL
 The moon phase, season and numbers you are given are real and computed. Treat them the way a farmer treats an almanac: as conditions worth knowing, not as fate. Never predict. Never tell them what will happen.
 
-Do not explain the system. They know what a waning moon is. Never define a term.
+Say what to do, then why, in that order. Never print the vocabulary of the system as though it were the advice.
+
+"The earth season asks the spleen and stomach to sort what belongs" is a real sentence in the tradition and means nothing to the person reading it. "A good day to eat light, or not at all" is the same idea and can be acted on in five seconds. Write the second one.
+
+This is translation, not dilution. Do not retreat into generic wellness copy — "keep tonight simple" is as useless as the jargon it replaced, in the opposite direction. The tradition attaches something specific and decisive to each phase and season, and that decisiveness is the point. Keep it; drop the terminology.
+
+Organ names, element names and Chinese-medicine terms may inform what you write and must not appear in it. Moon phases and seasons may be named plainly — "new moon", "late summer" — as the thing the advice came from, after the advice.
 
 When two signals agree — a waning moon and a clearing phase, spring and a liver protocol — saying so plainly is the single most useful thing you can write. That is the note earning its place.
 
@@ -616,6 +622,22 @@ export function buildUserPrompt(ctx: NoteContext): string {
 // ─── Fallback ──────────────────────────────────────────────────────────────
 
 /**
+ * What each five-element season asks for, in ordinary words.
+ *
+ * Keyed on the element so it stays in step with `elementalSeason()`, and
+ * deliberately decisive: the point is not to soften the tradition into generic
+ * wellness copy, it is to say the same strong thing in language somebody can
+ * act on without a glossary.
+ */
+const SEASON_PRACTICE: Readonly<Record<string, string>> = {
+  wood: "Spring — add movement and get outside.",
+  fire: "Summer — the year's best window for hard efforts.",
+  earth: "Late summer — eat simply and keep digestion easy.",
+  metal: "Autumn — cut back to what's working and protect sleep.",
+  water: "Winter — build slowly, sleep more, don't chase output.",
+};
+
+/**
  * Computed text, for when generation fails or is unavailable.
  *
  * Short and factual on purpose — it should read as deliberately terse rather
@@ -634,9 +656,19 @@ export function fallbackNote(ctx: NoteContext): Candidate {
       ? `The moon is ${a.moon.phase === "full" ? "full" : "emptying"}.`
       : `The moon is ${a.moon.phase === "new" ? "dark" : "filling"}.`,
   );
-  parts.push(
-    `${a.elemental.season.charAt(0).toUpperCase()}${a.elemental.season.slice(1)} — the time of the ${a.elemental.organ}.`,
-  );
+  /**
+   * The season as a practice, not as an organ.
+   *
+   * This line used to read "Late summer — the time of the spleen and stomach",
+   * which is a true sentence in the tradition and unreadable to almost
+   * everybody. A member saw it on their phone and asked what it meant.
+   *
+   * The fix is translation, not removal. The tradition attaches something
+   * concrete to each season and that part survives being said plainly; the
+   * organ names are the vocabulary of the system rather than its content, so
+   * they belong in the deeper explanation and never in the line itself.
+   */
+  parts.push(SEASON_PRACTICE[a.elemental.element] ?? `${a.elemental.season}.`);
   if (ctx.protocol) {
     parts.push(`Day ${ctx.protocol.dayNumber} of ${ctx.protocol.durationDays}.`);
   }
