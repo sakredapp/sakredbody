@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Download, Smartphone } from "lucide-react";
+import { Download, Smartphone, type LucideIcon } from "lucide-react";
 import { YinYang } from "@/components/YinYang";
 import {
   LEGAL_LINKS,
@@ -40,6 +40,52 @@ const HEALTH_LINKS = [
   { label: "Research & Blog", href: `${SAKRED_HEALTH_URL}/blog` },
 ];
 
+/**
+ * A store button, or the placeholder standing in for one until that store
+ * approves the app.
+ *
+ * The placeholder is a `<span>`, not an `<a>` without an href. A bare anchor
+ * still announces as a link to a screen reader and still takes focus, which
+ * promises a destination that does not exist yet — and the whole reason this
+ * component exists is that we stopped promising the wrong destination.
+ *
+ * The two stores approve independently, so the pending state is per badge
+ * rather than one banner over both.
+ */
+function StoreBadge({
+  href,
+  icon: Icon,
+  label,
+  testId,
+}: {
+  href: string | null;
+  icon: LucideIcon;
+  label: string;
+  testId: string;
+}) {
+  const shape = "inline-flex items-center gap-2 px-4 py-2 rounded-md border text-xs transition-colors";
+
+  if (!href) {
+    return (
+      <span className={`${shape} border-border text-muted-foreground`} data-testid={testId}>
+        <Icon className="h-4 w-4" /> {label} · soon
+      </span>
+    );
+  }
+
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`${shape} border-gold/30 text-gold hover-elevate`}
+      data-testid={testId}
+    >
+      <Icon className="h-4 w-4" /> {label}
+    </a>
+  );
+}
+
 export function SiteFooter() {
   return (
     /* The margin is the gap the eye actually reads, because the border-t is
@@ -65,24 +111,18 @@ export function SiteFooter() {
               their edge.
             </p>
             <div className="flex flex-wrap gap-3">
-              <a
+              <StoreBadge
                 href={APP_STORE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-gold/30 text-xs text-gold hover-elevate transition-colors"
-                data-testid="footer-app-store"
-              >
-                <Download className="h-4 w-4" /> iOS
-              </a>
-              <a
+                icon={Download}
+                label="iOS"
+                testId="footer-app-store"
+              />
+              <StoreBadge
                 href={PLAY_STORE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-gold/30 text-xs text-gold hover-elevate transition-colors"
-                data-testid="footer-play-store"
-              >
-                <Smartphone className="h-4 w-4" /> Android
-              </a>
+                icon={Smartphone}
+                label="Android"
+                testId="footer-play-store"
+              />
             </div>
           </div>
 

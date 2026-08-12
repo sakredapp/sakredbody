@@ -1,6 +1,27 @@
 /** Outbound links used across the marketing pages. */
-export const APP_STORE_URL = "https://apps.apple.com/us/app/sakred-health/id6756814847";
-export const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.sakredunion.app";
+
+/**
+ * The app store listings — `null` until each one is actually live.
+ *
+ * Both of these used to point at **Sakred Health**: `id6756814847` on the App
+ * Store and `com.sakredunion.app` on Play. That is a different product for a
+ * different audience (docs/VISION.md §1) — free and macro, where this one is
+ * a five-figure coaching engagement. Someone who came here, read this page and
+ * tapped "iOS" would have installed the wrong app and had no way to find out;
+ * there is no error state for landing in a listing that looks plausible. Worse
+ * than sending them nowhere.
+ *
+ * `com.sakredbody.app` is submitted and in review. Approval gives each store
+ * its own URL — and the two stores approve independently, so expect to fill
+ * these in one at a time rather than together.
+ *
+ * **To restore:** paste the real URL over `null` here and nothing else. The
+ * footer and the login page each read these directly and turn back into links
+ * on their own; neither has a hardcoded store URL. Do not re-point either one
+ * at Sakred Health in the meantime.
+ */
+export const APP_STORE_URL: string | null = null;
+export const PLAY_STORE_URL: string | null = null;
 
 export const FOOD_CHART_URL = "https://www.sakredhealth.com/food-chart";
 export const SAKRED_HEALTH_URL = "https://www.sakredhealth.com";

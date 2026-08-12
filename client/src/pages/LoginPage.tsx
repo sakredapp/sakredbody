@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowRight, Download, Loader2, Smartphone } from "lucide-react";
+import { ArrowRight, Download, Loader2, Smartphone, type LucideIcon } from "lucide-react";
 import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/links";
 import { apiFetch, setAuthToken } from "@/lib/apiFetch";
 import { ConstellationSky } from "@/components/portal/ConstellationSky";
@@ -22,6 +22,58 @@ const isNative = Capacitor.isNativePlatform();
  * they *do* get sent to is /reset-password, and only from the emailed link.
  */
 type Mode = "login" | "register" | "forgot";
+
+/**
+ * A store button, or the same button greyed out until that store approves us.
+ *
+ * `disabled` rather than a styled-down link: it drops the control out of the
+ * tab order and announces as unavailable, both of which are true. Wrapping a
+ * dead button in an `<a href={null}>` would leave a focusable link to nowhere.
+ *
+ * Per badge, not one banner over both — Apple and Google approve on their own
+ * schedules and one is likely to land first.
+ */
+function StoreButton({
+  href,
+  icon: Icon,
+  label,
+  testId,
+}: {
+  href: string | null;
+  icon: LucideIcon;
+  label: string;
+  testId: string;
+}) {
+  if (!href) {
+    return (
+      <Button
+        variant="outline"
+        disabled
+        className="flex-1 border-white/10 text-white/40 bg-white/[0.02]"
+        data-testid={testId}
+      >
+        <Icon className="w-4 h-4 mr-2" /> {label} · soon
+      </Button>
+    );
+  }
+
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex-1"
+      data-testid={testId}
+    >
+      <Button
+        variant="outline"
+        className="w-full border-white/20 text-white bg-white/5 gold-outline-lift"
+      >
+        <Icon className="w-4 h-4 mr-2" /> {label}
+      </Button>
+    </a>
+  );
+}
 
 export default function LoginPage() {
   const [, navigate] = useLocation();
@@ -412,38 +464,26 @@ export default function LoginPage() {
                   store, which is a review rejection rather than a quirk. */}
               {!isNative && (
               <div className="pt-1">
+                {/* Was "Or take it with you" — a promise, and until a store
+                    approves us there is nothing to take. Neutral instead, so
+                    the eyebrow stays true in all four combinations of the two
+                    stores being live; each button carries its own state. */}
                 <p className="text-white/35 text-[10px] uppercase tracking-[0.18em] text-center mb-3">
-                  Or take it with you
+                  On your phone
                 </p>
                 <div className="flex gap-3">
-                  <a
+                  <StoreButton
                     href={APP_STORE_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1"
-                    data-testid="link-login-ios"
-                  >
-                    <Button
-                      variant="outline"
-                      className="w-full border-white/20 text-white bg-white/5 gold-outline-lift"
-                    >
-                      <Download className="w-4 h-4 mr-2" /> iOS
-                    </Button>
-                  </a>
-                  <a
+                    icon={Download}
+                    label="iOS"
+                    testId="link-login-ios"
+                  />
+                  <StoreButton
                     href={PLAY_STORE_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1"
-                    data-testid="link-login-android"
-                  >
-                    <Button
-                      variant="outline"
-                      className="w-full border-white/20 text-white bg-white/5 gold-outline-lift"
-                    >
-                      <Smartphone className="w-4 h-4 mr-2" /> Android
-                    </Button>
-                  </a>
+                    icon={Smartphone}
+                    label="Android"
+                    testId="link-login-android"
+                  />
                 </div>
               </div>
               )}

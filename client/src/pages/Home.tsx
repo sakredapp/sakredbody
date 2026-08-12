@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { ArrowRight, Download, Smartphone } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
@@ -20,7 +20,6 @@ import { LessonSlideshow, type Lesson } from "@/components/LessonSlideshow";
 import { SectionHeader } from "@/components/PageHero";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/links";
 import { TOTAL_FOODS } from "@/data/foodCount";
 import { TERRITORIES } from "@/data/territories";
 import { responsive, SIZES_FULL_BLEED } from "@/lib/img";
