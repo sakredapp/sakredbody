@@ -28,7 +28,10 @@ import { eq, and, inArray, desc, asc, or, ilike, sql } from "drizzle-orm";
 import { isAuthenticated } from "../auth/index.js";
 import { storage } from "../storage.js";
 import { z } from "zod";
+import { SUPPORT_LIBRARY } from "../../shared/models/apothecary.js";
 import {
+  supportProducts,
+  linkSupportProductSchema,
   products,
   productLinks,
   habitProducts,
@@ -93,6 +96,101 @@ async function withLinks(rows: Product[]): Promise<(Product & { links: ProductLi
 }
 
 export function registerShopRoutes(app: Express) {
+  // ── Apothecary primitives ↔ products ────────────────────────────────────
+  //
+  // The suggestions on a metric screen come from a constant in
+  // shared/models/apothecary.ts. This is what lets one of them carry
+  // "the one we actually use" and a link, without the guidance depending on a
+  // product existing — see the note on the table.
+
+  /** Every link, for the client to match against the suggestions it renders. */
+  app.get("/api/apothecary/links", isAuthenticated, async (_req: Request, res: Response) => {
+    try {
+      /**
+       * The product and where to actually buy it.
+       *
+       * `product_links` is the commerce model — a product can have several
+       * vendors — so the left join is deliberate: a product with no link yet
+       * still renders as "the one we use" without a broken button next to it.
+       * Inactive products are excluded rather than shown as unavailable.
+       */
+      const rows = await db
+        .select({
+          supportId: supportProducts.supportId,
+          note: supportProducts.note,
+          productId: products.id,
+          name: products.name,
+          brand: products.brand,
+          priceCents: products.priceCents,
+          priceNote: products.priceNote,
+          imageUrl: products.imageUrl,
+          linkLabel: productLinks.label,
+          url: productLinks.url,
+        })
+        .from(supportProducts)
+        .innerJoin(products, eq(products.id, supportProducts.productId))
+        .leftJoin(productLinks, eq(productLinks.productId, products.id))
+        .where(eq(products.isActive, true))
+        .orderBy(asc(supportProducts.sortOrder));
+      res.json(rows);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.post("/api/admin/apothecary/links", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
+    try {
+      const input = linkSupportProductSchema.parse(req.body);
+      // The support id must name something in the library. A typo here would
+      // create a link that silently never renders.
+      if (!SUPPORT_LIBRARY.some((p) => p.id === input.supportId)) {
+        return res.status(400).json({ message: `No apothecary entry called "${input.supportId}".` });
+      }
+      const [row] = await db
+        .insert(supportProducts)
+        .values({
+          supportId: input.supportId,
+          productId: input.productId,
+          note: input.note ?? null,
+          sortOrder: input.sortOrder ?? 0,
+        })
+        .onConflictDoUpdate({
+          target: [supportProducts.supportId, supportProducts.productId],
+          set: { note: input.note ?? null, sortOrder: input.sortOrder ?? 0 },
+        })
+        .returning();
+      res.status(201).json(row);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: zodMessage(err) });
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.delete("/api/admin/apothecary/links/:id", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
+    try {
+      await db.delete(supportProducts).where(eq(supportProducts.id, String(req.params.id)));
+      res.status(204).end();
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  /** The library itself, so admin can pick from real ids rather than type them. */
+  app.get("/api/admin/apothecary/primitives", isAuthenticated, isAdmin, (_req: Request, res: Response) => {
+    res.json(
+      SUPPORT_LIBRARY.map((p) => ({
+        id: p.id,
+        title: p.title,
+        type: p.type,
+        evidence: p.evidence,
+        conditions: p.conditions,
+      })),
+    );
+  });
+
   // ─── MEMBER ──────────────────────────────────────────────────────────────
 
   app.get("/api/apothecary/products", isAuthenticated, async (req, res) => {

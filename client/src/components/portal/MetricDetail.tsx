@@ -31,6 +31,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sparkline } from "@/components/portal/Sparkline";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { METRIC_DISPLAY, adviceFor, localToday, type DaySeries } from "@/lib/healthDisplay";
 import { selectSupport, type SupportPrimitive } from "@shared/models/apothecary";
 import type { HealthMetric } from "@shared/models/health";
@@ -117,6 +118,24 @@ export function MetricDetail({
             : ([] as const);
 
   const support = selectSupport({ conditions: [...conditions], depleted: true });
+
+  /**
+   * Products attached to these suggestions, if any.
+   *
+   * Fetched once and matched client-side rather than per card. The guidance
+   * renders whether or not this resolves — see the note on the table: a card
+   * that only appears when there is something to sell is an advert wearing
+   * guidance's clothes.
+   */
+  const links = useQuery<ApothecaryLink[]>({
+    queryKey: ["/api/apothecary/links"],
+    queryFn: async () => {
+      const r = await fetch("/api/apothecary/links", { credentials: "include" });
+      if (!r.ok) throw new Error("links");
+      return r.json();
+    },
+    staleTime: 30 * 60 * 1000,
+  });
 
   const best = points.length ? Math.max(...points.map((p) => p.value)) : null;
   const worst = points.length ? Math.min(...points.map((p) => p.value)) : null;
@@ -206,7 +225,11 @@ export function MetricDetail({
                   Try tonight
                 </p>
                 {support.map((p) => (
-                  <SupportCard key={p.id} primitive={p} />
+                  <SupportCard
+                    key={p.id}
+                    primitive={p}
+                    link={links.data?.find((l) => l.supportId === p.id) ?? null}
+                  />
                 ))}
               </div>
             )}
@@ -261,7 +284,27 @@ export function MetricDetail({
  * a tap, because somebody on thyroid medication should not have to be curious
  * to find out that ashwagandha matters to them.
  */
-function SupportCard({ primitive }: { primitive: SupportPrimitive }) {
+export type ApothecaryLink = {
+  supportId: string;
+  note: string | null;
+  productId: string;
+  name: string;
+  brand: string | null;
+  priceCents: number | null;
+  priceNote: string | null;
+  imageUrl: string | null;
+  linkLabel: string | null;
+  url: string | null;
+};
+
+function SupportCard({
+  primitive,
+  link,
+}: {
+  primitive: SupportPrimitive;
+  /** Null whenever nothing is stocked for this. Renders nothing at all. */
+  link: ApothecaryLink | null;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -278,6 +321,39 @@ function SupportCard({ primitive }: { primitive: SupportPrimitive }) {
 
       {primitive.cautions && (
         <p className="text-[11px] text-amber-400/80 leading-snug">{primitive.cautions}</p>
+      )}
+
+      {/*
+        What we actually use, when there is one.
+
+        Absent entirely when nothing is linked — no "coming soon", no empty
+        shelf. The practice stands on its own and this is an addition to it.
+      */}
+      {link && (
+        <div className="flex items-center gap-2 rounded-lg border border-[hsl(var(--gold))]/20 p-2">
+          {link.imageUrl && (
+            <img src={link.imageUrl} alt="" className="h-8 w-8 rounded object-cover shrink-0" />
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] truncate">
+              {link.brand ? `${link.brand} · ` : ""}
+              {link.name}
+            </p>
+            {link.note && (
+              <p className="text-[10px] text-muted-foreground truncate">{link.note}</p>
+            )}
+          </div>
+          {link.url && (
+            <a
+              href={link.url}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-[10px] uppercase tracking-widest text-[hsl(var(--gold))] shrink-0 tap-clean"
+            >
+              {link.linkLabel ?? "Get it"}
+            </a>
+          )}
+        </div>
       )}
 
       <button

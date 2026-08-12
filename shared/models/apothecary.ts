@@ -1,3 +1,7 @@
+import { sql } from "drizzle-orm";
+import { pgTable, uuid, text, integer, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { z } from "zod";
+
 /**
  * The Apothecary, brought to the member instead of waiting to be found.
  *
@@ -354,7 +358,7 @@ export const SUPPORT_LIBRARY: readonly SupportPrimitive[] = [
 
 // ── Selection ──────────────────────────────────────────────────────────────
 
-export type SupportRequest = {
+export type ApothecaryRequest = {
   conditions: readonly SupportCondition[];
   /**
    * True when the day is already asking for less.
@@ -377,7 +381,7 @@ export type SupportRequest = {
  * drink, something to take, something to do. So the first pass takes the best
  * of each type before any type gets a second slot.
  */
-export function selectSupport(req: SupportRequest): SupportPrimitive[] {
+export function selectSupport(req: ApothecaryRequest): SupportPrimitive[] {
   const { conditions, depleted = false, exclude = [], limit = 3 } = req;
   if (!conditions.length) return [];
 
@@ -437,3 +441,56 @@ export function conditionsFrom(input: {
   }
   return out;
 }
+
+// ─── Linking a primitive to something you can buy ──────────────────────────
+
+/**
+ * The product that goes with a suggestion, when there is one.
+ *
+ * ── Why a join table and not a field on the primitive ─────────────────────
+ *
+ * The library above is a constant — a decision, versioned with the code and
+ * reviewable in a diff. The catalogue is data: products come and go, prices
+ * change, something goes out of stock. Putting a product id in the constant
+ * would mean a deploy every time the shop changed and a library that lies
+ * whenever it hasn't.
+ *
+ * ── Why nothing appears when nothing is linked ────────────────────────────
+ *
+ * The guidance has to stand on its own. Chamomile, tulsi and passionflower are
+ * useful advice whether or not Sakred sells any of them, and a card that only
+ * appears when there is something to sell is an advert wearing guidance's
+ * clothes. So: the practice always renders, and the link is an addition to it.
+ * If there is no product, there is no link and the member is not told they are
+ * missing anything.
+ *
+ * Follows habit_products and routine_products deliberately — same shape, same
+ * cascade, so there is one way this join works in the product rather than three.
+ */
+export const supportProducts = pgTable(
+  "support_products",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    /** A SupportPrimitive id from the library above. Text, not a FK — the
+     *  library is code, so there is no row to point at. */
+    supportId: text("support_id").notNull(),
+    productId: uuid("product_id").notNull(),
+    /** "The one we actually use", "loose leaf, not bags". */
+    note: text("note"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => [
+    index("idx_support_products_support").on(t.supportId),
+    uniqueIndex("uq_support_products").on(t.supportId, t.productId),
+  ],
+);
+
+export type SupportProduct = typeof supportProducts.$inferSelect;
+
+export const linkSupportProductSchema = z.object({
+  supportId: z.string().min(1).max(60),
+  productId: z.string().uuid(),
+  note: z.string().trim().max(200).optional().nullable(),
+  sortOrder: z.number().int().min(0).max(999).optional(),
+});
