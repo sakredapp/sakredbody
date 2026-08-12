@@ -107,8 +107,8 @@ export default function Restore() {
           buried under the order section as a pull quote; full-bleed and on its
           own it does the work the deck was failing to do. */}
       <ImageBand
-        image="/images/zen-sand-garden.webp"
-        alt="Raked sand in a walled stone garden"
+        image="/images/white-cliff-turquoise.webp"
+        alt="Clear turquoise water running out from a white cliff"
         title={<>You cannot clean a room <span className="text-gold">while the door is still locked.</span></>}
         tall
         testId="text-restore-turn"
@@ -161,7 +161,7 @@ export default function Restore() {
           </motion.div>
 
           <motion.div variants={fadeInUp} className="text-center flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/member">
+            <Link href="/login">
               <Button className="gold-metallic-btn px-8 w-full sm:w-auto" data-testid="button-see-protocols">
                 Enter the Portal <ArrowRight className="ml-2 h-4 w-4" />
               </Button>

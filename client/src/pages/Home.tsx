@@ -326,7 +326,7 @@ export default function Home() {
           </motion.div>
 
           <motion.div variants={fadeInUp} className="text-center mt-10">
-            <Link href="/member">
+            <Link href="/login">
               <Button variant="outline" className="border-gold-subtle text-gold" data-testid="button-portal">
                 Enter the Portal <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
@@ -545,7 +545,7 @@ export default function Home() {
           <motion.div variants={fadeInUp}>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Magnetic>
-                <Link href="/member">
+                <Link href="/login">
                   <Button size="lg" className="text-base px-8 gold-metallic-btn" data-testid="button-final-cta">
                     Enter the Portal <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>

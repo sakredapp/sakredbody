@@ -220,19 +220,17 @@ export default function Philosophy() {
             <span className="text-gold">Unresolved stress is.</span>
           </motion.h2>
           <motion.div variants={fadeInUp} className="space-y-5 text-muted-foreground leading-relaxed text-base md:text-lg">
+            {/* Three paragraphs down to two. */}
             <p>
               Muscle requires stress, then recovery. The nervous system requires challenge, then regulation.
-              Fasting requires feeding. Cleansing requires rebuilding. Work requires sleep. Every adaptation
-              worth having runs on the same two-stroke engine.
+              Fasting requires feeding. Cleansing requires rebuilding. Every adaptation worth having runs on
+              the same two-stroke engine.
             </p>
             <p className="text-foreground">
-              So the goal was never a life with less stress in it. The goal is becoming an organism that can
-              meet stress, adapt to it, and return to equilibrium — faster each time.
-            </p>
-            <p>
-              This is also why we won't sell you only the calm half. A practice built entirely on
-              restoration produces someone very relaxed and very fragile. A practice built entirely on
-              intensity produces someone impressive who breaks. Both halves, in the right order.
+              So the goal was never a life with less stress in it — it's becoming an organism that can meet
+              stress, adapt, and return to equilibrium faster each time. Which is why we won't sell you only
+              the calm half: restoration alone produces someone relaxed and fragile, intensity alone
+              produces someone impressive who breaks.
             </p>
           </motion.div>
         </motion.div>

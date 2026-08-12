@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { Deck } from "@/components/Deck";
+import { ImageBand } from "@/components/ImageBand";
 import { PageHero, SectionHeader } from "@/components/PageHero";
 import { ResonantRing } from "@/components/ResonantRing";
 import { BreathPacer } from "@/components/BreathPacer";
@@ -85,22 +86,14 @@ export default function BodyLiteracy() {
             <br />
             <span className="text-gold">from two or three signals.</span>
           </motion.h2>
-          <motion.div variants={fadeInUp} className="space-y-5 text-muted-foreground leading-relaxed text-base md:text-lg">
-            <p>
-              Tired. Hungry. Sore. That's the entire vocabulary many adults have for a system producing
-              dozens of distinct signals every day. It's like navigating a city with a map that shows three
-              streets.
-            </p>
-            <p className="text-foreground">
-              Low resolution means you can only respond in blunt ways — more coffee, more food, more rest,
-              more effort — and you'll frequently pick the wrong one, because two very different states felt
-              identical on the way in.
-            </p>
-            <p>
-              The fix isn't more data. It's more discrimination. Learning that what you called "tired" is
-              actually four different states with four different answers is worth more than any device.
-            </p>
-          </motion.div>
+          {/* Three paragraphs down to one. The middle one restated the first
+              with a different metaphor, and the third restated the headline. */}
+          <motion.p variants={fadeInUp} className="text-muted-foreground leading-relaxed text-base md:text-lg">
+            Tired. Hungry. Sore. That's the whole vocabulary many adults have for a system producing dozens
+            of distinct signals a day — and low resolution means blunt answers: more coffee, more food, more
+            rest. The fix isn't more data. It's learning that what you called tired is four different states
+            with four different answers.
+          </motion.p>
         </motion.div>
       </Section>
 
@@ -125,40 +118,27 @@ export default function BodyLiteracy() {
         </motion.div>
       </Section>
 
-      {/* ── Caution ──────────────────────────────────────────── */}
-      <Section tone="ink">
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={viewportOnce}
-          variants={stagger}
-          className="max-w-3xl mx-auto text-center"
-        >
-          <motion.h2
-            variants={fadeInUp}
-            className="text-3xl md:text-4xl font-display font-normal mb-8"
-            data-testid="text-caution-headline"
-          >
-            Attention, <span className="text-gold">not vigilance.</span>
-          </motion.h2>
-          <motion.div variants={fadeInUp} className="space-y-5 text-muted-foreground leading-relaxed">
-            <p>
-              There's a version of this that goes wrong, and it's worth naming. Scanning yourself constantly
-              for problems isn't literacy — it's anxiety with a health vocabulary, and it makes the nervous
-              system worse, not better.
-            </p>
-            <p className="text-foreground">
-              The goal is a light, regular read. Check in, note it, act if the pattern holds for a few days,
-              and then get on with your life. Literacy should make you spend <em>less</em> time thinking about
-              your body, not more — because you'll trust what you're hearing.
-            </p>
-            <p>
-              And it doesn't replace a doctor. New, severe, or persistent symptoms are for a qualified
-              provider, not a checklist.
-            </p>
-          </motion.div>
-        </motion.div>
-      </Section>
+      {/* ── Caution ──────────────────────────────────────────
+          Three ink sections used to run together here — the deck, this, and
+          the practice — which is what made the middle of this page read as one
+          long slab. As a band it separates them and the caution lands as a
+          held moment instead of a third block of body copy.
+
+          The medical line is not trimmed away with the rest. It is the one
+          sentence on this page that has to survive. */}
+      <ImageBand
+        image="/images/wooden-pavilion.webp"
+        alt="An open wooden pavilion looking out over still water"
+        title={<>Attention, <span className="text-gold">not vigilance.</span></>}
+        tall
+        testId="text-caution-headline"
+      >
+        <p>
+          Scanning yourself for problems isn't literacy — it's anxiety with a health vocabulary. The goal is
+          a light, regular read, and then getting on with your life. New, severe or persistent symptoms are
+          for a qualified provider, not a checklist.
+        </p>
+      </ImageBand>
 
       {/* ── The practice ─────────────────────────────────────
           Rehoused from the retired Embody page. Reading your state and doing
@@ -212,7 +192,7 @@ export default function BodyLiteracy() {
             record you can look back on.
           </motion.p>
           <motion.div variants={fadeInUp}>
-            <Link href="/member">
+            <Link href="/login">
               <Button size="lg" className="gold-metallic-btn px-8" data-testid="button-app">
                 See the App <ArrowRight className="ml-2 h-5 w-5" />
               </Button>

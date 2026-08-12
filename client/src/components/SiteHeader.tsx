@@ -145,7 +145,7 @@ export function SiteHeader({ navItems = SITE_NAV, cta, overHero = true }: SiteHe
         </nav>
 
         <div className="flex items-center gap-3">
-          <Link href="/member" className="hidden lg:block" data-testid="link-member-portal">
+          <Link href="/login" className="hidden lg:block" data-testid="link-member-portal">
             <Button
               variant="outline"
               size="sm"
@@ -171,7 +171,7 @@ export function SiteHeader({ navItems = SITE_NAV, cta, overHero = true }: SiteHe
           <nav className="tone-ink lg:hidden pointer-events-auto mt-2 rounded-3xl border border-white/12 bg-[hsl(30_10%_9%/0.96)] backdrop-blur-xl max-h-[70vh] overflow-y-auto shadow-lg shadow-black/30">
             <div className="px-5 py-3 flex flex-col">
             <Link
-              href="/member"
+              href="/login"
               className="py-3 text-sm text-gold-light border-b border-white/10"
               data-testid="link-member-portal-mobile"
             >

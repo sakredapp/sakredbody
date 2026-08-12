@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Check } from "lucide-react";
 import { ApplicationModal } from "@/components/ApplicationModal";
 import { Section } from "@/components/Section";
+import { ImageBand } from "@/components/ImageBand";
 import { WaysToWork } from "@/components/WaysToWork";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -90,7 +91,12 @@ export default function Mastermind() {
             </motion.h1>
             
             <motion.p variants={fadeInUp} className="text-base md:text-lg text-white/60 mb-8 max-w-2xl leading-relaxed font-sans font-normal">
-              Discussion and teaching, not treatment. Build the person, restore the system that person depends on, and do it alongside others doing the same — cohorts on a real schedule, people who hold the same standard, and the portal that runs your practice between sessions. Cohorts run to a direction, Yin or Yang, the same as the retreats do. The protocols live in the app; the retreats are where they're run in person.
+              {/* Four sentences down to two. The third restated the Yin/Yang
+                  split every other page already carries, and the fourth
+                  explained where protocols and retreats live — both of which
+                  this page goes on to say properly further down. */}
+              Discussion and teaching, not treatment. Cohorts on a real schedule, people who hold the same
+              standard, and the portal that runs your practice between sessions.
             </motion.p>
             
             <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4">
@@ -255,6 +261,18 @@ export default function Mastermind() {
           ]}
         />
       </Section>
+
+      {/* Two five-card grids ran straight into each other here — who it's for,
+          then what you get — which is the same shape twice and reads as one
+          long cabinet however different the copy is. The band separates them,
+          and says the thing this page is actually selling. */}
+      <ImageBand
+        image="/images/long-dining-table.webp"
+        alt="A long table laid for a shared dinner"
+        title={<>Nobody holds a standard <span className="text-gold">alone.</span></>}
+        tall
+        testId="text-mastermind-turn"
+      />
 
       <Section tone="raised">
         <div className="text-center mb-10">

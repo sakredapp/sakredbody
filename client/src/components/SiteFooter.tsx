@@ -42,7 +42,7 @@ const HEALTH_LINKS = [
 
 export function SiteFooter() {
   return (
-    <footer className="tone-ink bg-background border-t border-border pt-20 md:pt-24 pb-10">
+    <footer className="tone-ink bg-background border-t border-border mt-10 md:mt-16 pt-28 md:pt-36 pb-10">
       <div className="container max-w-6xl mx-auto px-4">
         <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-6 mb-14">
           {/* Brand */}

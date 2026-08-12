@@ -177,7 +177,7 @@ export default function Build() {
           </motion.div>
 
           <motion.div variants={fadeInUp} className="text-center">
-            <Link href="/member">
+            <Link href="/login">
               <Button className="gold-metallic-btn px-8" data-testid="button-build-portal">
                 Enter the Portal <ArrowRight className="ml-2 h-4 w-4" />
               </Button>

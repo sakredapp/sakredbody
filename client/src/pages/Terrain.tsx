@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { FlipCards } from "@/components/FlipCards";
+import { ImageBand } from "@/components/ImageBand";
 import { PageHero, SectionHeader } from "@/components/PageHero";
 import { ParticleSphere } from "@/components/ParticleSphere";
 import { TerrainWheel } from "@/components/TerrainWheel";
@@ -85,8 +86,23 @@ export default function Terrain() {
         </motion.div>
       </Section>
 
+      {/* ── The turn ─────────────────────────────────────────
+          The wheel and the consequences were two ink sections butting
+          together, and the line below was buried at the foot of the second
+          one where a reader arrives already full. It is the page's thesis, so
+          it gets the full bleed. Landscape rather than the vineyard — Retreats
+          already opens on that photograph, and one image doing hero duty on
+          one page and a band on another reads as a stock library. */}
+      <ImageBand
+        image="/images/rugged-cliffs.webp"
+        alt="Weathered cliffs falling away to open water"
+        title={<>Ask what condition is receiving the intervention <span className="text-gold">before asking whether the intervention is good.</span></>}
+        tall
+        testId="text-terrain-turn"
+      />
+
       {/* ── Implications ─────────────────────────────────────── */}
-      <Section tone="ink">
+      <Section tone="raised">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
@@ -99,15 +115,6 @@ export default function Terrain() {
           <motion.div variants={fadeInUp}>
             <FlipCards testId="flip-implications" columns={4} cards={IMPLICATIONS} />
           </motion.div>
-
-          <motion.p
-            variants={fadeInUp}
-            className="text-center font-display text-xl md:text-2xl mt-12 max-w-2xl mx-auto leading-relaxed"
-          >
-            Ask what condition is receiving the intervention
-            <br />
-            <span className="text-gold">before asking whether the intervention is good.</span>
-          </motion.p>
         </motion.div>
       </Section>
 

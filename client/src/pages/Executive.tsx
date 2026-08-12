@@ -3,6 +3,7 @@ import { ArrowRight } from "lucide-react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
+import { ImageBand } from "@/components/ImageBand";
 import { Deck } from "@/components/Deck";
 import { WaysToWork } from "@/components/WaysToWork";
 import { PageHero, SectionHeader } from "@/components/PageHero";
@@ -140,24 +141,18 @@ export default function Executive() {
             <span className="text-gold">to be operating below capacity.</span>
           </motion.h2>
           <motion.div variants={fadeInUp} className="space-y-5 text-muted-foreground leading-relaxed text-base md:text-lg">
+            {/* Five paragraphs down to three. The fourth was a Yin/Yang
+                primer that Restore and Build each carry in full, delivered to
+                the one audience least likely to sit through it. */}
             <p>
               Someone can build a company worth tens of millions while sleeping five hours, living on
-              caffeine, eating whatever fits between meetings, travelling constantly, and carrying tension
-              they haven't put down in a decade.
+              caffeine, and carrying tension they haven't put down in a decade. Because the results keep
+              arriving, nobody treats it as a problem. Including them.
             </p>
             <p className="text-foreground">
-              And because the results keep arriving, nobody treats it as a problem. Including them.
-            </p>
-            <p>
-              High output isn't the problem, and it works — right up until the terrain underneath it can no
-              longer fund it. Nothing about the output changes on the day that happens. What changes is that
-              it starts being paid for out of capital instead of income.
-            </p>
-            <p className="text-foreground">
-              There is an older name for this. Yang is the advancing force — drive, heat, output, everything
-              you are good at. Yin is what refills it: sleep, drainage, minerals, the downshift. A decade of
-              Yang with no Yin behind it doesn't look like illness. It looks like a person who is still
-              performing, on borrowed capacity, with nothing underneath.
+              High output works — right up until the terrain underneath it can no longer fund it. Nothing
+              about the output changes on the day that happens. What changes is that it starts being paid
+              for out of capital instead of income.
             </p>
             <p>
               We're not going to tell you you're burned out. You'd reject that, and you'd probably be right.
@@ -226,6 +221,17 @@ export default function Executive() {
           </motion.div>
         </motion.div>
       </Section>
+
+      {/* Two decks ran back to back here — the five layers, then the four
+          arrivals — which is the same card stack twice in a row. The band
+          separates them and says the thing this page is for. */}
+      <ImageBand
+        image="/images/elegant-interior.webp"
+        alt="A quiet, well-appointed room in late afternoon light"
+        title={<>Your body is the one asset <span className="text-gold">you cannot delegate.</span></>}
+        tall
+        testId="text-executive-turn"
+      />
 
       {/* ── Who ──────────────────────────────────────────────── */}
       <Section tone="raised">
