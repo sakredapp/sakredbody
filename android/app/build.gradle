@@ -31,7 +31,7 @@ android {
         // one, and the release then reports "does not add or remove any app
         // bundles". Increment on every upload, including re-uploads of a build
         // that was never rolled out.
-        versionCode 37
+        versionCode 38
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
