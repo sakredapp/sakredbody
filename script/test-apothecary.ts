@@ -14,6 +14,8 @@ import {
   conditionsFrom,
   SUPPORT_TYPES,
   SUPPORT_CONDITIONS,
+  EVIDENCE_LEVELS,
+  EVIDENCE_LANGUAGE,
   type SupportPrimitive,
 } from "../shared/models/apothecary.js";
 
@@ -106,6 +108,58 @@ for (const p of SUPPORT_LIBRARY) {
     !/^according to|^in ayurveda|^in chinese medicine/i.test(p.action),
   );
 }
+
+// ─── Evidence bounds the language ──────────────────────────────────────────
+
+/**
+ * The failure this prevents: a long tradition of use quietly becoming a modern
+ * mechanistic fact. "Long used as an evening calming herb" is honest about
+ * chamomile; "shown to improve sleep" is not, because the human evidence for
+ * that is limited.
+ *
+ * So the verbs reserved for demonstrated effects may not appear on an entry
+ * whose basis is traditional or mechanistic.
+ */
+const DEMONSTRATED = /\b(shown to|proven|demonstrated to|clinically proven|is effective|will improve)\b/i;
+/** Hedges that must be present somewhere once a claim gets specific. */
+const HEDGED = /\b(some people|traditionally|long used|may |tends? to|often|usually|limited|mixed|preclinical)\b/i;
+
+for (const p of SUPPORT_LIBRARY) {
+  check(`${p.id}: declares its evidence`, (EVIDENCE_LEVELS as readonly string[]).includes(p.evidence));
+
+  if (p.evidence === "traditional" || p.evidence === "mechanistic") {
+    check(
+      `${p.id}: doesn't claim a demonstrated effect`,
+      !DEMONSTRATED.test(`${p.why} ${p.deeper}`),
+    );
+    check(`${p.id}: hedges somewhere`, HEDGED.test(`${p.why} ${p.deeper}`));
+  }
+}
+
+check("every level has a language ceiling", EVIDENCE_LEVELS.every((l) => Boolean(EVIDENCE_LANGUAGE[l])));
+
+/**
+ * The specific card that prompted this. Chamomile's human evidence for sleep
+ * is limited and the receptor work is preclinical and inconsistent — the copy
+ * must say so rather than assert the mechanism.
+ */
+const tea = SUPPORT_LIBRARY.find((p) => p.id === "evening_tea")!;
+check("the sleep tea is marked traditional", tea.evidence === "traditional");
+check("it no longer asserts it doesn't sedate", !/don't sedate|do not sedate/i.test(tea.why));
+check("it says the human evidence is limited", /limited/i.test(tea.deeper));
+check("and calls the receptor work preclinical", /preclinical/i.test(tea.deeper));
+
+// ─── Preparation is not a dose ─────────────────────────────────────────────
+
+/**
+ * "Steep for ten minutes" is a preparation instruction and has to be allowed —
+ * a herbal suggestion nobody can follow is useless. What stays banned is
+ * supplement dosing in mass units, which is prescribing.
+ */
+check(
+  "preparation instructions survive the dose ban",
+  /ten minutes/i.test(tea.action) && !DOSAGE.test(tea.action),
+);
 
 // Anything that can interact with a medication or a condition has to say so.
 for (const id of ["evening_tea", "magnesium_glycinate", "adaptogens", "bitters", "cold", "sauna"]) {

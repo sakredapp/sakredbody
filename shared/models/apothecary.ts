@@ -100,6 +100,48 @@ export const SUPPORT_CONDITIONS = [
 ] as const;
 export type SupportCondition = (typeof SUPPORT_CONDITIONS)[number];
 
+/**
+ * How much is actually known, and therefore how strongly we may speak.
+ *
+ * ── Why this is a field and not a matter of careful writing ───────────────
+ *
+ * The first version of the sleep tea said "they don't sedate, so they help you
+ * fall asleep without costing you the morning" and stated apigenin's action at
+ * the benzodiazepine receptor as fact. Both are more confident than what is
+ * known: the human evidence for chamomile in insomnia is limited, and the
+ * preclinical receptor work is real but not consistent about whether the
+ * behavioural effect runs through that pathway at all.
+ *
+ * Nothing about that requires watering down traditional medicine. It requires
+ * separating three different things that are easy to blur:
+ *
+ *   traditional   long and specific use, which is a real reason to try
+ *                 something and not a claim about mechanism
+ *   mechanistic   a plausible pathway, usually preclinical
+ *   preliminary   some human evidence, mixed or small
+ *   established   consistent human evidence
+ *
+ * Holding it as a field means the constraint is checkable. A test asserts that
+ * a `traditional` entry never uses the verbs reserved for `established` ones,
+ * so an ancient use cannot quietly become a modern mechanistic fact the next
+ * time somebody adds to this library.
+ */
+export const EVIDENCE_LEVELS = ["traditional", "mechanistic", "preliminary", "established"] as const;
+export type EvidenceLevel = (typeof EVIDENCE_LEVELS)[number];
+
+/**
+ * The strongest verb each level is allowed.
+ *
+ * Given to whoever writes the copy — human or model — as the ceiling on how
+ * confident the language may be, rather than as text to print.
+ */
+export const EVIDENCE_LANGUAGE: Readonly<Record<EvidenceLevel, string>> = {
+  traditional: "Long used for — a tradition of use, not a demonstrated effect.",
+  mechanistic: "There is a plausible pathway, mostly studied outside people.",
+  preliminary: "Some human research suggests it may help; findings are mixed.",
+  established: "Consistently shown in people.",
+};
+
 export type SupportPrimitive = {
   id: string;
   title: string;
@@ -115,6 +157,8 @@ export type SupportPrimitive = {
   deeper: string;
   /** Where the practice comes from, named plainly. */
   tradition?: string;
+  /** How much is known. Bounds how strongly the copy may be written. */
+  evidence: EvidenceLevel;
   /** Who should not, or should ask first. Rendered whenever present. */
   cautions?: string;
 };
@@ -137,10 +181,11 @@ export const SUPPORT_LIBRARY: readonly SupportPrimitive[] = [
     conditions: ["low_sleep", "trouble_winding_down", "wired"],
     action:
       "Steep chamomile, tulsi or passionflower strong — ten minutes, covered — and drink it an hour before bed rather than at bedtime.",
-    why: "These settle a nervous system that is still switched on. They don't sedate, so they help you fall asleep without costing you the morning.",
+    why: "All three have long traditions of use for settling the evening. Some people find them useful when the body is tired but the nervous system is still carrying the day.",
     deeper:
-      "Chamomile's apigenin binds the same receptor family as benzodiazepines, far more weakly. Tulsi is Ayurveda's central calming adaptogen, and passionflower came into European herbalism for exactly this — a mind that will not stop turning over at night. Covering the cup matters: the volatile oils that do the work leave with the steam.",
+      "Chamomile contains apigenin, a flavonoid studied for effects on nervous-system signalling including benzodiazepine-receptor binding — though that work is largely preclinical and not consistent about whether the calming effect runs through that pathway. Human evidence for sleep specifically is limited, so this is a traditional support rather than a sleep aid. Tulsi is Ayurveda's central calming herb; passionflower entered European herbalism for a mind that will not stop turning over. Covering the cup is worth doing either way: the volatile oils leave with the steam.",
     tradition: "Ayurveda and European herbalism",
+    evidence: "traditional",
     cautions:
       "Chamomile is in the daisy family — skip it if you react to those. Check with whoever prescribes for you if you take sedatives or blood thinners.",
   },
@@ -152,7 +197,8 @@ export const SUPPORT_LIBRARY: readonly SupportPrimitive[] = [
     loadClass: "restorative",
     conditions: ["low_sleep", "trouble_winding_down", "high_training_load"],
     action: "Take it with your evening meal rather than at bedtime.",
-    why: "The form is the whole point. Glycinate is absorbed and calming; the cheap oxide mostly stays in the gut and mainly produces a loose morning.",
+    why: "The form is the part worth getting right. Glycinate is better absorbed; oxide is poorly absorbed and mostly reaches the gut.",
+    evidence: "preliminary",
     deeper:
       "Magnesium is a cofactor in hundreds of enzymatic reactions and is depleted by both sweat and sustained stress — which is why hard training weeks and stressful ones both tend to show up as worse sleep. Glycine, the carrier, is itself mildly calming and lowers core temperature slightly, which is one of the physiological triggers for sleep onset.",
     cautions: "Ask first if you have kidney disease. Start low if your gut is sensitive.",
@@ -166,7 +212,8 @@ export const SUPPORT_LIBRARY: readonly SupportPrimitive[] = [
     conditions: ["low_sleep", "trouble_winding_down", "wired", "low_recovery"],
     action:
       "Lights low, no screen, ten minutes of breathing with the exhale twice as long as the inhale. Then bed.",
-    why: "A long exhale is the fastest lever you have on your own nervous system, and it works whether or not you feel like doing it.",
+    why: "A long exhale is the most direct lever you have on your own nervous system, and it works whether or not you feel like doing it.",
+    evidence: "established",
     deeper:
       "Exhaling slows the heart via the vagus nerve — the same mechanism heart-rate variability measures. Pranayama built practices around this centuries before anyone could measure it, and the measurement has since agreed with the practice.",
     tradition: "Pranayama",
@@ -181,6 +228,7 @@ export const SUPPORT_LIBRARY: readonly SupportPrimitive[] = [
     action:
       "Get outside within an hour of waking, and keep your wake time where it normally is even though you're short.",
     why: "Going to bed earlier after a bad night usually fails. Holding the wake time and getting morning light is what stops one short night becoming a week of them.",
+    evidence: "established",
     deeper:
       "Morning light sets the timing of the circadian system for the following night — the effect is on tomorrow, not today. Sleeping in to catch up shifts that timing later and is the most common way a single bad night turns into a drifting pattern.",
   },
@@ -194,7 +242,8 @@ export const SUPPORT_LIBRARY: readonly SupportPrimitive[] = [
     loadClass: "restorative",
     conditions: ["low_recovery", "wired", "high_training_load"],
     action: "Ashwagandha or tulsi daily for several weeks — not as a rescue on a bad day.",
-    why: "This class does nothing noticeable in one dose. Taken across a demanding stretch, it takes the edge off it.",
+    why: "This class does nothing noticeable in a single evening. It is taken across a demanding stretch, not on a bad day.",
+    evidence: "preliminary",
     deeper:
       "Ashwagandha is a rasayana in Ayurveda — a class taken over long periods to build resilience rather than to fix a symptom. Trials showing effects on cortisol and perceived stress run for weeks, which matches how it has always been used.",
     tradition: "Ayurveda",
@@ -209,7 +258,8 @@ export const SUPPORT_LIBRARY: readonly SupportPrimitive[] = [
     loadClass: "restorative",
     conditions: ["low_recovery", "digestive_heaviness", "high_training_load"],
     action: "Something cooked, warm and plain tonight. Salt it properly and drink water with it.",
-    why: "A body already working on something has less to spare for a difficult meal.",
+    why: "A body already working on something usually has less to spare for a difficult meal.",
+    evidence: "traditional",
     deeper:
       "Both Ayurveda and Chinese medicine regard cooked warm food as easier to extract from than raw or cold — the modern framing is gastric emptying and the energetic cost of digestion. They agree here, which is not always the case.",
     tradition: "Ayurveda and Chinese medicine",
@@ -223,6 +273,7 @@ export const SUPPORT_LIBRARY: readonly SupportPrimitive[] = [
     conditions: ["low_recovery", "high_training_load", "low_sleep"],
     action: "Twenty to forty minutes walking, breathing through your nose the whole way.",
     why: "This clears more than sitting still does, and unlike a session it costs you nothing you'll need tomorrow.",
+    evidence: "established",
     deeper:
       "Easy aerobic work moves blood without adding meaningful stress. Nasal breathing keeps the intensity honest — if you have to open your mouth, you have left the range this is for.",
   },
@@ -237,6 +288,7 @@ export const SUPPORT_LIBRARY: readonly SupportPrimitive[] = [
     conditions: ["low_movement", "digestive_heaviness"],
     action: "Ten to fifteen minutes on your feet after the biggest meal of the day.",
     why: "The same walk does more for you after eating than at any other time.",
+    evidence: "established",
     deeper:
       "Contracting muscle takes up glucose without needing insulin, so a short walk blunts the post-meal rise more than a longer one taken hours later. The traditional advice to walk after eating predates the mechanism by a long way.",
   },
@@ -248,7 +300,8 @@ export const SUPPORT_LIBRARY: readonly SupportPrimitive[] = [
     loadClass: "neutral",
     conditions: ["digestive_heaviness"],
     action: "Something bitter — rocket, chicory, a bitter tincture — ten minutes before the meal.",
-    why: "Bitterness is the signal that tells the gut a meal is coming.",
+    why: "Bitterness is traditionally the signal that a meal is coming, and it tends to work best a little before you eat.",
+    evidence: "mechanistic",
     deeper:
       "Bitter receptors on the tongue trigger saliva, stomach acid and bile release before food arrives. European herbalism built an entire category around this, and it is one of the clearer cases where the traditional practice and the physiology describe the same thing.",
     tradition: "European herbalism",
@@ -263,6 +316,7 @@ export const SUPPORT_LIBRARY: readonly SupportPrimitive[] = [
     conditions: ["low_movement", "low_sleep", "wired"],
     action: "Ten minutes outside within an hour of waking. Overcast still counts.",
     why: "It is the cheapest thing on this list and it moves both today's mood and tonight's sleep.",
+    evidence: "established",
     deeper:
       "Outdoor light is many times brighter than indoor lighting even under cloud, and morning exposure is the strongest signal for setting circadian timing.",
   },
@@ -277,6 +331,7 @@ export const SUPPORT_LIBRARY: readonly SupportPrimitive[] = [
     conditions: ["high_training_load"],
     action: "Sauna or a long hot bath, finishing at least ninety minutes before bed.",
     why: "Genuinely restorative and genuinely demanding — worth it on a day with room for it.",
+    evidence: "preliminary",
     deeper:
       "Heat exposure raises heart rate and fluid loss much as easy cardio does, then triggers a compensatory drop in core temperature afterwards, which is why the timing before bed matters more than the heat itself.",
     cautions: "Hydrate and salt afterwards. Not a good idea on a day you are already wrung out.",
@@ -289,7 +344,8 @@ export const SUPPORT_LIBRARY: readonly SupportPrimitive[] = [
     loadClass: "stressor",
     conditions: ["high_training_load"],
     action: "Two or three minutes cold, in the morning rather than the evening.",
-    why: "A sharp stimulus that raises alertness for hours. It is a stressor, so it belongs on a day that can carry one.",
+    why: "A sharp stimulus that tends to raise alertness for hours. It is a stressor, so it belongs on a day that can carry one.",
+    evidence: "mechanistic",
     deeper:
       "Cold drives a large and long-lasting catecholamine rise — which is the point, and also why it is a poor idea at night or on top of accumulated fatigue. Done immediately after lifting it can blunt some of the adaptation you just trained for.",
     cautions: "Not if you have a heart condition. Never alone in open water.",
