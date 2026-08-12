@@ -11,26 +11,39 @@
  * avatar is square and phone photos are not.
  */
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Camera, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { PhotoCrop } from "./PhotoCrop";
 
-export function PhotoStep({
+/**
+ * The avatar, the file input and the crop — everything except the buttons.
+ *
+ * Split out because onboarding and Settings want the same picker under
+ * different footers: onboarding offers "Skip for now", Settings offers
+ * "Remove photo", and neither belongs in the other. The crop step is the part
+ * worth not having twice — a second copy is a second place for "phone photos
+ * are not square" to be got wrong.
+ *
+ * `footer` receives the opener so a button outside this component can still
+ * raise the file dialog, and `hasPhoto` so it can say "Change" rather than
+ * "Choose" without tracking the preview itself.
+ */
+export function PhotoPicker({
   initials,
   currentUrl,
   saving,
   error,
   onUpload,
-  onSkip,
+  footer,
 }: {
   initials: string;
   currentUrl?: string | null;
   saving: boolean;
   error?: string | null;
   onUpload: (file: File) => void;
-  onSkip: () => void;
+  footer: (open: () => void, hasPhoto: boolean) => ReactNode;
 }) {
   const input = useRef<HTMLInputElement>(null);
   // A local object URL so the member sees their own face immediately rather
@@ -127,13 +140,45 @@ export function PhotoStep({
       {error && <p className="text-[11px] text-destructive text-center">{error}</p>}
 
       <div className="flex flex-col gap-2">
-        <Button onClick={() => input.current?.click()} disabled={saving} data-testid="photo-upload">
-          {saving ? "Uploading…" : shown ? "Choose a different photo" : "Choose a photo"}
-        </Button>
-        <Button variant="ghost" onClick={onSkip} className="text-muted-foreground">
-          {shown && !saving ? "Continue" : "Skip for now"}
-        </Button>
+        {footer(() => input.current?.click(), Boolean(shown))}
       </div>
     </div>
+  );
+}
+
+/** The onboarding step: the picker, and a way past it without choosing. */
+export function PhotoStep({
+  initials,
+  currentUrl,
+  saving,
+  error,
+  onUpload,
+  onSkip,
+}: {
+  initials: string;
+  currentUrl?: string | null;
+  saving: boolean;
+  error?: string | null;
+  onUpload: (file: File) => void;
+  onSkip: () => void;
+}) {
+  return (
+    <PhotoPicker
+      initials={initials}
+      currentUrl={currentUrl}
+      saving={saving}
+      error={error}
+      onUpload={onUpload}
+      footer={(open, hasPhoto) => (
+        <>
+          <Button onClick={open} disabled={saving} data-testid="photo-upload">
+            {saving ? "Uploading…" : hasPhoto ? "Choose a different photo" : "Choose a photo"}
+          </Button>
+          <Button variant="ghost" onClick={onSkip} className="text-muted-foreground">
+            {hasPhoto && !saving ? "Continue" : "Skip for now"}
+          </Button>
+        </>
+      )}
+    />
   );
 }

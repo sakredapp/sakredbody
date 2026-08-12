@@ -38,7 +38,32 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+        // ── Mobile sizing ──────────────────────────────────────────────────
+        //
+        // Every class here is defensive, and every one of them is load-bearing
+        // for a bug that actually shipped.
+        //
+        // `grid-cols-[minmax(0,1fr)]` — a grid column is `auto` by default,
+        // which means max-content. One child that refuses to shrink widens the
+        // column, and `max-w-*` cannot claw it back, because the overflow
+        // belongs to the content rather than the box. That is how a row of 28
+        // date labels in the metric detail dragged the whole dialog off the
+        // right of the phone, taking the centred title with it. Pinning the
+        // column to `minmax(0, 1fr)` makes shrinking possible, so children
+        // wrap or scroll instead of widening their parent.
+        //
+        // `max-h-[85vh] overflow-y-auto` — without a height cap a tall dialog
+        // simply extended past the bottom of the screen with no way to reach
+        // the rest of it. Sleep was unusable for exactly this reason.
+        //
+        // `w-[calc(100%-2rem)]` rather than `w-full` — a dialog flush to the
+        // screen edges has nowhere to show its own corner, and the overlay
+        // beside it is the tap target for dismissing on a phone.
+        //
+        // Consumers that set their own `flex flex-col` and manage an internal
+        // scroll region still win: their `display` and `overflow` come later
+        // in the stylesheet and override these.
+        "fixed left-[50%] top-[50%] z-50 grid max-h-[85vh] w-[calc(100%-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] grid-cols-[minmax(0,1fr)] gap-4 overflow-y-auto overscroll-contain border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] rounded-lg",
         className
       )}
       {...props}

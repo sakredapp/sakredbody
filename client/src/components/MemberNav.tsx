@@ -24,7 +24,7 @@
  * nothing is hidden behind a scroll nobody knows to perform.
  */
 
-import type { ComponentType } from "react";
+import { useMemo, type ComponentType } from "react";
 import {
   Home as HomeIcon,
   Dumbbell,
@@ -48,6 +48,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { useHasCoachPlan } from "@/hooks/use-coaching";
 import { cn } from "@/lib/utils";
 
 export type MemberSection =
@@ -150,7 +151,32 @@ export const SECONDARY: Destination[] = [
   { id: "settings", label: "Settings", icon: Settings, note: "Blocked people, units, your account" },
 ];
 
-const ALL = [...PRIMARY, ...SECONDARY];
+/**
+ * The secondary destinations this particular member actually has.
+ *
+ * "Coach's Plan" is removed for anybody who has not been assigned one, which is
+ * most members. It listed itself to everyone — "what your coach has you on" —
+ * and opened an empty checklist, so the first thing a member without a coach
+ * learned about the app was that one of its rooms was not for them.
+ *
+ * Home has gated its lead card on this since it was built (PillarHome's
+ * `hasPlan`); the menu simply never got the same treatment, and the two
+ * disagreeing is what made the app feel like it was guessing. Both read the
+ * same fact now.
+ *
+ * The product point underneath the layout one: an account with no coach has to
+ * be a complete thing rather than a trial version of a coached one. Restore,
+ * Build, the Room, Wins, the Library and the member's own numbers all stand up
+ * without a plan attached, so the nav should stop implying something is
+ * missing.
+ */
+function useSecondary(): Destination[] {
+  const hasPlan = useHasCoachPlan();
+  return useMemo(
+    () => (hasPlan ? SECONDARY : SECONDARY.filter((d) => d.id !== "coaching")),
+    [hasPlan],
+  );
+}
 
 // ─── Phone ─────────────────────────────────────────────────────────────────
 
@@ -161,7 +187,8 @@ export function MemberBottomNav({
   section: MemberSection;
   onChange: (s: MemberSection) => void;
 }) {
-  const inMore = SECONDARY.some((d) => d.id === section);
+  const secondary = useSecondary();
+  const inMore = secondary.some((d) => d.id === section);
 
   return (
     <nav
@@ -227,7 +254,7 @@ export function MemberBottomNav({
                   Escape does. So picking a section navigated underneath and
                   left the sheet sitting over the page it had just opened, and
                   the member had to dismiss it themselves to see anything. */}
-              {SECONDARY.map(({ id, label, icon: Icon, note }) => (
+              {secondary.map(({ id, label, icon: Icon, note }) => (
                 <SheetClose asChild key={id}>
                 <button
                   onClick={() => onChange(id)}
@@ -281,9 +308,13 @@ export function MemberTopNav({
   section: MemberSection;
   onChange: (s: MemberSection) => void;
 }) {
+  // Same fact as the phone's More sheet, so the two navs cannot disagree about
+  // whether this member has a coach.
+  const all = [...PRIMARY, ...useSecondary()];
+
   return (
     <div className="hidden md:flex items-center bg-muted/60 rounded-full p-1 gap-0.5">
-      {ALL.map(({ id, label }) => (
+      {all.map(({ id, label }) => (
         <button
           key={id}
           onClick={() => onChange(id)}

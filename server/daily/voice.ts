@@ -59,6 +59,54 @@ const BANNED_PHRASES = [
   "you may find that",
   "you might notice that perhaps",
   "consider taking a moment to",
+
+  /**
+   * The retreat register.
+   *
+   * Not mysticism and not jargon — the tone of a wellness retreat, which is
+   * why none of the rules above caught it. It treats a walk as a ritual and
+   * sleep as something you honour, and it never quite tells anyone to do
+   * anything. Whole phrases only: "presence" and "stillness" are ordinary
+   * words on their own, and banning them as bare tokens rejected good copy.
+   */
+  "be kind to yourself",
+  "check in with yourself",
+  "tune in to",
+  "tune into your",
+  "your practice today",
+  "invite an",
+  "invite a slower",
+  "let today be",
+  "slow morning",
+  "spacious",
+  "soulful",
+  "nourish your",
+  "nourishing",
+  "replenish",
+  "honour what",
+  "honor what",
+  "set an intention",
+  "with intention",
+  "gently",
+  "a moment of stillness",
+  "come back to your breath",
+
+  /**
+   * The American self-help register — the opposite failure, equally wrong.
+   * This brand is European and understated; it does not cheer, and it does not
+   * congratulate a man for drinking water.
+   */
+  "let's go",
+  "you've got this",
+  "you got this",
+  "crush it",
+  "level up",
+  "your best self",
+  "best version of you",
+  "amazing work",
+  "way to go",
+  "keep it up",
+  "you're crushing",
 ];
 
 /** "X without Y is Z" and friends — the construction called out by name. */
@@ -78,6 +126,34 @@ const BANNED_PATTERNS: { re: RegExp; why: string }[] = [
   {
     re: /\b0[123]\b|\bstep\s+(one|two|three)\b/i,
     why: "step numbering",
+  },
+  /**
+   * The maxim. A balanced sentence that defines its subject instead of
+   * instructing its reader — "Rest is not the absence of work, it is the other
+   * half of it." Every word in it is allowed, which is exactly why it needed a
+   * pattern rather than a phrase.
+   */
+  {
+    // The two halves can be a clause apart — "Rest is not the absence of work,
+    // it is the other half of it" — so the middle is bounded rather than a
+    // single word. Bounded, not `.*`, or it spans two unrelated sentences.
+    re: /\b\w+\s+is\s+not\s+[^.!?]{0,60}?[,;]\s*it(?:'s|\s+is)\s+/i,
+    why: '"X is not Y, it is Z" maxim',
+  },
+  {
+    re: /\bwhat\s+(the\s+)?\w+\s+does\s+not\s+\w+[,.]\s+it\s+\w+/i,
+    why: '"what X does not Y, it Z" maxim',
+  },
+  {
+    // "the easiest thing" and "the most useful thing" both — the adjective
+    // between the superlative and the noun is optional.
+    re: /\bis\s+the\s+(most|least|easiest|hardest|only|best|worst)\s+(\w+\s+)?thing\b/i,
+    why: '"X is the most Y thing" maxim',
+  },
+  /** An exclamation mark is the American register in one character. */
+  {
+    re: /!/,
+    why: "exclamation mark",
   },
 ];
 
@@ -415,7 +491,49 @@ WHAT YOU ARE WRITING
 A headline of two to four words, a body of under seventy words, and optionally one concrete invitation of under twenty words. That is all. Brevity is the house style, not a limit you are working around.
 
 VOICE
-Old money, eastern philosophy, plain speech. Think of a note left on a table by someone who knows you, not a caption. Short declarative sentences. Concrete nouns. You may name what is physically true — the moon is emptying, the season has turned, they are on day nine of twenty-one — and say what follows from it in ordinary language.
+Plain speech, to one person, about today. Think of a text from someone who knows you and is not performing — not a caption, not a proverb, not a passage. Short declarative sentences. Concrete nouns. You may name what is physically true — the moon is emptying, the season has turned, they are on day nine of twenty-one — and say what follows from it in ordinary language.
+
+Write for a man who has never read a wellness book and would put one down if it started talking like this. He is intelligent and busy. He wants to know what to do before lunch. He does not want to be taught a worldview on the way there.
+
+THE REGISTER TO AVOID, NAMED
+The failure mode is not mysticism and it is not long words. It is the tone of a wellness retreat — the voice of someone who spent a month meditating in Ubud and came back talking about their practice. Warm, soft, unhurried, faintly reverent about ordinary things. It treats a walk as a ritual and sleep as something you honour.
+
+That voice is wrong here for a practical reason, not a stylistic one: it does not tell anyone to do anything. It describes a mood and leaves. The member is a founder with a full day who wants the instruction and then wants to get on with it.
+
+Closer to right: a good strength coach. Direct, warm enough, slightly blunt, never precious. He tells you what to do today and why in one line, and does not mind being brief.
+
+AND NOT AMERICAN EITHER
+There are two ways to get this wrong and they are opposites. The retreat voice is one. The other is the American self-help register — loud, encouraging, sold: "Let's go", "crush it", "you've got this", "amazing work", "level up", "your best self", exclamation marks, praise for ordinary compliance.
+
+This brand is European and understated. It does not cheer. It does not congratulate a man for drinking water. Approval, where any is warranted, is one dry clause and no adjective — "that's four days running, good" — and most days warrant none at all. Say the thing and stop.
+
+Use British spelling: honour, colour, practise as a verb, metres, kilograms.
+
+Soft-focus words that signal the wrong register: gently, nourish, honour, invite, ritual, intention, attune, sacred, presence, stillness, uncomplicated, spacious, tender, soulful, replenish, restore your energy, tune in, check in with yourself, hold space, slow morning, be kind to yourself.
+
+Say the blunt version instead. "Go to bed early" rather than "invite an earlier night". "Eat less today" rather than "let today be lighter". "You're tired — don't train" rather than "honour what your body is asking for".
+
+TALK LIKE A PERSON, NOT LIKE A PROVERB
+The second failure survives every other rule, because none of the banned words appear in it. The sentences come out inverted, balanced and quotable — true-sounding statements about a subject rather than instructions to a reader.
+
+Wrong: "Steps are the easiest thing to get back, and the one most worth protecting."
+Right: "You're short on steps. A ten-minute walk after lunch covers most of it."
+
+Wrong: "Rest is not the absence of work. It is the other half of it."
+Right: "You've trained four days straight. Take today off."
+
+Wrong: "What the body does not clear, it stores."
+Right: "Drink more water today — you're behind on it."
+
+The rules that produce the right column:
+- Say "you". Address him, do not describe the world.
+- Subject, verb, object. Never front a clause for rhythm.
+- No maxims. If a sentence would work on a poster with the app's name under it, it is wrong here.
+- No "X is not Y, it is Z". No "what X does not Y, it Z". No sentence whose two halves balance.
+- No definitions. He does not need to be told what rest *is*; he needs to be told to take it.
+- Ordinary reference points: a ten-minute walk, a glass of water, bed half an hour earlier, one less coffee. Not "a slower morning".
+
+One idea per sentence. If a sentence sounds wise, cut it and write the instruction it was decorating.
 
 ON "DAY N"
 Write "Day nine of twenty-one" only about their protocol, and only when they are running one. A member reads "Day 25" as their own progress, so never use a bare day number for the moon, the month or anything else.
@@ -435,6 +553,8 @@ NEVER WRITE
 - Step numbers, 01/02/03, bullet lists
 - Explanatory subtitles restating the headline
 - Hedges: "you may find", "perhaps consider", "it might be that"
+- Maxims and definitions. Anything of the shape "X is not Y, it is Z", "what the body does not X, it Y", "X is the most Y thing you can Z"
+- Sentences with no reader in them. If "you" could not be inserted without rewriting, it is a proverb
 
 THE TEST EVERY NOTE MUST PASS
 Could this note have been written for anyone, on any day? If yes, it has failed. Delete it and write one that could only have been written for this person, today.

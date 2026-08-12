@@ -95,5 +95,12 @@ returns them empty by design. That is not a bug; don't "fix" it.
 - **Supabase Postgres**, project `zcvanbozvtojmnyuzsjh`. Every table has RLS.
 - **AWS Bedrock, `zai.glm-5`**, via the Converse API — model-agnostic on
   purpose, since GLM-5 isn't an Anthropic model.
-- `npm test` — 192 assertions across engine, almanac, voice and community.
-  Run it before you commit server or shared changes.
+- **Capacitor 8** wraps the same client as the iOS and Android apps
+  (`com.sakredbody.app`), with a first-party health plugin in
+  `plugins/health-sync`. The client is *bundled*, never loaded over the
+  network — see the note at the top of `capacitor.config.ts` before changing
+  anything about how the shell loads.
+- `npm test` — 1,721 assertions across 17 files. Run it before you commit
+  server or shared changes, and after any change to `client/src/lib/` or
+  `shared/models/`: much of the product's judgement lives there and is covered
+  without a browser or a database.

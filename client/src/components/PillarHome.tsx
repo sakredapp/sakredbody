@@ -28,6 +28,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useTrackedHabits } from "@/components/habits/useHabits";
+import { useActiveEnrollment, useHasCoachPlan } from "@/hooks/use-coaching";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HealthSwatches } from "@/components/portal/HealthSwatches";
@@ -226,15 +227,14 @@ function useCounts() {
    * it for somebody not enrolled in anything. So the fact says "Nothing
    * active" rather than staying blank, which is the difference between a door
    * that looks broken and one that tells you why it is empty.
+   *
+   * Through the shared hook rather than a second inline query on the same key.
+   * It was declared here with its own hand-written response type, and the More
+   * sheet answered the same question from nowhere at all — which is how the nav
+   * came to offer a coach's plan to members this screen had already decided did
+   * not have one.
    */
-  const protocol = useQuery<{ routine?: { name?: string | null } | null } | null>({
-    queryKey: ["/api/routines/active"],
-    queryFn: async () => {
-      const r = await fetch("/api/routines/active", { credentials: "include" });
-      if (!r.ok) throw new Error("no");
-      return r.json();
-    },
-  });
+  const protocol = useActiveEnrollment();
 
   // The centres query left with the Terrain door. It was the only caller, and
   // a request whose result nothing renders is a request nobody will notice is
@@ -340,7 +340,7 @@ export function PillarHome({
    * somebody not enrolled, so the card is hidden only once we actually know —
    * showing it and then removing it a moment later reads as a glitch.
    */
-  const hasPlan = !protocol.isLoading && Boolean(protocol.data?.routine?.name);
+  const hasPlan = useHasCoachPlan();
 
   /**
    * The live line under each title.
@@ -413,12 +413,29 @@ export function PillarHome({
 
   return (
     <div className="space-y-6">
+      {/*
+        The greeting, and the date.
+
+        It was "You are your practice." in italic gold — a slogan printed under
+        a greeting, telling the member nothing and setting exactly the tone the
+        app is trying not to have. It is the first line on the first screen, so
+        it did more than any other string to make this read like a retreat
+        brochure.
+
+        The date replaces it because it is the one thing worth saying in that
+        position: everything below is about today, and today is now named. A
+        line that carries information beats a line that carries an attitude.
+      */}
       <div className="space-y-1">
         <h1 className="font-display text-3xl leading-tight">
           Welcome back{firstName ? `, ${firstName}` : ""}.
         </h1>
-        <p className="font-display italic text-lg text-[hsl(var(--gold))]">
-          You are your practice.
+        <p className="text-sm text-muted-foreground">
+          {new Date().toLocaleDateString(undefined, {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+          })}
         </p>
       </div>
 

@@ -31,7 +31,13 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sparkline } from "@/components/portal/Sparkline";
 import { useState } from "react";
-import { METRIC_DISPLAY, adviceFor, localToday, type DaySeries } from "@/lib/healthDisplay";
+import {
+  METRIC_DISPLAY,
+  adviceFor,
+  isStillCounting,
+  localToday,
+  type DaySeries,
+} from "@/lib/healthDisplay";
 import { selectSupport, type SupportPrimitive } from "@shared/models/apothecary";
 import { useApothecaryLinks, type ApothecaryLink } from "@/hooks/use-apothecary-links";
 import type { HealthMetric } from "@shared/models/health";
@@ -86,8 +92,23 @@ export function MetricDetail({
   const today = localToday();
 
   const history = latest ? points.filter((p) => p.onDate !== latest.onDate) : [];
-  const baseline =
+  const rawBaseline =
     history.length >= 5 ? history.reduce((a, b) => a + b.value, 0) / history.length : null;
+
+  /**
+   * Whether this reading is still being added to as we look at it.
+   *
+   * Steps, distance and burn accumulate; at lunchtime they are a fraction of
+   * the day and comparing them to a full day's usual reports a collapse that
+   * is really just the clock. The number stays — it is true — but everything
+   * downstream of a comparison is withheld until the day is done, which is why
+   * this suppresses the baseline itself rather than only the sentence: the
+   * advice and the suggestions below both read from it.
+   */
+  const stillCounting = Boolean(
+    metric && latest && isStillCounting(metric, latest.onDate, today),
+  );
+  const baseline = stillCounting ? null : rawBaseline;
 
   const delta = latest && baseline ? latest.value - baseline : null;
   const better =
@@ -149,6 +170,26 @@ export function MetricDetail({
                 {whenLabel(latest.onDate, today)} · {latest.onDate}
               </p>
             </div>
+
+            {/*
+              Said plainly, instead of a comparison that would be wrong.
+
+              The alternative was to show nothing here, which reads as the app
+              having no opinion — and a member who saw "down on your usual"
+              yesterday will assume something broke. Naming the reason is one
+              line and it is the true one.
+            */}
+            {stillCounting && (
+              <div className="rounded-xl border border-border/40 p-3">
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Today so far
+                </p>
+                <p className="text-sm mt-1">Still counting.</p>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  We'll compare it with your usual once the day is done.
+                </p>
+              </div>
+            )}
 
             {baseline !== null && delta !== null && (
               <div className="rounded-xl border border-border/40 p-3">

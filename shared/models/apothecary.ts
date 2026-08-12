@@ -319,7 +319,7 @@ export const SUPPORT_LIBRARY: readonly SupportPrimitive[] = [
     loadClass: "restorative",
     conditions: ["low_movement", "low_sleep", "wired"],
     action: "Ten minutes outside within an hour of waking. Overcast still counts.",
-    why: "It is the cheapest thing on this list and it moves both today's mood and tonight's sleep.",
+    why: "It costs nothing, and it moves both today's mood and tonight's sleep.",
     evidence: "established",
     deeper:
       "Outdoor light is many times brighter than indoor lighting even under cloud, and morning exposure is the strongest signal for setting circadian timing.",

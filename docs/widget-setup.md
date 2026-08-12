@@ -1,12 +1,19 @@
 # The home-screen widget
 
-Everything except one step is written and compiling. The exception is creating
-the iOS Widget Extension **target**, which has to be done in Xcode — adding a
-target means writing `project.pbxproj` by hand, and a malformed one does not
-fail cleanly, it corrupts the project.
+**Both platforms are done and shipping.** Nothing in this file is outstanding.
 
-Android needs nothing: the provider, layout and manifest entry are committed and
-already build.
+It is kept because the iOS half was assembled by hand in Xcode, and the steps
+below are the only record of how. If the target is ever lost — a corrupted
+`project.pbxproj`, a fresh `npx cap add ios`, a merge that drops it — this is
+how to rebuild it, and re-deriving it from scratch costs an afternoon.
+
+> **This file used to open by saying the iOS target still had to be created.**
+> That was true when it was written and stopped being true at commit `90b69d3`.
+> The target exists: `com.sakredbody.app.SakredWidget` appears throughout
+> `ios/App/App.xcodeproj/project.pbxproj`, with `SakredWidgetExtension.entitlements`
+> and `ios/App/SakredWidget/` committed alongside it. A doc describing a
+> resolved blocker as the open one sends the next person to redo finished work,
+> which is a worse failure than being out of date about something small.
 
 ---
 
@@ -14,9 +21,9 @@ already build.
 
 | Piece | Where | State |
 |---|---|---|
-| Shared store, iOS | `HealthSyncPlugin.updateWidget` → App Group `UserDefaults` | compiles |
-| Shared store, Android | `HealthSyncPlugin.updateWidget` → `SharedPreferences` | compiles |
-| Widget UI, iOS | `plugins/health-sync/ios/Widget/SakredWidget.swift` | parses; needs a target |
+| Shared store, iOS | `HealthSyncPlugin.updateWidget` → App Group `UserDefaults` | shipped |
+| Shared store, Android | `HealthSyncPlugin.updateWidget` → `SharedPreferences` | shipped |
+| Widget UI, iOS | `ios/App/SakredWidget/SakredWidget.swift`, target `com.sakredbody.app.SakredWidget` | **builds** |
 | Widget UI, Android | `android/app/src/main/java/com/sakredbody/app/SakredWidgetProvider.java` | **builds** |
 | Feeding it | `client/src/lib/widget.ts`, called on every app open | shipped |
 
@@ -27,7 +34,9 @@ says "Not synced today" rather than quietly showing an old number.
 
 ---
 
-## iOS — the seven steps
+## iOS — how the target was built
+
+Already done. Kept as the rebuild procedure, not a to-do list.
 
 ### 1. Add the target
 

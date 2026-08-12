@@ -218,8 +218,20 @@ export function IntakeStep({
             a chunky intrinsic width on iOS — refuses to shrink below it and
             spills over the neighbouring column instead of wrapping. The two
             controls end up drawn on top of each other. Letting them shrink is
-            the fix; the wider gap is what keeps them apart once they do. */}
-        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-x-4 gap-y-3">
+            the fix; the wider gap is what keeps them apart once they do.
+
+            It was not sufficient on its own. WebKit also enforces a minimum
+            intrinsic width on the `date` and `time` controls themselves, and
+            that one ignores `width: 100%` — so the columns shrank, the inputs
+            did not, and the time control hung off the right of the card with
+            the two boxes touching where the gap should have been. The inputs
+            carry their own `min-w-0` below for that.
+
+            The columns are uneven because the content is: "12 Jan 2001" needs
+            noticeably more room than "01:10", and splitting them evenly is
+            what made the date side feel crammed while the time side had space
+            going spare. */}
+        <div className="grid grid-cols-1 min-[400px]:grid-cols-[1.4fr_1fr] gap-x-4 gap-y-3">
           <div className="min-w-0 space-y-1.5">
             <label
               htmlFor="intake-birth-date"
@@ -233,7 +245,7 @@ export function IntakeStep({
               value={birthDate}
               max={today}
               onChange={(e) => setBirthDate(e.target.value)}
-              className="w-full [color-scheme:dark]"
+              className="w-full min-w-0 [color-scheme:dark]"
               data-testid="intake-birth-date"
             />
           </div>
@@ -249,7 +261,7 @@ export function IntakeStep({
               type="time"
               value={birthTime}
               onChange={(e) => setBirthTime(e.target.value)}
-              className="w-full [color-scheme:dark]"
+              className="w-full min-w-0 [color-scheme:dark]"
               data-testid="intake-birth-time"
             />
           </div>

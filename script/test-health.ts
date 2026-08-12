@@ -30,6 +30,8 @@ import {
   seriesFor,
   planTiles,
   trendOf,
+  isStillCounting,
+  localToday,
 } from "../client/src/lib/healthDisplay.js";
 
 let passed = 0;
@@ -652,8 +654,61 @@ for (const m of METRICS) {
   check(`${m} has a label`, d.label.length > 0);
   check(`${m} sits in a known group`, GROUP_ORDER.includes(d.group), d.group);
   check(`${m} formats a number without throwing`, typeof d.format(1) === "string");
-  check(`${m} declares how a window collapses`, ["average", "latest"].includes(d.summarise));
+  // Was `declares how a window collapses`, checking a `summarise` field that
+  // no longer exists: the headline number is now always the reading on the day
+  // the surface is labelled with, so there is nothing per-metric left to
+  // declare. `higherIsBetter` is the remaining three-state decision, and `null`
+  // is a real answer for it — weight is a goal, not a virtue — so the check is
+  // that it was decided, not that it is a boolean.
+  check(`${m} declares a better direction, or that it has none`,
+    d.higherIsBetter === true || d.higherIsBetter === false || d.higherIsBetter === null);
+  check(`${m} declares whether it accumulates across a day`,
+    typeof d.cumulative === "boolean");
 }
+
+/**
+ * A partial day is not a bad day.
+ *
+ * Steps at lunchtime are a fraction of the day, and comparing them with a full
+ * day's usual reports a collapse that is really just the clock — 3,937 against
+ * a usual of 18,133 read as -78% on the home screen every morning. The reading
+ * still shows; the comparison waits until the day is finished.
+ */
+const TODAY = localToday();
+const YESTERDAY = new Date(Date.parse(`${TODAY}T00:00:00Z`) - 86_400_000)
+  .toISOString()
+  .slice(0, 10);
+
+check("steps accumulate", METRIC_DISPLAY.steps.cumulative === true);
+check("resting heart rate is measured, not accumulated",
+  METRIC_DISPLAY.restingHeartRate.cumulative === false);
+// Last night is over by the time it is read, whatever the clock says now.
+check("sleep counts as finished", METRIC_DISPLAY.sleepMinutes.cumulative === false);
+
+check("an accumulating metric is still counting today",
+  isStillCounting("steps", TODAY, TODAY));
+check("an accumulating metric is finished by yesterday",
+  !isStillCounting("steps", YESTERDAY, TODAY));
+check("a measured metric is never still counting",
+  !isStillCounting("restingHeartRate", TODAY, TODAY));
+check("no reading is not still counting", !isStillCounting("steps", null, TODAY));
+
+/** The suppression has to reach the arrow, not just the helper. */
+const midday = Array.from({ length: 12 }, (_, i) => ({
+  onDate: i === 11 ? TODAY : `2026-01-${String(i + 1).padStart(2, "0")}`,
+  steps: i === 11 ? 3937 : 18000,
+}));
+const middayTile = planTiles(midday as never, 1)[0];
+check("today's partial step count still shows its number",
+  middayTile?.value === 3937, String(middayTile?.value));
+check("today's partial step count shows no trend arrow",
+  trendOf(middayTile) === null, JSON.stringify(trendOf(middayTile)));
+
+/** The same shortfall on a finished day is a real signal and must survive. */
+const finished = midday.map((d, i) => (i === 11 ? { ...d, onDate: YESTERDAY } : d));
+const finishedTile = planTiles(finished as never, 1)[0];
+check("the same drop on a finished day still shows a trend",
+  trendOf(finishedTile) !== null);
 
 /** Formatting has to be readable, not merely produced. */
 check("442 minutes reads as 7h 22m", METRIC_DISPLAY.sleepMinutes.format(442) === "7h 22m",
@@ -710,15 +765,51 @@ const series = Array.from({ length: 30 }, (_, i) => {
 
 const stepStat = summarise(series, "steps");
 check("a metric present every day is summarised", stepStat !== null);
-check("the headline is the recent window", Math.round(stepStat?.value ?? 0) === 6000,
+check("the headline is the most recent day", Math.round(stepStat?.value ?? 0) === 6000,
   String(stepStat?.value));
-check("the baseline excludes the recent window", Math.round(stepStat?.baseline ?? 0) === 10000,
+// Every day held except the one being shown: 23 at 10000, then 6 at 6000.
+check("the baseline is every other day held", Math.round(stepStat?.baseline ?? 0) === 9172,
   String(stepStat?.baseline));
 
 const weightStat = summarise(series, "weightKg");
-check("a 'latest' metric takes the last value, not a mean",
+check("the headline takes the last value, not a mean",
   Math.abs((weightStat?.value ?? 0) - 78.29) < 0.001, String(weightStat?.value));
-check("a 'latest' metric shows no trend", weightStat?.baseline === null);
+check("a baseline exists once enough other days are held",
+  typeof weightStat?.baseline === "number", String(weightStat?.baseline));
+
+/**
+ * The bug this pins, because it shipped and nobody could see it.
+ *
+ * Eighteen metrics were declared `summarise: "average"`, so the home tile drew
+ * the mean of the last seven days — and then stamped it with a single date,
+ * under a header reading "Your body · Today". A member with 18,000 steps a day
+ * who had walked 3,937 by lunchtime saw 16,440 on the home screen and 3,937 in
+ * the sheet that opened from tapping it. Both numbers were computed correctly;
+ * one of them was answering a question nothing on screen had asked.
+ *
+ * The final day is deliberately unlike the six before it, so a regression to
+ * any window average fails here rather than passing on a flat series.
+ */
+const partial = Array.from({ length: 10 }, (_, i) => ({
+  onDate: `2026-03-${String(i + 1).padStart(2, "0")}`,
+  steps: i === 9 ? 3937 : 18000,
+}));
+const partialStat = summarise(partial, "steps");
+check("the headline is the latest reading, never a window mean",
+  partialStat?.value === 3937, String(partialStat?.value));
+check("the usual excludes the day being shown",
+  Math.round(partialStat?.baseline ?? 0) === 18000, String(partialStat?.baseline));
+
+/**
+ * Order is this function's own responsibility.
+ *
+ * The server sorts, but "the most recent reading" read off the end of an array
+ * is only correct while somebody else keeps that promise. Shuffled input must
+ * still find the last day.
+ */
+const shuffled = [partial[4], partial[9], partial[0], partial[7], partial[2]];
+check("the latest day is found in unsorted input",
+  summarise(shuffled, "steps")?.value === 3937, String(summarise(shuffled, "steps")?.value));
 
 check("a metric with no data yields nothing", summarise(series, "vo2Max") === null);
 

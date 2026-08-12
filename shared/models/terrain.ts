@@ -237,18 +237,30 @@ export function readTerrain(input: TerrainInputs): TerrainReading {
  * product's own author described the two halves out loud: Restore is "is the
  * body well rested", Build is "are you getting enough movement in".
  *
- * One sentence, no number, and it never gives an instruction — "asking for"
- * rather than "you should", because this reads signals and knows nothing about
- * the member's actual day.
+ * One sentence, no number, and it never gives an instruction, because this
+ * reads signals and knows nothing about the member's actual day. It states a
+ * condition and stops.
+ *
+ * ── Why it no longer says "your body is asking" ───────────────────────────
+ *
+ * That was the original way of avoiding an instruction, and it bought the
+ * avoidance with the wrong voice — the register of a wellness retreat, where
+ * the body is a party to be consulted rather than a thing you are. Read cold
+ * by the founder it is written for, "your body is asking for rest" is the line
+ * that makes a man close the app.
+ *
+ * Stating the condition flatly avoids the instruction just as well and costs
+ * nothing: "you're short on recovery" tells him what is true and leaves the
+ * decision where it belongs, with him and his coach.
  */
 export function terrainHeadline(reading: TerrainReading): string {
   switch (reading.lean) {
     case "restore":
-      return "Your body is asking for rest";
+      return "You're short on recovery";
     case "build":
       return "You have room for more movement";
     case "either":
-      return "Rested enough for whatever today asks";
+      return "You're well recovered";
     case "unknown":
       return "Not enough yet to tell";
   }

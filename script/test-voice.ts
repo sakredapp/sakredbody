@@ -371,5 +371,79 @@ tcheck("a gap is stated plainly", stale.includes("Last trained 12 days ago."));
 tcheck("an empty week says so", stale.includes("Nothing logged in the last seven days."));
 tcheck("no empty 'This week:' line", !stale.includes("This week:"));
 
+/**
+ * ── The two registers, both wrong ─────────────────────────────────────────
+ *
+ * Described by the person who read a week of live notes as "a woo woo lady who
+ * went to Ubud to meditate". None of it trips the older rules: no banned
+ * vocabulary, no jargon, grounded in a real fact. It is soft, reverent about
+ * ordinary things, and it never quite tells anybody to do anything.
+ *
+ * The opposite failure is the American self-help voice — loud, congratulatory,
+ * sold. This brand is European and understated, so both are rejections.
+ */
+rejects("an invitation instead of an instruction", {
+  headline: "A slower morning",
+  body: "Let today be lighter. Invite a slower start, and be kind to yourself about the pace.",
+  invitation: null,
+});
+rejects("honouring rather than doing", {
+  headline: "Rest today",
+  body: "Honour what your body is asking for. Set an intention for the evening and tune in to what it needs.",
+  invitation: null,
+});
+rejects("a walk treated as a ritual", {
+  headline: "Move gently",
+  body: "Come back to your breath and gently nourish your body with a moment of stillness.",
+  invitation: null,
+});
+rejects("American cheerleading", {
+  headline: "Four days running",
+  body: "Amazing work — you've got this. Keep it up and become the best version of you.",
+  invitation: null,
+});
+rejects("an exclamation mark", {
+  headline: "Day nine",
+  body: "You are on day nine of twenty-one. Drink more water today!",
+  invitation: null,
+}, "exclamation");
+
+/** The maxim: every word allowed, no reader anywhere in it. */
+rejects("an X-is-not-Y maxim", {
+  headline: "On rest",
+  body: "Rest is not the absence of work, it is the other half of it. Day nine of twenty-one.",
+  invitation: null,
+}, "maxim");
+rejects("a what-the-body-does-not maxim", {
+  headline: "Water",
+  body: "What the body does not clear, it stores. You are on day nine of twenty-one.",
+  invitation: null,
+}, "maxim");
+rejects("a superlative maxim", {
+  headline: "Steps",
+  body: "Walking is the easiest thing to get back after a waning moon week.",
+  invitation: null,
+}, "maxim");
+
+/**
+ * And the blunt version of each has to survive, or the filter has simply
+ * banned the subject rather than the register.
+ */
+acceptsGrounded("the blunt version of a rest note", {
+  headline: "Take today off",
+  body: "You have trained four days straight and you are on day nine of twenty-one. Skip the session. Go to bed half an hour early.",
+  invitation: "Bed by ten.",
+});
+acceptsGrounded("the blunt version of a movement note", {
+  headline: "Short on steps",
+  body: "You are behind on movement for day nine of twenty-one. A ten-minute walk after lunch covers most of it.",
+  invitation: "Walk ten minutes after your largest meal.",
+});
+acceptsGrounded("a dry, unadorned approval", {
+  headline: "Four days running",
+  body: "That is four days running on day nine of twenty-one, good. Hold the same load tomorrow.",
+  invitation: null,
+});
+
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);
 process.exit(failed === 0 ? 0 : 1);

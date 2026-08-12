@@ -24,6 +24,7 @@ import { SectionHeading, Panel } from "@/components/portal/Panel";
 import { HealthSettings } from "@/components/portal/HealthSettings";
 import { ReplaySetup } from "@/components/portal/ReplaySetup";
 import { AboutYouSettings } from "@/components/portal/AboutYouSettings";
+import { PhotoSettings } from "@/components/portal/PhotoSettings";
 import { MovementSettings } from "@/components/portal/MovementSettings";
 import { InfoTip } from "@/components/ui/info-tip";
 import { EyeOff, Scale, LogOut, ShieldOff } from "lucide-react";
@@ -95,6 +96,15 @@ export function SettingsTab({
           for good. */}
       <Panel title="About you">
         <AboutYouSettings />
+      </Panel>
+
+      {/* ── Your photo ─────────────────────────────────────────────────────
+          Onboarding asks for this once and invites you to skip it, and until
+          now that skip was permanent — the picker existed on exactly one
+          screen a member sees exactly once. Both server routes were already
+          there; only the way back was missing. */}
+      <Panel title="Your photo">
+        <PhotoSettings />
       </Panel>
 
       {/* ── What Build opens on ────────────────────────────────────────────

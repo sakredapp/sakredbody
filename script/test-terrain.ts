@@ -148,7 +148,18 @@ check(
 
 console.log("\nThe headline\n");
 
-check("depleted reads as asking for rest", terrainHeadline(depleted).includes("asking for rest"));
+check("depleted reads as short on recovery", terrainHeadline(depleted).includes("short on recovery"));
+/**
+ * The headline states a condition and never instructs — it reads signals and
+ * knows nothing about the member's actual day. It also must not say "your body
+ * is asking", which was the old way of avoiding the instruction and bought it
+ * with the register of a wellness retreat.
+ */
+for (const reading of [depleted, read({ daysSinceLastSession: 6 }), read({})]) {
+  const line = terrainHeadline(reading);
+  check(`"${line}" gives no instruction`, !/\byou should\b|\btry to\b|\bmake sure\b/i.test(line));
+  check(`"${line}" does not personify the body`, !/\bbody is asking\b|\basking for\b/i.test(line));
+}
 check(
   "fresh reads as having room",
   terrainHeadline(read({ daysSinceLastSession: 6 })).includes("room for more movement"),

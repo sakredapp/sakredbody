@@ -27,10 +27,33 @@ export interface SparkPoint {
   value: number;
 }
 
+/**
+ * Which readings get a written date under them.
+ *
+ * This used to be all of them, one `<span>` per point, and with 28 readings in
+ * a `max-w-sm` dialog it was worse than unreadable — it was destructive. Flex
+ * items do not shrink below their own content, so 28 labels reading `07-16` at
+ * `tracking-widest` demanded something like 1,200px, widened the dialog's grid
+ * column past the phone, and pushed every centred thing in the dialog off to
+ * the right. Respiratory rate appeared to work only because that member had
+ * fewer days of it.
+ *
+ * Evenly spaced and always including the first and last, so the row still says
+ * what window is being drawn while fitting inside it. Twenty-eight tick labels
+ * under a 72px line were never legible anyway.
+ */
+function labelIndices(count: number, max: number): number[] {
+  if (count <= max) return Array.from({ length: count }, (_, i) => i);
+  const step = (count - 1) / (max - 1);
+  return Array.from({ length: max }, (_, i) => Math.round(i * step));
+}
+
 export function Sparkline({
   points,
   height = 64,
   showLabels = true,
+  /** Ticks to write. Five fits a phone; the line still draws every point. */
+  maxLabels = 5,
   className,
   emptyNote = "Not enough history yet.",
   "data-testid": testId,
@@ -38,6 +61,7 @@ export function Sparkline({
   points: SparkPoint[];
   height?: number;
   showLabels?: boolean;
+  maxLabels?: number;
   className?: string;
   emptyNote?: string;
   "data-testid"?: string;
@@ -67,7 +91,7 @@ export function Sparkline({
   const last = points.length - 1;
 
   return (
-    <div className={cn("w-full", className)} data-testid={testId}>
+    <div className={cn("w-full min-w-0", className)} data-testid={testId}>
       <svg
         width="100%"
         height={height}
@@ -100,16 +124,16 @@ export function Sparkline({
       </svg>
 
       {showLabels && (
-        <div className="flex justify-between mt-2">
-          {points.map((p, i) => (
+        <div className="flex justify-between gap-2 mt-2 min-w-0">
+          {labelIndices(points.length, maxLabels).map((i) => (
             <span
-              key={p.label + i}
+              key={points[i].label + i}
               className={cn(
-                "text-[10px] uppercase tracking-widest",
+                "text-[10px] uppercase tracking-widest whitespace-nowrap",
                 i === last ? "text-[hsl(var(--gold))]" : "text-muted-foreground/60",
               )}
             >
-              {p.label}
+              {points[i].label}
             </span>
           ))}
         </div>

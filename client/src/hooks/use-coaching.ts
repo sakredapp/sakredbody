@@ -264,8 +264,20 @@ export function useRoutineDetail(routineId: string | null) {
   });
 }
 
+/**
+ * The enrollment, with the routine it points at joined on.
+ *
+ * GET /api/routines/active has always answered `{ ...enrollment, routine }`,
+ * but the hook was typed as the bare enrollment — so the one field callers
+ * actually want, the plan's name, was invisible to TypeScript and every caller
+ * re-declared its own shape inline.
+ */
+export type ActiveEnrollment = UserRoutine & {
+  routine?: { name?: string | null } | null;
+};
+
 export function useActiveEnrollment() {
-  return useQuery<UserRoutine | null>({
+  return useQuery<ActiveEnrollment | null>({
     queryKey: ["/api/routines/active"],
     queryFn: async () => {
       const res = await fetch("/api/routines/active", { credentials: "include" });
@@ -274,6 +286,29 @@ export function useActiveEnrollment() {
       return res.json();
     },
   });
+}
+
+/**
+ * Does this member actually have a coach's plan?
+ *
+ * The one place that answer is computed, because the app kept disagreeing with
+ * itself about it: Home already hid its lead card when there was no plan, while
+ * the More sheet listed "Coach's Plan — what your coach has you on" to everyone
+ * and opened an empty checklist. A member with no coach was being shown a door
+ * to a room that does not exist for them.
+ *
+ * Most members do not have a plan, and the app has to be worth opening anyway.
+ * So this is not a loading flag with a fallback — it is the fact, and the UI is
+ * expected to be complete in both of its states rather than treating the
+ * planless one as a degraded version of the real thing.
+ *
+ * `false` while the request is in flight, deliberately. The alternative is
+ * showing the entry and withdrawing it a moment later, which reads as a glitch;
+ * arriving is fine, vanishing is not.
+ */
+export function useHasCoachPlan(): boolean {
+  const { data, isLoading } = useActiveEnrollment();
+  return !isLoading && Boolean(data?.routine?.name);
 }
 
 export function useEnrollmentHistory() {

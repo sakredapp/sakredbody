@@ -32,15 +32,26 @@ export type MetricDisplay = {
   group: MetricGroup;
   /** A whole value, formatted with its unit. */
   format: (value: number) => string;
-  /**
-   * How a window of days collapses into one headline number.
-   *
-   * "total" would be wrong for anything measured rather than accumulated — a
-   * 30-day total resting heart rate is meaningless — and "average" is wrong for
-   * steps, where a member wants their typical day, not the month's sum. Both
-   * are per-metric decisions, so both are written down.
+  /*
+   * `summarise: "average" | "latest"` used to live here, deciding whether a
+   * metric's headline number was its last reading or the mean of its last
+   * seven days. It is gone because the answer is no longer per-metric: every
+   * surface that shows a headline number also stamps it with a date, so the
+   * number has to be the reading on that date or the label is a lie. See
+   * `summarise()` below for the full account. The averaging did not disappear
+   * — it became the baseline, which is where a comparison belongs.
    */
-  summarise: "average" | "latest";
+  /**
+   * Whether the number accumulates across the day, or is simply measured.
+   *
+   * Steps at noon are half a day of steps. A resting heart rate at noon is a
+   * resting heart rate. Only the first kind can be compared against a full
+   * day's usual and come out looking like a collapse purely because the day is
+   * not over — 3,937 steps against a usual of 18,133 is not a 78% drop, it is
+   * lunchtime. Sleep counts as measured: last night is finished by the time it
+   * is read, whatever the clock says now.
+   */
+  cumulative: boolean;
   /**
    * Which direction is an improvement, for trend colouring. `null` where there
    * is no such thing — weight is a goal, not a virtue, and colouring it green
@@ -65,7 +76,7 @@ export const METRIC_DISPLAY: Record<HealthMetric, MetricDisplay> = {
     label: "Steps",
     group: "Movement",
     format: (v) => round(v),
-    summarise: "average",
+    cumulative: true,
     higherIsBetter: true,
   },
   distanceMeters: {
@@ -74,35 +85,35 @@ export const METRIC_DISPLAY: Record<HealthMetric, MetricDisplay> = {
     // Kilometres to a member; metres in the column. Storing SI and displaying
     // human is the whole reason the two are separate concerns.
     format: (v) => `${round(v / 1000, 1)} km`,
-    summarise: "average",
+    cumulative: true,
     higherIsBetter: true,
   },
   flightsClimbed: {
     label: "Flights",
     group: "Movement",
     format: (v) => round(v),
-    summarise: "average",
+    cumulative: true,
     higherIsBetter: true,
   },
   exerciseMinutes: {
     label: "Exercise",
     group: "Movement",
     format: hoursMinutes,
-    summarise: "average",
+    cumulative: true,
     higherIsBetter: true,
   },
   activeCalories: {
     label: "Active burn",
     group: "Movement",
     format: (v) => `${round(v)} kcal`,
-    summarise: "average",
+    cumulative: true,
     higherIsBetter: true,
   },
   totalCalories: {
     label: "Total burn",
     group: "Movement",
     format: (v) => `${round(v)} kcal`,
-    summarise: "average",
+    cumulative: true,
     higherIsBetter: null,
   },
 
@@ -111,30 +122,30 @@ export const METRIC_DISPLAY: Record<HealthMetric, MetricDisplay> = {
     label: "Sleep",
     group: "Sleep",
     format: hoursMinutes,
-    summarise: "average",
+    cumulative: false,
     higherIsBetter: true,
   },
   sleepDeepMinutes: {
     label: "Deep",
     group: "Sleep",
     format: hoursMinutes,
-    summarise: "average",
+    cumulative: false,
     higherIsBetter: true,
   },
   sleepRemMinutes: {
     label: "REM",
     group: "Sleep",
     format: hoursMinutes,
-    summarise: "average",
+    cumulative: false,
     higherIsBetter: true,
   },
   sleepAwakeMinutes: {
     label: "Awake",
     group: "Sleep",
     format: hoursMinutes,
-    summarise: "average",
     // Time awake inside a sleep session is the one sleep number where less is
     // the good outcome.
+    cumulative: false,
     higherIsBetter: false,
   },
 
@@ -143,24 +154,24 @@ export const METRIC_DISPLAY: Record<HealthMetric, MetricDisplay> = {
     label: "Resting HR",
     group: "Heart",
     format: (v) => `${round(v)} bpm`,
-    summarise: "average",
     // Rising resting heart rate is the classic overreaching signal.
+    cumulative: false,
     higherIsBetter: false,
   },
   heartRateVariability: {
     label: "HRV",
     group: "Heart",
     format: (v) => `${round(v)} ms`,
-    summarise: "average",
+    cumulative: false,
     higherIsBetter: true,
   },
   vo2Max: {
     label: "VO₂ max",
     group: "Heart",
+    // VO2 max is an estimate the device revises rather than a daily
+    // measurement, so the current one is the answer and a mean only lags it.
     format: (v) => round(v, 1),
-    // Latest, not average: VO2 max is an estimate the device revises, so the
-    // current one is the answer and a 30-day mean just lags it.
-    summarise: "latest",
+    cumulative: false,
     higherIsBetter: true,
   },
 
@@ -169,21 +180,21 @@ export const METRIC_DISPLAY: Record<HealthMetric, MetricDisplay> = {
     label: "Weight",
     group: "Body",
     format: (v) => `${round(v, 1)} kg`,
-    summarise: "latest",
+    cumulative: false,
     higherIsBetter: null,
   },
   bodyFatPercent: {
     label: "Body fat",
     group: "Body",
     format: (v) => `${round(v, 1)}%`,
-    summarise: "latest",
+    cumulative: false,
     higherIsBetter: null,
   },
   heightCm: {
     label: "Height",
     group: "Body",
     format: (v) => `${round(v)} cm`,
-    summarise: "latest",
+    cumulative: false,
     higherIsBetter: null,
   },
 
@@ -192,21 +203,21 @@ export const METRIC_DISPLAY: Record<HealthMetric, MetricDisplay> = {
     label: "Respiratory rate",
     group: "Vitals",
     format: (v) => `${round(v, 1)} /min`,
-    summarise: "average",
+    cumulative: false,
     higherIsBetter: null,
   },
   oxygenSaturation: {
     label: "Blood oxygen",
     group: "Vitals",
     format: (v) => `${round(v, 1)}%`,
-    summarise: "average",
+    cumulative: false,
     higherIsBetter: true,
   },
   bodyTemperatureC: {
     label: "Body temp",
     group: "Vitals",
     format: (v) => `${round(v, 1)}°C`,
-    summarise: "average",
+    cumulative: false,
     higherIsBetter: null,
   },
 
@@ -215,21 +226,21 @@ export const METRIC_DISPLAY: Record<HealthMetric, MetricDisplay> = {
     label: "Mindfulness",
     group: "Practice",
     format: hoursMinutes,
-    summarise: "average",
+    cumulative: true,
     higherIsBetter: true,
   },
   waterMl: {
     label: "Water",
     group: "Practice",
     format: (v) => `${round(v / 1000, 1)} L`,
-    summarise: "average",
+    cumulative: true,
     higherIsBetter: true,
   },
   dietaryCalories: {
     label: "Eaten",
     group: "Practice",
     format: (v) => `${round(v)} kcal`,
-    summarise: "average",
+    cumulative: true,
     higherIsBetter: null,
   },
 };
@@ -246,29 +257,54 @@ export type DaySeries = { onDate: string } & Partial<Record<HealthMetric, number
  */
 export function summarise(
   days: DaySeries[],
-  metric: HealthMetric,
-  recentDays = 7
+  metric: HealthMetric
 ): { value: number; baseline: number | null; days: number } | null {
   const display = METRIC_DISPLAY[metric];
   if (!display) return null;
 
   const points = days
     .map((d) => ({ onDate: d.onDate, value: d[metric] }))
-    .filter((p): p is { onDate: string; value: number } => typeof p.value === "number");
+    .filter((p): p is { onDate: string; value: number } => typeof p.value === "number")
+    // The server already sorts (see `pivot`), but this function's whole
+    // contract is "the most recent reading", and reading that off the end of
+    // an array whose order is somebody else's promise is how it silently
+    // becomes the oldest reading instead.
+    .sort((a, b) => a.onDate.localeCompare(b.onDate));
   if (!points.length) return null;
-
-  const recent = points.slice(-recentDays);
 
   const mean = (xs: { value: number }[]) =>
     xs.reduce((a, b) => a + b.value, 0) / (xs.length || 1);
 
-  const value = display.summarise === "latest" ? points[points.length - 1].value : mean(recent);
+  /**
+   * The reading on the most recent day held — never a window average.
+   *
+   * ── The bug this fixes ──────────────────────────────────────────────────
+   *
+   * Eighteen of the twenty-two metrics are declared `summarise: "average"`,
+   * and this returned the mean of their last seven days. Every surface that
+   * renders it, though, stamps the number with a single date and sits under a
+   * header reading "Your body · Today". So the home screen showed 16,440 steps
+   * dated today, while the detail sheet for the same metric on the same screen
+   * showed 3,937 — the number actually recorded today. Both were "right"; they
+   * were answering different questions, and only one of them was the question
+   * the label asked.
+   *
+   * A member cannot act on a weekly mean presented as this morning, and cannot
+   * tell it apart from the app being stale. The average is not lost — it is
+   * the baseline below, which is where a comparison belongs.
+   */
+  const value = points[points.length - 1].value;
 
-  // A baseline drawn from the same days as the value compares a window with
-  // itself and always reads as flat. Only the days BEFORE the recent window
-  // count, and only if there are enough of them to mean anything.
-  const older = points.slice(0, Math.max(0, points.length - recentDays));
-  const baseline = display.summarise === "latest" || older.length < 3 ? null : mean(older);
+  /**
+   * Every other day held, which is what "your usual" means.
+   *
+   * Excludes the day being shown, or the number is partly compared with itself
+   * and every deviation flattens. Five is the same floor MetricDetail uses,
+   * deliberately: the tile and the sheet it opens must not quote different
+   * usuals for the same metric.
+   */
+  const older = points.slice(0, -1);
+  const baseline = older.length >= 5 ? mean(older) : null;
 
   return { value, baseline, days: points.length };
 }
@@ -428,6 +464,27 @@ export function dayLabel(onDate: string | null, today: string): string {
   });
 }
 
+/**
+ * Is this reading still being added to?
+ *
+ * True only for a metric that accumulates, on the member's own today. Every
+ * comparison against a baseline has to ask this first, because the baseline is
+ * a full day and a partial day measured against it is not a change in the
+ * person — it is the clock. The arrow that results is the most alarming thing
+ * on the screen and it means nothing, which is the worst combination available.
+ *
+ * The reading is still shown. It is the *comparison* that is withheld, because
+ * the number is true and the comparison is not.
+ */
+export function isStillCounting(
+  metric: HealthMetric,
+  onDate: string | null,
+  today = localToday(),
+): boolean {
+  if (!onDate) return false;
+  return METRIC_DISPLAY[metric]?.cumulative === true && onDate === today;
+}
+
 /** The member's own date, as the browser sees it. */
 export function localToday(): string {
   const n = new Date();
@@ -535,6 +592,8 @@ export function planTiles(days: DaySeries[], limit = 5): Tile[] {
  */
 export function trendOf(tile: Tile): { pct: number; good: boolean | null } | null {
   if (tile.baseline === null || tile.baseline === 0) return null;
+  // A day that is still filling up cannot be down on anything yet.
+  if (isStillCounting(tile.metric, tile.onDate)) return null;
   const pct = ((tile.value - tile.baseline) / tile.baseline) * 100;
   // Under a couple of percent is noise in the sensor, not a change in the
   // person. Showing "+0.4%" invites someone to read meaning into drift.
@@ -667,8 +726,8 @@ export function adviceFor(
     if (value / baseline <= 0.9) {
       return {
         title: "Down on your baseline",
-        body: "A nervous system biased toward stress rather than recovery. It moves with sleep, alcohol, training load and how the week is going.",
-        tip: "Absolute numbers mean nothing between two people — only your own trend does. One low reading is noise; a week of them is a signal.",
+        body: "You're leaning toward stress rather than recovery. Sleep, alcohol, training load and a hard week all move this one.",
+        tip: "Don't compare the number with anybody else's; only your own trend means anything. One low reading is noise, a week of them isn't.",
         remedy: {
           title: "Where the adaptogens belong",
           body: "Ashwagandha and tulsi are the two traditionally used for a stretch like this — taken daily over weeks rather than as a rescue, which is the part most people get wrong. Slow nasal breathing with a longer exhale does more in ten minutes than either.",
@@ -681,9 +740,9 @@ export function adviceFor(
   if (metric === "steps") {
     if (delta <= -2000) {
       return {
-        title: "A quieter day than usual",
-        body: "Steps are the easiest thing to get back, and the one most worth protecting on a busy week.",
-        tip: "A walk after your largest meal does more for blood sugar than the same walk at any other time of day.",
+        title: "Short on steps",
+        body: "You're well down on your usual. Walking makes it up without needing a session, so this one is easy to fix today.",
+        tip: "Walk after your largest meal. The same walk does more for blood sugar then than at any other time of day.",
       };
     }
     return null;
