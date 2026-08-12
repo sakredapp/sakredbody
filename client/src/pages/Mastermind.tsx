@@ -41,7 +41,7 @@ export default function Mastermind() {
   const openApplication = () => setIsModalOpen(true);
 
   return (
-    <div className="min-h-screen bg-background text-foreground font-sans">
+    <div className="tone-ink min-h-screen bg-background text-foreground font-sans">
       <SiteHeader
         cta={
           <Button

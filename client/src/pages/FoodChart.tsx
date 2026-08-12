@@ -68,7 +68,7 @@ export default function FoodChart() {
   const isFiltering = query.trim() !== "" || activeRatings.size > 0;
 
   return (
-    <div className="min-h-screen bg-background text-foreground font-sans">
+    <div className="tone-ink min-h-screen bg-background text-foreground font-sans">
       <SiteHeader overHero={false} />
 
       {/* ── Header ───────────────────────────────────────────── */}

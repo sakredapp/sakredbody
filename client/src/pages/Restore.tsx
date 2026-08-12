@@ -62,7 +62,7 @@ export default function Restore() {
   );
 
   return (
-    <div className="min-h-screen bg-background text-foreground font-sans">
+    <div className="tone-ink min-h-screen bg-background text-foreground font-sans">
       <SiteHeader overHero={false} />
 
       {/* No intro paragraph.

@@ -64,7 +64,7 @@ export default function Executive() {
     document.getElementById("apply")?.scrollIntoView({ behavior: "smooth" });
 
   return (
-    <div className="min-h-screen bg-background text-foreground font-sans">
+    <div className="tone-ink min-h-screen bg-background text-foreground font-sans">
       <SiteHeader overHero={false} />
 
       <PageHero
