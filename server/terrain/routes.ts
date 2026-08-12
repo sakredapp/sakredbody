@@ -22,6 +22,7 @@ import type { Express } from "express";
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "../db.js";
 import { isAuthenticated } from "../auth/index.js";
+import { memberToday } from "../coaching/enrollment.js";
 import {
   healthDays,
   exercises,
@@ -127,14 +128,24 @@ async function daysSinceLastSession(userId: string, onDate: string): Promise<num
 export function registerTerrainRoutes(app: Express): void {
   app.get("/api/terrain/today", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id as string;
-      // The member's own date, matching daily_notes and health_days — a
-      // terrain read filed under the server's tomorrow is wrong in a way that
-      // looks like a data problem rather than a timezone one.
+      const userId = (req.user?.id ?? req.session?.userId) as string;
+      /**
+       * The member's own date, matching daily_notes and health_days.
+       *
+       * This fell back to `new Date().toISOString()` — the *server's* UTC date
+       * — directly underneath a comment saying it must not. For anybody west
+       * of Greenwich the last hours of their evening are already tomorrow in
+       * UTC, so from about 20:00 Eastern the screen asked for a day that had
+       * not happened, found nothing, and told a member with months of synced
+       * data to "connect health data or log a session".
+       *
+       * A wrong-by-one-day read is the worst kind of bug here: it is invisible
+       * for two thirds of the day and looks like a sync failure for the rest.
+       */
       const onDate =
         typeof req.query.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)
           ? req.query.date
-          : new Date().toISOString().slice(0, 10);
+          : await memberToday(userId);
 
       const [avg, categories, since] = await Promise.all([
         averages(userId, onDate),
