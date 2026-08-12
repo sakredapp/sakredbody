@@ -91,33 +91,46 @@ interface Destination {
  * The four, and the rest.
  *
  * Chosen by what a member does daily rather than by what the business thinks
- * is important: home is the five doors, today is the product, the room is why
- * they stay, and wins are why they come back.
+ * is important: home is where you are, the room is why they stay, and wins are
+ * why they come back.
+ *
+ * ── Why Today is no longer one of them ────────────────────────────────────
+ *
+ * It held the second slot from the beginning, on the argument that "today is
+ * the product". That was true of the idea and stopped being true of the
+ * screen. Home already opens with the terrain reading and the member's own
+ * numbers — it *is* the answer to "how am I doing today" — while the Today tab
+ * showed a coach's routine checklist, which for most members is "No routine
+ * running. Start one." A destination whose common case is an empty state,
+ * sitting next to a screen that already answers its question, is a tab people
+ * tap once.
+ *
+ * Restore and Build are the two things somebody actually does daily, and both
+ * were buried in the More sheet underneath it. They take the slots.
+ *
+ * The coach's plan is not gone: it is the lead card on Home the moment a coach
+ * assigns one, and it is in the More sheet. That is the right prominence for
+ * something most members do not have.
  *
  * Five is the ceiling, not a target — iOS collapses a sixth into "More" on
- * its own, and Android's guidance is the same. "What's On" moved into the
- * More sheet when Home took a slot: it is reachable from the Retreats door on
- * the home screen, which is where somebody looking for it would go first.
+ * its own, and Android's guidance is the same.
  */
 export const PRIMARY: Destination[] = [
   { id: "home", label: "Home", icon: HomeIcon },
-  { id: "coaching", label: "Today", icon: Sun },
+  { id: "restore", label: "Restore", icon: Moon },
+  { id: "build", label: "Build", icon: Dumbbell },
   { id: "community", label: "Room", icon: Users },
   { id: "wins", label: "Wins", icon: Award },
 ];
 
 export const SECONDARY: Destination[] = [
-  { id: "retreat", label: "What's On", icon: CalendarDays, note: "Retreats, masterminds and talks" },
   /**
-   * Restore sits immediately above Build, and that adjacency is the point.
-   *
-   * They are the two directions the whole product is built on, so a sheet that
-   * listed one of them and sent the other somewhere else was quietly saying
-   * they aren't a pair. Restore first, because you cannot load a terrain that
-   * cannot yet drain.
+   * The coach's plan, by the name a member would use for it. It was the
+   * "Today" tab; what it actually contains is whatever a coach has assigned,
+   * which most members do not have.
    */
-  { id: "restore", label: "Restore", icon: Moon, note: "Sleep, breath and giving capacity back" },
-  { id: "build", label: "Build", icon: Dumbbell, note: "Today's lifts, and what you hit" },
+  { id: "coaching", label: "Coach's Plan", icon: Sun, note: "What your coach has you on" },
+  { id: "retreat", label: "What's On", icon: CalendarDays, note: "Retreats, masterminds and talks" },
   /**
    * "The Body", and not "Terrain".
    *

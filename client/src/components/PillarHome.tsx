@@ -32,8 +32,6 @@ import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HealthSwatches } from "@/components/portal/HealthSwatches";
 import { TerrainToday } from "@/components/TerrainToday";
-import { TodayRead } from "@/components/TodayRead";
-import { RhythmSection } from "@/components/RhythmCards";
 import type { MemberSection, CoachingTab } from "@/components/MemberNav";
 
 interface Pillar {
@@ -155,7 +153,7 @@ const PILLARS: Pillar[] = [
   {
     key: "retreats",
     title: "Gather",
-    blurb: "Retreats, masterminds and the room.",
+    blurb: "Retreats, masterminds, the room.",
     image: "/images/retreat-mountain.webp",
     section: "retreat",
   },
@@ -312,7 +310,7 @@ function Door({
               small type under a title made these read as dense. It is on every
               card now because the first person to use the version without them
               asked what one of the doors was — dense beats unexplained. */}
-          <p className="text-[11px] leading-snug text-white/55 mt-0.5 line-clamp-2">
+          <p className="text-[11px] leading-snug text-white/55 mt-0.5 line-clamp-1">
             {pillar.blurb}
           </p>
           {fact && <p className="text-[11px] text-[hsl(var(--gold))] mt-1">{fact}</p>}
@@ -429,27 +427,25 @@ export function PillarHome({
       <TerrainToday onOpenRestore={() => onOpen("restore")} />
 
       {/*
-        The answer to "what should I do in the next hour", above the menu of
-        places to go.
+        Their own numbers, and then the doors. Nothing else.
 
-        This is the piece the home screen was missing. A launcher is honest
-        about being sparse, but it still left the member to work out for
-        themselves what the numbers underneath meant — which is the job the
-        product exists to do. Restore and Build tap through to the side the
-        option belongs to; the category is carried so the destination can open
-        on the right thing rather than at the top of a list.
+        ── Why the suggestions are not here ──────────────────────────────────
+
+        They were, for one build, and it was the wrong call. Three cards of
+        "here's something you could do" at the top of Home turned a launcher
+        into a recommendation engine — the first thing anybody saw, every time
+        they opened the app, whether or not they wanted it.
+
+        That is not what the feature is. It is a small, optional prompt for
+        somebody who has already decided to move and wants an idea: it belongs
+        inside Build and Restore, next to the thing it is suggesting, where a
+        member arrives having asked the question it answers. On Home it was
+        answering a question nobody had asked yet.
+
+        The rhythm cards moved to Restore for the same reason — terrain
+        context, not a headline.
       */}
-      <TodayRead
-        onOpenCategory={(s) => onOpen(s.side === "restore" ? "restore" : "build")}
-        onCheckIn={() => onOpen("restore")}
-      />
-
-      {/* Their own numbers, before the menu. */}
       <HealthSwatches onOpenStats={() => onOpen("coaching")} />
-
-      {/* Rhythm sits below the day's read rather than above it: it is context
-          for a day, never the headline of one. */}
-      <RhythmSection />
 
       {/* The lead, then a 2x2 of equals. One Door component for both, so the
           only difference between them is height. */}

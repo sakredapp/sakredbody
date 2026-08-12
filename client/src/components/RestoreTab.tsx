@@ -30,6 +30,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Moon, Wind, HeartPulse } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { FreeSession } from "@/components/build/FreeSession";
+import { TodayRead } from "@/components/TodayRead";
+import { RhythmSection } from "@/components/RhythmCards";
 import { Panel, SectionHeading } from "@/components/portal/Panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -268,6 +270,20 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
           </p>
         </Panel>
       )}
+
+      {/*
+        An idea, for somebody who has already decided to move.
+
+        This lived at the top of Home for one build and was the first thing
+        anybody saw on opening the app — which made an optional prompt feel
+        like the product's opinion of your day. Here it sits below the habits
+        and the terrain reading, on a screen a member reached deliberately.
+        Restore only shows the restorative side; Build shows the other.
+      */}
+      <TodayRead side="restore" onOpenCategory={() => undefined} />
+
+      {/* Rhythm is terrain context, so it belongs on the terrain screen. */}
+      <RhythmSection />
 
       {/* ── The reading from the inside ── */}
       <Panel

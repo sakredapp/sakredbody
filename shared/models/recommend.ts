@@ -106,6 +106,16 @@ export type ReadinessRead = {
   confidence: "none" | "low" | "good";
 };
 
+/**
+ * The band a night can actually fall in.
+ *
+ * Deliberately wide. The job is to catch a measurement fault, not to tell
+ * somebody their nine-hour Sunday was wrong — a person who genuinely slept
+ * twelve hours should still be read as having slept a lot.
+ */
+const MIN_PLAUSIBLE_SLEEP = 60;
+const MAX_PLAUSIBLE_SLEEP = 13 * 60;
+
 /** Whole hours and minutes, for copy: 445 → "7h 25m". */
 function hm(minutes: number): string {
   const h = Math.floor(minutes / 60);
@@ -141,8 +151,24 @@ export function readReadiness(signals: ReadinessSignals): ReadinessRead {
     cycleLean,
   } = signals;
 
-  // Sleep, against the member's own usual night.
-  if (sleepMinutes != null && sleepBaselineMinutes != null && sleepBaselineMinutes > 0) {
+  /**
+   * Sleep, against the member's own usual night — when the number is a night.
+   *
+   * A reading of seventeen hours is not somebody who slept well, it is a
+   * measurement problem: several apps writing the same night into Health and
+   * the total being summed rather than unioned. That bug is fixed at the
+   * source, and this is the guard that stops the *next* one being read aloud
+   * as a compliment. The app said "You slept well — 17h 4m" to a real person,
+   * which is worse than saying nothing, because it is confidently wrong about
+   * something they can check.
+   *
+   * Outside the plausible band the signal is dropped whole: no score, no
+   * reason, and not counted toward confidence. We do not know how they slept.
+   */
+  const sleepIsPlausible =
+    sleepMinutes != null && sleepMinutes >= MIN_PLAUSIBLE_SLEEP && sleepMinutes <= MAX_PLAUSIBLE_SLEEP;
+
+  if (sleepIsPlausible && sleepMinutes != null && sleepBaselineMinutes != null && sleepBaselineMinutes > 0) {
     known++;
     const deficit = sleepBaselineMinutes - sleepMinutes;
     if (deficit >= 90) {
@@ -360,7 +386,14 @@ export function suggestToday(input: SuggestionInput): Suggestion[] {
       headline: slot.headline,
       // No signals means no claim. The headline still stands on its own.
       because: read.confidence === "none" ? "" : (read.reasons[0] ?? ""),
-      isStretch: !recency.has(best.category),
+      /**
+       * Only meaningful against a history to be new *to*.
+       *
+       * With no logged sessions every category is unseen, so every card was
+       * badged "something new" — three identical labels that told a member
+       * nothing and made the row look like a system talking to itself.
+       */
+      isStretch: recentCategories.length > 0 && !recency.has(best.category),
       side: sideOf(orientation),
     });
   }

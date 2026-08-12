@@ -36,6 +36,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { InfoTip } from "@/components/ui/info-tip";
 import { SectionHeading, Panel, StatTile } from "@/components/portal/Panel";
 import { HabitPanel } from "@/components/habits/HabitPanel";
+import { TodayRead } from "@/components/TodayRead";
 import { MemberBuild } from "@/components/build/MemberBuild";
 import { FreeSession } from "@/components/build/FreeSession";
 import { Dumbbell, Check, Plus, Trophy, Loader2 } from "lucide-react";
@@ -268,6 +269,16 @@ export function BuildTab() {
               setFreeSession({ id, title: t });
               qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
             }} />
+
+            {/*
+              An idea, if they want one — below the thing they came here to do.
+
+              This spent one build at the top of Home, where it stopped being
+              an optional prompt and became the app's opinion of your day. It
+              belongs next to the movement it is suggesting, on a screen
+              somebody opened having already decided to train.
+            */}
+            <TodayRead side="build" onOpenCategory={() => undefined} />
             <p className="text-[11px] text-muted-foreground text-center max-w-sm mx-auto">
               When your coach plans a session for today, it appears at the top of this screen with
               its targets already worked out.

@@ -39,7 +39,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import type { RelationalGuidance } from "@shared/models/relating";
-import type { RhythmSubjectView } from "@/components/TodayRead";
+import { useToday, type RhythmSubjectView } from "@/components/TodayRead";
 
 type RhythmResponse = {
   date: string;
@@ -262,15 +262,25 @@ function MyRhythm({ subject }: { subject: RhythmSubjectView }) {
           </p>
         </>
       ) : (
-        <p className="text-[11px] text-muted-foreground leading-snug">
-          {/* Honest about why there is nothing here, rather than blank. */}
-          {subject.model === "spontaneous_cycle"
-            ? "Log a period start and this will start reading your cycle alongside your sleep and recovery."
-            : "Phases aren't estimated on your current setting — the rest of your day still reads normally."}
-        </p>
+        /*
+          Everybody has a rhythm. A cycle is one kind.
+
+          This card used to answer a man with "Phases aren't estimated on your
+          current setting" — a sentence about a setting, in a feature called My
+          Rhythm, that told him nothing about himself. It was the flattening the
+          whole design was supposed to avoid, pointed the other way: the model
+          was built role-first precisely so the *self* view works for anyone,
+          and then the only content written for it was menstrual.
+
+          His rhythm is load, sleep debt and recovery — which the app already
+          measures and already reads every morning. So the fallback is not an
+          apology, it is the same read the day is built on, said as a pattern
+          about him.
+        */
+        <OwnRhythm />
       )}
 
-      {subject.model === "spontaneous_cycle" && (
+      {subject.model === "spontaneous_cycle" && subject.subjectSex === "female" && (
         <button
           onClick={() => logPeriod.mutate()}
           disabled={logPeriod.isPending}
@@ -281,6 +291,61 @@ function MyRhythm({ subject }: { subject: RhythmSubjectView }) {
         </button>
       )}
     </div>
+  );
+}
+
+/**
+ * The rhythm anybody has: how hard the last few days asked, and what today can
+ * carry.
+ *
+ * Reads the same `/api/today` response the rest of the app does, so it cannot
+ * disagree with the day's read — and says nothing at all when there is nothing
+ * measured, rather than inventing a pattern from one night.
+ */
+function OwnRhythm() {
+  const { data } = useToday();
+
+  if (!data || data.read.confidence === "none") {
+    return (
+      <p className="text-[11px] text-muted-foreground leading-snug">
+        Once sleep and recovery have a few days behind them, this reads how your
+        own load and recovery move — and what today can carry.
+      </p>
+    );
+  }
+
+  const level =
+    data.read.level === "depleted"
+      ? "Asking for less"
+      : data.read.level === "primed"
+        ? "Room to push"
+        : "Steady";
+
+  return (
+    <>
+      <p className="font-display text-base leading-snug">{level}</p>
+      {data.read.reasons.length > 0 ? (
+        <ul className="space-y-1">
+          {data.read.reasons.map((r) => (
+            <li key={r} className="text-[11px] text-muted-foreground leading-snug">
+              {r}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-[11px] text-muted-foreground leading-snug">
+          Nothing is standing out in your sleep, recovery or recent training.
+        </p>
+      )}
+      {/* Their own terrain turned into how it lands on other people — built
+          entirely from their own measurements, which is what lets it be stated
+          plainly. Null on an unremarkable day. */}
+      {data.relating && (
+        <p className="text-xs text-[hsl(var(--gold))]/80 leading-snug pt-1">
+          {data.relating.goodMove}
+        </p>
+      )}
+    </>
   );
 }
 

@@ -94,10 +94,20 @@ export function useToday() {
  */
 function Option({
   suggestion,
+  showBecause,
   onOpen,
   onDismiss,
 }: {
   suggestion: Suggestion;
+  /**
+   * Only the first card says why.
+   *
+   * The reason is a fact about the day, not about the option — printing
+   * "You slept well — 8h 3m" under all three reads as a stutter and makes the
+   * app look like it is padding. The note at the top of this file said exactly
+   * that, and the first version repeated it anyway.
+   */
+  showBecause: boolean;
   onOpen: (s: Suggestion) => void;
   onDismiss: (category: string, scope: "today" | "forever") => void;
 }) {
@@ -132,7 +142,7 @@ function Option({
 
         <p className="font-display text-base mt-1 leading-snug">{suggestion.headline}</p>
         <p className="text-xs text-[hsl(var(--gold))]/80 mt-0.5">{suggestion.label}</p>
-        {suggestion.because && (
+        {showBecause && suggestion.because && (
           <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">
             {suggestion.because}
           </p>
@@ -268,9 +278,18 @@ export function RelatingCard({ note }: { note: RelationalGuidance }) {
  * is a worse first impression than a beat of nothing.
  */
 export function TodayRead({
+  side,
   onOpenCategory,
   onCheckIn,
 }: {
+  /**
+   * Which half of the practice this screen is.
+   *
+   * Restore shows the restorative options, Build the demanding ones. Undefined
+   * shows all three — nothing uses that today, and it exists so the component
+   * does not have to change if a combined surface ever comes back.
+   */
+  side?: "restore" | "build";
   onOpenCategory: (suggestion: Suggestion) => void;
   onCheckIn?: () => void;
 }) {
@@ -290,6 +309,11 @@ export function TodayRead({
   });
 
   if (isLoading || !data) return null;
+
+  const shown = side ? data.suggestions.filter((s) => s.side === side) : data.suggestions;
+  // Nothing for this side means nothing to render. An empty heading is worse
+  // than an absent one.
+  if (!shown.length) return null;
 
   return (
     <div className="space-y-3" data-testid="today-read">
@@ -318,10 +342,11 @@ export function TodayRead({
       )}
 
       <div className="space-y-2">
-        {data.suggestions.map((s) => (
+        {shown.map((s, i) => (
           <Option
             key={s.category}
             suggestion={s}
+            showBecause={i === 0}
             onOpen={onOpenCategory}
             onDismiss={(category, scope) => dismiss.mutate({ category, scope })}
           />
