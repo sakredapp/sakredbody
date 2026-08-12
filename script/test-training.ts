@@ -33,8 +33,20 @@ import {
   categoryLoad,
   categoryOrientation,
   orientationOfLoad,
+  externalActivityCategory,
+  externalActivityOrientation,
+  EXTERNAL_ACTIVITY_CATEGORY,
+  DEMANDING_EXTERNAL_TYPES,
+  WORKOUT_RESPONSES,
+  WORKOUT_PLACEMENTS,
+  PLACEMENT_LABEL,
+  ORIENTATION_LABEL,
+  placementOfOrientation,
+  effectivePlacement,
+  placementIsMembers,
   type LoggedSet,
 } from "../shared/models/training.js";
+import { workoutFeedbackSchema } from "../shared/models/health.js";
 import { catalogueRows, slug, arrayLiteral } from "../shared/data/exerciseCatalogue.js";
 
 let passed = 0;
@@ -375,6 +387,191 @@ check("Lagree is not gentle because it happens on a carriage", categoryOrientati
 check("Pilates is both", categoryOrientation("pilates") === "both");
 check("an unknown category is neutral, not guessed", categoryOrientation("nonsense") === "neutral");
 check("an unknown category has no load", categoryLoad("nonsense").stress === 0);
+
+/**
+ * ── Workouts imported from Apple Health / Health Connect ──────────────────
+ *
+ * The point of the mapping is that it is a *translation*, not a second opinion.
+ * An imported run has to reach Build through exactly the model a logged session
+ * uses, or the app ends up with two answers to "what does a run cost" and no
+ * way to say which is right.
+ */
+check("a run is endurance", externalActivityCategory("running") === "endurance");
+check("and endurance is Build", externalActivityOrientation("running") === "yang");
+
+check("yoga is yoga", externalActivityCategory("yoga") === "yoga");
+check("and yoga is Restore", externalActivityOrientation("yoga") === "yin");
+
+check("stretching lands in mobility", externalActivityCategory("flexibility") === "mobility");
+check("and mobility is Restore", externalActivityOrientation("flexibility") === "yin");
+
+check("strength training is a full-body session", externalActivityCategory("strength") === "full_body");
+check("walking is locomotion", externalActivityCategory("walking") === "locomotion");
+
+/** Case and whitespace come from two different platforms; neither should matter. */
+check("the platform's casing is irrelevant", externalActivityCategory(" Running ") === "endurance");
+
+/**
+ * The orientation must come from CATEGORY_LOAD, never from a second table.
+ * If someone re-tunes what yoga costs, this follows automatically — and this
+ * assertion is what proves the two are actually wired together.
+ */
+for (const [type, category] of Object.entries(EXTERNAL_ACTIVITY_CATEGORY)) {
+  check(
+    `${type} orients the same way as its category`,
+    externalActivityOrientation(type) === categoryOrientation(category),
+  );
+  check(`${type} maps to a category the load model knows`, categoryLoad(category).stress > 0 || categoryLoad(category).restoration > 0);
+}
+
+/**
+ * An activity we cannot place contributes nothing.
+ *
+ * Guessing would feed an invented load into the terrain reading, and a wrong
+ * reason there is worse than a missing one — the member is asked to act on it.
+ */
+check("an unmapped activity has no category", externalActivityCategory("paragliding") === null);
+check("and therefore no orientation", externalActivityOrientation("paragliding") === null);
+check("'other' is never mapped", externalActivityCategory("other") === null);
+check("nothing at all is not a category", externalActivityCategory(null) === null);
+check("an empty string is not a category", externalActivityCategory("") === null);
+
+/**
+ * The demanding list is derived, not hand-kept. Yoga resetting "nothing
+ * demanding in N days" would tell somebody who has stretched for a fortnight
+ * that they have been training.
+ */
+check("running is demanding", DEMANDING_EXTERNAL_TYPES.includes("running"));
+check("strength is demanding", DEMANDING_EXTERNAL_TYPES.includes("strength"));
+check("yoga is not demanding", !DEMANDING_EXTERNAL_TYPES.includes("yoga"));
+check("stretching is not demanding", !DEMANDING_EXTERNAL_TYPES.includes("flexibility"));
+check("a cooldown is not demanding", !DEMANDING_EXTERNAL_TYPES.includes("cooldown"));
+/**
+ * "Demanding" here must mean the same thing it means everywhere else — the
+ * stress >= 2 that orientationOfLoad already uses to call something Build.
+ * Any other threshold would let an activity reset the "nothing demanding"
+ * counter while not counting as Build, which is two definitions of one word.
+ */
+check(
+  "demanding means exactly what Build means",
+  DEMANDING_EXTERNAL_TYPES.every((t) =>
+    ["yang", "both"].includes(externalActivityOrientation(t)!),
+  ),
+);
+check(
+  "and nothing demanding was left out",
+  Object.keys(EXTERNAL_ACTIVITY_CATEGORY)
+    .filter((t) => ["yang", "both"].includes(externalActivityOrientation(t)!))
+    .every((t) => DEMANDING_EXTERNAL_TYPES.includes(t)),
+);
+
+// ─── How a session landed, and where the member wants it ───────────────────
+
+/**
+ * The whole point of this layer is that the two questions stay apart. A
+ * placement moves where a session is shown; it is not an opinion about what the
+ * session cost, and nothing in the load model may read it.
+ */
+console.log("\nHow a session landed, and where the member wants it\n");
+
+check("Sakred reads a run as Build", placementOfOrientation(externalActivityOrientation("running")) === "build");
+check("and yoga as Restore", placementOfOrientation(externalActivityOrientation("yoga")) === "restore");
+check("and pilates as both", placementOfOrientation(externalActivityOrientation("pilates")) === "both");
+/**
+ * Neutral is not a fourth placement. A gentle walk is genuinely neither, and
+ * filing it under Build or Restore would be the app asserting something it does
+ * not think.
+ */
+check("neutral has no placement", placementOfOrientation("neutral") === null);
+check("and neither does an unplaceable activity", placementOfOrientation(null) === null);
+
+check("with no override, Sakred's reading stands", effectivePlacement("running", null) === "build");
+check("the member's choice wins", effectivePlacement("running", "restore") === "restore");
+/**
+ * Clearing has to return the row to Sakred's reading exactly, with nothing left
+ * behind. This is why "system" is not a stored value: there is no third state
+ * that could later disagree with the model.
+ */
+check("clearing returns to Sakred's reading", effectivePlacement("running", null) === "build");
+check("an override on an unplaceable activity still places it", effectivePlacement("paragliding", "build") === "build");
+check("and without one it stays unplaced", effectivePlacement("paragliding", null) === null);
+
+/**
+ * Provenance is derived, never stored. `classification_source` would be a
+ * second copy of this and could drift from it.
+ */
+check("no override means Sakred placed it", placementIsMembers(null) === false);
+check("an override means the member did", placementIsMembers("restore") === true);
+
+/**
+ * ── The one that matters most ────────────────────────────────────────────
+ *
+ * A member who says a run restored them still ran. If an override or a response
+ * could reach the load model, the app would tell somebody they were fresh on
+ * the fourth day of a hard week because they had enjoyed it.
+ */
+check(
+  "a placement override does not change what the activity costs",
+  categoryLoad(externalActivityCategory("running")!).stress === CATEGORY_LOAD.endurance.stress,
+);
+check(
+  "and the activity still counts as demanding after being moved to Restore",
+  DEMANDING_EXTERNAL_TYPES.includes("running"),
+);
+/**
+ * Structural rather than behavioural, and deliberately so: the load functions
+ * take a category and nothing else, so there is no parameter through which a
+ * member's answer could arrive. A test that called them with an override would
+ * not compile, which is the guarantee worth having.
+ */
+check("load is a function of category alone", categoryLoad.length === 1);
+check("and orientation likewise", categoryOrientation.length === 1);
+
+/** The two vocabularies stay apart — see the note above WORKOUT_PLACEMENTS. */
+check("placements are not orientations", !WORKOUT_PLACEMENTS.some((p) => ["yin", "yang"].includes(p)));
+check(
+  "but they say the same thing to a member",
+  PLACEMENT_LABEL.restore === ORIENTATION_LABEL.yin &&
+    PLACEMENT_LABEL.build === ORIENTATION_LABEL.yang &&
+    PLACEMENT_LABEL.both === ORIENTATION_LABEL.both,
+);
+check("every orientation with a side maps to a placement", ["yin", "yang", "both"].every((o) =>
+  WORKOUT_PLACEMENTS.includes(placementOfOrientation(o as never)!),
+));
+
+// ── What the API will accept ──
+
+check("a response is accepted", workoutFeedbackSchema.safeParse({ response: "restored" }).success);
+check("all three responses are", WORKOUT_RESPONSES.every((r) =>
+  workoutFeedbackSchema.safeParse({ response: r }).success,
+));
+check("all three placements are", WORKOUT_PLACEMENTS.every((p) =>
+  workoutFeedbackSchema.safeParse({ placement: p }).success,
+));
+check("an invented response is not", !workoutFeedbackSchema.safeParse({ response: "great" }).success);
+check("an orientation is not a placement", !workoutFeedbackSchema.safeParse({ placement: "yang" }).success);
+
+/**
+ * Null clears, absent leaves alone. Without both, an answer to "how did that
+ * land" could be given once and never taken back.
+ */
+check("null clears a response", workoutFeedbackSchema.safeParse({ response: null }).success);
+check("null clears a placement", workoutFeedbackSchema.safeParse({ placement: null }).success);
+{
+  const parsed = workoutFeedbackSchema.safeParse({ response: null });
+  check("and a cleared response is null, not missing", parsed.success && parsed.data.response === null);
+  check("while the field left out stays undefined", parsed.success && parsed.data.placement === undefined);
+}
+check("an empty body changes nothing and is refused", !workoutFeedbackSchema.safeParse({}).success);
+
+/**
+ * Nothing a sensor measured can be written here. An endpoint that accepted a
+ * duration would quietly turn imported measurements into self-reported ones.
+ */
+for (const field of ["durationSeconds", "distanceMeters", "activeCalories", "workoutType", "userId"]) {
+  const parsed = workoutFeedbackSchema.safeParse({ response: "steady", [field]: 999 });
+  check(`${field} is not writable through feedback`, parsed.success && !(field in parsed.data));
+}
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

@@ -205,6 +205,20 @@ export default function MemberDashboard() {
     setSection(next);
     if (tab) setCoachingTab(tab);
   }, []);
+
+  /**
+   * A section is not a route, so ScrollToTop never sees one change.
+   *
+   * Every section of the portal lives at /member and is switched by the state
+   * above, while ScrollToTop keys on wouter's location. Tapping Restore from
+   * halfway down Home therefore opened Restore halfway down — reported as
+   * "it loads somewhere in the middle", and intermittent in exactly the way
+   * that description suggests: it only happens if you had scrolled first, so
+   * checking it from the top of the page shows nothing wrong.
+   */
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [section]);
   const [showBookingDialog, setShowBookingDialog] = useState(false);
 
   // Health syncs when the app comes to the foreground, throttled — neither

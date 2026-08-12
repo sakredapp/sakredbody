@@ -22,6 +22,7 @@ import {
 } from "@/lib/health";
 import type { SyncResult } from "@/lib/health";
 import type { HealthMetric, HealthWorkout } from "@shared/schema";
+import type { WorkoutPlacement, WorkoutResponse } from "@shared/models/training";
 
 export type HealthDay = { onDate: string } & Partial<Record<HealthMetric, number>>;
 
@@ -50,6 +51,69 @@ export function useMemberHealth(userId: string | null, days = 30) {
   return useQuery<HealthSummary>({
     queryKey: [`/api/admin/health/${userId}/summary?days=${days}`],
     enabled: Boolean(userId),
+  });
+}
+
+/**
+ * Answering "how did that land", or moving a session to the other side.
+ *
+ * Optimistic, because the whole point of the control is that it costs nothing:
+ * a member taps "Restored me" and it is simply true on screen. Waiting for a
+ * round trip turns a one-tap aside into an operation, and a failed round trip
+ * that has already been reflected is corrected on the next read anyway.
+ *
+ * Both fields distinguish `undefined` from `null` all the way down. Leaving a
+ * field out means "don't touch it"; sending null clears it — which is how a
+ * member takes an answer back rather than being stuck with their first tap.
+ */
+export function useWorkoutFeedback() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      id: string;
+      response?: WorkoutResponse | null;
+      placement?: WorkoutPlacement | null;
+    }) => {
+      const { id, ...body } = input;
+      const res = await apiRequest("PATCH", `/api/health/workouts/${id}`, body);
+      return (await res.json()) as HealthWorkout;
+    },
+    onMutate: async ({ id, response, placement }) => {
+      const matches = (key: unknown) => String(key ?? "").startsWith("/api/health/summary");
+      await queryClient.cancelQueries({ predicate: (q) => matches(q.queryKey[0]) });
+
+      queryClient.setQueriesData<HealthSummary>(
+        { predicate: (q) => matches(q.queryKey[0]) },
+        (old) =>
+          old
+            ? {
+                ...old,
+                workouts: old.workouts.map((w) =>
+                  w.id === id
+                    ? {
+                        ...w,
+                        userResponse: response === undefined ? w.userResponse : response,
+                        userOrientationOverride:
+                          placement === undefined ? w.userOrientationOverride : placement,
+                      }
+                    : w,
+                ),
+              }
+            : old,
+      );
+    },
+    // Whatever happened, the server's copy is the one that counts. On success
+    // this replaces a guess with the truth; on failure it puts back what the
+    // member's tap had already overwritten on screen.
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        predicate: (q) => String(q.queryKey[0] ?? "").startsWith("/api/health/summary"),
+      });
+      // Placement changes what Restore and Build show, and the terrain read
+      // still counts the session either way — but the screens have to catch up.
+      queryClient.invalidateQueries({ queryKey: ["/api/terrain/today"] });
+    },
   });
 }
 

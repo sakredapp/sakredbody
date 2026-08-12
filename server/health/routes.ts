@@ -5,6 +5,7 @@
  *   GET    /api/health/status      — is a phone linked, how fresh, what's flowing
  *   POST   /api/health/sync        — the phone posts what it read
  *   GET    /api/health/summary     — the member's own numbers, pivoted by day
+ *   PATCH  /api/health/workouts/:id — how a session landed, and where it belongs
  *   DELETE /api/health/connection  — unlink, and delete everything we hold
  *
  * Coach / admin:
@@ -14,6 +15,10 @@
  * device is the source of truth; a hand-edited health row is a number nobody
  * can trace to a measurement, sitting in the same column as numbers a coach is
  * about to make a decision on.
+ *
+ * The PATCH above is not an exception to that. It writes two columns no sensor
+ * ever had an opinion about — how a session landed, and which side of the app
+ * the member wants it shown on — and it can reach nothing that was measured.
  *
  * ── On the trailing re-read window ────────────────────────────────────────
  * Health data arrives late and changes after the fact, which makes "sync
@@ -42,6 +47,7 @@ import {
   healthDays,
   healthWorkouts,
   healthSyncSchema,
+  workoutFeedbackSchema,
   healthMetricEnum,
   HEALTH_UNITS,
   HEALTH_RANGES,
@@ -264,6 +270,22 @@ export function registerHealthRoutes(app: Express) {
                 syncedAt: new Date(),
               }))
             )
+            /**
+             * The platform's columns, named one at a time.
+             *
+             * `user_response` and `user_orientation_override` are absent from
+             * this list on purpose, and the omission is load-bearing: the
+             * trailing re-read window means the same session is posted again on
+             * most syncs, so anything listed here is rewritten every hour or so.
+             * Apple correcting a distance from 5.73 to 5.76 miles is the system
+             * working. Apple erasing "that run restored me" is not — the
+             * platform knows what happened, the member knows how it landed, and
+             * only one of those two is entitled to the other's columns.
+             *
+             * This is also why it stays an explicit list rather than a spread of
+             * the inserted row, which would silently swallow every column added
+             * from here on.
+             */
             .onConflictDoUpdate({
               target: [healthWorkouts.userId, healthWorkouts.externalId],
               set: {
@@ -351,6 +373,74 @@ export function registerHealthRoutes(app: Express) {
     } catch (err) {
       console.error("[health] admin summary failed", err);
       res.status(500).json({ message: "Could not read health data." });
+    }
+  });
+
+  // ── How a session landed ─────────────────────────────────────────────────
+
+  /**
+   * The member's own reading of one imported session.
+   *
+   * Two separate answers, and they are not versions of each other:
+   *
+   *   response   how it landed — restored me, steady, taxed me
+   *   placement  where it belongs — Restore, Build, Both
+   *
+   * A hard run that left somebody feeling better is `taxed`-by-the-model and
+   * `restored`-by-them at the same time, and both are true. Neither answer is
+   * required, neither is ever asked for twice, and either can be taken back:
+   * an explicit null clears it, which is why the schema distinguishes "absent"
+   * from "null" rather than treating a missing field as a clear.
+   *
+   * What this endpoint cannot do is change what the session cost. Duration,
+   * distance and calories are not in the schema, and the terrain reading never
+   * reads either of these columns — it goes through the activity's category and
+   * CATEGORY_LOAD, exactly as it does for a session logged in Sakred.
+   */
+  app.patch("/api/health/workouts/:id", isAuthenticated, async (req, res) => {
+    const parsed = workoutFeedbackSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: zodMessage(parsed.error) });
+
+    const userId = req.session!.userId!;
+    const { response, placement } = parsed.data;
+
+    // Checked before it reaches Postgres, which answers a malformed uuid with a
+    // cast error and a 500 — an error page for what is really a 404.
+    const id = String(req.params.id ?? "");
+    if (!/^[0-9a-f-]{36}$/i.test(id)) {
+      return res.status(404).json({ message: "No such session." });
+    }
+
+    try {
+      const patch: Partial<typeof healthWorkouts.$inferInsert> = {};
+      // `undefined` means the field was not sent and must be left alone; null
+      // means clear it. Assigning undefined into the object would make Drizzle
+      // drop the column from the UPDATE, which is right — but only if we never
+      // build an empty patch, which the schema's refinement prevents.
+      if (response !== undefined) patch.userResponse = response;
+      if (placement !== undefined) patch.userOrientationOverride = placement;
+
+      /**
+       * Scoped by user as well as id.
+       *
+       * The id is a uuid and unguessable, which is not the same as private. One
+       * clause is the difference between "hard to find someone else's workout"
+       * and "cannot write to it", and only the second one is a rule.
+       */
+      const [updated] = await db
+        .update(healthWorkouts)
+        .set(patch)
+        .where(and(eq(healthWorkouts.id, id), eq(healthWorkouts.userId, userId)))
+        .returning();
+
+      // 404 rather than 403 for somebody else's row: whether that id exists is
+      // not this member's business either way.
+      if (!updated) return res.status(404).json({ message: "No such session." });
+
+      res.json(updated);
+    } catch (err) {
+      console.error("[health] workout feedback failed", err);
+      res.status(500).json({ message: "Could not save that." });
     }
   });
 

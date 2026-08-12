@@ -5,10 +5,15 @@
  *   health_days         — one number, for one member, for one day, for one metric
  *   health_workouts     — sessions, which are events rather than daily totals
  *
- * The device is the source of truth and we are a cache. Nothing here is
- * authored by us and nothing here should be edited by hand: a member revokes
- * access in iOS Settings or Health Connect, not in our UI, and the next sync
- * simply stops carrying that metric.
+ * The device is the source of truth for what happened, and we are a cache of
+ * it. None of the measurements are authored by us and none should be edited by
+ * hand: a member revokes access in iOS Settings or Health Connect, not in our
+ * UI, and the next sync simply stops carrying that metric.
+ *
+ * The two exceptions are named as such where they appear — `user_response` and
+ * `user_orientation_override` on health_workouts, which are the member's
+ * account of a session rather than the platform's, and which a sync must never
+ * overwrite.
  *
  * WHY LONG AND NARROW, not a wide `health_days(steps, hrv, sleep_minutes, …)`:
  * the metric vocabulary is the platforms', not ours, and it grows. Apple added
@@ -30,6 +35,7 @@
  */
 
 import { sql } from "drizzle-orm";
+import { WORKOUT_RESPONSES, WORKOUT_PLACEMENTS } from "./training.js";
 import {
   pgTable,
   text,
@@ -339,6 +345,39 @@ export const healthWorkouts = pgTable(
     /** Whatever else the platform sent, unread. Cheap, and answers questions later. */
     raw: jsonb("raw"),
 
+    /**
+     * ── The member's columns ────────────────────────────────────────────────
+     *
+     * Everything above this line is the platform's account of what happened,
+     * and a re-sync is entitled to correct any of it — Apple revising a
+     * distance from 5.73 to 5.76 miles is the system working. These two are
+     * not the platform's to touch. They are what the person said about the
+     * session, and no amount of re-reading Health Connect makes that stale.
+     *
+     * The upsert in `server/health/routes.ts` therefore names its columns
+     * rather than writing the row wholesale, and these are deliberately absent
+     * from that list. A test pins it, because the failure is silent: the member
+     * answers once, syncs again an hour later, and their answer is simply gone
+     * with nothing in a log to say why.
+     */
+
+    /** restored | steady | taxed — how it landed. Null is the normal state. */
+    userResponse: text("user_response"),
+
+    /**
+     * restore | build | both — where the member wants it shown.
+     *
+     * Null means Sakred's own reading applies, which is also how clearing it
+     * works: there is no "system" value to write back, so an override that is
+     * removed leaves nothing behind that could later disagree with the model.
+     * See `effectivePlacement` in shared/models/training.ts.
+     *
+     * This changes where a session appears. It does not change what it cost —
+     * terrain and load read `CATEGORY_LOAD` through the activity's category and
+     * never look at this column.
+     */
+    userOrientationOverride: text("user_orientation_override"),
+
     syncedAt: timestamp("synced_at").defaultNow(),
   },
   (t) => [
@@ -363,6 +402,29 @@ export const healthWorkoutSchema = z.object({
   sourceApp: z.string().max(120).optional().nullable(),
 });
 export type HealthWorkoutInput = z.infer<typeof healthWorkoutSchema>;
+
+/**
+ * What a member is allowed to say about one of their sessions.
+ *
+ * Both fields are `.nullable()` and optional, and the two states mean different
+ * things: absent leaves the value alone, explicit null clears it. Without that
+ * distinction there is no way to take an answer back — "restored" would be
+ * writable and permanent, which is a poor property for a question about how
+ * something felt.
+ *
+ * Nothing else about a workout is accepted here. Duration and distance belong
+ * to the platform, and an endpoint that let them be edited would quietly turn
+ * imported measurements into self-reported ones.
+ */
+export const workoutFeedbackSchema = z
+  .object({
+    response: z.enum(WORKOUT_RESPONSES).nullable().optional(),
+    placement: z.enum(WORKOUT_PLACEMENTS).nullable().optional(),
+  })
+  .refine((v) => v.response !== undefined || v.placement !== undefined, {
+    message: "Nothing to change.",
+  });
+export type WorkoutFeedbackInput = z.infer<typeof workoutFeedbackSchema>;
 
 // ─── 5. THE SYNC ENVELOPE ──────────────────────────────────────────────────
 

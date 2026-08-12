@@ -49,6 +49,38 @@ class HealthReader(private val context: Context) {
 
     data class Sample(val onDate: String, val metric: String, val value: Double)
 
+    /**
+     * One session, as an event rather than a daily total.
+     *
+     * ── The gap this closes ───────────────────────────────────────────────
+     *
+     * `collect()` below has always read ExerciseSessionRecord and folded it
+     * into `exerciseMinutes` — a single number per day. Everything else about
+     * the session was then discarded: what it was, when it started, how far,
+     * which app recorded it. So an Android member who ran 10km with Strava had
+     * "62 exercise minutes" in Sakred and nothing that could be placed in
+     * Build, counted toward training load, or shown to a coach. iOS has posted
+     * full workout events since it was written; Android never did, and the
+     * server has accepted a `workouts` array the whole time.
+     *
+     * `externalId` is the idempotency key. Health Connect's metadata id is
+     * stable across reads, so the server's unique index on (user, externalId)
+     * turns the trailing re-read window into an update rather than a second
+     * run every fifteen minutes.
+     */
+    data class Workout(
+        val externalId: String,
+        val workoutType: String,
+        val startAt: String,
+        val endAt: String,
+        val onDate: String,
+        val durationSeconds: Int,
+        val distanceMeters: Double?,
+        val activeCalories: Double?,
+        val sourceApp: String?,
+        val title: String?,
+    )
+
     private val zone: ZoneId get() = ZoneId.systemDefault()
 
     private fun localDate(instant: Instant): String =
@@ -93,6 +125,122 @@ class HealthReader(private val context: Context) {
         // granted steps and withheld weight is the normal case, and on Health
         // Connect a withheld type throws rather than returning empty.
         emptyList()
+    }
+
+    /**
+     * Health Connect's exercise type, in the same words iOS uses.
+     *
+     * The vocabulary is deliberately identical to HealthSyncEngine.activityName
+     * on the iOS side, because one shared table in shared/models/training.ts
+     * maps these onto Sakred movement categories. Two platform-specific
+     * vocabularies would mean two mapping tables and, eventually, a run that is
+     * Build on an iPhone and something else on a Pixel.
+     *
+     * Anything unlisted becomes "other" rather than a number. "other" is not in
+     * the mapping table either, so it contributes no load — an activity we
+     * could not identify is shown to the member and counted by nothing, which
+     * is the honest treatment.
+     */
+    private fun exerciseName(type: Int): String = when (type) {
+        ExerciseSessionRecord.EXERCISE_TYPE_RUNNING,
+        ExerciseSessionRecord.EXERCISE_TYPE_RUNNING_TREADMILL -> "running"
+
+        ExerciseSessionRecord.EXERCISE_TYPE_BIKING,
+        ExerciseSessionRecord.EXERCISE_TYPE_BIKING_STATIONARY -> "cycling"
+
+        ExerciseSessionRecord.EXERCISE_TYPE_SWIMMING_POOL,
+        ExerciseSessionRecord.EXERCISE_TYPE_SWIMMING_OPEN_WATER -> "swimming"
+
+        ExerciseSessionRecord.EXERCISE_TYPE_ROWING,
+        ExerciseSessionRecord.EXERCISE_TYPE_ROWING_MACHINE -> "rowing"
+
+        ExerciseSessionRecord.EXERCISE_TYPE_ELLIPTICAL -> "elliptical"
+
+        ExerciseSessionRecord.EXERCISE_TYPE_STAIR_CLIMBING,
+        ExerciseSessionRecord.EXERCISE_TYPE_STAIR_CLIMBING_MACHINE -> "stairs"
+
+        ExerciseSessionRecord.EXERCISE_TYPE_HIGH_INTENSITY_INTERVAL_TRAINING,
+        ExerciseSessionRecord.EXERCISE_TYPE_BOOT_CAMP -> "hiit"
+
+        ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING,
+        ExerciseSessionRecord.EXERCISE_TYPE_WEIGHTLIFTING,
+        ExerciseSessionRecord.EXERCISE_TYPE_CALISTHENICS -> "strength"
+
+        ExerciseSessionRecord.EXERCISE_TYPE_BOXING,
+        ExerciseSessionRecord.EXERCISE_TYPE_MARTIAL_ARTS -> "boxing"
+
+        ExerciseSessionRecord.EXERCISE_TYPE_TENNIS,
+        ExerciseSessionRecord.EXERCISE_TYPE_TABLE_TENNIS,
+        ExerciseSessionRecord.EXERCISE_TYPE_SQUASH,
+        ExerciseSessionRecord.EXERCISE_TYPE_RACQUETBALL,
+        ExerciseSessionRecord.EXERCISE_TYPE_BADMINTON -> "tennis"
+
+        ExerciseSessionRecord.EXERCISE_TYPE_GOLF -> "golf"
+        ExerciseSessionRecord.EXERCISE_TYPE_DANCING -> "dance"
+        ExerciseSessionRecord.EXERCISE_TYPE_HIKING -> "hiking"
+        ExerciseSessionRecord.EXERCISE_TYPE_WALKING -> "walking"
+        ExerciseSessionRecord.EXERCISE_TYPE_YOGA -> "yoga"
+        ExerciseSessionRecord.EXERCISE_TYPE_PILATES -> "pilates"
+        ExerciseSessionRecord.EXERCISE_TYPE_STRETCHING -> "flexibility"
+        ExerciseSessionRecord.EXERCISE_TYPE_GUIDED_BREATHING -> "cooldown"
+        ExerciseSessionRecord.EXERCISE_TYPE_EXERCISE_CLASS -> "hiit"
+
+        else -> "other"
+    }
+
+    /**
+     * Sessions in the window, with the metrics that overlap them.
+     *
+     * Health Connect keeps distance and energy in their own record types rather
+     * than on the session, so a run's distance has to be gathered by summing
+     * DistanceRecord over the session's own time range. That is why this reads
+     * those two types again rather than reusing the daily fold — the fold has
+     * already collapsed them to one number per day, which cannot be attributed
+     * back to a particular session.
+     *
+     * Heart rate is absent on purpose. READ_HEART_RATE is stripped from the
+     * merged manifest (see android/app/src/main/AndroidManifest.xml) because
+     * nothing consumed it, and asking for a permission in order to fill a field
+     * is the wrong way round — the Play health declaration has to justify every
+     * type we request.
+     */
+    suspend fun workouts(start: Instant, end: Instant): List<Workout> {
+        val client = HealthConnectClient.getOrCreate(context)
+
+        val sessions = read(client, ExerciseSessionRecord::class, start, end)
+        if (sessions.isEmpty()) return emptyList()
+
+        val distances = read(client, DistanceRecord::class, start, end)
+        val calories = read(client, ActiveCaloriesBurnedRecord::class, start, end)
+
+        return sessions.mapNotNull { session ->
+            val id = session.metadata.id
+            if (id.isEmpty()) return@mapNotNull null
+
+            val from = session.startTime
+            val to = session.endTime
+            // A record counts toward the session when it starts inside it.
+            // Whole-record attribution rather than proportional splitting: the
+            // alternative invents a figure for a record straddling the boundary,
+            // and these are summaries, not a billing system.
+            val within = { s: Instant -> !s.isBefore(from) && s.isBefore(to) }
+
+            val metres = distances.filter { within(it.startTime) }.sumOf { it.distance.inMeters }
+            val kcal = calories.filter { within(it.startTime) }.sumOf { it.energy.inKilocalories }
+
+            Workout(
+                externalId = id,
+                workoutType = exerciseName(session.exerciseType),
+                startAt = from.toString(),
+                endAt = to.toString(),
+                onDate = localDate(from),
+                durationSeconds = (to.epochSecond - from.epochSecond).toInt().coerceAtLeast(0),
+                distanceMeters = metres.takeIf { it > 0 },
+                activeCalories = kcal.takeIf { it > 0 },
+                sourceApp = session.metadata.dataOrigin.packageName.takeIf { it.isNotEmpty() },
+                title = session.title,
+            )
+        }
     }
 
     suspend fun collect(start: Instant, end: Instant): List<Sample> {

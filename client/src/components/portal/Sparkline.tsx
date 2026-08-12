@@ -110,14 +110,34 @@ export function Sparkline({
           // stroke with it. This keeps the line an even weight at any width.
           vectorEffect="non-scaling-stroke"
         />
+        {/*
+          Dots drawn as zero-length strokes, not circles.
+
+          The viewBox is 100 units wide and stretched to whatever the container
+          is — around 350px — while the height maps one-to-one. So the whole
+          drawing is scaled about 3.5x horizontally and 1x vertically, and a
+          <circle> came out as a wide flat ellipse. It looked like a rendering
+          fault because it was one.
+
+          `vectorEffect="non-scaling-stroke"` already rescued the line, but it
+          only protects a stroke, and a circle's roundness is its geometry. A
+          zero-length subpath with a round linecap draws a dot whose diameter is
+          the stroke width — and stroke width is exactly the thing the transform
+          cannot touch. So these stay round at any container width, with no
+          measuring and no resize handling.
+
+          Smaller than the old radii as well: 3px and 5px across, where the
+          circles were 4 and 6 before being stretched to about 14 and 21.
+        */}
         {points.map((p, i) => (
-          <circle
+          <path
             key={p.label + i}
-            cx={x(i)}
-            cy={y(p.value)}
-            r={i === last ? 3 : 2}
-            fill={i === last ? "hsl(var(--gold-light))" : "hsl(var(--gold))"}
-            fillOpacity={i === last ? 1 : 0.55}
+            d={`M ${x(i)} ${y(p.value)} L ${x(i)} ${y(p.value)}`}
+            stroke={i === last ? "hsl(var(--gold-light))" : "hsl(var(--gold))"}
+            strokeOpacity={i === last ? 1 : 0.55}
+            strokeWidth={i === last ? 5 : 3}
+            strokeLinecap="round"
+            fill="none"
             vectorEffect="non-scaling-stroke"
           />
         ))}

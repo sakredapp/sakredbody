@@ -570,6 +570,208 @@ export const ORIENTATION_LABEL: Readonly<Record<Orientation, string>> = {
   neutral: "Neutral",
 };
 
+/**
+ * A workout Apple Health or Health Connect knows about, placed in our own
+ * vocabulary.
+ *
+ * ── Why this is a translation and not a second classifier ─────────────────
+ *
+ * The temptation is a table mapping Apple's activity types straight to Restore
+ * and Build. That would be a second opinion about movement living beside the
+ * one above, and the two would drift the first time a category's load changed —
+ * a run would be Build in one place and something else in the other, with
+ * nothing to say which was right.
+ *
+ * So this only answers "what is this, in Sakred's terms". Whether it is Restore
+ * or Build is then decided where it is decided for everything else, by
+ * CATEGORY_LOAD and categoryOrientation. Changing what a run costs a member is
+ * still one edit, in one table.
+ *
+ * ── The vocabulary on each side ───────────────────────────────────────────
+ *
+ * The keys are what our own readers emit, not raw platform enums: iOS turns
+ * HKWorkoutActivityType into a lowercase name in HealthSyncEngine.activityName,
+ * and Android does the same for ExerciseSessionRecord's exercise types. Both
+ * deliberately produce the same small set, so this table is shared rather than
+ * one per platform.
+ *
+ * ── What is deliberately absent ───────────────────────────────────────────
+ *
+ * Anything unrecognised returns null and is counted by nothing. An imported
+ * workout we cannot place is still shown to the member with its duration and
+ * its source, because it happened — but guessing a category for it would feed
+ * an invented load into the terrain reading, and a wrong reason there is worse
+ * than a missing one.
+ */
+export const EXTERNAL_ACTIVITY_CATEGORY: Readonly<Record<string, string>> = {
+  // ── Yang: these ask something of the body ──
+  running: "endurance",
+  cycling: "endurance",
+  swimming: "endurance",
+  rowing: "endurance",
+  elliptical: "cardio",
+  stairs: "cardio",
+  hiit: "explosive",
+  strength: "full_body",
+  boxing: "sport",
+  tennis: "sport",
+  golf: "sport",
+  dance: "class",
+
+  // ── Both, or contextual ──
+  // Hiking and walking carry a real cost and give something back; locomotion
+  // is the category that already says exactly that.
+  hiking: "locomotion",
+  walking: "locomotion",
+  pilates: "pilates",
+  core: "core",
+
+  // ── Yin: these give more than they take ──
+  yoga: "yoga",
+  flexibility: "mobility",
+  cooldown: "recovery",
+
+  // `other` is deliberately not here. It is what our own readers emit when
+  // they do not recognise the platform's type, so mapping it would be
+  // inventing a category for something we already failed to identify.
+};
+
+/**
+ * The Sakred category for an imported workout, or null if we cannot say.
+ *
+ * Null is a real answer and callers must handle it: it means the workout is
+ * shown but contributes no load, which is the honest treatment of an activity
+ * whose character we do not know.
+ */
+export function externalActivityCategory(workoutType: string | null | undefined): string | null {
+  if (!workoutType) return null;
+  return EXTERNAL_ACTIVITY_CATEGORY[workoutType.trim().toLowerCase()] ?? null;
+}
+
+/**
+ * Restore, Build, Both — or null when the activity could not be placed.
+ *
+ * Straight through the same orientation model every Sakred-logged session
+ * uses, which is the entire point of the table above.
+ */
+export function externalActivityOrientation(
+  workoutType: string | null | undefined,
+): Orientation | null {
+  const category = externalActivityCategory(workoutType);
+  return category === null ? null : categoryOrientation(category);
+}
+
+/**
+ * Imported activity types that actually cost the body something.
+ *
+ * Derived from the two tables above rather than written out, so it cannot
+ * drift: change what a category costs in CATEGORY_LOAD and this follows. A
+ * hand-kept second list is how "yoga counts as training" gets shipped by
+ * somebody editing one file and not the other.
+ *
+ * Used to answer "how long since they last did something demanding" — yoga and
+ * stretching are real movement and belong in a member's history, but letting
+ * them reset that counter would tell someone who has stretched for a fortnight
+ * that they have been training.
+ *
+ * "Demanding" is `stress >= 2`, which is not a new threshold: it is the one
+ * `orientationOfLoad` already uses to decide that something is Build. Yoga sits
+ * at 1 and is correctly excluded. Picking any other number here would mean an
+ * activity could be demanding enough to reset this counter while not being
+ * demanding enough to count as Build, which is two definitions of the same word.
+ */
+export const DEMANDING_EXTERNAL_TYPES: string[] = Object.entries(EXTERNAL_ACTIVITY_CATEGORY)
+  .filter(([, category]) => orientationOfLoad(categoryLoad(category)) === "yang"
+    || orientationOfLoad(categoryLoad(category)) === "both")
+  .map(([type]) => type);
+
+// ─── 1a-iv. WHAT THE PERSON SAYS ABOUT IT ──────────────────────────────────
+
+/**
+ * Three things about one session, kept apart on purpose.
+ *
+ *   what happened          the imported event — type, duration, distance
+ *   what it asks of a body CATEGORY_LOAD, via the table above
+ *   how it landed          the member's own answer, below
+ *
+ * The first is Apple's or Google's to state, the second is ours, the third is
+ * only ever the member's. Collapsing any two of them loses something real: a
+ * 54-minute run that somebody found restorative was still a 54-minute run, and
+ * an app that lets "it felt good" delete the load will cheerfully tell them
+ * they are fresh on the fourth day of it.
+ *
+ * So nothing here feeds `categoryLoad`. This module is what somebody says about
+ * a session; the load model is what the session cost. Both are stored, and only
+ * one of them is a matter of opinion.
+ */
+
+/** How it landed. Absent is the normal state — most sessions are never rated. */
+export const WORKOUT_RESPONSES = ["restored", "steady", "taxed"] as const;
+export type WorkoutResponse = (typeof WORKOUT_RESPONSES)[number];
+
+export const WORKOUT_RESPONSE_LABEL: Readonly<Record<WorkoutResponse, string>> = {
+  restored: "Restored me",
+  steady: "Steady",
+  taxed: "Taxed me",
+};
+
+/**
+ * Where a session sits in the app, which is a different question from what it
+ * cost.
+ *
+ * Deliberately its own vocabulary rather than reusing `Orientation`. An
+ * override spelled "yang" is one careless line away from being fed into a load
+ * calculation — it would type-check — and that is exactly the mistake this
+ * whole section exists to prevent. Spelled as Restore and Build, it can only
+ * ever answer the question it is for: which side of the app this session is
+ * shown on. Nothing downstream of `CATEGORY_LOAD` accepts one of these.
+ */
+export const WORKOUT_PLACEMENTS = ["restore", "build", "both"] as const;
+export type WorkoutPlacement = (typeof WORKOUT_PLACEMENTS)[number];
+
+export const PLACEMENT_LABEL: Readonly<Record<WorkoutPlacement, string>> = {
+  restore: "Restore",
+  build: "Build",
+  both: "Both",
+};
+
+/**
+ * Sakred's own reading of a session, in placement terms.
+ *
+ * `neutral` becomes null rather than a fourth placement: a gentle walk is
+ * genuinely neither, and putting it under Build or Restore would be the app
+ * asserting something it does not think.
+ */
+export function placementOfOrientation(
+  orientation: Orientation | null | undefined,
+): WorkoutPlacement | null {
+  if (orientation === "yin") return "restore";
+  if (orientation === "yang") return "build";
+  if (orientation === "both") return "both";
+  return null;
+}
+
+/**
+ * Where this session is shown — the member's choice if they made one, ours
+ * otherwise.
+ *
+ * Clearing the override is not a third state to store. It returns null, this
+ * falls through to the canonical reading, and the member is back where they
+ * started with nothing left behind to go stale.
+ */
+export function effectivePlacement(
+  workoutType: string | null | undefined,
+  override: WorkoutPlacement | null | undefined,
+): WorkoutPlacement | null {
+  if (override) return override;
+  return placementOfOrientation(externalActivityOrientation(workoutType));
+}
+
+/** Whether an override was used — derived, so it can never disagree. */
+export function placementIsMembers(override: WorkoutPlacement | null | undefined): boolean {
+  return override != null;
+}
+
 // ─── 1b. THE MEMBER'S OWN SESSIONS ─────────────────────────────────────────
 
 /**

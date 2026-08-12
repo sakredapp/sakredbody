@@ -170,7 +170,7 @@ export function HealthCard() {
             </div>
           ))}
 
-          <HealthWorkouts workouts={data?.workouts ?? []} />
+          <HealthWorkouts workouts={data?.workouts ?? []} editable />
 
           {isLoading && <p className="text-xs text-muted-foreground">Loading…</p>}
 

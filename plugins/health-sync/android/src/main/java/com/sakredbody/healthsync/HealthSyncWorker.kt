@@ -50,8 +50,10 @@ class HealthSyncWorker(context: Context, params: WorkerParameters) :
         val end = Instant.now()
         val start = end.minus(overlapDays.toLong(), ChronoUnit.DAYS)
 
+        val reader = HealthReader(applicationContext)
+
         val samples = try {
-            HealthReader(applicationContext).collect(start, end)
+            reader.collect(start, end)
         } catch (e: Throwable) {
             record(prefs, "read failed: ${e.message}")
             // retry(), because a read that threw is usually transient — the
@@ -59,12 +61,25 @@ class HealthSyncWorker(context: Context, params: WorkerParameters) :
             return@withContext Result.retry()
         }
 
-        if (samples.isEmpty()) {
+        /**
+         * Sessions as events, alongside the daily totals.
+         *
+         * Read separately and failed separately: a member who granted step data
+         * and withheld exercise sessions should still get their steps, and a
+         * throw here would have taken the whole run down with it.
+         */
+        val workouts = try {
+            reader.workouts(start, end)
+        } catch (e: Throwable) {
+            emptyList()
+        }
+
+        if (samples.isEmpty() && workouts.isEmpty()) {
             record(prefs, "nothing to post")
             return@withContext Result.success()
         }
 
-        return@withContext when (val outcome = post(origin, token, samples, end)) {
+        return@withContext when (val outcome = post(origin, token, samples, workouts, end)) {
             is PostResult.Ok -> {
                 record(prefs, "posted ${outcome.accepted} values")
                 Result.success()
@@ -93,6 +108,7 @@ class HealthSyncWorker(context: Context, params: WorkerParameters) :
         origin: String,
         token: String,
         samples: List<HealthReader.Sample>,
+        workouts: List<HealthReader.Workout>,
         syncedThrough: Instant,
     ): PostResult {
         // Last value wins per key. Postgres cannot resolve two rows that
@@ -113,9 +129,36 @@ class HealthSyncWorker(context: Context, params: WorkerParameters) :
             )
         }
 
+        // Events, not totals. Deduped by the platform's own record id here as
+        // well as by the server's unique index, because the trailing re-read
+        // window means the same session arrives on most runs.
+        val workoutArray = JSONArray()
+        val seen = HashSet<String>()
+        for (w in workouts) {
+            if (!seen.add(w.externalId)) continue
+            workoutArray.put(
+                JSONObject()
+                    .put("externalId", w.externalId)
+                    .put("workoutType", w.workoutType)
+                    .put("startAt", w.startAt)
+                    .put("endAt", w.endAt)
+                    .put("onDate", w.onDate)
+                    .put("durationSeconds", w.durationSeconds)
+                    .apply {
+                        // Absent rather than zero. A run with no distance
+                        // recorded and a run of zero metres are different
+                        // things, and only one of them should be shown.
+                        w.distanceMeters?.let { put("distanceMeters", it) }
+                        w.activeCalories?.let { put("activeCalories", it) }
+                        w.sourceApp?.let { put("sourceApp", it) }
+                    }
+            )
+        }
+
         val body = JSONObject()
             .put("platform", "healthconnect")
             .put("samples", array)
+            .put("workouts", workoutArray)
             .put("syncedThrough", syncedThrough.toString())
             .put("deviceModel", "android-background")
             .toString()
