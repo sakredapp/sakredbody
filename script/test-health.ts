@@ -30,6 +30,7 @@ import {
   seriesFor,
   planTiles,
   trendOf,
+  sleepTonight,
   isStillCounting,
   localToday,
 } from "../client/src/lib/healthDisplay.js";
@@ -812,6 +813,52 @@ check("the latest day is found in unsorted input",
   summarise(shuffled, "steps")?.value === 3937, String(summarise(shuffled, "steps")?.value));
 
 check("a metric with no data yields nothing", summarise(series, "vo2Max") === null);
+
+/**
+ * A number to aim at tonight, built from their own week.
+ *
+ * "You're down on your average" is a diagnosis with no instruction attached.
+ * The useful output is an hour count, and it has to be allowed to be large:
+ * somebody badly behind needs a genuinely long night, and will not take one
+ * unless the app says the figure out loud.
+ */
+const nightsOf = (values: number[]) =>
+  values.map((value, i) => ({ onDate: `2026-05-${String(i + 1).padStart(2, "0")}`, value }));
+
+// Squared up: nothing to repay, so nothing is asked for.
+check("a settled week asks for nothing",
+  sleepTonight(nightsOf([440, 435, 445, 440, 438, 442, 439]), 440) === null);
+
+// Badly behind — five hours a night against a usual of eight.
+const behind = sleepTonight(nightsOf([300, 300, 300, 300, 300, 300, 300]), 480);
+check("a bad week returns a target", behind !== null);
+check("the debt is the sum of the shortfalls, not the average",
+  behind?.debt === 1260, String(behind?.debt));
+check("the target reaches into double figures",
+  behind?.target === 630, String(behind?.target));
+check("and is capped at ten and a half hours",
+  (behind?.target ?? 0) <= 630 && (behind?.target ?? 0) <= HEALTH_RANGES.sleepMinutes[1],
+  String(behind?.target));
+
+// A single short night, on an otherwise fine week.
+const oneBad = sleepTonight(nightsOf([440, 440, 440, 250, 440, 440, 440]), 440);
+check("one short night still earns a target", oneBad !== null);
+check("its debt is that night's shortfall alone", oneBad?.debt === 190, String(oneBad?.debt));
+// 440 + 180, because repayment caps at three hours even when the debt is 190.
+check("repayment is capped at three hours in one night",
+  oneBad?.target === 620, String(oneBad?.target));
+
+/**
+ * A long night does not cancel a short one. Netting them off would hide the
+ * exact week this is meant to catch — you do not un-spend a bad night by
+ * having a good one afterwards.
+ */
+const mixed = sleepTonight(nightsOf([300, 660, 300, 660, 300, 660, 300]), 480);
+check("surpluses do not offset shortfalls",
+  mixed?.debt === 720, String(mixed?.debt));
+
+check("no baseline means no target", sleepTonight(nightsOf([300, 300, 300]), null) === null);
+check("an empty week means no target", sleepTonight([], 480) === null);
 
 const shown = groupsWithData(series);
 const shownMetrics = shown.flatMap((g) => g.metrics);

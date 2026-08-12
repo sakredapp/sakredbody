@@ -677,6 +677,65 @@ export type MetricAdvice = {
   remedy?: { title: string; body: string };
 };
 
+/**
+ * How much to sleep tonight, as an actual number of hours.
+ *
+ * ── Why this exists ───────────────────────────────────────────────────────
+ *
+ * The sleep screen could tell you that you were down on your average and
+ * nothing else. That is a diagnosis with no instruction attached — a member
+ * reads it, agrees, and does nothing differently, because "sleep more" is not
+ * a plan and they already knew.
+ *
+ * What is actually useful is a figure to aim at tonight. And the figure is
+ * often much larger than people expect: somebody eight hours down across a
+ * week needs a genuinely long night to clear it, and will not take one,
+ * because ten hours in bed feels like sloth. Naming the number, and where it
+ * came from, is what gives them permission to spend it.
+ *
+ * ── Their own usual, never a norm ─────────────────────────────────────────
+ *
+ * The target is built from this member's own baseline and their own shortfall.
+ * There is no eight-hours-is-healthy anywhere in it, because the rest of this
+ * file refuses population norms on purpose — an ideal night for one person is
+ * a bad one for another, and a target we invented is a target they will fail
+ * against for no reason.
+ *
+ * ── The two caps, and why ─────────────────────────────────────────────────
+ *
+ * At most three hours of repayment in one night: debt built over a week does
+ * not clear in one, and a target nobody could hit is one they stop reading.
+ * And never above ten and a half hours in total, which keeps the number
+ * believable and inside HEALTH_RANGES either way.
+ *
+ * Returns null when there is nothing to repay. A screen that asks for a
+ * catch-up every single night is one that gets ignored on the night it matters.
+ */
+export function sleepTonight(
+  points: { onDate: string; value: number }[],
+  baseline: number | null,
+  overNights = 7,
+): { target: number; debt: number; nights: number } | null {
+  if (baseline === null || baseline <= 0) return null;
+
+  const recent = points.slice(-overNights);
+  if (!recent.length) return null;
+
+  // Only shortfalls count. A long night does not cancel a short one — you do
+  // not un-spend a bad night by having a good one afterwards, and netting them
+  // off would hide exactly the week this is meant to catch.
+  const debt = recent.reduce((sum, p) => sum + Math.max(0, baseline - p.value), 0);
+
+  // Half an hour across a week is noise, not a debt worth a plan.
+  if (debt < 30) return null;
+
+  const MAX_REPAYMENT = 180;
+  const MAX_TARGET = 630;
+  const target = Math.min(baseline + Math.min(debt, MAX_REPAYMENT), MAX_TARGET);
+
+  return { target, debt, nights: recent.length };
+}
+
 export function adviceFor(
   metric: HealthMetric,
   value: number,

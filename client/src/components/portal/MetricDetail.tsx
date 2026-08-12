@@ -36,6 +36,7 @@ import {
   adviceFor,
   isStillCounting,
   localToday,
+  sleepTonight,
   type DaySeries,
 } from "@/lib/healthDisplay";
 import { selectSupport, type SupportPrimitive } from "@shared/models/apothecary";
@@ -111,6 +112,9 @@ export function MetricDetail({
   const baseline = stillCounting ? null : rawBaseline;
 
   const delta = latest && baseline ? latest.value - baseline : null;
+
+  /** A figure to aim at tonight, on the sleep screen only. Null when square. */
+  const tonight = metric === "sleepMinutes" ? sleepTonight(points, baseline) : null;
   const better =
     delta === null || display?.higherIsBetter === null || display?.higherIsBetter === undefined
       ? null
@@ -210,6 +214,40 @@ export function MetricDetail({
                 <p className="text-[11px] text-muted-foreground mt-1">
                   Your average over the {history.length} other days we hold — not a target, and not
                   a comparison with anybody else.
+                </p>
+              </div>
+            )}
+
+            {/*
+              A number to aim at tonight.
+
+              The screen could say you were down on your average and stop,
+              which is a diagnosis with no instruction attached — the member
+              agrees, changes nothing, and already knew. This gives the figure,
+              and the figure is usually larger than people will allow
+              themselves: eight hours down across a week needs a long night to
+              clear, and most people won't take one because ten hours in bed
+              feels like sloth. Saying the number out loud is the point.
+
+              Built from their own baseline and their own shortfall. No
+              eight-hours-is-healthy anywhere in it.
+            */}
+            {tonight && (
+              <div className="rounded-xl border border-[hsl(var(--gold))]/25 p-3 space-y-1.5">
+                <p className="text-[10px] uppercase tracking-widest text-[hsl(var(--gold))]/70">
+                  Tonight
+                </p>
+                <p className="font-display text-2xl">
+                  Aim for {display.format(tonight.target)}
+                </p>
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  You're {display.format(tonight.debt)} short across the last {tonight.nights}{" "}
+                  nights, against your usual {display.format(baseline ?? 0)}. A long night makes
+                  most of that back.
+                </p>
+                <p className="text-xs text-[hsl(var(--gold))]/85 leading-snug">
+                  Attention and judgement are the first things short sleep takes, and the first
+                  things that come back once you catch up.
                 </p>
               </div>
             )}
