@@ -284,6 +284,20 @@ import HealthKit
      Sort by start, then walk once, extending the open span while the next one
      begins before the current one ends.
      */
+    /**
+     How long a break has to be before it is a different sleep.
+
+     Long enough to swallow the ordinary interruptions inside one night — a
+     trip to the bathroom, a stretch a ring scores as awake, a watch that
+     simply stops reporting for a while — and short enough that an afternoon
+     nap is not annexed to the morning it followed.
+
+     Ninety minutes is the usual convention and it errs the safe way: two
+     nights can never be joined, because nobody is awake for less than ninety
+     minutes between them.
+     */
+    static let sleepSessionGap: TimeInterval = 90 * 60
+
     private static func unionedMinutes(_ spans: [Span]) -> Double {
         guard !spans.isEmpty else { return 0 }
         let sorted = spans.sorted { $0.start < $1.start }
@@ -432,30 +446,82 @@ import HealthKit
                     .append(Span(start: sample.startDate, end: sample.endDate))
             }
 
-            for sample in results {
-                guard sample.endDate > sample.startDate else { continue }
-                let date = Self.localDate(sample.endDate)
+            /*
+             HealthKit hands back stages, not nights — and a stage has to be
+             dated by the night it belongs to, not by its own clock.
 
-                if #available(iOS 16.0, *) {
-                    switch sample.value {
-                    case HKCategoryValueSleepAnalysis.asleepDeep.rawValue:
-                        record(date, "sleepMinutes", sample)
-                        record(date, "sleepDeepMinutes", sample)
-                    case HKCategoryValueSleepAnalysis.asleepREM.rawValue:
-                        record(date, "sleepMinutes", sample)
-                        record(date, "sleepRemMinutes", sample)
-                    case HKCategoryValueSleepAnalysis.asleepCore.rawValue,
-                         HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue:
-                        record(date, "sleepMinutes", sample)
-                    case HKCategoryValueSleepAnalysis.awake.rawValue:
-                        record(date, "sleepAwakeMinutes", sample)
-                    default:
-                        break // inBed
-                    }
+             Since iOS 16 a night arrives as dozens of short samples: core,
+             deep, REM, awake, each one its own record of a few minutes. Dating
+             each of those individually by when it ended files everything
+             before midnight under the previous day. Fall asleep at 23:15 and
+             the first forty-five minutes are yesterday's sleep; the member
+             wakes at 07:00 having slept seven hours and the app shows six.
+
+             The damage is doubled, because those minutes are not lost — they
+             land on the day before, which then reads high. So a member sleeping
+             a steady seven hours sees an alternating chart of short nights and
+             long ones, neither of them true, and no single number is far enough
+             out to look like a bug.
+
+             So: group the samples into sessions first, and give the whole
+             session the date it ENDS on. A session breaks when there is a real
+             gap — SLEEP_SESSION_GAP — between one sample ending and the next
+             beginning. Below that they are the same night, including the awake
+             stretches inside it, which is exactly what a member means by "last
+             night". Above it, a separate sleep: an afternoon nap stays its own
+             session on its own day rather than being absorbed into the morning.
+             */
+            let staged = results
+                .filter { $0.endDate > $0.startDate }
+                .sorted { $0.startDate < $1.startDate }
+
+            var sessions: [[HKCategorySample]] = []
+            var current: [HKCategorySample] = []
+            var openEnd = Date.distantPast
+
+            for sample in staged {
+                if current.isEmpty || sample.startDate <= openEnd.addingTimeInterval(Self.sleepSessionGap) {
+                    current.append(sample)
+                    // The session's reach is the latest end seen, not this
+                    // sample's — sources overlap, so a long span from the watch
+                    // can enclose several short ones from a ring.
+                    openEnd = max(openEnd, sample.endDate)
                 } else {
-                    // Before iOS 16 there are no stages: asleep or in bed.
-                    if sample.value == HKCategoryValueSleepAnalysis.asleep.rawValue {
-                        record(date, "sleepMinutes", sample)
+                    sessions.append(current)
+                    current = [sample]
+                    openEnd = sample.endDate
+                }
+            }
+            if !current.isEmpty { sessions.append(current) }
+
+            for session in sessions {
+                // Every stage in the session answers to the morning the member
+                // woke up on.
+                guard let wokeAt = session.map({ $0.endDate }).max() else { continue }
+                let date = Self.localDate(wokeAt)
+
+                for sample in session {
+                    if #available(iOS 16.0, *) {
+                        switch sample.value {
+                        case HKCategoryValueSleepAnalysis.asleepDeep.rawValue:
+                            record(date, "sleepMinutes", sample)
+                            record(date, "sleepDeepMinutes", sample)
+                        case HKCategoryValueSleepAnalysis.asleepREM.rawValue:
+                            record(date, "sleepMinutes", sample)
+                            record(date, "sleepRemMinutes", sample)
+                        case HKCategoryValueSleepAnalysis.asleepCore.rawValue,
+                             HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue:
+                            record(date, "sleepMinutes", sample)
+                        case HKCategoryValueSleepAnalysis.awake.rawValue:
+                            record(date, "sleepAwakeMinutes", sample)
+                        default:
+                            break // inBed
+                        }
+                    } else {
+                        // Before iOS 16 there are no stages: asleep or in bed.
+                        if sample.value == HKCategoryValueSleepAnalysis.asleep.rawValue {
+                            record(date, "sleepMinutes", sample)
+                        }
                     }
                 }
             }

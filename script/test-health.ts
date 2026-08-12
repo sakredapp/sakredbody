@@ -233,6 +233,90 @@ check(
 );
 for (const s of staged) check(`${s.metric} is in minutes`, s.unit === "min");
 
+/*
+  The night that arrives in pieces.
+
+  Since iOS 16 HealthKit hands back stages, not sessions: a night is dozens of
+  short samples, each its own record. Dating each one by its own end filed
+  everything before midnight under the previous day — so a member who fell
+  asleep at 23:15 lost that time off the night they woke from, and the day
+  before read high by exactly as much. Both days wrong, neither obviously so.
+
+  This is the shape that was in production: 45 minutes before midnight, the
+  rest after, one night.
+*/
+const pieces = foldSleep([
+  {
+    startDate: new Date(2026, 7, 8, 23, 15).toISOString(),
+    endDate: new Date(2026, 7, 9, 0, 0).toISOString(),
+    sleepState: "asleep",
+  },
+  {
+    startDate: new Date(2026, 7, 9, 0, 0).toISOString(),
+    endDate: new Date(2026, 7, 9, 3, 30).toISOString(),
+    sleepState: "asleep",
+  },
+  {
+    startDate: new Date(2026, 7, 9, 3, 30).toISOString(),
+    endDate: new Date(2026, 7, 9, 6, 22).toISOString(),
+    sleepState: "asleep",
+  },
+]);
+check("a night in pieces lands on one day", pieces.length === 1, JSON.stringify(pieces));
+check(
+  "the pieces before midnight belong to the morning",
+  pieces[0]?.onDate === "2026-08-09",
+  pieces[0]?.onDate
+);
+check(
+  "and none of the night is lost",
+  Math.round(pieces[0]?.value ?? 0) === 427,
+  String(pieces[0]?.value)
+);
+
+/*
+  Two sources, one night. A watch and a ring both report the same hours; a
+  member does not sleep twice for agreeing with themselves.
+*/
+const twoSources = foldSleep([
+  {
+    startDate: new Date(2026, 7, 8, 23, 0).toISOString(),
+    endDate: new Date(2026, 7, 9, 7, 0).toISOString(),
+    sleepState: "asleep",
+    sourceName: "Apple Watch",
+  },
+  {
+    startDate: new Date(2026, 7, 8, 23, 10).toISOString(),
+    endDate: new Date(2026, 7, 9, 6, 50).toISOString(),
+    sleepState: "asleep",
+    sourceName: "Oura",
+  },
+]);
+check(
+  "overlapping sources are counted once",
+  Math.round(twoSources[0]?.value ?? 0) === 480,
+  String(twoSources[0]?.value)
+);
+
+/* An afternoon nap is its own sleep, not an extension of the morning. */
+const withNap = foldSleep([
+  {
+    startDate: new Date(2026, 7, 8, 23, 0).toISOString(),
+    endDate: new Date(2026, 7, 9, 6, 0).toISOString(),
+    sleepState: "asleep",
+  },
+  {
+    startDate: new Date(2026, 7, 9, 14, 0).toISOString(),
+    endDate: new Date(2026, 7, 9, 14, 40).toISOString(),
+    sleepState: "asleep",
+  },
+]);
+check(
+  "a nap hours later is not joined to the night",
+  Math.round(withNap.find((s) => s.metric === "sleepMinutes")?.value ?? 0) === 460,
+  JSON.stringify(withNap)
+);
+
 // ── 5. Server-side validation matches what the client can send ─────────────
 section("Client and server agree");
 
@@ -467,7 +551,22 @@ const reader = readFileSync(
  * it wrong on one platform means iPhone and Android members' sleep sits on
  * different days in the same table.
  */
-check("Swift files sleep by end date", /localDate\(sample\.endDate\)/.test(swift));
+/*
+  The Swift rule is stronger than the Kotlin one because the platforms hand
+  back different shapes. Health Connect gives Kotlin a session that knows when
+  it ended. HealthKit gives Swift loose stages, so Swift has to reassemble the
+  session first and date it by the moment the member woke — dating each stage
+  by its own end is exactly the bug that put the pre-midnight half of a night
+  on the day before.
+*/
+check(
+  "Swift files sleep by when the member woke, not by each stage",
+  /localDate\(wokeAt\)/.test(swift) && !/let date = Self\.localDate\(sample\.endDate\)/.test(swift)
+);
+check(
+  "Swift groups loose stages into sessions before dating them",
+  /sleepSessionGap/.test(swift)
+);
 check("Kotlin files sleep by end date", /localDate\(session\.endTime\)/.test(reader));
 
 /** HealthKit's percent() is a fraction; Health Connect's is already 0–100. */

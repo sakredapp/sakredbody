@@ -216,6 +216,55 @@ export const CANONICAL_UNITS: Record<HealthMetric, string> = {
  * sleep under the previous day, and would move it between days depending on
  * whether they happened to fall asleep before or after midnight.
  */
+/**
+ * Ninety minutes. See the note in foldSleep, and HealthSyncEngine.swift, which
+ * has to agree with this — the two paths write to the same rows, and a night
+ * that lands on different days depending on which one ran is worse than either
+ * rule on its own.
+ */
+const SESSION_GAP_MS = 90 * 60 * 1000;
+
+/**
+ * For every stage-level sample, when the sleep it belongs to ended.
+ *
+ * Samples carrying their own `stages` are already whole sessions and are left
+ * alone. The rest are sorted by start and walked once, extending the open
+ * session while the next sample begins within SESSION_GAP_MS of the furthest
+ * end seen so far — the furthest end, not the previous sample's, because
+ * sources overlap and one long span from a watch can enclose several short
+ * ones from a ring.
+ */
+function sessionEnds<T extends { startDate: string; endDate: string; stages?: unknown[] }>(
+  samples: T[],
+): Map<T, string> {
+  const loose = samples
+    .filter((s) => !s.stages?.length && s.startDate && s.endDate)
+    .sort((a, b) => Date.parse(a.startDate) - Date.parse(b.startDate));
+
+  const ends = new Map<T, string>();
+  let group: T[] = [];
+  let openEnd = -Infinity;
+
+  const close = () => {
+    if (!group.length) return;
+    const last = group.reduce((a, b) => (Date.parse(a.endDate) >= Date.parse(b.endDate) ? a : b));
+    for (const s of group) ends.set(s, last.endDate);
+    group = [];
+  };
+
+  for (const s of loose) {
+    const start = Date.parse(s.startDate);
+    const end = Date.parse(s.endDate);
+    if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
+    if (group.length && start > openEnd + SESSION_GAP_MS) close();
+    group.push(s);
+    openEnd = Math.max(openEnd, end);
+  }
+  close();
+
+  return ends;
+}
+
 export function foldSleep(
   samples: {
     startDate: string;
@@ -225,32 +274,86 @@ export function foldSleep(
     sourceName?: string;
   }[]
 ): CanonicalSample[] {
-  const byDate = new Map<string, Record<string, number>>();
+  const byDate = new Map<string, Map<string, [number, number][]>>();
+  const durationByDate = new Map<string, Map<string, number>>();
   const appByDate = new Map<string, string>();
 
-  const add = (date: string, metric: string, minutes: number) => {
-    if (!date || !Number.isFinite(minutes) || minutes <= 0) return;
-    const day = byDate.get(date) ?? {};
-    day[metric] = (day[metric] ?? 0) + minutes;
+  /**
+   * Intervals, not durations.
+   *
+   * A member with a watch *and* a ring has every minute of the night reported
+   * twice, and adding those durations is how one eight-hour night becomes
+   * sixteen. Two sources agreeing about the same 3am add nothing to each
+   * other — agreement is not extra sleep — so what gets stored is how much of
+   * the clock was covered, which is the union. `unionMinutes` does that at the
+   * end; this only collects.
+   */
+  const add = (date: string, metric: string, from: string, to: string) => {
+    const start = Date.parse(from);
+    const end = Date.parse(to);
+    if (!date || !Number.isFinite(start) || !Number.isFinite(end) || end <= start) return;
+    const day = byDate.get(date) ?? new Map<string, [number, number][]>();
+    const spans = day.get(metric) ?? [];
+    spans.push([start, end]);
+    day.set(metric, spans);
     byDate.set(date, day);
   };
 
+  /**
+   * The fallback for a source that reports a stage's length but not when it
+   * happened. There is nothing to union — a duration with no place on the
+   * clock cannot be compared with anything — so it is added, and a member
+   * whose only source is one of these keeps working exactly as before.
+   */
+  const addDuration = (date: string, metric: string, minutes: number) => {
+    if (!date || !Number.isFinite(minutes) || minutes <= 0) return;
+    const day = durationByDate.get(date) ?? new Map<string, number>();
+    day.set(metric, (day.get(metric) ?? 0) + minutes);
+    durationByDate.set(date, day);
+  };
+
+  /*
+    A stage is dated by the night it belongs to, not by its own clock.
+
+    Some platforms hand back one session with its stages inside it, and that
+    session already knows when it ended. Others hand back the stages loose —
+    core, deep, REM, awake, each a few minutes long and each its own record.
+    Dating those individually files everything before midnight under the day
+    before, so falling asleep at 23:15 costs the member three quarters of an
+    hour off last night and adds it to the night before. Neither day is then
+    true, and neither is wrong enough to look broken.
+
+    So the loose ones are grouped into sessions first, on the same rule the
+    iOS plugin uses: a gap of SESSION_GAP_MS or more starts a new sleep. Below
+    that it is the same night, awake stretches included. Above it — an
+    afternoon nap — it is a separate sleep on its own day.
+  */
+  const sessionEnd = sessionEnds(samples);
+
   for (const s of samples) {
-    const date = localDate(s.endDate || s.startDate);
+    const date = s.stages?.length
+      ? localDate(s.endDate || s.startDate)
+      : localDate(sessionEnd.get(s) ?? s.endDate ?? s.startDate);
     if (!date) continue;
     if (s.sourceName && !appByDate.has(date)) appByDate.set(date, s.sourceName);
 
     if (s.stages?.length) {
       for (const stage of s.stages) {
-        const mins = stage.durationMinutes;
+        const timed = Number.isFinite(Date.parse(stage.startDate ?? "")) &&
+          Number.isFinite(Date.parse(stage.endDate ?? ""));
+        const put = (metric: string) =>
+          timed
+            ? add(date, metric, stage.startDate, stage.endDate)
+            : addDuration(date, metric, stage.durationMinutes);
+
         // 'awake' is time in the session spent not sleeping — counted on its
         // own, and kept out of the total, which is what a member means by
         // "how long did I sleep".
-        if (stage.stage === "awake") add(date, "sleepAwakeMinutes", mins);
+        if (stage.stage === "awake") put("sleepAwakeMinutes");
         else {
-          add(date, "sleepMinutes", mins);
-          if (stage.stage === "deep") add(date, "sleepDeepMinutes", mins);
-          if (stage.stage === "rem") add(date, "sleepRemMinutes", mins);
+          put("sleepMinutes");
+          if (stage.stage === "deep") put("sleepDeepMinutes");
+          if (stage.stage === "rem") put("sleepRemMinutes");
         }
       }
       continue;
@@ -259,22 +362,61 @@ export function foldSleep(
     // No stage breakdown: a plain session. 'inBed' is not sleep — Apple
     // records it from a phone on a nightstand, and counting it inflates a
     // member's sleep by however long they read.
-    const minutes = (new Date(s.endDate).getTime() - new Date(s.startDate).getTime()) / 60_000;
-    if (s.sleepState === "awake") add(date, "sleepAwakeMinutes", minutes);
-    else if (s.sleepState !== "inBed") add(date, "sleepMinutes", minutes);
+    if (s.sleepState === "awake") add(date, "sleepAwakeMinutes", s.startDate, s.endDate);
+    else if (s.sleepState !== "inBed") add(date, "sleepMinutes", s.startDate, s.endDate);
   }
 
   const out: CanonicalSample[] = [];
-  byDate.forEach((metrics, onDate) => {
-    Object.keys(metrics).forEach((metric) => {
+  const dates = new Set([...Array.from(byDate.keys()), ...Array.from(durationByDate.keys())]);
+
+  dates.forEach((onDate) => {
+    const spansByMetric = byDate.get(onDate) ?? new Map<string, [number, number][]>();
+    const sumsByMetric = durationByDate.get(onDate) ?? new Map<string, number>();
+    const metrics = new Set([
+      ...Array.from(spansByMetric.keys()),
+      ...Array.from(sumsByMetric.keys()),
+    ]);
+
+    metrics.forEach((metric) => {
+      const minutes =
+        unionMinutes(spansByMetric.get(metric) ?? []) + (sumsByMetric.get(metric) ?? 0);
+      if (minutes <= 0) return;
       out.push({
         onDate,
         metric: metric as HealthMetric,
-        value: Math.round(metrics[metric] * 100) / 100,
+        value: Math.round(minutes * 100) / 100,
         unit: "min",
         sourceApp: appByDate.get(onDate) ?? null,
       });
     });
   });
   return out;
+}
+
+/**
+ * Minutes covered by these intervals, counting overlaps once.
+ *
+ * Sort by start, walk once, extend the open span while the next one begins
+ * before the current one ends. The mirror of `unionedMinutes` in
+ * HealthSyncEngine.swift — both paths write the same rows, so they have to
+ * answer the same way.
+ */
+function unionMinutes(spans: [number, number][]): number {
+  if (!spans.length) return 0;
+  const sorted = [...spans].sort((a, b) => a[0] - b[0]);
+  let total = 0;
+  let [openStart, openEnd] = sorted[0];
+
+  for (const [start, end] of sorted.slice(1)) {
+    if (start > openEnd) {
+      total += openEnd - openStart;
+      openStart = start;
+      openEnd = end;
+    } else if (end > openEnd) {
+      // Overlapping or touching — absorb it rather than add it.
+      openEnd = end;
+    }
+  }
+  total += openEnd - openStart;
+  return total / 60_000;
 }
