@@ -31,6 +31,7 @@ import { Panel } from "@/components/portal/Panel";
 import { MovementPicker, type Movement } from "./MovementPicker";
 import { LogPractice } from "./LogPractice";
 import { RecentSessions } from "./RecentSessions";
+import { TodaysMovement } from "@/components/portal/TodaysMovement";
 import { ModalityPrompt } from "./Modalities";
 import { cn } from "@/lib/utils";
 
@@ -92,6 +93,17 @@ export function MemberBuild({ onStarted }: { onStarted: (sessionId: string, titl
 
   return (
     <>
+      {/*
+        Today, before the buttons that ask you to log something.
+
+        A member who ran five miles this morning opened Build and was offered
+        "Start a session" and "Log an activity" — an invitation to record what
+        the app had already imported and was already counting. Showing it first
+        is the difference between an app that watched their morning and one that
+        wants them to type it in again.
+      */}
+      <TodaysMovement />
+
       <Panel title="Your own training">
         <div className="space-y-4">
           <p className="text-xs text-muted-foreground leading-relaxed">

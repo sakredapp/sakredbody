@@ -633,6 +633,32 @@ export const EXTERNAL_ACTIVITY_CATEGORY: Readonly<Record<string, string>> = {
   tennis: "sport",
   dance: "class",
 
+  /**
+   * Named by iOS and, until now, mapped by nothing.
+   *
+   * `HealthSyncEngine.activityName` emits "martial arts" for
+   * `.martialArts`, and this table had no key for it — so an iOS member's BJJ
+   * or muay thai session was stored, shown on their health card, and counted
+   * by nothing. It contributed no load to terrain and did not reset "nothing
+   * demanding in N days". Android is unaffected because its reader folds
+   * martial arts into "boxing", which is itself worth noticing: the two
+   * platforms disagreed, and the disagreement was invisible.
+   *
+   * An unmapped activity failing silently is the expensive property of this
+   * table. Nothing warns; the member simply gets advice computed as though
+   * they had not trained.
+   */
+  "martial arts": "sport",
+
+  /**
+   * Meditation, tai chi, qigong — Apple files all three under `.mindAndBody`.
+   * Restorative, and previously invisible for the same reason.
+   */
+  "mind and body": "somatic",
+
+  /** A gym class, when the platform will not say which kind. */
+  class: "class",
+
   // ── Both, or contextual ──
   hiking: "locomotion",
   pilates: "pilates",

@@ -25,7 +25,7 @@ import { isAuthenticated } from "../auth/index.js";
 import { memberToday } from "../coaching/enrollment.js";
 import { healthDays, healthWorkouts, workoutSessions } from "../../shared/schema.js";
 import { readTerrain, terrainHeadline } from "../../shared/models/terrain.js";
-import { DEMANDING_EXTERNAL_TYPES } from "../../shared/models/training.js";
+import { DEMANDING_EXTERNAL_TYPES, categoryOrientation } from "../../shared/models/training.js";
 import { recentMovement } from "../movement/history.js";
 import { addDaysToString } from "../../shared/utils/dates.js";
 
@@ -89,9 +89,8 @@ async function averages(userId: string, onDate: string): Promise<Averages> {
  * of them did not live in `server/today/signals.ts` — which is precisely why
  * Today and Restore could disagree about whether the member had trained.
  */
-async function trainedCategories(userId: string, onDate: string): Promise<string[]> {
-  const moved = await recentMovement(userId, addDaysToString(onDate, -RECENT_DAYS));
-  return moved.map((m) => m.category);
+async function trainedCategories(userId: string, onDate: string) {
+  return recentMovement(userId, addDaysToString(onDate, -RECENT_DAYS));
 }
 
 async function daysSinceLastSession(userId: string, onDate: string): Promise<number | null> {
@@ -169,7 +168,7 @@ export function registerTerrainRoutes(app: Express): void {
         hrvBaseline: avg.heartRateVariability.baseline,
         rhrRecent: avg.restingHeartRate.recent,
         rhrBaseline: avg.restingHeartRate.baseline,
-        trainedCategories: categories,
+        trainedCategories: categories.map((m) => m.category),
         daysSinceLastSession: since,
         // The reasons name these out loud, so they come from the same two
         // constants the averages were taken over rather than being restated.
@@ -177,7 +176,25 @@ export function registerTerrainRoutes(app: Express): void {
         baselineDays: BASELINE_DAYS,
       });
 
-      res.json({ ...reading, headline: terrainHeadline(reading), onDate });
+      /**
+       * The movement the reading is reasoning from, not just its conclusion.
+       *
+       * Restore could say "9 demanding sessions this week" and show none of
+       * them, so a member had to take the number on faith — and when the number
+       * was wrong, because every dog walk was counting as a session, there was
+       * nothing on screen that would have revealed it.
+       *
+       * Orientation comes from the same CATEGORY_LOAD the reading used, so the
+       * list cannot disagree with the sentence above it.
+       */
+      const movement = categories.map((m) => ({
+        onDate: m.onDate,
+        category: m.category,
+        orientation: categoryOrientation(m.category),
+        source: m.source,
+      }));
+
+      res.json({ ...reading, headline: terrainHeadline(reading), movement, onDate });
     } catch (err) {
       console.error("[terrain] today failed", err);
       res.status(500).json({ message: "Could not read your terrain." });

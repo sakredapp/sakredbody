@@ -92,6 +92,7 @@ import { PortalBackdrop } from "@/components/portal/PortalBackdrop";
 import { groupByBand } from "@/components/portal/dayBands";
 import { WinMoment } from "@/components/WinMoment";
 import { HealthCard } from "@/components/portal/HealthCard";
+import { TodayBody } from "@/components/portal/TodayBody";
 import type { Win } from "@shared/models/wins";
 
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
@@ -413,13 +414,30 @@ function TodayHabits() {
  * do, then the day's actual work. One screen in that order because that's the
  * order the day happens in — you find out what today is before you do it.
  */
-export function TodayTab() {
+/**
+ * Today — the day's operating page.
+ *
+ * ── Order, and why it is this order ───────────────────────────────────────
+ *
+ * The body first, because that is the question somebody opens this screen with:
+ * what has happened in me today, and what state am I in now. It used to be
+ * answered two tabs away under Stats, which is how Today ended up feeling like
+ * the moon page with nothing to do on it.
+ *
+ * The rhythm second. It is context rather than news — the moon and the personal
+ * day are as true at nine in the evening as at six in the morning — and it
+ * reads better underneath the thing it is giving context to.
+ *
+ * The checklist last, because it is the only part that asks for an action, and
+ * because it is the part most members do not have. It renders nothing at all
+ * when there is no routine running.
+ */
+export function TodayTab({ onOpenTrends }: { onOpenTrends?: () => void }) {
   return (
-    <div className="space-y-12">
+    <div className="space-y-10">
+      <TodayBody onOpenTrends={onOpenTrends} />
       <DailyRitual />
-      <div className="border-t border-border/50 pt-8">
-        <TodayHabits />
-      </div>
+      <TodayHabits />
     </div>
   );
 }

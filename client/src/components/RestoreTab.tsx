@@ -42,13 +42,111 @@ import { TerrainCheckin } from "@/components/habits/TerrainCheckin";
 import type { MemberSection } from "@/components/MemberNav";
 import { cn } from "@/lib/utils";
 
+type MovementEntry = {
+  onDate: string;
+  category: string;
+  orientation: "yin" | "yang" | "both" | "neutral";
+  source: "sakred" | "imported";
+};
+
 type Reading = {
   lean: "restore" | "build" | "either" | "unknown";
   headline: string;
   reasons: { text: string; pulls: "restore" | "build" }[];
   week: { stress: number; restoration: number; sessions: number };
+  /** What the reading is reasoning from. See MovementBehindTheReading. */
+  movement?: MovementEntry[];
   hasBody: boolean;
 };
+
+const CATEGORY_LABEL = new Map(EXERCISE_CATEGORIES.map((c) => [c.id as string, c.label as string]));
+
+/** "Today", "Yesterday", then the weekday. Nobody needs a date for this week. */
+function whenShort(onDate: string): string {
+  const today = new Date().toISOString().slice(0, 10);
+  if (onDate === today) return "today";
+  const days = Math.round(
+    (new Date(`${today}T12:00:00`).getTime() - new Date(`${onDate}T12:00:00`).getTime()) /
+      86_400_000,
+  );
+  if (days === 1) return "yesterday";
+  return new Date(`${onDate}T12:00:00`).toLocaleDateString(undefined, { weekday: "long" });
+}
+
+/**
+ * What you are recovering from, and what you have done about it.
+ *
+ * ── Two lists, and the distinction between them is the point ──────────────
+ *
+ * Demanding work belongs on this screen as *context*. A hard week is the reason
+ * Restore is saying what it is saying, and hiding it left the member with a
+ * conclusion — "9 demanding sessions this week" — and no way to check it. When
+ * that number was wrong, because every walk was counting as a session, nothing
+ * on screen would have shown them why.
+ *
+ * But appearing here does not make a run restorative. The first list is what
+ * created the demand; the second is what has answered it. Collapsing them would
+ * say that training hard counts as recovery, which is the opposite of what this
+ * screen is for.
+ *
+ * Both are grouped by category and day, because "Legs · Tuesday" is what a
+ * person remembers and eight rows of individual sets is not.
+ */
+function MovementBehindTheReading({ movement }: { movement: MovementEntry[] }) {
+  if (!movement.length) return null;
+
+  const demanding = movement.filter((m) => m.orientation === "yang" || m.orientation === "both");
+  const restoring = movement.filter((m) => m.orientation === "yin" || m.orientation === "both");
+
+  const line = (m: MovementEntry) =>
+    `${CATEGORY_LABEL.get(m.category) ?? m.category} · ${whenShort(m.onDate)}`;
+
+  return (
+    <div className="space-y-3 pt-3 border-t border-[hsl(var(--gold))]/10">
+      {demanding.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+            What you're recovering from
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {demanding.length} demanding session{demanding.length === 1 ? "" : "s"} this week
+          </p>
+          <ul className="space-y-0.5">
+            {demanding.slice(0, 5).map((m, i) => (
+              <li key={`${m.onDate}-${m.category}-${i}`} className="text-xs flex items-baseline gap-2">
+                <span className="truncate">{line(m)}</span>
+                {/* Where it came from, because a session the member never
+                    logged needs to explain its own presence. */}
+                {m.source === "imported" && (
+                  <span className="text-[10px] text-muted-foreground/70 shrink-0">from your phone</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="space-y-1">
+        <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+          Your restore movement
+        </p>
+        {restoring.length > 0 ? (
+          <ul className="space-y-0.5">
+            {restoring.slice(0, 5).map((m, i) => (
+              <li key={`${m.onDate}-${m.category}-${i}`} className="text-xs truncate">
+                {line(m)}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          // Stated plainly rather than as a prompt. It is a fact about the
+          // week, and the list of what gives capacity back is already above.
+          <p className="text-xs text-muted-foreground">None this week.</p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 /**
  * The movement that gives capacity back, taken from the catalogue rather than
@@ -158,16 +256,7 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
               </ul>
             )}
 
-            {terrain.data.week.sessions > 0 && (
-              <p className="text-xs text-muted-foreground pt-1 border-t border-[hsl(var(--gold))]/10">
-                This week: {terrain.data.week.sessions} session
-                {terrain.data.week.sessions === 1 ? "" : "s"} logged
-                {terrain.data.week.restoration > 0
-                  ? `, ${terrain.data.week.restoration >= terrain.data.week.stress ? "more" : "less"} restoring than demanding`
-                  : ", none of it restorative"}
-                .
-              </p>
-            )}
+            <MovementBehindTheReading movement={terrain.data.movement ?? []} />
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">

@@ -48,6 +48,7 @@ import {
 } from "../shared/models/training.js";
 import { workoutFeedbackSchema } from "../shared/models/health.js";
 import { catalogueRows, slug, arrayLiteral } from "../shared/data/exerciseCatalogue.js";
+import { readFileSync } from "node:fs";
 
 let passed = 0;
 let failed = 0;
@@ -489,6 +490,59 @@ check(
  * placement moves where a session is shown; it is not an opinion about what the
  * session cost, and nothing in the load model may read it.
  */
+/**
+ * ── Every word the phones can say, against the table that reads them ──────
+ *
+ * The expensive property of EXTERNAL_ACTIVITY_CATEGORY is that a missing key
+ * fails silently: the workout is stored, shown on the health card, and counted
+ * by nothing. Terrain gets no load from it and "nothing demanding in N days"
+ * keeps counting. Nobody reports it, because the screen looks fine.
+ *
+ * That is exactly how "martial arts" and "mind and body" went unmapped — both
+ * are emitted by the iOS reader and neither had a key here.
+ *
+ * So this reads the two native readers and asserts the table covers everything
+ * they can emit. It is grep rather than a shared constant because the readers
+ * are Swift and Kotlin and cannot import this file; a new `case` in either that
+ * nobody maps now fails here instead of on somebody's phone.
+ */
+console.log("\nEvery activity name the readers emit is mapped\n");
+
+{
+  const root = new URL("..", import.meta.url).pathname;
+  const swift = readFileSync(
+    `${root}plugins/health-sync/ios/Sources/HealthSyncPlugin/HealthSyncEngine.swift`,
+    "utf8",
+  );
+  const kotlin = readFileSync(
+    `${root}plugins/health-sync/android/src/main/java/com/sakredbody/healthsync/HealthReader.kt`,
+    "utf8",
+  );
+
+  // The bodies of the two name functions only, so unrelated string literals
+  // elsewhere in either file cannot be mistaken for an activity name.
+  const swiftBody = swift.slice(
+    swift.indexOf("func activityName"),
+    swift.indexOf("// MARK: - Posting"),
+  );
+  const kotlinBody = kotlin.slice(
+    kotlin.indexOf("fun exerciseName"),
+    kotlin.indexOf("suspend fun workouts"),
+  );
+
+  const names = new Set<string>();
+  for (const [, name] of swiftBody.matchAll(/return "([a-z ]+)"/g)) names.add(name);
+  for (const [, name] of kotlinBody.matchAll(/->\s*"([a-z ]+)"/g)) names.add(name);
+  // `other` is what both readers emit when they do not recognise a type.
+  // Mapping it would be inventing a category for an admitted unknown.
+  names.delete("other");
+
+  check("the readers were actually parsed", names.size >= 15, `found ${names.size}`);
+  for (const name of Array.from(names).sort()) {
+    check(`"${name}" has a Sakred category`, externalActivityCategory(name) !== null);
+  }
+}
+
 console.log("\nHow a session landed, and where the member wants it\n");
 
 check("Sakred reads a run as Build", placementOfOrientation(externalActivityOrientation("running")) === "build");

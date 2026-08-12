@@ -311,6 +311,49 @@ export function useHasCoachPlan(): boolean {
   return !isLoading && Boolean(data?.routine?.name);
 }
 
+/**
+ * Is anybody actually coaching this member?
+ *
+ * Distinct from `useHasCoachPlan`, which asks whether a coach has written them
+ * a protocol. A member can be coached without one — the conversation is the
+ * service, and the plan is one of the things it produces.
+ *
+ * ── Why this decides whether the tab exists ──────────────────────────────
+ *
+ * Coach was a permanent primary destination for everyone, and for a member
+ * without a coach it opened a full-height empty panel reading "Start the
+ * Conversation — they'll respond here." Nobody was going to respond. An
+ * unpurchased service dressed as an empty feature is worse than no entry at
+ * all: it reads as something broken, or as something the member has failed to
+ * use.
+ *
+ * Two signals, either of which is sufficient:
+ *
+ *   a coach's plan     somebody wrote them a protocol
+ *   a coach's message  somebody has spoken to them
+ *
+ * The second matters on its own so that an existing thread can never vanish
+ * because a protocol ended. Their own messages do not count — writing into an
+ * empty room is the symptom, not the evidence.
+ */
+export function useHasCoach(): boolean {
+  const hasPlan = useHasCoachPlan();
+
+  const { data } = useQuery<{ senderRole?: string }[]>({
+    queryKey: ["/api/coaching/messages"],
+    queryFn: async () => {
+      const res = await fetch("/api/coaching/messages", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    // The thread is small and the answer decides a navigation item, so it is
+    // worth one request — but not worth re-asking on every remount.
+    staleTime: 5 * 60_000,
+  });
+
+  return hasPlan || (data ?? []).some((m) => m.senderRole === "coach");
+}
+
 export function useEnrollmentHistory() {
   return useQuery<UserRoutine[]>({
     queryKey: ["/api/routines/history"],

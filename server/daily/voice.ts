@@ -150,6 +150,48 @@ const BANNED_PATTERNS: { re: RegExp; why: string }[] = [
     re: /\bis\s+the\s+(most|least|easiest|hardest|only|best|worst)\s+(\w+\s+)?thing\b/i,
     why: '"X is the most Y thing" maxim',
   },
+  /**
+   * ── A claim about today that cannot survive today ───────────────────────
+   *
+   * The note is written once, before dawn, and stored until midnight. So a
+   * sentence about the state of the member's body *right now* is false for most
+   * of the day it describes. This is not a hypothetical: Today read "your sleep
+   * and movement are both down — let today be small on purpose" at six in the
+   * evening, four seconds away from a Stats screen showing sixteen thousand
+   * steps and a five-mile run.
+   *
+   * Part of that was arithmetic and is fixed — the movement signal was
+   * averaging a step count that was still being counted. The rest is
+   * structural, and no amount of correct input fixes it: a note frozen at 7am
+   * cannot describe a body that trains at noon.
+   *
+   * So the division is enforced here rather than asked for in the prompt. The
+   * note carries the day's *rhythm* — the moon, the season, the personal day,
+   * the protocol — which is genuinely stable from waking to sleeping. Anything
+   * about how the body is doing belongs to the live terrain read, which is
+   * recomputed on every request and can change its mind at four in the
+   * afternoon because the member did.
+   *
+   * These patterns catch the shape rather than the vocabulary: a present-tense
+   * verdict on movement, sleep, energy or recovery, bound to today. "You have
+   * been short on sleep this week" passes, because it is still true at
+   * midnight. "Your movement is down today" does not.
+   */
+  {
+    // "are both down", "is a little low", "is well off" — an adverb or two can
+    // sit between the verb and the verdict, and the sentence means the same.
+    re: /\byour\s+(sleep|movement|energy|recovery|body|training)\b[^.!?]{0,40}\b(is|are|has been|seems)\s+(?:\w+\s+){0,2}(down|low|up|high|flat|off|depleted|behind)\b/i,
+    why: "a present-tense verdict on the body — that belongs to the live terrain read, not a note frozen at dawn",
+  },
+  {
+    re: /\b(today|so far today|this morning)\b[^.!?]{0,30}\byou\s+(have|haven't|have not|['’]ve)\s+\w*\s*(moved|trained|walked|slept|rested)\b/i,
+    why: "a claim about what the member has done today, in a note written before they did it",
+  },
+  {
+    re: /\byou\s+(have not|haven't|['’]ve not)\s+(moved|trained|exercised)\s+(today|yet)\b/i,
+    why: "asserting the day is empty before it has happened",
+  },
+
   /** An exclamation mark is the American register in one character. */
   {
     re: /!/,
@@ -534,6 +576,20 @@ The rules that produce the right column:
 - Ordinary reference points: a ten-minute walk, a glass of water, bed half an hour earlier, one less coffee. Not "a slower morning".
 
 One idea per sentence. If a sentence sounds wise, cut it and write the instruction it was decorating.
+
+WHAT THIS NOTE IS, AND WHAT IT IS NOT
+This is written once, before he is awake, and he will read it again at six in the evening. So it can only contain things that are still true then.
+
+The rhythm of the day is: the moon, the season, his personal day, where he is in a protocol. Those hold from waking to sleeping. Write those.
+
+How his body is doing right now is not yours to say. He may train at noon, walk fifteen thousand steps, sit in a sauna at five. A separate part of the screen reads that live and updates when he does. If you write "your movement is down", he will read it after a five-mile run, and every other sentence you wrote loses its credit.
+
+You are given his last seven completed days as background. Use them to decide what kind of day to point at. Do not report them back to him, and never make a claim about *today* — not what he has done, not what he has not done, not what state he is in.
+
+Wrong: "Your sleep and movement are both down — let today be small."
+Wrong: "You haven't moved yet today."
+Right: "A new moon and a personal day of withdrawal line up. Keep some space around yourself."
+Right: "You've been short on sleep this week. Bed half an hour earlier tonight."
 
 ON "DAY N"
 Write "Day nine of twenty-one" only about their protocol, and only when they are running one. A member reads "Day 25" as their own progress, so never use a bare day number for the moon, the month or anything else.

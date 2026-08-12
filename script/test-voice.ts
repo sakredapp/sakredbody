@@ -426,6 +426,49 @@ rejects("a superlative maxim", {
 }, "maxim");
 
 /**
+ * ── A note written at dawn cannot report on the afternoon ─────────────────
+ *
+ * The note is generated once and stored for the day. A present-tense verdict on
+ * the body is therefore false for most of the hours it is on screen — and it
+ * was: Today read "your sleep and movement are both down — let today be small"
+ * at 18:10, on a day with sixteen thousand steps and a five-mile run in it.
+ *
+ * The live terrain read owns that claim. This filter is what stops the frozen
+ * layer from making it, because a prompt rule is a request and this is the
+ * guarantee.
+ */
+rejects("a present-tense verdict on movement", {
+  headline: "Turn inward",
+  body: "A new moon and a personal day of withdrawal line up once. Your sleep and movement are both down, so keep the day small and eat something warm.",
+  invitation: null,
+}, "terrain read");
+rejects("the same verdict about energy", {
+  headline: "Quiet day",
+  body: "Your energy is low today, so keep the morning simple and eat something warm before noon.",
+  invitation: null,
+}, "terrain read");
+rejects("asserting an empty day before it happens", {
+  headline: "Get out",
+  body: "You have not moved today. Walk for ten minutes before the light goes and eat something warm.",
+  invitation: null,
+}, "before it has happened");
+
+/**
+ * The window that stays true has to survive, or the filter has banned the
+ * subject rather than the frozen claim. "This week" is over; "today" is not.
+ */
+acceptsGrounded("a claim about the week, which is still true at midnight", {
+  headline: "Sleep first",
+  body: "You have been short on sleep this week and you are on day nine of twenty-one. Bed half an hour earlier tonight. One less coffee after two.",
+  invitation: "Lights out by ten.",
+});
+acceptsGrounded("pure rhythm, with no claim about the body at all", {
+  headline: "Turn inward",
+  body: "A new moon and a personal day of withdrawal line up. Say less. Eat light. Keep some space around yourself and let the stomach rest.",
+  invitation: "Take one meal in silence.",
+});
+
+/**
  * And the blunt version of each has to survive, or the filter has simply
  * banned the subject rather than the register.
  */

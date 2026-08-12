@@ -183,7 +183,12 @@ class HealthReader(private val context: Context) {
         ExerciseSessionRecord.EXERCISE_TYPE_PILATES -> "pilates"
         ExerciseSessionRecord.EXERCISE_TYPE_STRETCHING -> "flexibility"
         ExerciseSessionRecord.EXERCISE_TYPE_GUIDED_BREATHING -> "cooldown"
-        ExerciseSessionRecord.EXERCISE_TYPE_EXERCISE_CLASS -> "hiit"
+
+        // A class, not necessarily a hard one. This returned "hiit", which maps
+        // to `explosive` — the heaviest bracket in the model — so a gentle
+        // studio class counted the same as sprint intervals. "class" carries a
+        // moderate load and no claim about intensity we cannot support.
+        ExerciseSessionRecord.EXERCISE_TYPE_EXERCISE_CLASS -> "class"
 
         else -> "other"
     }

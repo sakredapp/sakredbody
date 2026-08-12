@@ -71,6 +71,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useEffect } from "react";
+import { useHasCoach } from "@/hooks/use-coaching";
 import { scheduleMorningNotice } from "@/lib/morningNotice";
 import { updateWidget } from "@/lib/widget";
 
@@ -193,6 +194,19 @@ export default function MemberDashboard() {
   // do once, and it was standing in front of everything else.
   const [retreatView, setRetreatView] = useState<"book" | "services" | "my-bookings" | "masterminds">("masterminds");
   const [coachingTab, setCoachingTab] = useState<CoachingTab>("today");
+  const hasCoach = useHasCoach();
+
+  /**
+   * Never stranded on a tab that stopped existing.
+   *
+   * `hasCoach` resolves after a request, and a member can be sitting on Coach
+   * when a plan ends. Without this they keep the panel of a destination the row
+   * no longer offers, with no way back to it — the tab is gone, so nothing is
+   * highlighted and nothing looks wrong.
+   */
+  useEffect(() => {
+    if (!hasCoach && coachingTab === "coach") setCoachingTab("today");
+  }, [hasCoach, coachingTab]);
 
   /**
    * Open a section, and optionally land on one of its sub-tabs.
@@ -472,17 +486,37 @@ export default function MemberDashboard() {
       </header>
 
       {/* ─── Sub-navigation ─── */}
+      {/*
+        ── Four destinations, not six ────────────────────────────────────────
+
+        This row held Today, Journey, Routines, Habits, Stats and Coach, and it
+        did not fit — the last item was cut off mid-word on a phone, which is
+        how a second navigation system announces that it has outgrown the space
+        it was given. The fix is not a scroll affordance. It is that three of
+        the six should not have been there.
+
+        Stats is gone as a peer. Its current-day half now opens Today, which is
+        where somebody looking for "what has my body done" actually goes; the
+        history behind it is still one tap away and is detail, not a
+        destination.
+
+        Journey is gone because it was a fourteen-day habit strip — the same
+        ground as Habits and Routines, under a name promising something else.
+        It comes back when it is the longitudinal record it should be: what has
+        changed, not what is true today.
+
+        Coach appears only when somebody is actually coaching this member. See
+        `useHasCoach`.
+      */}
       {section === "coaching" && (
         <SubNav
           value={coachingTab}
           onChange={setCoachingTab}
           items={[
             { id: "today", label: "Today" },
-            { id: "journey", label: "Journey" },
             { id: "routines", label: "Routines" },
             { id: "catalog", label: "Habits" },
-            { id: "analytics", label: "Stats" },
-            { id: "coach", label: "Coach" },
+            ...(hasCoach ? [{ id: "coach" as const, label: "Coach" }] : []),
           ]}
         />
       )}
@@ -564,7 +598,14 @@ export default function MemberDashboard() {
             transition={{ duration: 0.2 }}
             className={`${PORTAL_COLUMN} py-6`}
           >
-            {coachingTab === "today" && <TodayTab />}
+            {coachingTab === "today" && (
+              <TodayTab onOpenTrends={() => setCoachingTab("analytics")} />
+            )}
+            {/*
+              Still reachable, no longer a peer. Stats is where the history
+              lives, and it is opened from the day it explains rather than
+              standing beside it in the row.
+            */}
             {coachingTab === "journey" && <JourneyMap />}
             {coachingTab === "routines" && <RoutinesTab />}
             {coachingTab === "catalog" && <CatalogSection />}
