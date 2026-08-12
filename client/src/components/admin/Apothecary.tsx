@@ -467,6 +467,168 @@ export function ApothecaryAdmin({ enabled }: { enabled: boolean }) {
           )}
         </div>
       )}
+
+      <GuidanceLinks enabled={enabled} products={productsQuery.data ?? []} />
+    </div>
+  );
+}
+
+/**
+ * Attaching a product to a piece of guidance.
+ *
+ * ── Two content layers, kept apart ────────────────────────────────────────
+ *
+ * The primitives are a constant in shared/models/apothecary.ts — versioned
+ * with the code, reviewable in a diff, and not editable here on purpose. The
+ * products are data. This screen is the join between them and nothing else:
+ * unlinking a product never alters the guidance, and deactivating a product
+ * never touches a link row. Both disappear from the member's screen by the
+ * same mechanism, which is the server filtering on is_active.
+ *
+ * ── Why the empty state is the important one ──────────────────────────────
+ *
+ * Most primitives will never have a product and must not look poorer for it.
+ * A ten-minute breathing downshift has nothing to sell and is one of the best
+ * things on the list. So "no product" reads as a normal, finished state here,
+ * exactly as it renders as one in the app.
+ */
+function GuidanceLinks({
+  enabled,
+  products,
+}: {
+  enabled: boolean;
+  products: ProductWithLinks[];
+}) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [pick, setPick] = useState<Record<string, string>>({});
+  const [note, setNote] = useState<Record<string, string>>({});
+
+  const primitives = useQuery<
+    { id: string; title: string; type: string; evidence: string; conditions: string[] }[]
+  >({ queryKey: ["/api/admin/apothecary/primitives"], enabled });
+
+  const links = useQuery<
+    { id?: string; supportId: string; productId: string; name: string; note: string | null }[]
+  >({ queryKey: ["/api/apothecary/guidance-links"], enabled });
+
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["/api/apothecary/guidance-links"] });
+  };
+
+  const attach = useMutation({
+    mutationFn: (body: { supportId: string; productId: string; note?: string | null }) =>
+      apiRequest("POST", "/api/admin/apothecary/guidance-links", body),
+    onSuccess: () => {
+      refresh();
+      toast({ title: "Linked." });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const detach = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest("DELETE", `/api/admin/apothecary/guidance-links/${id}`),
+    onSuccess: () => {
+      refresh();
+      toast({ title: "Unlinked. The guidance is unchanged." });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  if (!enabled) return null;
+
+  return (
+    <div className="mt-8 space-y-3">
+      <div>
+        <h3 className="text-lg font-display">Guidance links</h3>
+        <p className="text-xs text-muted-foreground mt-1">
+          Attach a product to a recommendation. Anything without one shows the practice on its
+          own — no button, no placeholder. Deactivating a product hides its link everywhere
+          without changing the guidance.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        {(primitives.data ?? []).map((p) => {
+          const linked = (links.data ?? []).filter((l) => l.supportId === p.id);
+          return (
+            <div key={p.id} className="rounded-lg border border-border/40 p-3 space-y-2">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-sm font-medium">{p.title}</span>
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                  {p.type} · {p.evidence}
+                </span>
+              </div>
+
+              {linked.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground">
+                  No product attached — members see the guidance only.
+                </p>
+              ) : (
+                linked.map((l) => (
+                  <div
+                    key={l.productId}
+                    className="flex items-center gap-2 rounded border border-[hsl(var(--gold))]/20 px-2 py-1"
+                  >
+                    <span className="text-xs flex-1 truncate">{l.name}</span>
+                    {l.note && (
+                      <span className="text-[10px] text-muted-foreground truncate">{l.note}</span>
+                    )}
+                    <button
+                      onClick={() => l.id && detach.mutate(l.id)}
+                      disabled={!l.id || detach.isPending}
+                      className="text-muted-foreground hover:text-destructive"
+                      aria-label={`Unlink ${l.name}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))
+              )}
+
+              {/* A picker of real products. No ids typed by hand. */}
+              <div className="flex gap-2">
+                <select
+                  value={pick[p.id] ?? ""}
+                  onChange={(e) => setPick({ ...pick, [p.id]: e.target.value })}
+                  className="flex-1 h-8 rounded border border-border/50 bg-transparent text-xs px-2"
+                >
+                  <option value="">Attach a product…</option>
+                  {products
+                    .filter((prod) => prod.isActive !== false)
+                    .map((prod) => (
+                      <option key={prod.id} value={prod.id}>
+                        {prod.brand ? `${prod.brand} — ` : ""}
+                        {prod.name}
+                      </option>
+                    ))}
+                </select>
+                <Input
+                  value={note[p.id] ?? ""}
+                  onChange={(e) => setNote({ ...note, [p.id]: e.target.value })}
+                  placeholder="Note — “the one we use”"
+                  className="h-8 text-xs flex-1"
+                />
+                <Button
+                  size="sm"
+                  className="h-8"
+                  disabled={!pick[p.id] || attach.isPending}
+                  onClick={() =>
+                    attach.mutate({
+                      supportId: p.id,
+                      productId: pick[p.id],
+                      note: note[p.id]?.trim() || null,
+                    })
+                  }
+                >
+                  Save
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

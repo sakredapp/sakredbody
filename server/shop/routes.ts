@@ -98,13 +98,20 @@ async function withLinks(rows: Product[]): Promise<(Product & { links: ProductLi
 export function registerShopRoutes(app: Express) {
   // ── Apothecary primitives ↔ products ────────────────────────────────────
   //
+  // Deliberately `guidance-links`, not `links`. This file already had
+  // /api/admin/apothecary/links/:linkId for removing a *vendor* buy link from
+  // a product, and the first version of these routes reused that exact path —
+  // registering first, so admin's "remove a buy link" silently hit this
+  // handler instead, found nothing in support_products and returned 204. Two
+  // different relationships, two different paths.
+  //
   // The suggestions on a metric screen come from a constant in
   // shared/models/apothecary.ts. This is what lets one of them carry
   // "the one we actually use" and a link, without the guidance depending on a
   // product existing — see the note on the table.
 
   /** Every link, for the client to match against the suggestions it renders. */
-  app.get("/api/apothecary/links", isAuthenticated, async (_req: Request, res: Response) => {
+  app.get("/api/apothecary/guidance-links", isAuthenticated, async (_req: Request, res: Response) => {
     try {
       /**
        * The product and where to actually buy it.
@@ -116,6 +123,8 @@ export function registerShopRoutes(app: Express) {
        */
       const rows = await db
         .select({
+          /** The link row, so admin can unlink without a second lookup. */
+          id: supportProducts.id,
           supportId: supportProducts.supportId,
           note: supportProducts.note,
           productId: products.id,
@@ -139,7 +148,7 @@ export function registerShopRoutes(app: Express) {
     }
   });
 
-  app.post("/api/admin/apothecary/links", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
+  app.post("/api/admin/apothecary/guidance-links", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
     try {
       const input = linkSupportProductSchema.parse(req.body);
       // The support id must name something in the library. A typo here would
@@ -168,7 +177,7 @@ export function registerShopRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/admin/apothecary/links/:id", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
+  app.delete("/api/admin/apothecary/guidance-links/:id", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
     try {
       await db.delete(supportProducts).where(eq(supportProducts.id, String(req.params.id)));
       res.status(204).end();

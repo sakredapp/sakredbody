@@ -31,9 +31,9 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sparkline } from "@/components/portal/Sparkline";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { METRIC_DISPLAY, adviceFor, localToday, type DaySeries } from "@/lib/healthDisplay";
 import { selectSupport, type SupportPrimitive } from "@shared/models/apothecary";
+import { useApothecaryLinks, type ApothecaryLink } from "@/hooks/use-apothecary-links";
 import type { HealthMetric } from "@shared/models/health";
 import { cn } from "@/lib/utils";
 
@@ -122,20 +122,11 @@ export function MetricDetail({
   /**
    * Products attached to these suggestions, if any.
    *
-   * Fetched once and matched client-side rather than per card. The guidance
-   * renders whether or not this resolves — see the note on the table: a card
-   * that only appears when there is something to sell is an advert wearing
-   * guidance's clothes.
+   * Through the shared resolver so that a sleep card, a Restore card and the
+   * Apothecary all answer "does this have a product" identically. Guidance
+   * renders whether or not this resolves.
    */
-  const links = useQuery<ApothecaryLink[]>({
-    queryKey: ["/api/apothecary/links"],
-    queryFn: async () => {
-      const r = await fetch("/api/apothecary/links", { credentials: "include" });
-      if (!r.ok) throw new Error("links");
-      return r.json();
-    },
-    staleTime: 30 * 60 * 1000,
-  });
+  const { linkFor } = useApothecaryLinks();
 
   const best = points.length ? Math.max(...points.map((p) => p.value)) : null;
   const worst = points.length ? Math.min(...points.map((p) => p.value)) : null;
@@ -228,7 +219,7 @@ export function MetricDetail({
                   <SupportCard
                     key={p.id}
                     primitive={p}
-                    link={links.data?.find((l) => l.supportId === p.id) ?? null}
+                    link={linkFor(p.id)}
                   />
                 ))}
               </div>
@@ -284,19 +275,6 @@ export function MetricDetail({
  * a tap, because somebody on thyroid medication should not have to be curious
  * to find out that ashwagandha matters to them.
  */
-export type ApothecaryLink = {
-  supportId: string;
-  note: string | null;
-  productId: string;
-  name: string;
-  brand: string | null;
-  priceCents: number | null;
-  priceNote: string | null;
-  imageUrl: string | null;
-  linkLabel: string | null;
-  url: string | null;
-};
-
 function SupportCard({
   primitive,
   link,
