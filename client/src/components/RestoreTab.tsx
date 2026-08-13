@@ -47,6 +47,13 @@ type MovementEntry = {
   id?: string;
   onDate: string;
   category: string;
+  /**
+   * Every category one event contributed to, when the row is an event rather
+   * than a projection. A logged session can be several things at once without
+   * being several sessions.
+   */
+  categories?: string[];
+  orientations?: ("yin" | "yang" | "both" | "neutral")[];
   /** What the member would call it, when the source gave us a name. */
   activity: string | null;
   orientation: "yin" | "yang" | "both" | "neutral";
@@ -104,8 +111,17 @@ function whenShort(onDate: string): string {
 function MovementBehindTheReading({ movement }: { movement: MovementEntry[] }) {
   if (!movement.length) return null;
 
-  const demanding = movement.filter((m) => m.orientation === "yang" || m.orientation === "both");
-  const restoring = movement.filter((m) => m.orientation === "yin" || m.orientation === "both");
+  /**
+   * Any contribution that pulls a given way puts the event in that list.
+   *
+   * One session can be both — "Back + Mobility" really did ask something of the
+   * body and give something back — and appearing in both is honest, where
+   * splitting it into two rows would say the member trained twice.
+   */
+  const pulls = (m: MovementEntry, ways: string[]) =>
+    (m.orientations ?? [m.orientation]).some((o) => ways.includes(o));
+  const demanding = movement.filter((m) => pulls(m, ["yang", "both"]));
+  const restoring = movement.filter((m) => pulls(m, ["yin", "both"]));
 
   /**
    * What they did, then when.
@@ -116,8 +132,11 @@ function MovementBehindTheReading({ movement }: { movement: MovementEntry[] }) {
    * and using it produced three rows of "Recovery" for a week of yoga, mobility
    * and a walk.
    */
-  const line = (m: MovementEntry) =>
-    `${activityLabel(m.activity) ?? CATEGORY_LABEL.get(m.category) ?? m.category} · ${whenShort(m.onDate)}`;
+  const line = (m: MovementEntry) => {
+    const fallback = m.categories?.[0] ?? m.category;
+    const name = activityLabel(m.activity) ?? CATEGORY_LABEL.get(fallback) ?? fallback;
+    return `${name} · ${whenShort(m.onDate)}`;
+  };
 
   return (
     <div className="space-y-3 pt-3 border-t border-[hsl(var(--gold))]/10">

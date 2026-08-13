@@ -249,9 +249,17 @@ export async function terrainFor(userId: string, onDate: string) {
   const movementEventList = events.map((e) => ({
     id: e.id,
     onDate: e.onDate,
-    category: e.category,
+    /**
+     * Every category this one event contributed to, and their orientations.
+     *
+     * Plural because a logged session can be several things at once. The screen
+     * decides demanding-or-restorative by asking whether *any* contribution
+     * pulls that way, which is how "Back + Mobility" can honestly appear under
+     * both without being two sessions.
+     */
+    categories: e.categories,
+    orientations: e.categories.map((c) => categoryOrientation(c)),
     activity: e.activity,
-    orientation: categoryOrientation(e.category),
     source: e.source,
   }));
 

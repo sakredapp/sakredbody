@@ -124,8 +124,20 @@ export type MovementEvent = {
   /** When it happened. Sakred sessions have no start time; this is the finish. */
   occurredAt: Date | null;
   onDate: string;
-  /** A Sakred category — what the load model reads. */
-  category: string;
+  /**
+   * The categories this one event contributed to — one or more.
+   *
+   * An event is what the member did; a category is what Sakred makes of it, and
+   * the two are not the same arity. An imported run contributes one. A logged
+   * session called "Back + Mobility" genuinely contributes strength, mobility
+   * and recovery — but it is still *one session*, and rendering it three times
+   * would tell somebody they trained three times when they trained once.
+   *
+   * So the multiplicity lives here, on the contributions, and never on the
+   * event. `recentMovement` expands these back out because load is per
+   * category; history does not, because history is per thing-you-did.
+   */
+  categories: string[];
   /** What the member would call it, where the source named it. */
   activity: string | null;
   source: "sakred" | "imported";
@@ -180,15 +192,33 @@ export async function movementEvents(userId: string, since: string): Promise<Mov
    * `title` is the member's own name for it where they gave one. No
    * imported-style activity word is invented for them.
    */
+  /**
+   * One event per session, not per category.
+   *
+   * The query returns a row per (session, category) because it joins through
+   * the sets. Grouping here is what keeps a single workout a single entry in
+   * the member's history while still recording everything it touched.
+   */
+  const bySession = new Map<string, MovementEvent>();
   for (const row of logged) {
-    events.push({
-      id: `${row.id}:${row.category}`,
+    const existing = bySession.get(row.id);
+    if (existing) {
+      if (!existing.categories.includes(row.category)) existing.categories.push(row.category);
+      continue;
+    }
+    bySession.set(row.id, {
+      id: row.id,
       occurredAt: row.finishedAt ?? null,
       onDate: row.onDate,
-      category: row.category,
+      categories: [row.category],
       activity: row.title?.trim() || null,
       source: "sakred",
     });
+  }
+  for (const e of Array.from(bySession.values())) {
+    // Stable within the event too, so the same session always reads the same.
+    e.categories.sort();
+    events.push(e);
   }
 
   for (const row of imported) {
@@ -200,7 +230,7 @@ export async function movementEvents(userId: string, since: string): Promise<Mov
       id: row.id,
       occurredAt: row.startAt ?? null,
       onDate: row.onDate,
-      category,
+      categories: [category],
       activity: row.workoutType ?? null,
       source: "imported",
     });
@@ -237,10 +267,14 @@ export async function recentMovement(
   });
 
   for (const e of ordered) {
-    const key = `${e.onDate}|${e.category}`;
-    if (claimed.has(key)) continue;
-    claimed.add(key);
-    out.push({ onDate: e.onDate, category: e.category, activity: e.activity, source: e.source });
+    // Back out to one entry per contribution: load is per category, and a
+    // session that touched three of them made three demands on the body.
+    for (const category of e.categories) {
+      const key = `${e.onDate}|${category}`;
+      if (claimed.has(key)) continue;
+      claimed.add(key);
+      out.push({ onDate: e.onDate, category, activity: e.activity, source: e.source });
+    }
   }
 
   return out.sort((a, b) => b.onDate.localeCompare(a.onDate));

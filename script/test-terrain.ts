@@ -389,6 +389,26 @@ console.log("\nAn event is history; a projection is not\n");
 
   check("there is an event-level reader", /export async function movementEvents\(/.test(hist));
   check("it carries a stable event id", /  id: string;/.test(hist));
+
+  /**
+   * One session is one event. The multiplicity belongs on the contributions,
+   * not on the thing the member did — a workout touching strength, mobility and
+   * recovery is one workout, and listing it three times would tell somebody
+   * they trained three times.
+   */
+  check("an event holds many categories", /categories: string\[\];/.test(hist));
+  /** The projection keeps its single category — that is the whole distinction. */
+  check(
+    "while the projection keeps exactly one",
+    /export type MovementDay = \{[\s\S]*?  category: string;[\s\S]*?\};/.test(hist),
+  );
+  check("logged sessions are grouped by session", /bySession\.get\(row\.id\)/.test(hist));
+  check("the event id is the session, not session-plus-category", !/\$\{row\.id\}:\$\{row\.category\}/.test(hist));
+  check(
+    "and the reduction expands contributions back out",
+    /for \(const category of e\.categories\)/.test(hist),
+  );
+  check("with contributions in a stable order", /e\.categories\.sort\(\)/.test(hist));
   check("and when it happened", /occurredAt: Date \| null;/.test(hist));
 
   /** One query path, so the two representations cannot drift apart. */
@@ -420,8 +440,10 @@ console.log("\nAn event is history; a projection is not\n");
   /** Placement stays classification, never English. */
   check(
     "demand and restoration come from orientation",
-    /orientation === "yang"/.test(restore) && /orientation === "yin"/.test(restore),
+    /pulls\(m, \["yang", "both"\]\)/.test(restore) && /pulls\(m, \["yin", "both"\]\)/.test(restore),
   );
+  /** A session that is both does not become two sessions. */
+  check("any contribution can place an event", /\.some\(\(o\) => ways\.includes\(o\)\)/.test(restore));
   check("not from the activity name", !/activity ===|activity\.includes/.test(restore));
 }
 
