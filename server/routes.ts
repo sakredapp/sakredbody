@@ -15,6 +15,7 @@ import {
   registerCoachRelationshipRoutes,
   registerCoachClientRoutes,
   registerCoachingMessageRoutes,
+  registerCoachPlanRoutes,
 } from "./coaching/index.js";
 import { registerMasterclassRoutes } from "./masterclass/index.js";
 import { registerShopRoutes } from "./shop/index.js";
@@ -473,6 +474,7 @@ export async function registerRoutes(
   registerCoachRelationshipRoutes(app);
   registerCoachClientRoutes(app);
   registerCoachingMessageRoutes(app);
+  registerCoachPlanRoutes(app);
 
   // ── Masterclass Video Library ────────────────────────────────────────
   registerMasterclassRoutes(app);

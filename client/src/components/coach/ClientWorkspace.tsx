@@ -36,11 +36,16 @@ import { METRIC_DISPLAY, dayLabel } from "@/lib/healthDisplay";
 import type { HealthMetric } from "@shared/schema";
 import { workoutSource } from "@/components/portal/TodaysMovement";
 import { Conversation } from "@/components/coach/Conversation";
+import { PlanEditor } from "@/components/coach/PlanEditor";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 import {
   useClientActivity,
   useClientHabits,
   useClientOverview,
-  useClientPlan,
+  useClientPlans,
   useClientTrends,
   type ClientPhase,
   type ResolvedHabitView,
@@ -483,47 +488,135 @@ function Habits({ memberId }: { memberId: string }) {
 
 // ─── Plan ──────────────────────────────────────────────────────────────────
 
-function Plan({ memberId }: { memberId: string }) {
-  const { data, isLoading, error } = useClientPlan(memberId);
+/**
+ * The Coach's Plan tab.
+ *
+ * A plan, a draft, and what came before. The habits and health context below it
+ * are the same canonical readers the rest of the workspace uses — the plan does
+ * not get its own copy of what the member is on.
+ */
+function Plan({ memberId, memberName }: { memberId: string; memberName: string }) {
+  const plans = useClientPlans(memberId);
   const trends = useClientTrends(memberId);
+  const [editing, setEditing] = useState(false);
+  const qc = useQueryClient();
+  const { toast } = useToast();
 
-  if (isLoading) return <Loading />;
-  if (error) return <Empty>{(error as Error).message}</Empty>;
-  if (!data) return null;
+  const create = useMutation({
+    mutationFn: async () =>
+      apiRequest("POST", `/api/coach/clients/${memberId}/plans`, {
+        title: `Plan for ${memberName.split(" ")[0] || memberName}`,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/coach/clients", memberId, "plans"] });
+      setEditing(true);
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
 
-  const phaseBy = new Map(data.phases.map((p) => [p.trackedHabitId, p]));
+  const end = useMutation({
+    mutationFn: async (planId: string) => apiRequest("POST", `/api/coach/plans/${planId}/end`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/coach/clients", memberId, "plans"] });
+      /*
+        Ending a plan does not end the member's practices — see endPlan. So the
+        habit views do not need invalidating, and saying otherwise here would
+        imply a change that did not happen.
+      */
+      toast({ title: "Plan ended" });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  if (plans.isLoading) return <Loading />;
+  if (plans.error) return <Empty>{(plans.error as Error).message}</Empty>;
+
+  const { active, draft, history } = plans.data ?? { active: null, draft: null, history: [] };
+
+  if (editing && draft) {
+    return (
+      <PlanEditor
+        memberId={memberId}
+        memberName={memberName}
+        plan={draft}
+        onDone={() => setEditing(false)}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4">
       <Section title="Coach's plan">
-        {data.plan ? (
+        {active ? (
           <>
-            <p className="text-sm">{data.plan.name ?? "Plan"}</p>
-            {data.plan.description && (
-              <p className="text-xs text-muted-foreground mt-1">{data.plan.description}</p>
+            <p className="text-sm">{active.title}</p>
+            {active.focus && (
+              <p className="text-xs text-muted-foreground mt-1">{active.focus}</p>
             )}
             <p className="text-xs text-muted-foreground mt-2">
-              Day {data.plan.currentDay} of {data.plan.totalDays}
+              {active.items.length} {active.items.length === 1 ? "practice" : "practices"}
+              {active.endsOn ? ` · through ${active.endsOn}` : ""}
             </p>
+            <div className="mt-3 space-y-1">
+              {active.items.map((i) => (
+                <p key={i.routineHabitId} className="text-sm">
+                  {i.title}
+                  {i.target != null && (
+                    <span className="text-muted-foreground"> · {i.target}</span>
+                  )}
+                </p>
+              ))}
+            </div>
+            {active.internalNote && (
+              /* The coach's own note. Never sent to the member. */
+              <p className="text-[11px] text-muted-foreground mt-3 pt-3 border-t border-border/20">
+                <span className="text-muted-foreground/50">Your note · </span>
+                {active.internalNote}
+              </p>
+            )}
+            <button
+              onClick={() => end.mutate(active.id)}
+              className="text-xs text-muted-foreground hover:text-destructive transition-colors mt-3"
+              data-testid="plan-end"
+            >
+              End this plan
+            </button>
           </>
         ) : (
           <Empty>No active Coach's Plan.</Empty>
         )}
-        {/* Authoring is a later slice. Said out loud so it doesn't read as broken. */}
-        <p className="text-[10px] text-muted-foreground/50 mt-3">
-          Read-only for now.
-        </p>
       </Section>
 
-      {data.habits.length > 0 && (
-        <Section title="What they're on today">
-          <div className="space-y-2">
-            {data.habits.map((h) => (
-              <HabitRow
-                key={String(h.trackedHabitId ?? h.id)}
-                h={h}
-                phase={phaseBy.get(String(h.trackedHabitId ?? h.id))}
-              />
+      {draft ? (
+        <Section title="Draft">
+          <p className="text-sm">{draft.title}</p>
+          {/* Said plainly, because the whole point of a draft is that it is not
+              doing anything to the member yet. */}
+          <p className="text-xs text-muted-foreground mt-1">
+            Not active. Nothing has changed for them.
+          </p>
+          <Button size="sm" className="mt-3" onClick={() => setEditing(true)} data-testid="plan-edit-draft">
+            Continue editing
+          </Button>
+        </Section>
+      ) : (
+        <Button size="sm" onClick={() => create.mutate()} disabled={create.isPending} data-testid="plan-create">
+          {create.isPending ? "Creating…" : active ? "Draft a new plan" : "Create plan"}
+        </Button>
+      )}
+
+      {history.length > 0 && (
+        <Section title="Earlier plans">
+          <div className="space-y-1.5">
+            {history.map((h) => (
+              <div key={h.id} className="flex items-baseline justify-between gap-3">
+                <span className="text-sm">{h.title}</span>
+                <span className="text-[11px] text-muted-foreground shrink-0">
+                  {h.startsOn ?? ""}
+                  {h.endsOn ? `–${h.endsOn}` : ""}
+                  {h.ranItsCourse ? "" : " · ended early"}
+                </span>
+              </div>
             ))}
           </div>
         </Section>
@@ -709,7 +802,7 @@ export function ClientWorkspace({
       {tab === "overview" && <Overview memberId={memberId} />}
       {tab === "activity" && <Activity memberId={memberId} />}
       {tab === "habits" && <Habits memberId={memberId} />}
-      {tab === "plan" && <Plan memberId={memberId} />}
+      {tab === "plan" && <Plan memberId={memberId} memberName={name} />}
       {tab === "messages" && <Messages memberId={memberId} memberName={name} />}
     </div>
   );

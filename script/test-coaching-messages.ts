@@ -230,5 +230,31 @@ console.log("\nThree different things that must not become one\n");
   check("no url in the client shape", !/[uU]rl/.test(shape));
 }
 
+/**
+ * The Admin coaching thread reads the same shape and the same retrieval path.
+ *
+ * When attachments stopped being a URL on the message, this screen silently
+ * lost the ability to show them. The fix was to give it `threadFor` and the
+ * authorized endpoint — not to revive `imageUrl`, and not to build a second
+ * admin-only attachment route.
+ */
+{
+  const coaching = readFileSync(new URL("../server/coaching/routes.ts", import.meta.url), "utf8");
+  const adminThread = coaching.slice(
+    coaching.indexOf('"/api/admin/coaching/messages/:userId"'),
+    coaching.indexOf("// ── Admin: reply to a user"),
+  );
+  check("the admin thread returns threadFor", /threadFor\(/.test(adminThread));
+  check(
+    "gated on superviseCoaching, not a rank",
+    /requireCapability\("superviseCoaching"\)/.test(adminThread),
+  );
+
+  const admin = readFileSync(new URL("../client/src/pages/AdminPortal.tsx", import.meta.url), "utf8");
+  check("admin renders attachments by id", /href=\{`\/api\/coaching\/attachments\/\$\{a\.id\}`\}/.test(admin));
+  check("and by id for the image itself", /src=\{`\/api\/coaching\/attachments\/\$\{a\.id\}`\}/.test(admin));
+  check("and never renders a stored url", !/src=\{msg\.imageUrl\}|href=\{msg\.imageUrl\}/.test(admin));
+}
+
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

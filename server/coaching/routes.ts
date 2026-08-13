@@ -41,6 +41,8 @@ import { db } from "../db.js";
 import { eq, and, desc, count, sql, gte, lte } from "drizzle-orm";
 import { z } from "zod";
 import { isAuthenticated } from "../auth/index.js";
+import { requireCapability } from "../auth/roles.js";
+import { threadFor } from "./messageRoutes.js";
 import { storage } from "../storage.js";
 import { track, trackError } from "../telemetry/index.js";
 import { awardWins } from "../wins/index.js";
@@ -1176,21 +1178,35 @@ export function registerCoachingRoutes(app: Express): void {
     }
   });
 
-  // ── Admin: get messages for a specific user ──────────────────────────
-  app.get("/api/admin/coaching/messages/:userId", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
-    try {
-      const userId = param(req, "userId");
-      const messages = await db
-        .select()
-        .from(coachingMessages)
-        .where(eq(coachingMessages.userId, userId))
-        .orderBy(coachingMessages.createdAt);
-      res.json(messages);
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ message: "Internal Server Error" });
-    }
-  });
+  /**
+   * Admin: one member's thread.
+   *
+   * Returns `threadFor` — the same object the member and their coach get, with
+   * `attachments` on each message — rather than raw rows. It was raw rows, and
+   * once attachments stopped being a URL on the message the admin screen had
+   * nothing to render: a coaching surface that silently could not show files.
+   *
+   * Two things deliberately *not* done to fix that. No `imageUrl` revival, and
+   * no separate admin attachment path — `GET /api/coaching/attachments/:id`
+   * already authorizes `superviseCoaching` through `conversationAccess`, so
+   * admin retrieval works through the one gate everybody else uses.
+   *
+   * Gated on `superviseCoaching` rather than `isAdmin`, which is the same set of
+   * people and the honest name for what reading somebody's coaching thread is.
+   */
+  app.get(
+    "/api/admin/coaching/messages/:userId",
+    isAuthenticated,
+    requireCapability("superviseCoaching"),
+    async (req: Request, res: Response) => {
+      try {
+        res.json(await threadFor(param(req, "userId")));
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Internal Server Error" });
+      }
+    },
+  );
 
   // ── Admin: reply to a user ───────────────────────────────────────────
   app.post("/api/admin/coaching/messages/:userId", isAuthenticated, isAdmin, async (req: Request, res: Response) => {

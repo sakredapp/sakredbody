@@ -177,24 +177,59 @@ export function useClientHabits(memberId: string | null) {
   });
 }
 
-export type ClientPlan = {
-  onDate: string;
-  plan: ClientOverview["plan"];
-  habits: ResolvedHabitView[];
-  phases: ClientPhase[];
+/** One practice in a plan, as the coach's screens read it. */
+export type PlanItemView = {
+  routineHabitId: string;
+  intent: string;
+  target: number | null;
+  scheduleKind: string | null;
+  scheduleCount: number | null;
+  memberReason: string | null;
+  /** The coach's own note on this practice. Never sent to the member. */
+  coachNote: string | null;
+  title: string;
+  emphasis: string | null;
+  trackingType: string;
+  defaultTarget: number | null;
+  loadClass: string | null;
+};
+
+export type CoachPlan = {
+  id: string;
+  title: string;
+  focus: string | null;
+  memberVisibleNote: string | null;
+  /** The coach's own. Reaches this screen and no member-facing one. */
+  internalNote: string | null;
+  status: string;
+  startsOn: string | null;
+  endsOn: string | null;
+  coachUserId: string;
+  activatedByUserId: string | null;
+  ranItsCourse: boolean;
+  items: PlanItemView[];
+};
+
+export type ClientPlans = {
+  active: CoachPlan | null;
+  /** At most one, and it is doing nothing to the member until activated. */
+  draft: CoachPlan | null;
   history: {
     id: string;
-    routineId: string;
-    status: string;
-    startDate: string;
-    endDate: string;
+    title: string;
+    focus: string | null;
+    startsOn: string | null;
+    endsOn: string | null;
+    endedAt: string | null;
+    coachUserId: string;
+    ranItsCourse: boolean;
   }[];
 };
 
-export function useClientPlan(memberId: string | null) {
-  return useQuery<ClientPlan>({
-    queryKey: ["/api/coach/clients", memberId, "plan"],
-    queryFn: () => read(`/api/coach/clients/${memberId}/plan`),
+export function useClientPlans(memberId: string | null) {
+  return useQuery<ClientPlans>({
+    queryKey: ["/api/coach/clients", memberId, "plans"],
+    queryFn: () => read(`/api/coach/clients/${memberId}/plans`),
     enabled: Boolean(memberId),
     retry: false,
   });

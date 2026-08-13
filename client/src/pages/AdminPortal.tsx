@@ -1238,10 +1238,17 @@ export default function AdminPortal() {
     senderRole: string;
     messageType: string;
     content: string;
+    /**
+     * Legacy. Kept on the type because the column still exists and old rows may
+     * carry one; deliberately never rendered. New attachments arrive below, as
+     * ids that mean nothing without an authorized request.
+     */
     imageUrl: string | null;
+    attachments?: { id: string; mimeType: string; filename: string; sizeBytes: number }[];
     metadata: string | null;
     readAt: string | null;
     createdAt: string;
+    senderName?: string | null;
   }
 
   const conversationsQuery = useQuery<ConversationSummary[]>({
@@ -2078,7 +2085,6 @@ export default function AdminPortal() {
                         month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
                       });
                       const meta = msg.metadata ? (() => { try { return JSON.parse(msg.metadata!); } catch { return null; } })() : null;
-                      const isImage = msg.messageType === "photo" || meta?.mimeType?.startsWith("image/");
                       return (
                         <div key={msg.id} className={`flex ${isMember ? "justify-start" : "justify-end"}`}>
                           <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
@@ -2095,17 +2101,48 @@ export default function AdminPortal() {
                               )}
                             </div>
                             <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
-                            {msg.imageUrl && (
-                              isImage ? (
-                                <a href={msg.imageUrl} target="_blank" rel="noopener noreferrer" className="block mt-2">
-                                  <img src={msg.imageUrl} alt={meta?.fileName || "Attachment"} className="max-w-full max-h-48 rounded-lg object-cover border border-border/30" />
+                            {/*
+                              Attachments through the authorized endpoint.
+
+                              `src` and `href` point at /api/coaching/attachments/:id,
+                              which resolves the conversation from the row and admits an
+                              admin on `superviseCoaching` before redirecting to a URL
+                              that lives a few minutes. No permanent URL is stored,
+                              rendered or restored — the old `imageUrl` was exactly that,
+                              and it is deliberately not read here even though the column
+                              still exists.
+                            */}
+                            {(msg.attachments ?? []).map((a) =>
+                              a.mimeType.startsWith("image/") ? (
+                                <a
+                                  key={a.id}
+                                  href={`/api/coaching/attachments/${a.id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="block mt-2"
+                                >
+                                  <img
+                                    src={`/api/coaching/attachments/${a.id}`}
+                                    alt={a.filename}
+                                    className="max-w-full max-h-48 rounded-lg object-cover border border-border/30"
+                                  />
                                 </a>
                               ) : (
-                                <a href={msg.imageUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-background/50 border border-border/30 hover:bg-muted/50 transition-colors">
+                                /* A file card, because a PDF is not a photograph. */
+                                <a
+                                  key={a.id}
+                                  href={`/api/coaching/attachments/${a.id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-background/50 border border-border/30 hover:bg-muted/50 transition-colors"
+                                >
                                   <ClipboardList className="w-4 h-4 text-muted-foreground shrink-0" />
-                                  <span className="text-xs truncate flex-1">{meta?.fileName || "File"}</span>
+                                  <span className="text-xs truncate flex-1">{a.filename}</span>
+                                  <span className="text-[10px] text-muted-foreground shrink-0">
+                                    {Math.max(1, Math.round(a.sizeBytes / 1024))} KB
+                                  </span>
                                 </a>
-                              )
+                              ),
                             )}
                             <div className={`flex ${isMember ? "justify-start" : "justify-end"} mt-1`}>
                               <span className="text-[9px] text-muted-foreground">{time}</span>

@@ -23,6 +23,7 @@
  */
 
 import { useState } from "react";
+import { CoachPlanCard } from "@/components/portal/CoachPlanCard";
 import { ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useHealthSummary } from "@/hooks/use-health";
@@ -136,6 +137,8 @@ function TerrainNow() {
 
 export function TodayBody({ onOpenTrends }: { onOpenTrends?: () => void }) {
   const { data } = useHealthSummary(30);
+  /** The same live reading TerrainNow renders — read once, not fetched twice. */
+  const { data: terrain } = useQuery<Reading>({ queryKey: ["/api/terrain/today"] });
   const [open, setOpen] = useState<HealthMetric | null>(null);
 
   const days = (data?.days ?? []) as DaySeries[];
@@ -176,6 +179,16 @@ export function TodayBody({ onOpenTrends }: { onOpenTrends?: () => void }) {
 
       <TodaysMovement workouts={workouts} />
       <TerrainNow />
+
+      {/*
+        The plan, and the tension with it.
+
+        Placed under the live reading on purpose: the coach's instruction and the
+        body's answer belong on one screen, next to each other, so the member is
+        the one holding both rather than being handed whichever the app decided
+        was more important. Renders nothing when there is no plan.
+      */}
+      <CoachPlanCard terrainLean={terrain?.lean ?? null} />
 
       <MetricDetail metric={open} days={days} onClose={() => setOpen(null)} />
     </div>
