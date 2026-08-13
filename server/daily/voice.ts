@@ -191,6 +191,19 @@ const BANNED_PATTERNS: { re: RegExp; why: string }[] = [
     re: /\byou\s+(have not|haven't|['’]ve not)\s+(moved|trained|exercised)\s+(today|yet)\b/i,
     why: "asserting the day is empty before it has happened",
   },
+  {
+    /**
+     * The past-tense form, which the two patterns above let through.
+     *
+     * "You ran five miles today" is the same frozen claim as "your movement is
+     * down" — it is simply true rather than false at the moment it is written,
+     * and then it is on screen again tomorrow. The note's own inputs no longer
+     * contain today's sessions, so it would have to invent this; the filter is
+     * here because the note has invented things before.
+     */
+    re: /\byou\s+(ran|walked|trained|lifted|swam|cycled|rode|moved|rested)\b[^.!?]{0,40}\b(today|this morning|this afternoon)\b/i,
+    why: "a claim about what the member did today, in a note frozen at dawn",
+  },
 
   /** An exclamation mark is the American register in one character. */
   {

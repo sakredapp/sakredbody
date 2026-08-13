@@ -452,6 +452,16 @@ rejects("asserting an empty day before it happens", {
   body: "You have not moved today. Walk for ten minutes before the light goes and eat something warm.",
   invitation: null,
 }, "before it has happened");
+/**
+ * The true-when-written version, which is the harder case. "You ran five miles
+ * today" is correct at six in the evening and still on screen at nine the next
+ * morning, when it is nonsense.
+ */
+rejects("a past-tense claim about today", {
+  headline: "Good day",
+  body: "You ran five miles today, so keep the evening quiet and get to bed at a reasonable hour.",
+  invitation: null,
+}, "frozen at dawn");
 
 /**
  * The window that stays true has to survive, or the filter has banned the

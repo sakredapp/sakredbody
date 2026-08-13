@@ -70,7 +70,31 @@ export async function trainingSignals(
    * correctly counted nine demanding sessions that week. Three copies is how
    * that happens; `recentMovement` is now the only one.
    */
-  const rows = await recentMovement(userId, since);
+  /**
+   * ── Completed days only, and today is not one ───────────────────────────
+   *
+   * `recentMovement` has no upper bound, so today's own sessions were reaching
+   * a note that is written once and frozen until midnight. Two things follow
+   * from that, and both are bad.
+   *
+   * The first is the one the rhythm/terrain split exists to prevent: a note
+   * generated after an afternoon run could say "you trained today", and that
+   * sentence is then on screen tomorrow morning, when it is simply false.
+   *
+   * The second is worse because it is invisible. The note is generated on the
+   * first request of the day, so its content depended on *what time the member
+   * opened the app*. Open it at seven and the run had not happened; open it at
+   * six and it had. The same member, the same day, two different notes, with
+   * nothing anywhere recording which one they got.
+   *
+   * Dropping today removes both. What is left is the member's finished days,
+   * which are the same at dawn and at midnight — so the note is deterministic,
+   * and every claim in it survives the day it is describing. Today's movement
+   * belongs to the live terrain read, which is recomputed on every request and
+   * can say "you have already asked plenty of the system today" precisely
+   * because it is allowed to change its mind.
+   */
+  const rows = (await recentMovement(userId, since)).filter((r) => r.onDate < onDate);
 
   if (rows.length === 0) return null;
 
