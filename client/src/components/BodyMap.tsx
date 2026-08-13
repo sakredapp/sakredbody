@@ -1,90 +1,98 @@
 /**
- * The Body Map
+ * The Body — the Sakred Body Map, in the app.
  *
- * A vertical axis of centres, crown to root, drawn as an engraving rather than
- * a diagram — the same register as CelestialField and TerrainWheel. Selecting a
- * centre opens what it is, how it reads today, and which practices move it.
+ * ── What this screen is for ───────────────────────────────────────────────
  *
- * The reading is the live part. It's append-only, so the member is recording a
- * moment rather than editing a status, and the strip of past readings under the
- * selector is the thing a coach actually looks at.
+ * It answers: what are the major interconnected territories of my body, what
+ * can I notice in each, and what does Sakred currently know about them?
+ *
+ * It deliberately does not ask "is your crown blocked, stirring or open?".
+ * That is what this replaces. Nine centres with a three-state selector made
+ * energetic anatomy the master ontology and asked people to diagnose an
+ * energetic condition they do not experience themselves as having — while
+ * quietly running a *second* subjective check-in beside the canonical one. A
+ * member could report clarity 2/5 on Restore and "crown: open" here, five
+ * minutes apart, about the same lived state, with nothing to reconcile them.
+ *
+ * The nine centres are not deleted from Sakred and should not be. They are one
+ * way of reading the body — a real tributary — and belong later as an optional
+ * traditional lens in the Library, not as the frame everything else hangs from.
+ * The server tables and use-energy hooks are untouched for exactly that reason.
+ *
+ * ── One body, one subjective history ─────────────────────────────────────
+ *
+ * Nothing here is an input. The seven canonical signals are answered once a
+ * day in the check-in and read back here, source-labelled, only where the
+ * member actually answered. See client/src/lib/bodySignals.ts for which signal
+ * a region may speak to, and why those mappings are editorial rather than
+ * physiological.
+ *
+ * ── One map across surfaces ──────────────────────────────────────────────
+ *
+ * The seven regions and their content come from client/src/data/bodyMap.ts,
+ * which the public Body Map also renders. The website teaches the philosophy;
+ * the app makes it personal. Same intellectual system, two expressions — and
+ * one file, so they cannot drift into two vocabularies for one body.
  */
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
+import { MAP_REGIONS } from "@/data/bodyMap";
 import {
-  useBodyMap,
-  useCentre,
-  useCentreHistory,
-  useRecordReading,
-  type MappedCentre,
-} from "@/hooks/use-energy";
-import type { CentreState } from "@shared/schema";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
+  REGION_NOTICE,
+  REGION_ORDER,
+  signalsForRegion,
+  type ReportedToday,
+  type RegionKey,
+} from "@/lib/bodySignals";
+import { TERRAIN_SIGNALS } from "@shared/models/terrainSignals";
 import { cn } from "@/lib/utils";
 import { SectionHeading } from "@/components/portal/Panel";
 
-const STATES: { id: CentreState; label: string }[] = [
-  { id: "blocked", label: "Blocked" },
-  { id: "stirring", label: "Stirring" },
-  { id: "open", label: "Open" },
-];
+const SIGNAL_LABEL = Object.fromEntries(TERRAIN_SIGNALS.map((s) => [s.id, s.label])) as Record<
+  string,
+  string
+>;
 
-/** Gold at full strength reads as open; dimmer as it closes. */
-const STATE_ALPHA: Record<CentreState, number> = {
-  blocked: 0.22,
-  stirring: 0.55,
-  open: 1,
-};
-
-function nodeColor(centre: MappedCentre, selected: boolean) {
-  if (selected) return "hsl(var(--gold))";
-  const state = centre.reading?.state;
-  if (!state) return "hsl(var(--gold) / 0.3)";
-  return `hsl(var(--gold) / ${STATE_ALPHA[state]})`;
-}
+/** Regions in reading order, head to ground, with the site's content attached. */
+const REGIONS = REGION_ORDER.map((key) => ({
+  key,
+  region: MAP_REGIONS.find((r) => r.key === key)!,
+})).filter((r) => r.region);
 
 // ─── The axis ──────────────────────────────────────────────────────────────
 
 function Axis({
-  centres,
-  selectedId,
+  selectedKey,
   onSelect,
 }: {
-  centres: MappedCentre[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
+  selectedKey: RegionKey;
+  onSelect: (key: RegionKey) => void;
 }) {
   return (
-    <div className="relative w-full" style={{ height: `${centres.length * 62 + 40}px` }}>
-      {/* The spine. Two lines: a faint full-length one and a gilt overlay, so
-          it reads as engraved rather than drawn. */}
+    <div className="relative w-full" style={{ height: `${REGIONS.length * 62 + 40}px` }}>
+      {/* The spine, engraved rather than drawn — the same register as the
+          constellation figure behind it and TerrainWheel elsewhere. */}
       <svg className="absolute inset-0 w-full h-full" aria-hidden="true">
-        <line
-          x1="24" y1="10" x2="24" y2="100%"
-          stroke="hsl(var(--gold) / 0.14)"
-          strokeWidth="1"
-        />
+        <line x1="24" y1="10" x2="24" y2="100%" stroke="hsl(var(--gold) / 0.14)" strokeWidth="1" />
       </svg>
 
-      {centres.map((c, i) => {
-        const selected = selectedId === c.id;
-        const top = 20 + i * 62;
+      {REGIONS.map(({ key, region }, i) => {
+        const selected = selectedKey === key;
         return (
           <button
-            key={c.id}
-            onClick={() => onSelect(c.id)}
+            key={key}
+            onClick={() => onSelect(key)}
             className="absolute left-0 right-0 min-h-[44px] flex items-center gap-4 text-left group"
-            style={{ top: `${top}px` }}
+            style={{ top: `${20 + i * 62}px` }}
             aria-pressed={selected}
-            data-testid={`centre-node-${c.id}`}
+            data-testid={`region-node-${key}`}
           >
             <span className="relative flex items-center justify-center w-12 shrink-0">
-              {/* A ring around the selected node — the orrery motif, small. */}
               {selected && (
                 <motion.span
-                  layoutId="centre-ring"
+                  layoutId="region-ring"
                   className="absolute h-7 w-7 rounded-full border"
                   style={{ borderColor: "hsl(var(--gold) / 0.45)" }}
                   transition={{ type: "spring", stiffness: 380, damping: 32 }}
@@ -95,7 +103,7 @@ function Axis({
                 style={{
                   height: selected ? 11 : 8,
                   width: selected ? 11 : 8,
-                  background: nodeColor(c, selected),
+                  background: selected ? "hsl(var(--gold))" : "hsl(var(--gold) / 0.3)",
                 }}
               />
             </span>
@@ -107,11 +115,8 @@ function Axis({
                   selected ? "text-foreground" : "text-muted-foreground group-hover:text-foreground",
                 )}
               >
-                {c.name}
+                {region.name}
               </span>
-              {c.aspect && (
-                <span className="block text-xs text-muted-foreground/70">{c.aspect}</span>
-              )}
             </span>
           </button>
         );
@@ -122,191 +127,139 @@ function Axis({
 
 // ─── Detail ────────────────────────────────────────────────────────────────
 
-function CentreDetail({ centreId, current }: { centreId: string; current: MappedCentre }) {
-  const detail = useCentre(centreId);
-  const history = useCentreHistory(centreId);
-  const record = useRecordReading();
+function Label({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground/70">{children}</p>
+  );
+}
 
-  const state = current.reading?.state ?? null;
+function RegionDetail({ regionKey, reported }: { regionKey: RegionKey; reported: ReportedToday | null }) {
+  const region = MAP_REGIONS.find((r) => r.key === regionKey)!;
+  const signals = signalsForRegion(regionKey, reported);
 
   return (
     <div className="space-y-8">
-      <div>
-        <h3 className="font-display text-3xl leading-tight" data-testid="text-centre-name">
-          {current.name}
-        </h3>
-        <p className="text-xs uppercase tracking-widest text-muted-foreground mt-2">
-          {[current.bodyRegion, current.element].filter(Boolean).join(" · ")}
-        </p>
+      <div className="space-y-2">
+        <h2 className="font-serif text-3xl">{region.name}</h2>
+        <Label>{region.covers}</Label>
+        <p className="text-sm text-muted-foreground leading-relaxed pt-1">{region.governs}</p>
       </div>
 
-      {current.description && (
-        <p className="text-[15px] leading-relaxed">{current.description}</p>
-      )}
-
-      {/* How it reads today. */}
-      <div>
-        <p className="text-xs uppercase tracking-widest text-[hsl(var(--gold))] mb-3">Today</p>
-        <div className="flex gap-2">
-          {STATES.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => record.mutate({ centreId, state: s.id })}
-              disabled={record.isPending}
-              className={cn(
-                "px-4 py-2 rounded-full text-sm border transition-colors",
-                state === s.id
-                  ? "border-[hsl(var(--gold))]/55 bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))]"
-                  : "border-border/60 text-muted-foreground hover:text-foreground",
-              )}
-              data-testid={`centre-state-${s.id}`}
-            >
-              {s.label}
-            </button>
+      <div className="space-y-3">
+        <Label>What you might notice</Label>
+        <ul className="space-y-1.5">
+          {REGION_NOTICE[regionKey].map((line) => (
+            <li key={line} className="text-sm text-muted-foreground leading-relaxed">
+              {line}
+            </li>
           ))}
-        </div>
+        </ul>
+      </div>
 
-        {/* The strip a coach reads: movement, not a snapshot. */}
-        {(history.data?.length ?? 0) > 1 && (
-          <div className="flex items-center gap-1 mt-5">
-            {history.data!.slice(-24).map((r) => (
-              <span
-                key={r.id}
-                title={new Date(r.recordedAt!).toLocaleDateString()}
-                className="h-6 flex-1 max-w-[10px] rounded-sm"
-                style={{
-                  background: `hsl(var(--gold) / ${STATE_ALPHA[r.state as CentreState]})`,
-                }}
-              />
+      {/*
+        Only what Sakred actually knows.
+
+        Rendered from the member's own check-in and nothing else. No section at
+        all when they have not answered — an empty reading invented to fill a
+        slot is worse than a screen that admits it does not know, and this is
+        the majority case rather than an edge one.
+      */}
+      {signals.length > 0 && (
+        <div className="space-y-3">
+          <Label>Today</Label>
+          <div className="space-y-2">
+            {signals.map((s) => (
+              <div key={s.id} className="flex items-baseline gap-3" data-testid={`region-signal-${s.id}`}>
+                <span className="text-sm w-32 shrink-0">{SIGNAL_LABEL[s.id] ?? s.id}</span>
+                <span className="text-sm tabular-nums">{s.value}/5</span>
+                <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/60">
+                  Member reported
+                </span>
+              </div>
             ))}
           </div>
-        )}
+        </div>
+      )}
+
+      {/*
+        Tradition and measurement, kept as two separate sentences.
+
+        The same rule the apothecary enforces in code: a tradition is what it
+        observed and the language it used; a measurement is what an instrument
+        can show. Merging them is what turns a long, useful tradition into a
+        modern assertion it never made.
+      */}
+      <div className="space-y-3 pt-2 border-t border-border/40">
+        <Label>Traditional lens</Label>
+        <p className="text-xs text-muted-foreground/80">{region.traditions}</p>
+        <p className="text-sm text-muted-foreground leading-relaxed">{region.lens}</p>
       </div>
 
-      {(current.whenBlocked || current.whenFlowing) && (
-        <div className="grid sm:grid-cols-2 gap-6 border-t border-border/50 pt-6">
-          {current.whenBlocked && (
-            <div>
-              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
-                When it's held
-              </p>
-              <p className="text-sm leading-relaxed text-muted-foreground">{current.whenBlocked}</p>
-            </div>
-          )}
-          {current.whenFlowing && (
-            <div>
-              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
-                When it moves
-              </p>
-              <p className="text-sm leading-relaxed text-muted-foreground">{current.whenFlowing}</p>
-            </div>
-          )}
-        </div>
-      )}
+      <div className="space-y-3">
+        <Label>Modern lens</Label>
+        <p className="text-sm text-muted-foreground leading-relaxed">{region.measured}</p>
+      </div>
 
-      {(detail.data?.practices.length ?? 0) > 0 && (
-        <div className="border-t border-border/50 pt-6">
-          <p className="text-xs uppercase tracking-widest text-[hsl(var(--gold))] mb-4">
-            What moves it
-          </p>
-          {detail.data!.practices.map((p) => (
-            <div key={p.id} className="py-2.5 border-b border-border/40 last:border-0">
-              <div className="flex items-baseline gap-2 flex-wrap">
-                <span className="text-sm">{p.title}</span>
-                <span className="text-xs text-muted-foreground">{p.action}</span>
-              </div>
-              {p.shortDescription && (
-                <p className="text-xs text-muted-foreground mt-0.5">{p.shortDescription}</p>
-              )}
-            </div>
+      <div className="space-y-3">
+        <Label>Practices</Label>
+        <div className="flex flex-wrap gap-2">
+          {region.practice.map((p) => (
+            <span
+              key={p}
+              className="rounded-full border border-border/60 px-3 py-1 text-xs text-muted-foreground"
+            >
+              {p}
+            </span>
           ))}
         </div>
-      )}
+      </div>
 
-      {(detail.data?.protocols.length ?? 0) > 0 && (
-        <div className="border-t border-border/50 pt-6">
-          <p className="text-xs uppercase tracking-widest text-[hsl(var(--gold))] mb-4">
-            Protocols
-          </p>
-          {detail.data!.protocols.map((p) => (
-            <div key={p.id} className="flex items-center gap-3 py-2.5 border-b border-border/40 last:border-0">
-              <span className="text-sm flex-1">{p.name}</span>
-              {p.isPrimary && <Badge variant="secondary" className="text-[10px]">Primary</Badge>}
-              <span className="text-xs text-muted-foreground">{p.durationDays} days</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <p className="text-xs text-muted-foreground/70 leading-relaxed border-t border-border/50 pt-6">
-        This is how we read the body. It explains what you're doing and why it's
-        sequenced this way — it isn't a diagnosis and it doesn't replace care.
+      <p className="text-xs text-muted-foreground/60 leading-relaxed pt-2 border-t border-border/40">
+        This is how we read the body. It explains what you're doing and why it's sequenced this way —
+        it isn't a diagnosis and it doesn't replace care.
       </p>
     </div>
   );
 }
 
-// ─── Tab ───────────────────────────────────────────────────────────────────
+// ─── The screen ────────────────────────────────────────────────────────────
 
 export function BodyMap() {
-  const map = useBodyMap();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<RegionKey>(REGION_ORDER[0]!);
 
-  const centres = map.data ?? [];
-  const selected = centres.find((c) => c.id === selectedId) ?? centres[0] ?? null;
-
-  if (map.isLoading) {
-    return (
-      <div className="grid md:grid-cols-[220px_1fr] gap-12">
-        <Skeleton className="h-[600px] w-full" />
-        <Skeleton className="h-[400px] w-full" />
-      </div>
-    );
-  }
-
-  // Heading kept on the empty state — see WinsTab for why: while the app has
-  // no content, the empty state is the screen most of the time, and a bare
-  // sentence with no title reads as a failure rather than as waiting.
-  if (centres.length === 0) {
-    return (
-      <div className="space-y-6">
-        <SectionHeading
-          title="The Body"
-          subtitle="Where things sit, and what you notice when they move."
-        />
-        <p className="py-12 text-center text-sm text-muted-foreground">
-          The map hasn't been drawn yet.
-        </p>
-      </div>
-    );
-  }
+  /**
+   * Today's check-in, read and never written.
+   *
+   * The same query key the check-in itself uses, so answering on Restore moves
+   * this screen too rather than leaving two versions of the same day on two
+   * tabs. `empty: true` is the server's way of saying the day has no row.
+   */
+  const checkin = useQuery<ReportedToday & { empty?: boolean }>({
+    queryKey: ["/api/terrain/checkin"],
+    staleTime: 60_000,
+  });
+  const reported = checkin.data && !checkin.data.empty ? checkin.data : null;
 
   return (
     <div className="space-y-8">
       <SectionHeading
         title="The Body"
-        subtitle="Where things sit, and what you notice when they move."
+        subtitle="A living map of what you feel, what we can measure, and how the systems connect."
       />
 
       <div className="grid md:grid-cols-[220px_1fr] gap-12">
-        <Axis
-          centres={centres}
-          selectedId={selected?.id ?? null}
-          onSelect={setSelectedId}
-        />
+        <Axis selectedKey={selectedKey} onSelect={setSelectedKey} />
 
         <AnimatePresence mode="wait">
-          {selected && (
-            <motion.div
-              key={selected.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-            >
-              <CentreDetail centreId={selected.id} current={selected} />
-            </motion.div>
-          )}
+          <motion.div
+            key={selectedKey}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+          >
+            <RegionDetail regionKey={selectedKey} reported={reported} />
+          </motion.div>
         </AnimatePresence>
       </div>
     </div>

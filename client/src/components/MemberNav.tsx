@@ -161,7 +161,7 @@ export const SECONDARY: Destination[] = [
    * One word, one meaning: terrain is the reading, The Body is the screen
    * where you take it yourself.
    */
-  { id: "body", label: "The Body", icon: Activity, note: "Nine centres, read in sequence" },
+  { id: "body", label: "The Body", icon: Activity, note: "Seven territories, and what you notice in each" },
   { id: "apothecary", label: "Apothecary", icon: Leaf, note: "What each protocol asks for" },
   { id: "library", label: "Library", icon: BookOpen, note: "Guides paired to your protocol" },
   { id: "masterclass", label: "Masterclass", icon: GraduationCap, note: "Lessons, on your own time" },
