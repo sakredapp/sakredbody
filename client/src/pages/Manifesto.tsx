@@ -10,8 +10,9 @@
  * on that page. What is new is the opening, because the page needed a reason
  * to start — and fragmentation is the argument every other page assumes.
  *
- * This is where the tension-and-release motion pass belongs: the fragments in
- * FRAGMENTATION accumulate, the page gets dense, and then it clears.
+ * The opening is now ManifestoField: one composition moving from
+ * fragmentation through compression to integration and capacity, carrying the
+ * beat copy with it. Everything below it is the same argument written out.
  */
 
 import { Link } from "wouter";
@@ -22,6 +23,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
 import { PageHero, SectionHeader } from "@/components/PageHero";
 import { StarDust } from "@/components/StarDust";
+import { ManifestoField } from "@/components/ManifestoField";
 import { ImageBand } from "@/components/ImageBand";
 import { AscentChart } from "@/components/AscentChart";
 import { YinYang } from "@/components/YinYang";
@@ -35,19 +37,6 @@ const fadeInUp = {
 };
 const stagger = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.09 } } };
 const viewportOnce = { once: true, amount: 0.2 } as const;
-
-/**
- * The words modern health actually runs on.
- *
- * Held as data rather than written into the paragraph because the motion pass
- * needs them as individual objects: they accumulate around the figure until
- * the screen feels compressed, then fall away.
- */
-const FRAGMENTATION = [
-  "optimise", "track", "biohack", "suppress", "push through",
-  "detox", "cleanse", "reset", "grind", "recover later",
-  "supplement", "measure", "repeat",
-];
 
 const DEFINITION = [
   { quality: "Clear", body: "enough to perceive." },
@@ -77,41 +66,26 @@ export default function Manifesto() {
         marks={["Information is not embodiment", "Neither half works alone", "Capacity, not absence"]}
       />
 
-      {/* ── Fragmentation ────────────────────────────────────
-          The motion target. These sit still for now. */}
-      <Section tone="ink" width="max-w-4xl">
-        <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
-          <motion.div variants={fadeInUp}>
-            <SectionHeader
-              eyebrow="Where We Are"
-              title={<>You know what your watch says. <span className="text-gold">You don't know what you feel.</span></>}
-              testId="text-fragmentation-headline"
-            />
-          </motion.div>
+      {/* ── The act ──────────────────────────────────────────
+          What was a static section holding the argument in place until the
+          motion pass existed. It exists now: one composition passing through
+          fragmentation, compression, the turn, integration and capacity, with
+          each beat's copy in the DOM so the case is made with or without it.
+          See the header of ManifestoField.tsx. */}
+      <ManifestoField />
 
-          <motion.ul
-            variants={fadeInUp}
-            className="flex flex-wrap justify-center gap-x-5 gap-y-2 max-w-2xl mx-auto mb-10"
-            aria-label="The vocabulary of modern health"
-          >
-            {FRAGMENTATION.map((f) => (
-              <li key={f} className="text-sm uppercase tracking-[0.16em] text-muted-foreground/60">
-                {f}
-              </li>
-            ))}
-          </motion.ul>
-
-          <motion.div variants={fadeInUp} className="max-w-2xl mx-auto text-center space-y-5">
-            <p className="text-muted-foreground leading-relaxed text-base md:text-lg">
-              Modern health got specialised, and then it got fragmented. A specialist for each part, an app
-              for each metric, a protocol for each complaint — and nobody holding the whole picture, least of
-              all the person living inside it.
-            </p>
-            <p className="text-foreground leading-relaxed text-base md:text-lg">
-              More information has not produced more capable people. It has produced people who can quote
-              their resting heart rate and cannot tell hunger from thirst.
-            </p>
-          </motion.div>
+      <Section tone="ink" width="max-w-2xl">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={viewportOnce}
+          variants={stagger}
+          className="text-center"
+        >
+          <motion.p variants={fadeInUp} className="text-foreground leading-relaxed text-lg md:text-xl">
+            More information has not produced more capable people. It has produced people who can quote
+            their resting heart rate and cannot tell hunger from thirst.
+          </motion.p>
         </motion.div>
       </Section>
 
