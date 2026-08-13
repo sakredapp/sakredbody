@@ -157,7 +157,14 @@ export async function reviewOf(plan: CoachingPlan): Promise<PlanReview> {
   try {
     const onDate = await memberToday(plan.memberUserId);
     const terrain = await terrainFor(plan.memberUserId, onDate);
-    terrainLean = terrain.hasBody ? terrain.lean : null;
+    /**
+     * `lean` rather than `hasBody`, since the reading now composes what the
+     * member said with what their devices measured. A member with no wearable
+     * who checks in has a real terrain, and gating on a synced phone would have
+     * thrown their own report away — which is the whole failure this composition
+     * exists to fix, reappearing one layer up.
+     */
+    terrainLean = terrain.lean === "unknown" ? null : terrain.lean;
   } catch {
     // No synced body is a normal state, not an error. The review says which
     // checks it managed to run rather than pretending it ran them all.

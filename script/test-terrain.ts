@@ -14,10 +14,12 @@
 
 import {
   readTerrain,
+  composeTerrainNow,
   terrainHeadline,
   weekLoad,
   type TerrainInputs,
 } from "../shared/models/terrain.js";
+import { terrainLeanFrom, signalLean } from "../shared/models/terrainSignals.js";
 
 let passed = 0;
 let failed = 0;
@@ -222,6 +224,129 @@ check(
   (["restore", "build", "either", "unknown"] as const).every((lean) =>
     !/terrain/i.test(terrainHeadline({ ...read(), lean })),
   ),
+);
+
+console.log("\nWhat the person says, alongside what the instruments say\n");
+
+/**
+ * ── The cases that matter are the disagreements ───────────────────────────
+ *
+ * A watch is a proxy for a body. A person is not. When the two agree, the
+ * composition is uninteresting; when they disagree, whichever one this product
+ * decides to believe *is* the product. So both stay on screen in every case
+ * below, and the rules are: what somebody reports always outweighs a single
+ * measurement, and never clears an accumulated deficit.
+ */
+const WRECKED = { energy: 1, recovery: 1, bodyTension: 5, nervousSystem: 2 };
+const STRONG = { energy: 5, recovery: 5, drive: 5, mentalClarity: 4 };
+const compose = (over: Partial<TerrainInputs>, reported: Parameters<typeof composeTerrainNow>[0]["reported"]) =>
+  composeTerrainNow({ measured: read(over), reported });
+
+/** Good wearable, poor subjective. The case that started all of this. */
+{
+  const r = compose({ daysSinceLastSession: 5 }, WRECKED);
+  check("a light week with a wrecked report does not offer more movement", r.lean !== "build");
+  check("it reads restore", r.lean === "restore");
+  check(
+    "and never prints 'you have room for more movement'",
+    terrainHeadline(r) !== terrainHeadline({ ...r, lean: "build" }),
+  );
+  check("the measured reason is still there", r.reasons.some((x) => x.source === "measured"));
+  check("beside the reported one", r.reasons.some((x) => x.source === "reported"));
+  check("which names the actual answers", /Recovery 1\/5/.test(r.reasons.at(-1)!.text));
+  check("in a voice that works on a coach's screen too", !/\byou\b/i.test(r.reasons.at(-1)!.text));
+}
+
+/** Poor wearable, strong subjective. Feeling good is not being recovered. */
+{
+  const oneDebt = compose({ sleepRecent: 380 }, STRONG);
+  check("one measurement down against a strong report yields to the person", oneDebt.lean === "build");
+  check("but the sleep debt is still stated", oneDebt.reasons.some((x) => /less sleep/.test(x.text)));
+
+  const realDebt = compose({ sleepRecent: 380, hrvRecent: 50, rhrRecent: 60 }, STRONG);
+  check("an accumulated deficit is not cleared by feeling great", realDebt.lean === "restore");
+  check("and the report is still shown, not suppressed",
+    realDebt.reasons.some((x) => x.source === "reported"));
+}
+
+/** Both agreeing, in each direction. */
+check("both poor reads restore", compose({ sleepRecent: 380 }, WRECKED).lean === "restore");
+check("both strong reads build", compose({ daysSinceLastSession: 5 }, STRONG).lean === "build");
+
+/** No report at all — the measured behaviour is exactly what it was. */
+{
+  const measured = read({ sleepRecent: 380 });
+  const composed = composeTerrainNow({ measured, reported: null });
+  check("no check-in changes nothing", composed.lean === measured.lean);
+  check("and says so", composed.hasReport === false);
+  check("with no reason invented", composed.reasons.length === measured.reasons.length);
+}
+
+/**
+ * Yesterday's answer is history, not a present-tense claim about a body. The
+ * freshness rule lives in the caller — this pins the half the model owns: it
+ * only ever sees what it is handed, and null is the same as no check-in.
+ */
+check("a stale check-in reaches the model as nothing at all",
+  composeTerrainNow({ measured: read(), reported: null }).hasReport === false);
+
+/** Answering too little is not a reading. */
+{
+  const thin = composeTerrainNow({ measured: read(), reported: { energy: 1, recovery: 1 } });
+  check("two answers is a mood, not a report", thin.hasReport === false);
+  check("and moves nothing", thin.lean === read().lean);
+}
+
+/** Answered, and nothing pulls. A report, and not a reason for anything. */
+{
+  const flat = composeTerrainNow({ measured: read(), reported: { energy: 3, recovery: 3, drive: 3 } });
+  check("a neutral report counts as having checked in", flat.hasReport === true);
+  check("without adding a reason", flat.reasons.length === read().reasons.length);
+}
+
+/** A member with no wearable is not an empty reading. */
+{
+  const nothing = read({
+    sleepRecent: null, sleepBaseline: null,
+    hrvRecent: null, hrvBaseline: null,
+    rhrRecent: null, rhrBaseline: null,
+    daysSinceLastSession: null,
+  });
+  check("with no devices at all, measured terrain is unknown", nothing.lean === "unknown");
+  const spoken = composeTerrainNow({ measured: nothing, reported: WRECKED });
+  check("but somebody who tells us how they are has a terrain", spoken.lean === "restore");
+  check("still honestly reporting no synced body", spoken.hasBody === false);
+  check("and that they spoke", spoken.hasReport === true);
+}
+
+/**
+ * One reducer. If these two ever disagree about the same seven answers, the
+ * member is being told one thing by Terrain Now and another by their
+ * recommendations, from a single check-in.
+ */
+{
+  const cases = [WRECKED, STRONG, { energy: 3, recovery: 3, drive: 3 }];
+  check(
+    "the terrain lean and the readiness lean read the check-in the same way",
+    cases.every((c) => {
+      const n = terrainLeanFrom(c);
+      const word = signalLean(c);
+      return n === null
+        ? word === "unknown"
+        : word === (n < 0 ? "restore" : n > 0 ? "build" : "either");
+    }),
+  );
+  check("and the check-in's weight is bounded", cases.every((c) => {
+    const n = terrainLeanFrom(c);
+    return n === null || (n >= -3 && n <= 3);
+  }));
+}
+
+/** Every reason says where it came from — no biometric invented from a slider. */
+check(
+  "no measured reason is ever produced by a report",
+  compose({}, WRECKED).reasons.filter((r) => r.source === "measured").length ===
+    read().reasons.length,
 );
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);

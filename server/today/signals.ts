@@ -161,55 +161,22 @@ export async function healthReadings(
 // ─── The check-in ──────────────────────────────────────────────────────────
 
 /**
- * Seven 1–5 answers, folded into the −3…+3 the engine expects.
+ * Seven 1–5 answers, folded into the −3…+3 this engine expects.
  *
- * `signalLean` in terrainSignals.ts answers a different question — which side
- * of the practice this person is on — and returns a word. The engine wants
- * magnitude as well as direction, because "a bit flat" and "wrung out" should
- * not move the day by the same amount.
+ * The weighting itself moved to `shared/models/terrainSignals.ts` when the
+ * terrain reading started needing the same answer. Re-exported here rather than
+ * having callers import from two places for one idea — and, more to the point,
+ * so this cannot quietly become a second opinion about the same check-in.
  *
- * Recovery, energy and nervous system pull down when low; drive and clarity
- * pull up when high. Body tension is inverted: a high number means *more*
- * tension, which is the one signal on the list where up is worse. Getting that
- * backwards would have made the tightest days read as the most capable.
+ * ── Read this before wiring the check-in into readiness twice ─────────────
+ *
+ * Readiness takes the subjective lean *here*, directly. It does not read
+ * `terrainFor`, which composes the same lean into Terrain Now. Two independent
+ * consumers, one shared reducer, and each hears the check-in exactly once.
+ * Passing a composed terrain reading into `readReadiness` as well would make a
+ * 1–5 slider vote twice.
  */
-const DOWN_WHEN_LOW: readonly TerrainSignalId[] = ["recovery", "energy", "nervousSystem"];
-const UP_WHEN_HIGH: readonly TerrainSignalId[] = ["drive", "mentalClarity"];
-
-export function terrainLeanFrom(
-  checkin: Partial<Record<TerrainSignalId, number | null>> | null,
-): number | null {
-  if (!checkin) return null;
-  const answered = SIGNAL_KEYS.filter((k) => typeof checkin[k] === "number");
-  // Two answers is a mood, not a reading. Below that the engine is better off
-  // knowing nothing than knowing one number.
-  if (answered.length < 3) return null;
-
-  let lean = 0;
-  for (const key of DOWN_WHEN_LOW) {
-    const v = checkin[key];
-    if (typeof v !== "number") continue;
-    if (v <= 2) lean -= 1;
-    else if (v >= 4) lean += 1;
-  }
-  for (const key of UP_WHEN_HIGH) {
-    const v = checkin[key];
-    if (typeof v !== "number") continue;
-    if (v >= 4) lean += 1;
-    else if (v <= 2) lean -= 1;
-  }
-  // High tension is a cost, not a capacity — the one inverted signal.
-  const tension = checkin.bodyTension;
-  if (typeof tension === "number") {
-    if (tension >= 4) lean -= 1;
-    else if (tension <= 2) lean += 1;
-  }
-
-  // Scaled back into the range the engine documents. Six contributing signals
-  // could otherwise hand it a ±6 and quietly outweigh everything else.
-  const scaled = Math.round((lean / 6) * 3);
-  return Math.max(-3, Math.min(3, scaled));
-}
+export { terrainLeanFrom } from "../../shared/models/terrainSignals.js";
 
 export async function todaysCheckin(userId: string, today: string) {
   const [row] = await db

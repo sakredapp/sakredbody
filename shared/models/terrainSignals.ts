@@ -154,31 +154,93 @@ export type TerrainCheckinInput = z.infer<typeof terrainCheckinSchema>;
 /** The column names, so a route can iterate them without restating the list. */
 export const SIGNAL_KEYS = TERRAIN_SIGNALS.map((s) => s.id) as readonly TerrainSignalId[];
 
+export type ReportedSignals = Partial<Record<TerrainSignalId, number | null>>;
+
 /**
- * Which way the subjective picture leans, in the same vocabulary the terrain
- * reading already uses — and only when there is enough to say.
+ * Which way each answered signal pulls: −1, 0 or +1.
  *
- * Deliberately blunt: recovery, nervous system and energy pull toward restore
- * when they are low; drive and clarity pull toward build when they are high.
- * Nothing is averaged into a score, and "not enough yet to tell" is a real
- * answer rather than a defaulted middle.
+ * ── One weighting, not three ──────────────────────────────────────────────
+ *
+ * Three things now want to know what somebody's check-in said: the readiness
+ * engine, the terrain reading, and the sentence that explains the terrain
+ * reading. Each of them weighting the seven signals for itself is how a member
+ * ends up told they are depleted on one screen and primed on the next, from the
+ * same seven numbers — the exact failure that produced one `recentMovement` and
+ * one `terrainFor`.
+ *
+ * So the judgement about what a 2/5 means lives here, once, and everything
+ * downstream reads it.
+ *
+ * ── The rules, and the one that is inverted ───────────────────────────────
+ *
+ * Most signals run the same way: low is depleted, high is capable. Body tension
+ * is the exception — a high number means *more* tension, so it is the one place
+ * where up is worse. Getting that backwards would have made the tightest days
+ * read as the most capable.
+ *
+ * Digestion is collected and does not pull. It is worth knowing, worth showing
+ * a coach and worth a trend, but this product has no defensible rule turning it
+ * into capacity — and inventing one to fill the gap would be pseudo-precision.
+ * It still counts toward "did they answer enough to have said anything".
  */
-export function signalLean(
-  c: Partial<Record<TerrainSignalId, number | null>>,
-): "restore" | "build" | "either" | "unknown" {
-  const answered = SIGNAL_KEYS.filter((k) => typeof c[k] === "number");
-  if (answered.length < 3) return "unknown";
+const PULL_RULE: Record<TerrainSignalId, "up-is-capacity" | "up-is-cost" | "no-pull"> = {
+  energy: "up-is-capacity",
+  recovery: "up-is-capacity",
+  nervousSystem: "up-is-capacity",
+  drive: "up-is-capacity",
+  mentalClarity: "up-is-capacity",
+  bodyTension: "up-is-cost",
+  digestion: "no-pull",
+};
 
-  const low = (k: TerrainSignalId) => typeof c[k] === "number" && (c[k] as number) <= 2;
-  const high = (k: TerrainSignalId) => typeof c[k] === "number" && (c[k] as number) >= 4;
+/** How many signals can actually move the lean. The divisor below. */
+const PULLING_SIGNALS = SIGNAL_KEYS.filter((k) => PULL_RULE[k] !== "no-pull").length;
 
-  const asking = [low("recovery"), low("energy"), low("nervousSystem"), low("bodyTension")]
-    .filter(Boolean).length;
-  const room = [high("recovery"), high("energy"), high("drive"), high("mentalClarity")]
-    .filter(Boolean).length;
+export function signalPulls(c: ReportedSignals): { id: TerrainSignalId; pull: -1 | 0 | 1 }[] {
+  const out: { id: TerrainSignalId; pull: -1 | 0 | 1 }[] = [];
+  for (const id of SIGNAL_KEYS) {
+    const v = c[id];
+    if (typeof v !== "number") continue;
+    const rule = PULL_RULE[id];
+    let pull: -1 | 0 | 1 = 0;
+    if (rule !== "no-pull" && (v <= 2 || v >= 4)) {
+      const depleted = v <= 2;
+      pull = rule === "up-is-cost" ? (depleted ? 1 : -1) : depleted ? -1 : 1;
+    }
+    out.push({ id, pull });
+  }
+  return out;
+}
 
-  if (asking >= 2 && room >= 2) return "either";
-  if (asking >= 2) return "restore";
-  if (room >= 2) return "build";
-  return "either";
+/**
+ * The check-in as a bounded −3…+3, or null when they haven't said enough.
+ *
+ * Magnitude as well as direction, because "a bit flat" and "wrung out" should
+ * not move a day by the same amount. Two answers is a mood, not a reading —
+ * below three the engines are better off knowing nothing than knowing one
+ * number, and a defaulted middle would be noise that looks like data.
+ */
+export function terrainLeanFrom(c: ReportedSignals | null): number | null {
+  if (!c) return null;
+  const pulls = signalPulls(c);
+  if (pulls.length < 3) return null;
+
+  const sum = pulls.reduce((n, p) => n + p.pull, 0);
+  // Scaled back into the documented range. Six contributing signals could
+  // otherwise hand a caller a ±6 and quietly outweigh everything else.
+  const scaled = Math.round((sum / PULLING_SIGNALS) * 3);
+  return Math.max(-3, Math.min(3, scaled));
+}
+
+/**
+ * The same answer as a word, in the vocabulary the terrain reading uses.
+ *
+ * Derived from `terrainLeanFrom` rather than computed again — a second
+ * weighting of the same seven numbers is a second opinion waiting to disagree
+ * with the first.
+ */
+export function signalLean(c: ReportedSignals): "restore" | "build" | "either" | "unknown" {
+  const lean = terrainLeanFrom(c);
+  if (lean === null) return "unknown";
+  return lean < 0 ? "restore" : lean > 0 ? "build" : "either";
 }

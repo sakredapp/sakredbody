@@ -35,6 +35,12 @@
  */
 
 import { categoryLoad, type MovementLoad } from "./training.js";
+import {
+  TERRAIN_SIGNALS,
+  signalPulls,
+  terrainLeanFrom,
+  type ReportedSignals,
+} from "./terrainSignals.js";
 
 // ─── The direction a thing runs ────────────────────────────────────────────
 
@@ -83,8 +89,21 @@ export function isEmphasis(v: unknown): v is Emphasis {
  */
 export type TerrainLean = "restore" | "build" | "either" | "unknown";
 
-/** One thing that is true, and which way it pulls. */
+/**
+ * One thing that is true, which way it pulls, and where it came from.
+ *
+ * ── Where a reason came from ──────────────────────────────────────────────
+ *
+ * Required, not optional, so a reason cannot be added without saying. The whole
+ * point of composing two kinds of evidence is that the member and the coach can
+ * still tell them apart: "your resting heart rate is up" and "you said you feel
+ * wrecked" are both true and are not the same claim, and a screen that blends
+ * them into one voice has invented a biometric out of a slider.
+ */
+export type ReasonSource = "measured" | "reported";
+
 export type TerrainReason = {
+  source: ReasonSource;
   /** Shown to the member, in their own terms. Never a metric name. */
   text: string;
   pulls: "restore" | "build";
@@ -121,8 +140,14 @@ export type TerrainReading = {
   reasons: TerrainReason[];
   /** What the week has actually asked for and given back. */
   week: { stress: number; restoration: number; sessions: number };
-  /** True when the phone has synced nothing useful — the UI says so rather than guessing. */
+  /** True when the phone has synced something useful — the UI says so rather than guessing. */
   hasBody: boolean;
+  /**
+   * True when the person has said how they are today, in enough detail to mean
+   * something. Separate from `hasBody` because a member with no wearable who
+   * checks in is not an empty reading — they are the reading.
+   */
+  hasReport: boolean;
 };
 
 /**
@@ -196,6 +221,7 @@ export function readTerrain(input: TerrainInputs): TerrainReading {
   ) {
     const down = input.sleepBaseline - input.sleepRecent;
     reasons.push({
+      source: "measured",
       text: `Last ${recentDays} nights: ${hm(down)} less sleep than ${against}`,
       pulls: "restore",
     });
@@ -208,6 +234,7 @@ export function readTerrain(input: TerrainInputs): TerrainReading {
     input.hrvRecent / input.hrvBaseline <= HRV_DOWN_RATIO
   ) {
     reasons.push({
+      source: "measured",
       text: `Last ${recentDays} days: heart rate variability below ${against}`,
       pulls: "restore",
     });
@@ -219,6 +246,7 @@ export function readTerrain(input: TerrainInputs): TerrainReading {
     input.rhrRecent - input.rhrBaseline >= RHR_UP_BPM
   ) {
     reasons.push({
+      source: "measured",
       text: `Last ${recentDays} days: resting heart rate up on ${against}`,
       pulls: "restore",
     });
@@ -227,6 +255,7 @@ export function readTerrain(input: TerrainInputs): TerrainReading {
   // ── What the week has asked for ──
   if (week.stress >= HEAVY_WEEK_STRESS) {
     reasons.push({
+      source: "measured",
       text: `${week.sessions} demanding session${week.sessions === 1 ? "" : "s"} this week`,
       pulls: "restore",
     });
@@ -235,11 +264,12 @@ export function readTerrain(input: TerrainInputs): TerrainReading {
     // anything that they are under-trained is a judgement about a stranger.
     if (input.daysSinceLastSession >= 3) {
       reasons.push({
+        source: "measured",
         text: `Nothing demanding in ${input.daysSinceLastSession} days`,
         pulls: "build",
       });
     } else if (week.sessions > 0) {
-      reasons.push({ text: "A light week so far", pulls: "build" });
+      reasons.push({ source: "measured", text: "A light week so far", pulls: "build" });
     }
   }
 
@@ -247,11 +277,11 @@ export function readTerrain(input: TerrainInputs): TerrainReading {
   // the ledger every training app forgets, and the reason a heavy week after a
   // restorative one is not the same as a heavy week after another heavy one.
   if (week.restoration >= 6 && week.stress >= HEAVY_WEEK_STRESS) {
-    reasons.push({ text: "You have been restoring alongside it", pulls: "build" });
+    reasons.push({ source: "measured", text: "You have been restoring alongside it", pulls: "build" });
   }
 
   if (!hasBody && input.daysSinceLastSession === null) {
-    return { lean: "unknown", reasons: [], week, hasBody };
+    return { lean: "unknown", reasons: [], week, hasBody, hasReport: false };
   }
 
   const toRestore = reasons.filter((r) => r.pulls === "restore").length;
@@ -260,7 +290,124 @@ export function readTerrain(input: TerrainInputs): TerrainReading {
   const lean: TerrainLean =
     toRestore > toBuild ? "restore" : toBuild > toRestore ? "build" : "either";
 
-  return { lean, reasons, week, hasBody };
+  return { lean, reasons, week, hasBody, hasReport: false };
+}
+
+// ─── Terrain Now: the measurement and the person, together ─────────────────
+
+/**
+ * The canonical reading — what devices measured, plus what the person said.
+ *
+ * ── Why this exists ───────────────────────────────────────────────────────
+ *
+ * `readTerrain` above reads instruments. For a long time that *was* Terrain
+ * Now, which produced a product that asked "how are you actually doing?", stored
+ * the answer, showed it to a coach, fed it to the recommendations — and then
+ * printed "You're well recovered" on the biggest card on the screen, because
+ * the watch looked fine. A member telling us they feel wrecked is first-party
+ * evidence about a body; a sensor is a proxy for one. Neither outranks the
+ * other absolutely, and the one that is easier to quantify does not get to win
+ * by default.
+ *
+ * ── Why it is a layer and not seven more lines inside readTerrain ─────────
+ *
+ * Not for architectural tidiness — so the two kinds of evidence stay
+ * distinguishable all the way to the screen. Every reason carries its source,
+ * and the composition never rewrites one as the other. "Your resting heart rate
+ * is up" must never appear because somebody moved a slider.
+ *
+ * There is still one Terrain Now. This is the only composition, `terrainFor` is
+ * the only caller, and every consumer — the member's Today, the coach's client
+ * view, the plan review, the plan/terrain tension — reads its result. No
+ * `coachTerrain`, no `todayTerrain`.
+ *
+ * ── Bounded, in both directions ───────────────────────────────────────────
+ *
+ * The report is worth at most `REPORT_MAX_WEIGHT` against the measured reasons.
+ * That number is the whole design:
+ *
+ *   · It always beats a single measured reason. Sleep looks fine and they say
+ *     they are wrecked — the card cannot answer "you have room for more
+ *     movement". They told us something the sensor has no access to.
+ *
+ *   · It never beats an accumulated one. Three nights short, HRV down, resting
+ *     heart rate up, and they report feeling great: the debt is real and stays.
+ *     Feeling good is not the same as being recovered, and a product that let
+ *     enthusiasm clear a deficit would be actively dangerous.
+ *
+ * The disagreements are the valuable cases, not the awkward ones, and both
+ * sides stay on screen in every one of them.
+ */
+const REPORT_MAX_WEIGHT = 2;
+
+export function composeTerrainNow(input: {
+  measured: TerrainReading;
+  /**
+   * Today's check-in, in the member's own local date, or null.
+   *
+   * Freshness is the caller's job and the rule is deliberately strict: only
+   * today's. Yesterday's "energy 1/5" is history — it belongs in a trend, and
+   * letting it stand in for the present would have the app insisting somebody
+   * is depleted on a morning they woke up fine. Because it is read live, an
+   * edit at 6pm simply replaces the 8am answer; there is one current report per
+   * day, not two observations.
+   */
+  reported: ReportedSignals | null;
+}): TerrainReading {
+  const { measured } = input;
+  const lean = terrainLeanFrom(input.reported ?? null);
+
+  // Answered too little to mean anything — the measured reading stands, exactly
+  // as it did before any of this existed.
+  if (lean === null) return { ...measured, hasReport: false };
+
+  // Answered, and nothing pulls either way. That is a report, and it is not a
+  // reason for anything.
+  if (lean === 0) return { ...measured, hasReport: true };
+
+  const pulls: "restore" | "build" = lean < 0 ? "restore" : "build";
+  const weight = Math.min(REPORT_MAX_WEIGHT, Math.abs(lean));
+  const reasons: TerrainReason[] = [
+    ...measured.reasons,
+    { source: "reported", text: reportedReason(input.reported!, pulls), pulls },
+  ];
+
+  const toRestore =
+    measured.reasons.filter((r) => r.pulls === "restore").length +
+    (pulls === "restore" ? weight : 0);
+  const toBuild =
+    measured.reasons.filter((r) => r.pulls === "build").length + (pulls === "build" ? weight : 0);
+
+  return {
+    lean: toRestore > toBuild ? "restore" : toBuild > toRestore ? "build" : "either",
+    reasons,
+    week: measured.week,
+    hasBody: measured.hasBody,
+    hasReport: true,
+  };
+}
+
+/**
+ * The reported reason, in their own numbers.
+ *
+ * Names the signals that actually pulled, so the sentence is checkable the way
+ * the measured ones are — someone who reads "Recovery 2/5" and knows they put 4
+ * has somewhere to point. The signals come from `signalPulls`, the same
+ * judgement the lean itself used, rather than a second opinion about which
+ * answers were the low ones.
+ *
+ * Third person, deliberately. The same sentence is read by the member and by
+ * their coach, and "you reported" is wrong on one of those two screens.
+ */
+function reportedReason(reported: ReportedSignals, pulls: "restore" | "build"): string {
+  const want = pulls === "restore" ? -1 : 1;
+  const named = signalPulls(reported)
+    .filter((p) => p.pull === want)
+    .map((p) => {
+      const meta = TERRAIN_SIGNALS.find((s) => s.id === p.id)!;
+      return `${meta.label} ${reported[p.id]}/5`;
+    });
+  return named.length ? `Reported today: ${named.join(", ")}` : "Reported today";
 }
 
 /**

@@ -52,7 +52,7 @@ type MovementEntry = {
 type Reading = {
   lean: "restore" | "build" | "either" | "unknown";
   headline: string;
-  reasons: { text: string; pulls: "restore" | "build" }[];
+  reasons: { source: "measured" | "reported"; text: string; pulls: "restore" | "build" }[];
   week: { stress: number; restoration: number; sessions: number };
   /** What the reading is reasoning from. See MovementBehindTheReading. */
   movement?: MovementEntry[];

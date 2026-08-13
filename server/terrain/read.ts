@@ -34,7 +34,8 @@
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "../db.js";
 import { healthDays, healthWorkouts, workoutSessions } from "../../shared/schema.js";
-import { readTerrain, terrainHeadline } from "../../shared/models/terrain.js";
+import { readTerrain, composeTerrainNow, terrainHeadline } from "../../shared/models/terrain.js";
+import { terrainCheckins } from "../../shared/models/terrainSignals.js";
 import { DEMANDING_EXTERNAL_TYPES, categoryOrientation } from "../../shared/models/training.js";
 import { recentMovement } from "../movement/history.js";
 import { addDaysToString } from "../../shared/utils/dates.js";
@@ -143,6 +144,27 @@ async function daysSinceLastSession(userId: string, onDate: string): Promise<num
   );
 }
 
+/** The member's own report for this day, if they have made one. */
+async function todaysReport(userId: string, onDate: string) {
+  const [row] = await db
+    .select({
+      energy: terrainCheckins.energy,
+      recovery: terrainCheckins.recovery,
+      nervousSystem: terrainCheckins.nervousSystem,
+      digestion: terrainCheckins.digestion,
+      bodyTension: terrainCheckins.bodyTension,
+      mentalClarity: terrainCheckins.mentalClarity,
+      drive: terrainCheckins.drive,
+    })
+    .from(terrainCheckins)
+    .where(and(eq(terrainCheckins.userId, userId), eq(terrainCheckins.onDate, onDate)))
+    .limit(1);
+  // Deliberately not the note. It is the member's own words to their coach and
+  // to themselves; nothing in the reading needs it, so nothing in the reading
+  // carries it.
+  return row ?? null;
+}
+
 export type TerrainRead = Awaited<ReturnType<typeof terrainFor>>;
 
 /**
@@ -153,13 +175,23 @@ export type TerrainRead = Awaited<ReturnType<typeof terrainFor>>;
  * that decides what to tell somebody should be checkable without a database.
  */
 export async function terrainFor(userId: string, onDate: string) {
-  const [avg, categories, since] = await Promise.all([
+  const [avg, categories, since, reported] = await Promise.all([
     averages(userId, onDate),
     trainedCategories(userId, onDate),
     daysSinceLastSession(userId, onDate),
+    /**
+     * Today's check-in, and only today's.
+     *
+     * Keyed to `onDate` — the member's own local date, which is also the date
+     * they answered under, so a check-in cannot leak across a timezone into a
+     * day it wasn't about. Read live on every request rather than cached, so a
+     * member who revises at 6pm sees the revised reading immediately, and so
+     * does their coach.
+     */
+    todaysReport(userId, onDate),
   ]);
 
-  const reading = readTerrain({
+  const measured = readTerrain({
     sleepRecent: avg.sleepMinutes.recent,
     sleepBaseline: avg.sleepMinutes.baseline,
     hrvRecent: avg.heartRateVariability.recent,
@@ -173,6 +205,14 @@ export async function terrainFor(userId: string, onDate: string) {
     recentDays: RECENT_DAYS,
     baselineDays: BASELINE_DAYS,
   });
+
+  /**
+   * The canonical Terrain Now — instruments and person, composed once here.
+   *
+   * Every reader of terrain goes through this function, so there is exactly one
+   * place the two get combined and no way for a screen to see only half.
+   */
+  const reading = composeTerrainNow({ measured, reported });
 
   /**
    * The movement the reading is reasoning from, not just its conclusion.

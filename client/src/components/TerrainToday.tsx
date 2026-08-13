@@ -33,7 +33,7 @@ type Lean = "restore" | "build" | "either" | "unknown";
 type Reading = {
   lean: Lean;
   headline: string;
-  reasons: { text: string; pulls: "restore" | "build" }[];
+  reasons: { source: "measured" | "reported"; text: string; pulls: "restore" | "build" }[];
   week: { stress: number; restoration: number; sessions: number };
   hasBody: boolean;
 };

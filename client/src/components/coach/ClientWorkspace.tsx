@@ -228,7 +228,13 @@ function Overview({ memberId }: { memberId: string }) {
   return (
     <div className="space-y-4">
       <Section title="Terrain now" kind="sakred">
-        {terrain.hasBody ? (
+        {/*
+          Not `hasBody`. The reading now composes what the member reported with
+          what their devices measured, so a client with no wearable who checks in
+          has a real terrain — gating on a synced phone would hide their own
+          words behind a missing gadget.
+        */}
+        {terrain.lean !== "unknown" ? (
           <>
             <p className="text-lg">{terrain.headline}</p>
             {terrain.reasons.length > 0 && (
@@ -248,7 +254,7 @@ function Overview({ memberId }: { memberId: string }) {
           </>
         ) : (
           <Empty>
-            No connected health data. Member-entered habits and check-ins still appear.
+            Nothing to read yet — no connected health data, and no check-in today.
           </Empty>
         )}
       </Section>

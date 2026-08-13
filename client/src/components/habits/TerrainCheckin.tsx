@@ -44,7 +44,18 @@ export function TerrainCheckin() {
       (await apiRequest("POST", "/api/terrain/checkin", v)).json(),
     // Optimistic would be wrong here: the answer is the point, and showing a
     // value that failed to save is worse than a half-second of nothing.
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/terrain/checkin"] }),
+    /**
+     * The check-in is an input to Terrain Now, so answering has to move it.
+     *
+     * Without this a member moves Recovery to 1, watches the card above go on
+     * saying "you're well recovered", and correctly concludes the question was
+     * decorative. `/api/today` too — readiness reads the same answers.
+     */
+    onSuccess: () => {
+      for (const key of ["/api/terrain/checkin", "/api/terrain/today", "/api/today"]) {
+        qc.invalidateQueries({ queryKey: [key] });
+      }
+    },
   });
 
   const answered = TERRAIN_SIGNALS.filter(
