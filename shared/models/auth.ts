@@ -137,6 +137,31 @@ export const authTokens = pgTable(
  * to deliver — so the client re-registers on every rotation and the unique
  * constraint collapses the duplicate.
  */
+/**
+ * Which devices to deliver to.
+ *
+ * ── One provider, both platforms ──────────────────────────────────────────
+ *
+ * Every token here is an **FCM registration token**, on Android and on iOS
+ * alike. iOS push does ride APNs underneath, but Firebase is the broker: the
+ * shell uses `@capacitor-firebase/messaging`, so the server has one provider to
+ * talk to and there is no second direct-APNs sender to build or keep in step.
+ *
+ * ── This column is a rented address, not an identity ──────────────────────
+ *
+ * `token` is what the current Firebase SDK hands us and what the current send
+ * API accepts, which is why it is the unique key — it identifies the *device*,
+ * so a resold phone re-points to whoever signs in next rather than accumulating
+ * a second row.
+ *
+ * Firebase is moving toward Installation IDs as the durable target identity,
+ * with registration-token targeting deprecated over time. Nothing to act on
+ * today — the installed plugin returns a token from `getToken()` and nothing
+ * else — but this schema should be read as "how we currently reach a device",
+ * not as a permanent fact. When the SDK moves, the change is to add an
+ * installation id beside this and migrate the send path, not to discover
+ * mid-incident that the app treated a rotating address as an identity.
+ */
 export const pushTokens = pgTable(
   "push_tokens",
   {
