@@ -35,6 +35,15 @@ export interface MapRegion {
   /** Matches a BODY_REGIONS key in ConstellationBody. Geometry, not taxonomy. */
   key: string;
   name: string;
+  /**
+   * One word, for the selector under the figure.
+   *
+   * The full name is the panel's job. Seven of "Structure & Strength" wrapped
+   * across a phone is a paragraph of controls, and the row exists to hand over
+   * the vocabulary at a glance — Mind · Breath · Axis · Organs · Middle · Flow
+   * · Structure — not to restate the headings.
+   */
+  short: string;
   /** The anatomy this region covers, so the concept lands on a body part. */
   covers: string;
   /** What it governs, in one line. */
@@ -53,6 +62,7 @@ export const MAP_REGIONS: MapRegion[] = [
   {
     key: "crown",
     name: "Mind & Awareness",
+    short: "Mind",
     covers: "Brain · attention · perception · state",
     governs: "Light, sleep, and the clock everything downstream runs on.",
     traditions: "Meditative and contemplative systems · Yoga · neuroscience",
@@ -65,6 +75,7 @@ export const MAP_REGIONS: MapRegion[] = [
   {
     key: "throat",
     name: "Breath & Pressure",
+    short: "Breath",
     covers: "Face · jaw · throat · ribcage · diaphragm",
     governs: "The switch between states — the one autonomic function you can take by hand.",
     traditions: "Pranayama · Qi Gong · breath disciplines · respiratory physiology",
@@ -77,6 +88,7 @@ export const MAP_REGIONS: MapRegion[] = [
   {
     key: "root",
     name: "The Central Axis",
+    short: "Axis",
     covers: "Spine · posture · nervous system",
     governs: "The line everything else hangs from, and the state it sets.",
     traditions: "Yoga · Kundalini · energetic anatomy · biomechanics",
@@ -89,6 +101,7 @@ export const MAP_REGIONS: MapRegion[] = [
   {
     key: "heart",
     name: "The Organ Network",
+    short: "Organs",
     covers: "Heart · lungs · liver · kidneys",
     governs: "Circulation, filtration, and whether the day's charge settles at night.",
     traditions: "Traditional Chinese Medicine · Taoist traditions · organ physiology",
@@ -101,6 +114,7 @@ export const MAP_REGIONS: MapRegion[] = [
   {
     key: "gut",
     name: "The Middle",
+    short: "Middle",
     covers: "Gut · digestion · microbiome · absorption",
     governs: "Where what you take in becomes what you're made of — or doesn't.",
     traditions: "Ayurveda · TCM · European herbalism · modern physiology",
@@ -113,6 +127,7 @@ export const MAP_REGIONS: MapRegion[] = [
   {
     key: "legs",
     name: "Flow",
+    short: "Flow",
     covers: "Blood · lymph · hydration · fluids",
     governs: "Drainage and transport. It moves when you move, and stalls when you don't.",
     traditions: "Walking and natural movement · martial traditions · European nature cure",
@@ -125,6 +140,7 @@ export const MAP_REGIONS: MapRegion[] = [
   {
     key: "arms",
     name: "Structure & Strength",
+    short: "Structure",
     covers: "Fascia · joints · muscle · bone · force",
     governs: "What carries load, and what happens when nothing asks it to.",
     traditions: "Physical culture · strength traditions · osteopathic and fascial thinking",

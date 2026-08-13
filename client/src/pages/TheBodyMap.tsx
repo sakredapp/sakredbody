@@ -29,7 +29,7 @@
  * separation is structural rather than stylistic.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight } from "lucide-react";
@@ -45,6 +45,7 @@ import { Deck } from "@/components/Deck";
 import { BreathPacer } from "@/components/BreathPacer";
 import { StarDust } from "@/components/StarDust";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { MAP_REGIONS } from "@/data/bodyMap";
 import { EMBODIED_PRACTICE } from "@/data/territories";
 import { usePageMeta } from "@/hooks/use-page-meta";
@@ -122,8 +123,42 @@ export default function TheBodyMap() {
     "The body as one connected chain, the traditions that studied each part of it, and how to tell where you currently are in it.",
   );
 
+  /**
+   * The one piece of state, driven by five things.
+   *
+   * The figure, the selector, the keyboard and the autocycle all resolve here;
+   * ConstellationBody renders it and requests changes to it rather than owning
+   * it. See the note above the component.
+   */
   const [activeKey, setActiveKey] = useState(MAP_REGIONS[0].key);
   const region = MAP_REGIONS.find((r) => r.key === activeKey) ?? MAP_REGIONS[0];
+
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  /** While the keyboard is in the selector, the figure stops cycling. */
+  const [tabFocus, setTabFocus] = useState(false);
+
+  /** Standard tablist keyboard behaviour: move focus and select together. */
+  const onTabKey = (e: React.KeyboardEvent, i: number) => {
+    const last = MAP_REGIONS.length - 1;
+    const to =
+      e.key === "ArrowRight" || e.key === "ArrowDown"
+        ? i === last
+          ? 0
+          : i + 1
+        : e.key === "ArrowLeft" || e.key === "ArrowUp"
+          ? i === 0
+            ? last
+            : i - 1
+          : e.key === "Home"
+            ? 0
+            : e.key === "End"
+              ? last
+              : -1;
+    if (to < 0) return;
+    e.preventDefault();
+    setActiveKey(MAP_REGIONS[to].key);
+    tabRefs.current[to]?.focus();
+  };
 
   return (
     <div className="tone-ink min-h-screen bg-background text-foreground font-sans">
@@ -151,20 +186,86 @@ export default function TheBodyMap() {
             <SectionHeader
               eyebrow="One Body, Many Lenses"
               title={<>Different cultures. Different lenses. <span className="text-gold">One human body.</span></>}
-              intro="No single tradition owns the human body. Touch a region — or let it move on its own."
+              intro="No single tradition owns the human body. Touch a region on the figure, choose one below it, or let it move on its own."
               testId="text-figure-headline"
             />
           </motion.div>
 
           <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
             <motion.div variants={fadeInUp} className="order-1">
-              <ConstellationBody onActive={setActiveKey} />
+              <ConstellationBody value={activeKey} onActive={setActiveKey} paused={tabFocus} />
+
+              {/* ── The seven, named ─────────────────────────
+                  Not only an accessibility fallback, though it is that: the
+                  canvas is aria-hidden, and without real controls the keyboard
+                  and a reduced-motion visitor had no way to reach any of this.
+
+                  It earns its place for everyone. The figure alone requires you
+                  to discover seven anatomical hit areas by exploration before
+                  you learn the map contains seven specific systems. The row
+                  hands over the vocabulary at a glance — Mind · Breath · Axis ·
+                  Organs · Middle · Flow · Structure — and then the body gives
+                  those words anatomy and movement.
+
+                  Wrapping rather than scrolling sideways: the entire purpose is
+                  that all seven are visible, so hiding some off the edge of a
+                  phone would defeat it. Two quiet rows is the right answer. */}
+              <div
+                role="tablist"
+                aria-label="Body territories"
+                aria-orientation="horizontal"
+                className="flex flex-wrap justify-center gap-2 mt-6"
+                onFocus={() => setTabFocus(true)}
+                onBlur={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node)) setTabFocus(false);
+                }}
+              >
+                {MAP_REGIONS.map((r, i) => {
+                  const selected = r.key === activeKey;
+                  return (
+                    <button
+                      key={r.key}
+                      ref={(el) => { tabRefs.current[i] = el; }}
+                      role="tab"
+                      id={`region-tab-${r.key}`}
+                      aria-selected={selected}
+                      aria-controls="region-panel"
+                      // Roving tabindex: the group is one tab stop, and the
+                      // arrows move within it.
+                      tabIndex={selected ? 0 : -1}
+                      onClick={() => setActiveKey(r.key)}
+                      onKeyDown={(e) => onTabKey(e, i)}
+                      className={cn(
+                        "rounded-full border px-3.5 py-1.5 text-[0.7rem] uppercase tracking-[0.14em] transition-colors",
+                        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gold/70",
+                        selected
+                          ? "border-gold/45 bg-gold/10 text-gold"
+                          : "border-white/12 text-white/55 hover:text-white/85 hover:border-white/25",
+                      )}
+                      data-testid={`region-tab-${r.key}`}
+                    >
+                      {r.short}
+                    </button>
+                  );
+                })}
+              </div>
             </motion.div>
 
             {/* min-h so the column doesn't resize as regions of different
                 length swap through it, which on a desktop makes the figure
                 beside it jump. */}
-            <motion.div variants={fadeInUp} className="order-2 min-h-[22rem] flex flex-col justify-center">
+            {/* The panel is the tabpanel, and it is the whole semantic path to
+                this content — the canvas beside it is aria-hidden and always
+                will be. A screen reader does not need 29 stars, 37 fascia edges
+                and 42 motes; it needs to know there are seven territories,
+                which one is selected, and what that one means. */}
+            <motion.div
+              variants={fadeInUp}
+              className="order-2 min-h-[22rem] flex flex-col justify-center"
+              role="tabpanel"
+              id="region-panel"
+              aria-labelledby={`region-tab-${region.key}`}
+            >
               <AnimatePresence mode="wait">
                 <motion.div
                   key={region.key}

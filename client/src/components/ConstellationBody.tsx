@@ -36,10 +36,17 @@ import { hash01, mountStage } from "@/lib/canvasStage";
  *
  * ── What is deliberately absent ───────────────────────────────────────────
  *
- * No scroll-driven camera, no WebGL. mountStage already caps device pixel
- * ratio, pauses on IntersectionObserver, and freezes under prefers-reduced-
- * motion while still painting one frame — so reduced motion gets a composed
- * still figure rather than a blank box.
+ * No scroll-driven camera, no WebGL. mountStage caps device pixel ratio and
+ * pauses on IntersectionObserver.
+ *
+ * ── Reduced motion means less moving, not less working ────────────────────
+ *
+ * It used to mean the loop stopped after one frame, which produced a composed
+ * still figure and a dead one: selecting a region changed nothing on screen,
+ * so somebody with the setting on got a handsome diagram permanently stuck on
+ * whichever region rendered first. Now the movement is dropped — no breath, no
+ * motes, no drift, no travelling charge, no autocycle — and the selection is
+ * kept, repainting a single composed frame each time the region changes.
  */
 
 interface Star {
@@ -206,17 +213,34 @@ interface Mote {
 }
 
 const MOTES = 42;
+const NO_MOTES: Mote[] = [];
 
+/**
+ * ── One state, several inputs ─────────────────────────────────────────────
+ *
+ * Hover, tap, the selector beside the figure, the keyboard and the autocycle
+ * are five ways of saying the same sentence, and they all resolve to one key.
+ * The canvas used to own that key, which meant the page beside it could only
+ * ever listen. It now *renders* the key and *requests* changes to it:
+ *
+ *     body interaction ─┐
+ *     region control ───┼→ activeKey → canvas + panel
+ *     autocycle ────────┘
+ *
+ * `value` is optional so the uncontrolled use still works — the homepage hero
+ * has no owner for the state and still needs the cycle to move.
+ */
 export function ConstellationBody({
   className,
+  /** The lit region. Omit to let the figure keep its own. */
+  value,
   /**
-   * Fires with the region key whenever the lit region changes — whether the
-   * pointer chose it, a tap chose it, or the cycle did.
+   * Fires with the region key whenever the figure wants a different region —
+   * pointer, tap or cycle.
    *
-   * Emitted from a ref comparison inside the animation loop rather than on
-   * every frame: `lit` is recomputed sixty times a second, and calling a React
-   * setter that often would re-render the page under the canvas. React hears
-   * "region changed", never "frame changed".
+   * Called on change only, never per frame. `lit` is read sixty times a second
+   * and a React setter at that rate would re-render the page under the canvas.
+   * React hears "region changed", never "frame changed".
    */
   onActive,
   /**
@@ -225,32 +249,91 @@ export function ConstellationBody({
    * belongs to /the-body-map and the hero is a signature rather than a lesson.
    */
   interactive = true,
+  /**
+   * Stops the cycle advancing while somebody is working the selector with a
+   * keyboard. Without it the selection moves under a screen-reader user every
+   * five seconds — the focused control quietly changing state on its own is
+   * the one thing a tablist must never do.
+   */
+  paused = false,
 }: {
   className?: string;
+  value?: string;
   onActive?: (key: string) => void;
   interactive?: boolean;
+  paused?: boolean;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const [active, setActive] = useState(0);
-  const activeRef = useRef(0);
-  /** A deliberate choice and the moment it stops counting. */
-  const holdRef = useRef<{ key: string; until: number } | null>(null);
-  const holdingRef = useRef(false);
-  const litRef = useRef<string | null>(null);
+
+  const [reduced] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+
+  const [selfKey, setSelfKey] = useState(BODY_REGIONS[0].key);
+  const lit = value ?? selfKey;
+
+  const litRef = useRef(lit);
   const onActiveRef = useRef(onActive);
   const interactiveRef = useRef(interactive);
+  const pausedRef = useRef(paused);
+  litRef.current = lit;
   onActiveRef.current = onActive;
   interactiveRef.current = interactive;
-  activeRef.current = active;
+  pausedRef.current = paused;
 
-  // The cycle stalls while somebody is holding a region, and picks up from
-  // where it was rather than jumping.
+  /** Paints one frame. The only way anything moves under reduced motion. */
+  const repaintRef = useRef<(() => void) | null>(null);
+
+  /**
+   * Wall clock, in ms, until which the autocycle stands down.
+   *
+   * Deliberately not the breath clock the draw runs on: under reduced motion
+   * the draw is not running, and the cycle still has to know it was interrupted.
+   */
+  const suspendUntilRef = useRef(0);
+  /**
+   * The last key this figure asked for, so a change it did *not* ask for can
+   * be recognised as somebody else's input and treated as an interruption.
+   */
+  const requestedRef = useRef<string>(value ?? BODY_REGIONS[0].key);
+
+  const requestRef = useRef<(key: string) => void>(() => {});
+  requestRef.current = (key: string) => {
+    if (key === litRef.current) return;
+    requestedRef.current = key;
+    setSelfKey(key);
+    onActiveRef.current?.(key);
+  };
+
+  // Somebody outside chose a region — the selector, or the keyboard. The
+  // figure follows, and the cycle gets out of the way for as long as a tap.
   useEffect(() => {
+    if (value === undefined || value === requestedRef.current) return;
+    requestedRef.current = value;
+    suspendUntilRef.current = Date.now() + 14_000;
+  }, [value]);
+
+  // Under reduced motion there is no loop to notice the change, so it has to
+  // be painted explicitly.
+  useEffect(() => {
+    if (reduced) repaintRef.current?.();
+  }, [lit, reduced]);
+
+  // The cycle picks up from wherever the region currently is rather than from
+  // its own counter, so a selection moves it rather than fighting it.
+  useEffect(() => {
+    // No automatic cycling under reduced motion: an unasked-for change every
+    // five seconds is the thing the setting exists to turn off.
+    if (reduced) return;
     const timer = setInterval(() => {
-      if (!holdingRef.current) setActive((a) => (a + 1) % BODY_REGIONS.length);
+      if (pausedRef.current || Date.now() < suspendUntilRef.current) return;
+      const i = BODY_REGIONS.findIndex((r) => r.key === litRef.current);
+      requestRef.current(BODY_REGIONS[(i + 1) % BODY_REGIONS.length].key);
     }, 5200);
     return () => clearInterval(timer);
-  }, []);
+  }, [reduced]);
 
   useEffect(() => {
     const canvas = ref.current;
@@ -278,6 +361,8 @@ export function ConstellationBody({
       if (!interactiveRef.current) return;
       const rect = canvas.getBoundingClientRect();
       tapped = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      // Under reduced motion no frame is coming along to consume it.
+      repaintRef.current?.();
     };
     const onMoveKind = (e: PointerEvent) => {
       if (e.pointerType === "touch") touchInput = true;
@@ -285,7 +370,9 @@ export function ConstellationBody({
     canvas.addEventListener("pointerdown", onDown);
     canvas.addEventListener("pointermove", onMoveKind);
 
-    const teardown = mountStage(canvas, (S) => {
+    const teardown = mountStage(
+      canvas,
+      (S) => {
       /** Primary activation, eased so regions fade rather than switch. */
       const level: Record<string, number> = {};
       /** Primary plus what the neighbours lend it. */
@@ -313,7 +400,11 @@ export function ConstellationBody({
         const { ctx, w, h } = S;
         const dt = Math.min(0.05, prev === 0 ? 0.016 : t - prev);
         prev = t;
-        const breath = breathAt(t);
+        // Reduced motion keeps the composition and drops the movement: no
+        // breath, no motes, no drift, no travelling charge. What survives is
+        // the part that carries meaning — which region is being talked about.
+        const still = S.reduced;
+        const breath = still ? 0 : breathAt(t);
         ctx.clearRect(0, 0, w, h);
 
         // The figure occupies x 18…82 and y 8…160. Fitting to its actual
@@ -337,7 +428,9 @@ export function ConstellationBody({
         // it drifting differently.
         // Everything a pointer drives — depth, attraction, hover — is gated on
         // this rather than on S.inside, so a scrolling finger moves nothing.
-        const hovering = S.inside && !touchInput;
+        // Hover needs a running loop to be worth anything, so under reduced
+        // motion the tap is the way in and the pointer is left alone.
+        const hovering = S.inside && !touchInput && !still;
 
         const pxN = hovering ? (S.px - w / 2) / (w / 2) : 0;
         const pyN = hovering ? (S.py - h / 2) / (h / 2) : 0;
@@ -376,30 +469,32 @@ export function ConstellationBody({
             // enough to finish the panel beside it: a tradition line, a name,
             // the anatomy, what it governs, the lens, the measure.
             const k = pick(tapped.x, tapped.y);
-            if (k) holdRef.current = { key: k, until: t + 14 };
+            if (k) {
+              suspendUntilRef.current = Date.now() + 14_000;
+              requestRef.current(k);
+            }
             tapped = null;
           }
           if (hovering) {
             const k = pick(S.px, S.py);
-            // Refreshed every frame the pointer is near, so the decay only
-            // starts once it actually leaves.
-            if (k) holdRef.current = { key: k, until: t + 1.2 };
+            // Refreshed every frame the pointer is near, so the cycle only
+            // starts counting again once it actually leaves. Never shortens an
+            // existing hold — a tap outranks a mouse passing over.
+            if (k) {
+              suspendUntilRef.current = Math.max(suspendUntilRef.current, Date.now() + 1200);
+              requestRef.current(k);
+            }
           }
         }
 
-        const hold = holdRef.current && t < holdRef.current.until ? holdRef.current : null;
-        holdingRef.current = !!hold;
-        const lit = hold?.key ?? BODY_REGIONS[activeRef.current].key;
-
-        if (lit !== litRef.current) {
-          litRef.current = lit;
-          onActiveRef.current?.(lit);
-        }
+        const lit = litRef.current;
 
         // Primary eases toward its target; act adds what the neighbours lend.
+        // Snapped rather than eased when still, because there is only one frame
+        // and a region caught 5% of the way in reads as nothing selected.
         for (const r of BODY_REGIONS) {
           const target = r.key === lit ? 1 : 0;
-          level[r.key] += (target - level[r.key]) * 0.05;
+          level[r.key] = still ? target : level[r.key] + (target - level[r.key]) * 0.05;
         }
         for (const r of BODY_REGIONS) act[r.key] = level[r.key];
         for (const r of BODY_REGIONS) {
@@ -439,13 +534,13 @@ export function ConstellationBody({
           fy += 0.85 * breath * local * breathGain;
 
           // The pressure wave, only while Breath is answering.
-          if (act.throat > 0.02) {
+          if (!still && act.throat > 0.02) {
             const dw = Math.abs(s.y - waveY);
             if (dw < 12) fy += Math.cos((dw / 12) * Math.PI * 0.5) * 0.5 * act.throat;
           }
 
           // The Middle turns rather than blinks.
-          if (act.gut > 0.02 && s.region === "gut") {
+          if (!still && act.gut > 0.02 && s.region === "gut") {
             fx += Math.cos(churn + i) * 0.7 * act.gut;
             fy += Math.sin(churn + i) * 0.5 * act.gut;
           }
@@ -491,7 +586,7 @@ export function ConstellationBody({
           ctx.stroke();
 
           // A charge travelling the line, away from the lit region.
-          if (heat > 0.12) {
+          if (!still && heat > 0.12) {
             const from = (act[STARS[a].region] ?? 0) >= (act[STARS[b].region] ?? 0) ? a : b;
             const to = from === a ? b : a;
             const k = (t * 0.55 + a * 0.17 + b * 0.11) % 1;
@@ -511,7 +606,9 @@ export function ConstellationBody({
         // both ends of every edge, which is what reads as passing through the
         // body rather than around it.
         const flowGain = 0.55 + act.legs * 1.9 + breath * 0.25;
-        for (const m of motes) {
+        // Flow is movement all the way down; there is no still version of
+        // it, so under reduced motion it is absent rather than frozen.
+        for (const m of still ? NO_MOTES : motes) {
           const [ea, eb] = FASCIA[m.edge];
           const from = m.dir === 1 ? ea : eb;
           const to = m.dir === 1 ? eb : ea;
@@ -550,19 +647,19 @@ export function ConstellationBody({
           // Mind & Awareness is finer and quicker than the rest — small
           // coherent pulses rather than a broad swell.
           const fine = s.region === "crown" ? 1 + act.crown * 1.6 : 1;
-          const twinkle = 0.5 + 0.5 * Math.sin(t * 1.1 * fine + hash01(i, 31.7) * 12);
+          const twinkle = still ? 0.5 : 0.5 + 0.5 * Math.sin(t * 1.1 * fine + hash01(i, 31.7) * 12);
 
           // The Organ Network answers itself: internal territories pulse on
           // staggered phases so the eye reads relationship, never one organ
           // blinking alone.
           let organ = 0;
-          if ((s.region === "heart" || s.region === "gut") && act.heart > 0.02) {
+          if (!still && (s.region === "heart" || s.region === "gut") && act.heart > 0.02) {
             organ = Math.max(0, Math.sin(t * 1.6 - i * 0.9)) * act.heart * 0.9;
           }
 
           // The spine conducts, crown to root, in sequence.
           let axis = 0;
-          if (act.root > 0.02 && Math.abs(s.x - 50) < 9) {
+          if (!still && act.root > 0.02 && Math.abs(s.x - 50) < 9) {
             const d = Math.abs(s.y - axisY);
             if (d < 14) axis = Math.cos((d / 14) * Math.PI * 0.5) * act.root;
           }
@@ -617,10 +714,13 @@ export function ConstellationBody({
         ctx.strokeStyle = `rgba(214,178,104,${0.05 + breath * 0.03})`;
         ctx.lineWidth = 1;
         ctx.stroke();
-      };
-    });
+        };
+      },
+      { controls: (h) => (repaintRef.current = h.repaint) },
+    );
 
     return () => {
+      repaintRef.current = null;
       canvas.removeEventListener("pointerdown", onDown);
       canvas.removeEventListener("pointermove", onMoveKind);
       teardown();

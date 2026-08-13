@@ -12,6 +12,15 @@ export interface Stage {
   inside: boolean;
   /** Seconds since the shared breath epoch. */
   t: number;
+  /**
+   * True when the visitor has asked for reduced motion.
+   *
+   * Exposed to the draw rather than kept private, because "reduced motion"
+   * is a question only the drawing can answer well. Freezing the loop is the
+   * right default for an ambient backdrop and the wrong one for a canvas that
+   * is also a control — see `controls.repaint` below.
+   */
+  reduced: boolean;
   /** Called after every resize, before the next frame. Seed particles here. */
   onResize?: () => void;
 }
@@ -43,6 +52,16 @@ export function mountStage(
      * for as long as somebody keeps the app open.
      */
     fps?: number;
+    /**
+     * Receives a handle, once, during mount.
+     *
+     * `repaint()` draws exactly one frame on demand. It exists for canvases
+     * that are interactive as well as animated: under reduced motion the loop
+     * stops, and without a way to ask for a single new frame the canvas is not
+     * merely still, it is unusable — selecting something changes nothing on
+     * screen. Reduced motion should mean less moving, not less working.
+     */
+    controls?: (handle: { repaint: () => void }) => void;
   } = {},
 ): () => void {
   const ctx = canvas.getContext("2d");
@@ -51,7 +70,17 @@ export function mountStage(
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-  const stage: Stage = { ctx, canvas, w: 0, h: 0, px: -9999, py: -9999, inside: false, t: 0 };
+  const stage: Stage = {
+    ctx,
+    canvas,
+    w: 0,
+    h: 0,
+    px: -9999,
+    py: -9999,
+    inside: false,
+    t: 0,
+    reduced,
+  };
 
   const resize = () => {
     const rect = canvas.getBoundingClientRect();
@@ -67,6 +96,15 @@ export function mountStage(
     canvas.height = Math.max(1, Math.round(rect.height * dpr));
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     stage.onResize?.();
+
+    // Resizing a canvas clears it, and under reduced motion no frame is coming
+    // to fill it back in. Every resize after the first — a rotation, the iOS
+    // safe-area insets resolving after first paint, a lazy layout — would
+    // otherwise leave a permanently blank box.
+    if (reduced) {
+      stage.t = elapsed(performance.now());
+      draw(stage.t);
+    }
   };
 
   const onMove = (e: PointerEvent) => {
@@ -146,6 +184,15 @@ export function mountStage(
   // One frame regardless, so a reduced-motion or offscreen canvas still paints
   // its resting state instead of sitting blank.
   frame(performance.now());
+
+  // Bypasses the fps gate deliberately: this is not the loop asking for the
+  // next frame, it is the caller saying something changed.
+  options.controls?.({
+    repaint: () => {
+      stage.t = elapsed(performance.now());
+      draw(stage.t);
+    },
+  });
 
   return () => {
     visible = false;
