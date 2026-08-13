@@ -63,8 +63,8 @@ export interface NavEntry {
  *                      people. Already a coherent trio in WaysToWork.tsx.
  *
  * Embody is not here. Embodiment is what living the system produces, not a
- * fourth thing to choose; its material moved to Body Literacy, whose job is
- * teaching you which direction you currently need. See data/territories.ts.
+ * fourth thing to choose; its material is now inside The Body Map, along with
+ * the terrain and the literacy pages it used to sit beside.
  */
 export const SITE_NAV: NavEntry[] = [
   {
@@ -78,7 +78,8 @@ export const SITE_NAV: NavEntry[] = [
     label: "The Intelligence",
     children: [
       { label: "The Body Map", href: "/the-body-map", note: "How the body works, and who taught us to read it" },
-      { label: "What Is a Sakred Body?", href: "/philosophy", note: "The manifesto" },
+      { label: "How Sakred Works", href: "/how-sakred-works", note: "The philosophy inside the app" },
+      { label: "The Manifesto", href: "/manifesto", note: "Why modern health feels fragmented" },
       { label: "Food Chart", href: "/food-chart", note: "What food actually does" },
     ],
   },

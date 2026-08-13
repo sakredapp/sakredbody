@@ -9,7 +9,8 @@ import { ScrollToTop } from "@/components/ScrollToTop";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { lazyRoute, clearChunkReloadGuards } from "@/lib/lazyRoute";
 import Home from "@/pages/Home";
-const Philosophy = lazyRoute("Philosophy", () => import("@/pages/Philosophy"));
+const HowSakredWorks = lazyRoute("HowSakredWorks", () => import("@/pages/HowSakredWorks"));
+const Manifesto = lazyRoute("Manifesto", () => import("@/pages/Manifesto"));
 const Restore = lazyRoute("Restore", () => import("@/pages/Restore"));
 const Build = lazyRoute("Build", () => import("@/pages/Build"));
 const TheBodyMap = lazyRoute("TheBodyMap", () => import("@/pages/TheBodyMap"));
@@ -68,7 +69,8 @@ const isAppHost =
  * mistake this list exists to prevent.
  */
 const MARKETING_PATHS: [string, React.ComponentType][] = [
-  ["/philosophy", Philosophy],
+  ["/how-sakred-works", HowSakredWorks],
+  ["/manifesto", Manifesto],
   ["/restore", Restore],
   ["/build", Build],
   ["/the-body-map", TheBodyMap],
@@ -112,6 +114,13 @@ function Router() {
       {/* Embodiment is what living the system produces, not a destination. It
           retired into Body Literacy, which has now retired in turn. */}
       <Route path="/embody">{() => <Redirect to="/the-body-map" />}</Route>
+
+      {/* /philosophy was two pages wearing one URL: an argument for why modern
+          health is fragmented, and a description of how the product reads a
+          body. Split into /manifesto and /how-sakred-works. The old path lands
+          on the manifesto, which is what somebody typing "philosophy" is
+          looking for — the argument, not the software. */}
+      <Route path="/philosophy">{() => <Redirect to="/manifesto" />}</Route>
 
       {/* The app and the portal are the same product. Old /app links land there. */}
       <Route path="/app">{() => <Redirect to="/member" />}</Route>

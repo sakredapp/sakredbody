@@ -17,7 +17,8 @@ const PATH_LINKS = [
 
 /** Worldview pages. */
 const PHILOSOPHY_LINKS = [
-  { label: "What Is a Sakred Body?", href: "/philosophy" },
+  { label: "How Sakred Works", href: "/how-sakred-works" },
+  { label: "The Manifesto", href: "/manifesto" },
   { label: "The Body Map", href: "/the-body-map" },
 ];
 

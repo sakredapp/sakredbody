@@ -287,9 +287,9 @@ export default function Home() {
           </motion.p>
 
           <motion.div variants={fadeInUp} className="text-center mt-9">
-            <Link href="/philosophy">
+            <Link href="/manifesto">
               <Button variant="outline" className="border-gold-subtle text-gold" data-testid="button-philosophy-page">
-                Read the Full Philosophy <ArrowRight className="ml-2 h-4 w-4" />
+                Read the Manifesto <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
           </motion.div>
