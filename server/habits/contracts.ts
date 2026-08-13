@@ -47,6 +47,31 @@ export class ContractError extends Error {
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+/**
+ * Run this write in a transaction — joining the caller's, if it has one.
+ *
+ * ── Why this is not just `db.transaction` ─────────────────────────────────
+ *
+ * `db` is a connection *pool*. `db.transaction()` checks out a fresh
+ * connection, so a `db.transaction` called from inside another one is not a
+ * nested transaction at all — it is a second, independent transaction on a
+ * second connection, and it commits on its own regardless of what happens to
+ * the caller. Postgres never sees a relationship between them.
+ *
+ * That is invisible until something coordinates several of these writers. A
+ * plan activation is exactly that: four practices added, one retargeted, one
+ * stopped. Without this, a failure on the fifth would leave the first four
+ * committed to the member's live routine while the plan that explains them
+ * rolls back to a draft — the member wakes up to half a plan nobody authored,
+ * and there is no record saying which half.
+ *
+ * So a coordinating caller passes its `tx`, and these writes land on its
+ * connection, inside its transaction, and roll back with it.
+ */
+function inTransaction<T>(tx: Tx | undefined, fn: (tx: Tx) => Promise<T>): Promise<T> {
+  return tx ? fn(tx) : db.transaction(fn);
+}
+
 /** Config as the columns a phase stores, with the catalogue supplying defaults. */
 function phaseColumns(
   habit: typeof routineHabits.$inferSelect,
@@ -116,8 +141,10 @@ export async function addTrackedHabit(opts: {
   today: string;
   actorId: string;
   source: "member" | "coach" | "plan" | "retreat" | "cohort";
+  /** Supplied when this add is one step of a larger all-or-nothing change. */
+  tx?: Tx;
 }) {
-  return db.transaction(async (tx) => {
+  return inTransaction(opts.tx, async (tx) => {
     const habit = await habitOrThrow(tx, opts.routineHabitId);
 
     const [existing] = await tx
@@ -251,8 +278,10 @@ export async function reconfigure(opts: {
   today: string;
   actorId: string;
   source: "member" | "coach" | "plan" | "retreat" | "cohort";
+  /** Supplied when this change is one step of a larger all-or-nothing change. */
+  tx?: Tx;
 }) {
-  return db.transaction(async (tx) => {
+  return inTransaction(opts.tx, async (tx) => {
     const [tracked] = await tx
       .select()
       .from(trackedHabits)
@@ -449,8 +478,10 @@ export async function completePhase(opts: {
   then: "stop" | "continue";
   today: string;
   actorId: string;
+  /** Supplied when this ending is one step of a larger all-or-nothing change. */
+  tx?: Tx;
 }) {
-  return db.transaction(async (tx) => {
+  return inTransaction(opts.tx, async (tx) => {
     const [live] = await tx
       .select()
       .from(trackedHabitPhases)

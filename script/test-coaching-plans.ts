@@ -18,6 +18,7 @@
  * Run: tsx script/test-coaching-plans.ts
  */
 
+import { readFileSync } from "node:fs";
 import { reviewPlan, weeklyFrequency, type ReviewHabit } from "../shared/models/planReview.js";
 import {
   planDraftSchema,
@@ -140,6 +141,29 @@ console.log("\nWhat activation would actually do\n");
   });
   check("a habit the plan never mentions is untouched", r.changes.length === 1);
   check("and it is not the one they kept themselves", r.changes[0].routineHabitId === "h-protein");
+}
+
+/**
+ * A second revision on top of the first.
+ *
+ * 140 → 165 was verified against Postgres. The thing worth pinning here is that
+ * the review reads *what is live*, not what the plan previously said: after
+ * activation the live contract is 165, so 175 is a change from 165, not another
+ * change from 140. A review that reasoned from the old plan would keep offering
+ * to make a change the member is already on.
+ */
+{
+  const r = reviewPlan({
+    ...base,
+    items: [{ routineHabitId: "h-protein", intent: "change", target: 175, schedule: null }],
+    live: [
+      { routineHabitId: "h-protein", trackedHabitId: "t1", target: 165, scheduleKind: "daily", scheduleCount: null },
+    ] as never,
+  });
+  check("a revision on top of a revision is still one change", r.changes.length === 1);
+  check("measured from the live contract, not the old plan", r.changes[0].from === "165");
+  check("to the new number", r.changes[0].to === "175");
+  check("and it may activate", r.canActivate);
 }
 
 console.log("\nThe catalogue's own ceilings are not the coach's to raise\n");
@@ -359,6 +383,86 @@ check(
 );
 check("an open-ended plan never claims to have finished",
   !planRanItsCourse({ endedAt: "2026-08-20T10:00:00Z", endsOn: null }));
+
+console.log("\nActivation is one transaction — and one connection\n");
+
+/**
+ * ── Why this is checked in source rather than exercised ───────────────────
+ *
+ * The failure these guard against is not a Postgres question. Postgres rolls
+ * back what is in a transaction; that was never in doubt. The question is
+ * whether activation's writes are *in* one — and the answer turned on a detail
+ * invisible at every call site: `db` is a pool, so `db.transaction()` checks out
+ * a fresh connection, and a `db.transaction` invoked from inside another one
+ * commits independently of it.
+ *
+ * Which is what activation used to do. Each writer was transactional, the
+ * activation block was transactional, every comment said atomic, and a failure
+ * on the fifth change would still have committed the first four to the member's
+ * live routine while the plan rolled back to a draft.
+ *
+ * The fix is one word at three call sites, and nothing about the code's shape
+ * makes its absence visible — no type breaks, no test fails, the transaction is
+ * right there in the diff. So the guard is the word itself.
+ *
+ * These cannot run the code: `contracts.ts` reaches the database at import, and
+ * there is no database here. The live rollback was verified separately against
+ * Postgres.
+ */
+const contractsSrc = readFileSync(new URL("../server/habits/contracts.ts", import.meta.url), "utf8");
+const plansSrc = readFileSync(new URL("../server/coaching/plans.ts", import.meta.url), "utf8");
+const activation = plansSrc.slice(plansSrc.indexOf("export async function activatePlan"));
+
+check("activation opens a transaction", /await db\.transaction\(async \(tx\) => \{/.test(activation));
+
+for (const writer of ["addTrackedHabit", "reconfigure", "completePhase"] as const) {
+  const at = activation.indexOf(`${writer}({`);
+  const call = at < 0 ? "" : activation.slice(at, activation.indexOf("});", at));
+  check(`activation calls ${writer}`, at >= 0);
+  check(
+    `and hands it the transaction, so its writes roll back with the plan`,
+    /\btx,/.test(call),
+    `${writer} is called on the pool — it would commit on its own`,
+  );
+
+  // The other half: the writer has to honour what it is handed.
+  const decl = contractsSrc.slice(contractsSrc.indexOf(`export async function ${writer}(`));
+  // Signature through the line that opens the transaction — the two halves
+  // that have to agree.
+  const opens = decl.slice(0, decl.indexOf("=> {"));
+  check(`${writer} accepts a caller's transaction`, /tx\?: Tx;/.test(opens));
+  check(
+    `${writer} joins it rather than opening its own`,
+    /return inTransaction\(opts\.tx,/.test(opens),
+    "still calls db.transaction — a second connection, committing independently",
+  );
+}
+
+/**
+ * And the helper itself. `fn(tx)` — the caller's transaction, used directly.
+ * Anything that reaches for `db` here is a new connection again.
+ */
+{
+  const helper = contractsSrc.slice(
+    contractsSrc.indexOf("function inTransaction"),
+    contractsSrc.indexOf("function inTransaction") + 400,
+  );
+  const body = helper.slice(helper.indexOf("{")).replace(/\s+/g, " ");
+  check(
+    "a supplied transaction is used as-is",
+    body.includes("return tx ? fn(tx) : db.transaction(fn);"),
+  );
+}
+
+/**
+ * Nothing outside a coordinated change should be passing one. A route handler
+ * that opened a transaction to wrap a single write would be holding a
+ * connection for the length of an HTTP request for no reason.
+ */
+{
+  const routes = readFileSync(new URL("../server/habits/routes.ts", import.meta.url), "utf8");
+  check("ordinary member and coach writes still transact for themselves", !/\btx,/.test(routes));
+}
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

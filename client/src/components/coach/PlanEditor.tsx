@@ -459,7 +459,9 @@ export function PlanEditor({
             <div className="rounded-lg border border-border/30 p-3 space-y-2">
               <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Safety</p>
               {r.findings.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nothing flagged.</p>
+                <p className="text-sm text-muted-foreground">
+                  Nothing flagged by the checks below.
+                </p>
               ) : (
                 r.findings.map((f, i) => (
                   <p
@@ -479,22 +481,35 @@ export function PlanEditor({
                 ))
               )}
               {/*
-                Which questions were actually asked. "No conflicts found" on the
-                strength of an empty relations table would be a check-shaped
-                reassurance, so the screen says what it did and did not look at.
+                Which questions were actually asked, one line each, in the
+                engine's own terms.
+
+                The line that matters is the last one. `habit_relations` — the
+                table that would say cold plunging and an extended fast are a bad
+                pair — is empty, so pairwise checking currently has nothing to
+                check. "No conflicts found" would be a true sentence read as a
+                clean bill of health, which is worse than saying nothing: a coach
+                would take it as evidence the pairing was considered.
+
+                So it says what is actually true — nothing is declared about
+                these practices — and it stays a small grey line rather than a
+                reassuring green one, because an unpopulated check has not earned
+                any prominence.
               */}
-              <p className="text-[10px] text-muted-foreground/60 pt-1">
-                Checked:{" "}
-                {[
-                  r.checked.catalogueLimits && "weekly limits",
-                  r.checked.terrainFit && "terrain fit",
-                  r.checked.stressLoad && "stress load",
-                  r.checked.declaredConflicts && "declared conflicts",
-                ]
-                  .filter(Boolean)
-                  .join(", ") || "nothing — no constraints apply to these practices"}
-                {!r.checked.terrainFit && " · no synced health data, so terrain wasn't weighed"}
-              </p>
+              <div className="pt-1.5 space-y-0.5 text-[10px] text-muted-foreground/60">
+                <p>Weekly frequency limits · {r.checked.catalogueLimits ? "checked" : "none apply"}</p>
+                <p>Stressor stacking · {r.checked.stressLoad ? "checked" : "not checked"}</p>
+                <p>
+                  Terrain fit ·{" "}
+                  {r.checked.terrainFit ? "checked" : "not checked — no synced health data"}
+                </p>
+                <p>
+                  Catalogue conflicts ·{" "}
+                  {r.checked.declaredConflicts
+                    ? "checked"
+                    : "none declared for these practices"}
+                </p>
+              </div>
             </div>
 
             <div className="flex items-center gap-2">

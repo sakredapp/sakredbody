@@ -229,12 +229,18 @@ export async function activatePlan(opts: {
   const byId = new Map(review.changes.map((c) => [c.routineHabitId, c]));
 
   /**
-   * One transaction for the whole transition.
+   * One transaction for the whole transition — and one *connection*.
    *
-   * `addTrackedHabit` and friends each open their own transaction. Postgres
-   * nests those as savepoints under this one, so a failure anywhere still rolls
-   * the entire activation back — which is the guarantee that matters and the
-   * reason none of them were reimplemented here.
+   * `addTrackedHabit`, `reconfigure` and `completePhase` are each transactional
+   * on their own, and it is tempting to read that as enough. It is not. They
+   * transact against the pool, so calling them from in here would check out
+   * separate connections and commit independently of this block — leaving, on a
+   * failure partway through, a member carrying the first three changes of a plan
+   * that is still a draft.
+   *
+   * Passing `tx` is what makes the guarantee real: their statements run on this
+   * connection, in this transaction, and roll back with it. That is also why
+   * none of them were reimplemented here — every rule they enforce still applies.
    */
   await db.transaction(async (tx) => {
     for (const item of items) {
@@ -273,6 +279,7 @@ export async function activatePlan(opts: {
             then: "stop",
             today,
             actorId,
+            tx,
           });
         }
         continue;
@@ -289,6 +296,7 @@ export async function activatePlan(opts: {
           today,
           actorId,
           source: "plan",
+          tx,
         });
         trackedHabitId = live.trackedHabitId;
       } else {
@@ -299,6 +307,7 @@ export async function activatePlan(opts: {
           today,
           actorId,
           source: "plan",
+          tx,
         });
         trackedHabitId = result.tracked.id;
       }

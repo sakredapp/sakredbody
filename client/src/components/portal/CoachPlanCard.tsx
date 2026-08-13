@@ -115,15 +115,28 @@ export function CoachPlanCard({
       {tension && (
         <div className="mt-3 pt-3 border-t border-border/20 space-y-1">
           <p className="text-xs">
-            <span className="text-muted-foreground/60">Your plan includes </span>
+            <span className="text-muted-foreground/60">Your plan calls for </span>
             Build today.
           </p>
           <p className="text-xs">
             <span className="text-muted-foreground/60">Your terrain is asking for </span>
             less.
           </p>
+          {/*
+            Not "both are true" — they are not the same kind of claim.
+
+            The plan is an intention somebody formed last week about a direction
+            worth going. The terrain is a reading of this morning. Calling both
+            "true" flattens them into rival facts and leaves the member picking a
+            winner, which is the one job this card should not hand them.
+
+            Naming what each one is instead tells them how to use both: the plan
+            says where, the body says how much of it fits today. That is a
+            question they can actually answer.
+          */}
           <p className="text-[11px] text-muted-foreground/70 pt-0.5">
-            Both are true. You're the one who knows which matters more today.
+            Hold both. The plan gives direction; your body tells you how much of
+            it fits today.
           </p>
         </div>
       )}
