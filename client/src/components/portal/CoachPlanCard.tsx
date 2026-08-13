@@ -17,49 +17,9 @@
  * signal that overrides the plan without saying so produces confusion.
  */
 
-import { useQuery } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
+import { useCoachPlan } from "@/hooks/use-coach-plan";
 import { cn } from "@/lib/utils";
-
-type MemberPlan = {
-  id: string;
-  title: string;
-  focus: string | null;
-  note: string | null;
-  startsOn: string | null;
-  endsOn: string | null;
-  coach: { id: string; name: string; firstName: string | null; profileImageUrl: string | null } | null;
-  items: {
-    routineHabitId: string;
-    title: string;
-    emphasis: string | null;
-    /** Written to them. The coach's private note never comes down this pipe. */
-    memberReason: string | null;
-  }[];
-};
-
-export function useCoachPlan() {
-  return useQuery<{ plan: MemberPlan | null }>({
-    queryKey: ["/api/coaching/plan"],
-    queryFn: async () => {
-      const res = await fetch("/api/coaching/plan", { credentials: "include" });
-      if (!res.ok) return { plan: null };
-      return res.json();
-    },
-    staleTime: 5 * 60_000,
-  });
-}
-
-/**
- * Does this member have a plan from a human?
- *
- * `false` while the request is in flight, deliberately — arriving is fine,
- * vanishing is not.
- */
-export function useHasActiveCoachPlan(): boolean {
-  const { data, isLoading } = useCoachPlan();
-  return !isLoading && Boolean(data?.plan);
-}
 
 export function CoachPlanCard({
   terrainLean,

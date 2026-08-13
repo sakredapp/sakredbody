@@ -23,7 +23,8 @@
  */
 
 import { useState } from "react";
-import { CoachPlanCard, useHasActiveCoachPlan } from "@/components/portal/CoachPlanCard";
+import { CoachPlanCard } from "@/components/portal/CoachPlanCard";
+import { useHasActiveCoachPlan } from "@/hooks/use-coach-plan";
 import { CheckinRequestCard, useOpenCheckinRequest } from "@/components/portal/CheckinRequestCard";
 import { ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";

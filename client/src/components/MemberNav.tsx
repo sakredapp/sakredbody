@@ -48,7 +48,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { useHasCoachPlan } from "@/hooks/use-coaching";
+import { useHasActiveCoachPlan } from "@/hooks/use-coach-plan";
 import { cn } from "@/lib/utils";
 
 export type MemberSection =
@@ -162,7 +162,9 @@ export const SECONDARY: Destination[] = [
  * Home has gated its lead card on this since it was built (PillarHome's
  * `hasPlan`); the menu simply never got the same treatment, and the two
  * disagreeing is what made the app feel like it was guessing. Both read the
- * same fact now.
+ * same fact now — and as of the coaching_plans canonicalization, that fact is
+ * the plan itself rather than legacy routine enrollment, which could be empty
+ * for somebody whose coach had demonstrably given them one.
  *
  * The product point underneath the layout one: an account with no coach has to
  * be a complete thing rather than a trial version of a coached one. Restore,
@@ -171,7 +173,7 @@ export const SECONDARY: Destination[] = [
  * missing.
  */
 function useSecondary(): Destination[] {
-  const hasPlan = useHasCoachPlan();
+  const hasPlan = useHasActiveCoachPlan();
   return useMemo(
     () => (hasPlan ? SECONDARY : SECONDARY.filter((d) => d.id !== "coaching")),
     [hasPlan],

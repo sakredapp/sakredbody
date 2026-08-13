@@ -28,7 +28,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useTrackedHabits } from "@/components/habits/useHabits";
-import { useActiveEnrollment, useHasCoachPlan } from "@/hooks/use-coaching";
+import { useCoachPlan, useHasActiveCoachPlan } from "@/hooks/use-coach-plan";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HealthSwatches } from "@/components/portal/HealthSwatches";
@@ -134,7 +134,14 @@ const PILLARS: Pillar[] = [
     blurb: "What your coach has you on.",
     image: "/images/rugged-cliffs.webp",
     section: "coaching",
-    tab: "routines",
+    /*
+      Today, not the routines catalogue. The card says "what your coach has you
+      on", and since coaching_plans became canonical that lives on Today beside
+      the live terrain reading — where the plan and the body can be held
+      together. The catalogue is the legacy self-enrollment feature and is a
+      different room.
+    */
+    tab: "today",
     lead: true,
   },
   {
@@ -234,13 +241,13 @@ function useCounts() {
    * came to offer a coach's plan to members this screen had already decided did
    * not have one.
    */
-  const protocol = useActiveEnrollment();
+  const plan = useCoachPlan();
 
   // The centres query left with the Terrain door. It was the only caller, and
   // a request whose result nothing renders is a request nobody will notice is
   // still being made.
 
-  return { tracked, offerings, ebooks, build, protocol };
+  return { tracked, offerings, ebooks, build, plan };
 }
 
 const lead = PILLARS.find((p) => p.lead) ?? null;
@@ -333,14 +340,14 @@ export function PillarHome({
   firstName?: string | null;
   onOpen: (section: MemberSection, tab?: CoachingTab) => void;
 }) {
-  const { tracked, offerings, ebooks, build, protocol } = useCounts();
+  const { tracked, offerings, ebooks, build, plan } = useCounts();
 
   /**
    * Resolved, not assumed. `null` is what /api/routines/active returns for
    * somebody not enrolled, so the card is hidden only once we actually know —
    * showing it and then removing it a moment later reads as a glitch.
    */
-  const hasPlan = useHasCoachPlan();
+  const hasPlan = useHasActiveCoachPlan();
 
   /**
    * The live line under each title.
@@ -353,7 +360,9 @@ export function PillarHome({
     switch (key) {
       case "protocol":
         // The card only renders when there is one, so this is always a name.
-        return protocol.data?.routine?.name ?? undefined;
+        // From the plan itself — the legacy enrollment it used to read can be
+        // empty for a member whose coach has demonstrably given them one.
+        return plan.data?.plan?.focus ?? plan.data?.plan?.title ?? undefined;
       /**
        * Each card counts its own habits.
        *

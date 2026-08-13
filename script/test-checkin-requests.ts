@@ -309,5 +309,73 @@ console.log("\nAbsence of state is absence of UI\n");
   );
 }
 
+console.log("\nOne answer to 'does this member have a plan'\n");
+
+/**
+ * ── The four gates ────────────────────────────────────────────────────────
+ *
+ *   Coach nav              ← an active coach_relationship
+ *   Coach's Plan UI        ← an active coaching_plan
+ *   Requested check-in UI  ← an open coaching_checkin_request
+ *   Terrain Now            ← measured + member-reported, and nothing else
+ *
+ * None may be inferred from the presence of another. The split this closes was
+ * real: "has a plan" was answered from legacy routine enrollment — a member
+ * choosing a published routine off a shelf — so somebody whose coach had
+ * demonstrably given them a plan got no nav entry and no card, because a table
+ * they had never touched was empty.
+ */
+{
+  const coachingHooks = code("client/src/hooks/use-coaching.ts");
+  check(
+    "the legacy plan inference is gone, not deprecated",
+    !/export function useHasCoachPlan/.test(coachingHooks),
+    "a second runtime authority on 'has a plan' still exists",
+  );
+
+  const canonical = code("client/src/hooks/use-coach-plan.ts");
+  check(
+    "the canonical reader asks the plan endpoint",
+    /queryKey: \["\/api\/coaching\/plan"\]/.test(canonical),
+  );
+  check(
+    "and nothing else claims to answer it",
+    !/routines\/active/.test(canonical),
+  );
+
+  for (const consumer of [
+    "client/src/components/MemberNav.tsx",
+    "client/src/components/PillarHome.tsx",
+    "client/src/components/portal/TodayBody.tsx",
+  ]) {
+    const c = code(consumer);
+    check(`${consumer.split("/").pop()} reads the canonical plan`, /useHasActiveCoachPlan|useCoachPlan/.test(c));
+    check(
+      `${consumer.split("/").pop()} no longer infers a plan from enrollment`,
+      !/useActiveEnrollment/.test(c),
+      "legacy enrollment is still deciding plan UI here",
+    );
+  }
+
+  /**
+   * Plan UI is plan-driven, coach UI is relationship-driven. A plan whose
+   * contracts are still governing somebody's day does not stop existing because
+   * a coaching arrangement lapsed — the habits are live, and removing the
+   * explanation for them would leave a member with practices and no account of
+   * where they came from.
+   */
+  const planRoutes = code("server/coaching/planRoutes.ts");
+  const memberRead = planRoutes.slice(planRoutes.indexOf('app.get("/api/coaching/plan"'));
+  check(
+    "the member's plan comes from the plan, not their current coach",
+    /activePlanFor\(memberId\)/.test(memberRead.slice(0, 400)),
+  );
+  check(
+    "with no relationship check gating it",
+    !/activeRelationship|coachOf\(/.test(memberRead.slice(0, 900)),
+    "a lapsed relationship would hide a plan whose habits are still live",
+  );
+}
+
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

@@ -289,27 +289,21 @@ export function useActiveEnrollment() {
 }
 
 /**
- * Does this member actually have a coach's plan?
+ * ── `useHasCoachPlan` lived here, and was wrong ───────────────────────────
  *
- * The one place that answer is computed, because the app kept disagreeing with
- * itself about it: Home already hid its lead card when there was no plan, while
- * the More sheet listed "Coach's Plan — what your coach has you on" to everyone
- * and opened an empty checklist. A member with no coach was being shown a door
- * to a room that does not exist for them.
+ * It answered "does this member have a Coach's Plan?" from
+ * `/api/routines/active` — legacy routine enrollment, which is a member picking
+ * a published routine off a shelf. That is a different feature wearing this
+ * one's name, and once `coaching_plans` became canonical the two could disagree
+ * outright: a member with a real plan from a real human got no nav entry and no
+ * lead card, because a table they had never touched was empty.
  *
- * Most members do not have a plan, and the app has to be worth opening anyway.
- * So this is not a loading flag with a fallback — it is the fact, and the UI is
- * expected to be complete in both of its states rather than treating the
- * planless one as a degraded version of the real thing.
+ * The canonical reader is `useHasActiveCoachPlan` in `hooks/use-coach-plan.ts`.
+ * Deleted rather than deprecated, so it cannot be reached for again.
  *
- * `false` while the request is in flight, deliberately. The alternative is
- * showing the entry and withdrawing it a moment later, which reads as a glitch;
- * arriving is fine, vanishing is not.
+ * `useActiveEnrollment` below stays, for the routines feature it actually
+ * describes. It is not an authority on whether somebody has a coach's plan.
  */
-export function useHasCoachPlan(): boolean {
-  const { data, isLoading } = useActiveEnrollment();
-  return !isLoading && Boolean(data?.routine?.name);
-}
 
 export type MyCoach = {
   coach: {
