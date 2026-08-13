@@ -43,6 +43,8 @@ import type { MemberSection } from "@/components/MemberNav";
 import { cn } from "@/lib/utils";
 
 type MovementEntry = {
+  /** Stable per event, so rows key on identity rather than on position. */
+  id?: string;
   onDate: string;
   category: string;
   /** What the member would call it, when the source gave us a name. */
@@ -56,8 +58,10 @@ type Reading = {
   headline: string;
   reasons: { source: "measured" | "reported"; text: string; pulls: "restore" | "build" }[];
   week: { stress: number; restoration: number; sessions: number };
-  /** What the reading is reasoning from. See MovementBehindTheReading. */
+  /** The (day, category) projection the reading reasons over. Not a diary. */
   movement?: MovementEntry[];
+  /** What actually happened, every event, deterministically ordered. */
+  movementEvents?: MovementEntry[];
   hasBody: boolean;
 };
 
@@ -140,7 +144,7 @@ function MovementBehindTheReading({ movement }: { movement: MovementEntry[] }) {
                 "from your phone" on every imported line was most of the visual
                 weight of the list while answering a question nobody asks twice.
               */
-              <li key={`${m.onDate}-${m.category}-${i}`} className="text-xs truncate">
+              <li key={m.id ?? `${m.onDate}-${m.category}-${i}`} className="text-xs truncate">
                 {line(m)}
               </li>
             ))}
@@ -155,7 +159,7 @@ function MovementBehindTheReading({ movement }: { movement: MovementEntry[] }) {
         {restoring.length > 0 ? (
           <ul className="space-y-0.5">
             {restoring.slice(0, 5).map((m, i) => (
-              <li key={`${m.onDate}-${m.category}-${i}`} className="text-xs truncate">
+              <li key={m.id ?? `${m.onDate}-${m.category}-${i}`} className="text-xs truncate">
                 {line(m)}
               </li>
             ))}
@@ -307,7 +311,18 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
               </ul>
             )}
 
-            <MovementBehindTheReading movement={terrain.data.movement ?? []} />
+            {/*
+              The events, not the projection.
+
+              `movement` collapses two workouts that share a Sakred category
+              into one entry, so a day of yoga and mobility rendered as a single
+              row — and which of the two names survived was not even stable.
+              Whether a row belongs under demanding or restorative still comes
+              from the canonical orientation, never from the activity's name.
+            */}
+            <MovementBehindTheReading
+              movement={terrain.data.movementEvents ?? terrain.data.movement ?? []}
+            />
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">

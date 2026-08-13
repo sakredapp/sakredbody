@@ -91,14 +91,61 @@ export type MovementDay = {
  * Sakred sessions are added first so that when a pair collapses, the surviving
  * entry is the one the member logged themselves.
  */
-export async function recentMovement(
-  userId: string,
-  since: string,
-): Promise<MovementDay[]> {
+/**
+ * One thing that actually happened, kept whole.
+ *
+ * ── Why this exists beside the reduction ──────────────────────────────────
+ *
+ * `recentMovement` collapses to one entry per (day, category). That is correct
+ * for load — eight sets of squats is one demand on the body — and it was
+ * harmless as long as only the category survived, because two workouts sharing
+ * a category produced identical output either way.
+ *
+ * Attaching the activity name made the collapse a false claim. Yoga and
+ * mobility on the same day both map to `recovery`, so one of them was dropped
+ * and whichever survived supplied the name — and since the query had no
+ * ordering, *which* one survived could change between calls with no change to
+ * the data. A history that quietly rewrites its own past is worse than a vague
+ * one.
+ *
+ * So there are two representations of one truth, and neither impersonates the
+ * other:
+ *
+ *     movementEvents()   what happened          → member history
+ *     recentMovement()   day/category projection → terrain and load
+ *
+ * They share one mapper. The reduction is derived from these events rather than
+ * queried separately, so the two cannot drift into disagreeing about what
+ * counts as movement.
+ */
+export type MovementEvent = {
+  /** Stable per event, so a list can key on it and an order can break ties. */
+  id: string;
+  /** When it happened. Sakred sessions have no start time; this is the finish. */
+  occurredAt: Date | null;
+  onDate: string;
+  /** A Sakred category — what the load model reads. */
+  category: string;
+  /** What the member would call it, where the source named it. */
+  activity: string | null;
+  source: "sakred" | "imported";
+};
+
+/**
+ * Every movement event in the window, newest first, deterministically.
+ *
+ * The ordering is explicit and total: time descending, then id. Postgres is
+ * free to return unordered rows in any sequence it likes, and relying on that
+ * was the actual defect underneath the duplicate-activity bug.
+ */
+export async function movementEvents(userId: string, since: string): Promise<MovementEvent[]> {
   const [logged, imported] = await Promise.all([
     db
       .selectDistinct({
+        id: workoutSessions.id,
         onDate: workoutSessions.onDate,
+        finishedAt: workoutSessions.finishedAt,
+        title: workoutSessions.title,
         category: exercises.category,
       })
       .from(workoutSets)
@@ -113,39 +160,89 @@ export async function recentMovement(
         ),
       ),
     db
-      .select({ onDate: healthWorkouts.onDate, workoutType: healthWorkouts.workoutType })
+      .select({
+        id: healthWorkouts.id,
+        onDate: healthWorkouts.onDate,
+        startAt: healthWorkouts.startAt,
+        workoutType: healthWorkouts.workoutType,
+      })
       .from(healthWorkouts)
       .where(and(eq(healthWorkouts.userId, userId), gte(healthWorkouts.onDate, since))),
   ]);
 
-  const out: MovementDay[] = [];
-  const claimed = new Set<string>();
+  const events: MovementEvent[] = [];
 
+  /**
+   * A logged session becomes one event per category it touched, because that is
+   * what the load model already counts and what the member did — a full-body
+   * session that also included mobility is honestly two things.
+   *
+   * `title` is the member's own name for it where they gave one. No
+   * imported-style activity word is invented for them.
+   */
   for (const row of logged) {
-    const key = `${row.onDate}|${row.category}`;
-    if (claimed.has(key)) continue;
-    claimed.add(key);
-    out.push({ onDate: row.onDate, category: row.category, activity: null, source: "sakred" });
+    events.push({
+      id: `${row.id}:${row.category}`,
+      occurredAt: row.finishedAt ?? null,
+      onDate: row.onDate,
+      category: row.category,
+      activity: row.title?.trim() || null,
+      source: "sakred",
+    });
   }
 
   for (const row of imported) {
-    /**
-     * Anything we cannot place is dropped here, not guessed at.
-     *
-     * An unknown activity contributing an invented category would feed an
-     * invented load into a reading the member is asked to act on. They still
-     * see the workout on their health card either way — only one of those two
-     * puts a guess inside the advice.
-     */
+    // Same rule as the reduction: an activity we cannot place is dropped rather
+    // than guessed at, because an invented category feeds invented load.
     const category = externalActivityCategory(row.workoutType);
     if (!category) continue;
-    const key = `${row.onDate}|${category}`;
-    if (claimed.has(key)) continue;
-    claimed.add(key);
-    out.push({ onDate: row.onDate, category, activity: row.workoutType ?? null, source: "imported" });
+    events.push({
+      id: row.id,
+      occurredAt: row.startAt ?? null,
+      onDate: row.onDate,
+      category,
+      activity: row.workoutType ?? null,
+      source: "imported",
+    });
   }
 
-  // Newest first, which is what every caller wants and none of them should
-  // have to arrange for itself.
+  return events.sort((a, b) => {
+    if (a.onDate !== b.onDate) return b.onDate.localeCompare(a.onDate);
+    const at = a.occurredAt?.getTime() ?? 0;
+    const bt = b.occurredAt?.getTime() ?? 0;
+    if (at !== bt) return bt - at;
+    // Total order, so the same stored history always renders the same way.
+    return a.id.localeCompare(b.id);
+  });
+}
+
+export async function recentMovement(
+  userId: string,
+  since: string,
+): Promise<MovementDay[]> {
+  const events = await movementEvents(userId, since);
+
+  const out: MovementDay[] = [];
+  const claimed = new Set<string>();
+
+  /**
+   * Sakred-logged first, so that when a pair collapses the survivor is the one
+   * the member logged themselves. Within that, the deterministic order
+   * movementEvents already established — this reduction must not reintroduce
+   * the ambiguity it exists to hide from the load model.
+   */
+  const ordered = [...events].sort((a, b) => {
+    if (a.source !== b.source) return a.source === "sakred" ? -1 : 1;
+    return 0;
+  });
+
+  for (const e of ordered) {
+    const key = `${e.onDate}|${e.category}`;
+    if (claimed.has(key)) continue;
+    claimed.add(key);
+    out.push({ onDate: e.onDate, category: e.category, activity: e.activity, source: e.source });
+  }
+
   return out.sort((a, b) => b.onDate.localeCompare(a.onDate));
 }
+

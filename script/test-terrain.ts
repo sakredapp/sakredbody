@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 /**
  * Terrain — the reading.
  *
@@ -23,6 +24,15 @@ import { terrainLeanFrom, signalLean } from "../shared/models/terrainSignals.js"
 
 let passed = 0;
 let failed = 0;
+
+const src = (rel: string) =>
+  readFileSync(new URL(`../${rel}`, import.meta.url), "utf8");
+/** Source with comments stripped, so prose cannot satisfy a code assertion. */
+const code = (rel: string) =>
+  src(rel)
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "")
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
 
 function check(name: string, cond: boolean, detail?: string) {
   if (cond) passed++;
@@ -361,6 +371,59 @@ check(
   compose({}, WRECKED).reasons.filter((r) => r.source === "measured").length ===
     read().reasons.length,
 );
+
+
+console.log("\nAn event is history; a projection is not\n");
+
+/**
+ * The bug this pins: two workouts on one day that map to the same Sakred
+ * category collapsed into one entry, and — because the query had no ordering —
+ * which of their names survived could change between calls with no change to
+ * the data. Harmless while only the category survived; a false claim the moment
+ * a specific activity was displayed.
+ */
+{
+  const hist = code("server/movement/history.ts");
+  const read = code("server/terrain/read.ts");
+  const restore = code("client/src/components/RestoreTab.tsx");
+
+  check("there is an event-level reader", /export async function movementEvents\(/.test(hist));
+  check("it carries a stable event id", /  id: string;/.test(hist));
+  check("and when it happened", /occurredAt: Date \| null;/.test(hist));
+
+  /** One query path, so the two representations cannot drift apart. */
+  check(
+    "the reduction is derived from the events",
+    /const events = await movementEvents\(userId, since\);/.test(hist),
+  );
+  check(
+    "rather than querying health_workouts a second time",
+    (hist.match(/from\(healthWorkouts\)/g) ?? []).length === 1,
+  );
+
+  /** The actual defect: relying on unspecified row order. */
+  check("event order is explicit", /events\.sort\(\(a, b\) =>/.test(hist));
+  check("and total, so ties cannot float", /a\.id\.localeCompare\(b\.id\)/.test(hist));
+
+  /** The reduction keeps its job. */
+  check("the day/category collapse survives", /claimed\.has\(key\)\) continue;/.test(hist));
+  check(
+    "and still prefers what the member logged themselves",
+    /a\.source === "sakred" \? -1 : 1/.test(hist),
+  );
+
+  /** Restore reads history, not the projection. */
+  check("the terrain read exposes the events", /movementEvents: movementEventList/.test(read));
+  check("under their own name", !/movement: movementEventList/.test(read));
+  check("and Restore renders them", /terrain\.data\.movementEvents/.test(restore));
+
+  /** Placement stays classification, never English. */
+  check(
+    "demand and restoration come from orientation",
+    /orientation === "yang"/.test(restore) && /orientation === "yin"/.test(restore),
+  );
+  check("not from the activity name", !/activity ===|activity\.includes/.test(restore));
+}
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);
