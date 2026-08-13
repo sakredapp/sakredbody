@@ -50,6 +50,7 @@ import {
   communityMessages,
 } from "../../shared/schema.js";
 import { track, trackError } from "../telemetry/index.js";
+import { ROLES, atLeast, type Role } from "../../shared/models/access.js";
 
 function param(req: Request, name: string): string {
   const v = req.params[name];
@@ -85,6 +86,8 @@ const memberColumns = {
   lastName: users.lastName,
   profileImageUrl: users.profileImageUrl,
   isAdmin: users.isAdmin,
+  /** The canonical one. `isAdmin` is kept alongside for the RLS helper. */
+  role: users.role,
   membershipTier: users.membershipTier,
   timezone: users.timezone,
   currentStreak: users.currentStreak,
@@ -100,6 +103,20 @@ const patchMemberSchema = z.object({
   membershipTier: z.string().min(1).optional(),
   isAdmin: z.boolean().optional(),
   timezone: z.string().min(1).max(64).optional(),
+  /**
+   * The canonical role. See shared/models/access.ts.
+   *
+   * This endpoint could only write the legacy `isAdmin` varchar, which has
+   * exactly two states — so there was no way to make anybody a coach without a
+   * SQL console, which is why the app had a `coach` rank that nothing could
+   * ever reach.
+   *
+   * `isAdmin` is still written alongside it, because the Supabase RLS policies
+   * call `public.is_sakred_admin()` and that function reads the varchar. Two
+   * sources of truth is exactly the problem this is meant to avoid, so they are
+   * written together, from the role, below — never independently.
+   */
+  role: z.enum(ROLES as [Role, ...Role[]]).optional(),
 });
 
 const tierSchema = z.object({
@@ -260,6 +277,29 @@ export function registerMemberRoutes(app: Express) {
       if (input.timezone !== undefined) patch.timezone = input.timezone;
       // Stored as the string "true"/"false", matching the existing column.
       if (input.isAdmin !== undefined) patch.isAdmin = input.isAdmin ? "true" : "false";
+
+      /**
+       * Role, with the legacy flag kept in step.
+       *
+       * Written together and derived from one value, so the two can never
+       * disagree — `effectiveRole` takes the higher of them, which means a
+       * half-applied change would silently leave somebody with access they were
+       * just supposed to lose. Setting a role at or above `admin` sets the
+       * varchar; anything below clears it.
+       *
+       * The self-demotion guard below covers the same ground for `role` as it
+       * does for `isAdmin`: this is the only surface that grants back-office
+       * access, so an admin demoting themselves here would lock the office.
+       */
+      if (input.role !== undefined) {
+        if (id === actorId && !atLeast(input.role, "admin")) {
+          return res.status(400).json({
+            message: "You can't remove your own admin access — ask another admin.",
+          });
+        }
+        patch.role = input.role;
+        patch.isAdmin = atLeast(input.role, "admin") ? "true" : "false";
+      }
 
       const [updated] = await db
         .update(users)

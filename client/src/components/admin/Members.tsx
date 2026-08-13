@@ -27,7 +27,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { InfoTip } from "@/components/ui/info-tip";
 import {
@@ -39,6 +38,25 @@ import {
 } from "@/components/ui/select";
 import { Search, Shield, Plus, Trash2, Users, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ROLES, type Role } from "@shared/models/access";
+import { CoachAssignment } from "@/components/admin/CoachAssignment";
+
+/** The ladder in words. Order follows ROLES, which is ordered by rank. */
+const ROLE_LABEL: Record<Role, string> = {
+  member: "Member",
+  coach: "Coach",
+  moderator: "Moderator",
+  admin: "Admin",
+  owner: "Owner",
+};
+
+const ROLE_HINT: Record<Role, string> = {
+  member: "Their own account only",
+  coach: "Sees the members assigned to them",
+  moderator: "Community reports and support",
+  admin: "Full back-office access",
+  owner: "Can make other people staff",
+};
 
 interface Member {
   id: string;
@@ -46,6 +64,7 @@ interface Member {
   firstName: string | null;
   lastName: string | null;
   isAdmin: string | null;
+  role: string | null;
   membershipTier: string | null;
   timezone: string | null;
   currentStreak: number | null;
@@ -280,26 +299,54 @@ export function MembersAdmin() {
                         </Select>
                       </div>
 
+                      {/*
+                        ── Role, not an admin switch ────────────────────────
+
+                        This was a two-state toggle writing the legacy `isAdmin`
+                        varchar, which meant the role ladder in
+                        shared/models/access.ts had a `coach` rank that nothing
+                        in the product could ever reach: making somebody a coach
+                        required a SQL console. That is why coaching had no
+                        relationship model — the first step was impossible.
+
+                        The server writes `role` and keeps `isAdmin` in step
+                        from it, because the Supabase RLS helper still reads the
+                        varchar. One value in, both columns out, so they cannot
+                        drift.
+                      */}
                       <div className="space-y-1.5">
                         <Label className="text-xs flex items-center gap-1.5">
-                          Admin
-                          <InfoTip label="About admin" title="Full access">
-                            An admin sees every room and every back-office screen,
-                            whatever tier they hold. You can't remove your own — it would
-                            lock you out of this page.
+                          Role
+                          <InfoTip label="About roles" title="What they may do">
+                            Higher includes everything lower. A coach sees the members
+                            assigned to them and nobody else; an admin sees every
+                            back-office screen. You can't remove your own admin — it
+                            would lock you out of this page.
                           </InfoTip>
                         </Label>
                         <div className="flex items-center gap-3 h-10">
-                          <Switch
-                            checked={m.isAdmin === "true"}
-                            onCheckedChange={(v) => patch.mutate({ id: m.id, body: { isAdmin: v } })}
-                            data-testid={`switch-admin-${m.id}`}
-                          />
+                          <Select
+                            value={m.role ?? (m.isAdmin === "true" ? "admin" : "member")}
+                            onValueChange={(role) => patch.mutate({ id: m.id, body: { role } })}
+                          >
+                            <SelectTrigger className="w-40" data-testid={`select-role-${m.id}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ROLES.map((r) => (
+                                <SelectItem key={r} value={r}>
+                                  {ROLE_LABEL[r]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                           <span className="text-sm text-muted-foreground">
-                            {m.isAdmin === "true" ? "Full back-office access" : "Member only"}
+                            {ROLE_HINT[(m.role ?? "member") as Role] ?? ""}
                           </span>
                         </div>
                       </div>
+
+                      <CoachAssignment memberId={m.id} />
                     </div>
 
                     <p className="text-xs text-muted-foreground">

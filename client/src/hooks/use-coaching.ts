@@ -311,47 +311,59 @@ export function useHasCoachPlan(): boolean {
   return !isLoading && Boolean(data?.routine?.name);
 }
 
-/**
- * Is anybody actually coaching this member?
- *
- * Distinct from `useHasCoachPlan`, which asks whether a coach has written them
- * a protocol. A member can be coached without one — the conversation is the
- * service, and the plan is one of the things it produces.
- *
- * ── Why this decides whether the tab exists ──────────────────────────────
- *
- * Coach was a permanent primary destination for everyone, and for a member
- * without a coach it opened a full-height empty panel reading "Start the
- * Conversation — they'll respond here." Nobody was going to respond. An
- * unpurchased service dressed as an empty feature is worse than no entry at
- * all: it reads as something broken, or as something the member has failed to
- * use.
- *
- * Two signals, either of which is sufficient:
- *
- *   a coach's plan     somebody wrote them a protocol
- *   a coach's message  somebody has spoken to them
- *
- * The second matters on its own so that an existing thread can never vanish
- * because a protocol ended. Their own messages do not count — writing into an
- * empty room is the symptom, not the evidence.
- */
-export function useHasCoach(): boolean {
-  const hasPlan = useHasCoachPlan();
+export type MyCoach = {
+  coach: {
+    id: string;
+    name: string;
+    firstName: string | null;
+    lastName: string | null;
+    profileImageUrl: string | null;
+  } | null;
+  since?: string;
+};
 
-  const { data } = useQuery<{ senderRole?: string }[]>({
-    queryKey: ["/api/coaching/messages"],
+/**
+ * Who coaches this member — the canonical answer, from the relationship.
+ *
+ * ── What this replaces ───────────────────────────────────────────────────
+ *
+ * This used to infer a coach from whether a plan or a coach-sent message
+ * happened to exist. Those are consequences of a coaching relationship, and
+ * reading a consequence as the thing itself gets the two cases that matter
+ * backwards: a coach assigned this morning who has not written yet did not
+ * register at all, and a coach replaced last month still did.
+ *
+ * `coach_relationships` now holds the fact directly, so the inference is gone
+ * rather than kept as a fallback — a fallback would quietly resurrect exactly
+ * the wrong answers it was built to avoid.
+ */
+export function useMyCoach() {
+  return useQuery<MyCoach>({
+    queryKey: ["/api/coaching/my-coach"],
     queryFn: async () => {
-      const res = await fetch("/api/coaching/messages", { credentials: "include" });
-      if (!res.ok) return [];
+      const res = await fetch("/api/coaching/my-coach", { credentials: "include" });
+      if (!res.ok) return { coach: null };
       return res.json();
     },
-    // The thread is small and the answer decides a navigation item, so it is
-    // worth one request — but not worth re-asking on every remount.
     staleTime: 5 * 60_000,
   });
+}
 
-  return hasPlan || (data ?? []).some((m) => m.senderRole === "coach");
+/**
+ * Whether the Coach destination exists for this member.
+ *
+ * Coach was a permanent primary destination for everyone, and for a member
+ * without one it opened a full-height empty panel reading "Start the
+ * Conversation — they'll respond here." Nobody was going to respond. An
+ * unpurchased service dressed as an empty feature reads as something broken,
+ * or as something the member has failed to use.
+ *
+ * `false` while the request is in flight, deliberately — arriving is fine,
+ * vanishing is not.
+ */
+export function useHasCoach(): boolean {
+  const { data, isLoading } = useMyCoach();
+  return !isLoading && Boolean(data?.coach);
 }
 
 export function useEnrollmentHistory() {

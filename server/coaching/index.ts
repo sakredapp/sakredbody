@@ -3,6 +3,15 @@
  */
 
 export { registerCoachingRoutes } from "./routes.js";
+export { registerCoachRelationshipRoutes } from "./relationshipRoutes.js";
+export {
+  requireCoachOf,
+  activeRelationship,
+  coachOf,
+  clientsOf,
+  assignCoach,
+  endCoaching,
+} from "./relationships.js";
 export {
   enrollInRoutine,
   reconcileHabits,

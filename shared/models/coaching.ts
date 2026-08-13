@@ -19,6 +19,7 @@ import {
   date,
   timestamp,
   index,
+  varchar,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -426,6 +427,21 @@ export const coachingMessages = pgTable(
     id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
     userId: text("user_id").notNull().references(() => users.id),
     senderRole: text("sender_role").notNull().default("member"), // 'member' | 'coach'
+
+    /**
+     * Which human wrote this.
+     *
+     * `senderRole` says which side of the conversation, which was enough while
+     * there was no such thing as a specific coach. Once a member can be
+     * reassigned it is not: "a coach wrote this" cannot be acted on, and after
+     * Nick hands over to Gerard the thread has to keep saying which of them
+     * said what.
+     *
+     * Nullable, and deliberately not backfilled. The one message that predates
+     * this column was sent by a member and has no author to recover; inventing
+     * one would be worse than admitting it is unknown.
+     */
+    senderUserId: varchar("sender_user_id"),
     messageType: text("message_type").notNull().default("text"), // 'text' | 'progress_update' | 'photo'
     content: text("content").notNull(),
     imageUrl: text("image_url"),
@@ -447,3 +463,71 @@ export const insertCoachingMessageSchema = createInsertSchema(coachingMessages).
 
 export type CoachingMessage = typeof coachingMessages.$inferSelect;
 export type InsertCoachingMessage = z.infer<typeof insertCoachingMessageSchema>;
+
+// ─── Who coaches whom ──────────────────────────────────────────────────────
+
+/**
+ * The coaching relationship, which is the thing this app was missing.
+ *
+ * Everything coaching-shaped already existed — messages, coach-authored habit
+ * phases, an upload endpoint, a role ladder with `coach` on it — and there was
+ * no answer to "who is this member's coach". So the UI inferred one: a plan
+ * exists, or a coach has sent a message, therefore a coach exists. That reads
+ * the consequences of a relationship as the relationship, and it gets the two
+ * cases that matter backwards. A coach assigned this morning who has not yet
+ * written does not exist; a coach replaced last month still does.
+ *
+ * ── Three separate questions ────────────────────────────────────────────
+ *
+ *   role / capability   what may this account do          users.role
+ *   relationship        for which member may they do it   this table
+ *   attribution         which human actually did it       sender_user_id, …
+ *
+ * The role ladder is hierarchical, so `atLeast(role, "coach")` is true for
+ * every moderator, admin and owner. That is correct for capability and would be
+ * a serious mistake as an answer to the second question — it would make every
+ * admin the assigned coach of every member. `requireCoachOf` checks both.
+ *
+ * See supabase/coach-relationships.sql for the database guarantees: one active
+ * relationship per member, no self-coaching, and an `ended_at` that has to
+ * agree with the status.
+ */
+export const coachRelationships = pgTable(
+  "coach_relationships",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    coachUserId: varchar("coach_user_id").notNull(),
+    memberUserId: varchar("member_user_id").notNull(),
+
+    /**
+     * 'active' | 'ended'. Deliberately two, not three.
+     *
+     * A `paused` state whose access semantics nobody has decided would sit
+     * somewhere between "can read this member" and "cannot", and every route
+     * would have to guess which. It can be added later with its own tests.
+     */
+    status: text("status").notNull().default("active"),
+
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Set when it ends. The row stays — history is what keeps a past coach's
+     *  messages and plans attributable after somebody takes over. */
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+
+    /** Which admin did this. Null rather than invented for any future
+     *  automated path. */
+    assignedBy: varchar("assigned_by"),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_coach_relationships_coach").on(t.coachUserId, t.status),
+    index("idx_coach_relationships_member").on(t.memberUserId, t.status),
+  ],
+);
+
+export type CoachRelationship = typeof coachRelationships.$inferSelect;
+
+export const assignCoachSchema = z.object({
+  coachUserId: z.string().min(1).max(64),
+});

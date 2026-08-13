@@ -1152,6 +1152,10 @@ export function registerCoachingRoutes(app: Express): void {
       const [msg] = await db.insert(coachingMessages).values({
         userId,
         senderRole: "member",
+        // Who, not just which side. `senderRole` alone was survivable while
+        // there was no such thing as a specific coach; once a member can be
+        // reassigned, "a coach wrote this" is not something anyone can act on.
+        senderUserId: userId,
         messageType,
         content,
         imageUrl: imageUrl || null,
@@ -1238,6 +1242,9 @@ export function registerCoachingRoutes(app: Express): void {
       const [msg] = await db.insert(coachingMessages).values({
         userId,
         senderRole: "coach",
+        // The actual author, so a reassignment leaves "Nick wrote this" and
+        // "Gerard wrote this" intact rather than collapsing both to "a coach".
+        senderUserId: req.session!.userId!,
         messageType: "text",
         content,
       }).returning();

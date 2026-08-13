@@ -10,7 +10,7 @@ import { isAuthenticated } from "./auth/index.js";
 import "./auth/sessionAuth.js"; // session type augmentation
 import { insertPartnerSchema, insertPartnerServiceSchema, users } from "../shared/schema.js";
 import { submitExecutiveApplicationSchema, scoreApplication, EXEC_QUESTIONS } from "../shared/models/executive.js";
-import { registerCoachingRoutes } from "./coaching/index.js";
+import { registerCoachingRoutes, registerCoachRelationshipRoutes } from "./coaching/index.js";
 import { registerMasterclassRoutes } from "./masterclass/index.js";
 import { registerShopRoutes } from "./shop/index.js";
 import { registerLibraryRoutes } from "./library/index.js";
@@ -465,6 +465,7 @@ export async function registerRoutes(
 
   // ── Coaching Engine ──────────────────────────────────────────────────
   registerCoachingRoutes(app);
+  registerCoachRelationshipRoutes(app);
 
   // ── Masterclass Video Library ────────────────────────────────────────
   registerMasterclassRoutes(app);
