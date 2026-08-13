@@ -107,7 +107,12 @@ function pivot(rows: { onDate: string; metric: string; value: number }[]) {
   );
 }
 
-async function summaryFor(userId: string, days: number) {
+/**
+ * Exported because a coach reading a client needs exactly this, and the only
+ * other way to give it to them is a second implementation of it. Who is allowed
+ * to ask is decided by the caller — see `server/coaching/clientRoutes.ts`.
+ */
+export async function summaryFor(userId: string, days: number) {
   const since = new Date();
   since.setUTCDate(since.getUTCDate() - days);
   const sinceDate = since.toISOString().slice(0, 10);

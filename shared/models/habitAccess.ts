@@ -24,30 +24,65 @@
  * will not. It has been told this request is the database's owner.
  */
 
-import { atLeast, type Role } from "./access.js";
+import { atLeast, can, type Role } from "./access.js";
 
 export type Actor = {
   userId: string;
   role: Role;
+  /**
+   * The members this account actively coaches, resolved from
+   * `coach_relationships` by whoever built the actor.
+   *
+   * Undefined means "not looked up" and is treated exactly like empty: an actor
+   * assembled without the roster gets no client access rather than all of it.
+   * Failing closed matters more than convenience here — the shape of the
+   * mistake this guards against is somebody adding a new caller, forgetting the
+   * lookup, and silently handing every coach the whole membership again.
+   */
+  clientIds?: readonly string[];
 };
 
 /**
  * Reading somebody else's habits.
  *
- * The platform has no coach↔client table: staff at coach level and above work
- * with every member. This encodes exactly that and nothing more, so the day
- * rosters arrive it is one function to change rather than thirty route
- * handlers to find.
+ * ── What this used to say, and why it was wrong ───────────────────────────
+ *
+ * "The platform has no coach↔client table: staff at coach level and above work
+ * with every member." That was an honest description of a platform where the
+ * only alternative was hard-coding names, and it is now false. It meant every
+ * account at coach rank could read every member's habits, targets, adherence
+ * and terrain check-ins by changing a number in a URL — and because the role
+ * ladder is hierarchical, "coach rank" included every moderator and admin.
+ *
+ * `coach_relationships` answers the question properly, so it is asked properly:
+ *
+ *   themselves       always
+ *   manageMembers    a named administrative capability, not a rank
+ *   coach            only the members actually assigned to them
+ *   anyone else      no
+ *
+ * The admin bypass is checked by capability rather than by `atLeast(role,
+ * "admin")` on purpose. Rank comparisons are how the original hole opened: the
+ * ladder grows a rung, the rung inherits everything below it, and an
+ * authorization decision nobody revisited quietly widens.
  */
 export function canCoachAccessMember(actor: Actor, memberId: string): boolean {
   if (actor.userId === memberId) return true;
-  return atLeast(actor.role, "coach");
+  if (can(actor.role, "manageMembers")) return true;
+  if (!atLeast(actor.role, "coach")) return false;
+  return (actor.clientIds ?? []).includes(memberId);
 }
 
-/** Assigning, proposing, reconfiguring and logging on somebody else's behalf. */
+/**
+ * Assigning, proposing, reconfiguring and logging on somebody else's behalf.
+ *
+ * The same boundary as reading. It is a separate function because the two are
+ * genuinely separate questions and one of them may tighten later — a coach who
+ * can see a member is not obviously a coach who may log on their behalf — but
+ * neither may ever be broader than the relationship.
+ */
 export function canCoachModifyMemberHabit(actor: Actor, memberId: string): boolean {
-  if (actor.userId === memberId) return true;
-  return atLeast(actor.role, "coach");
+  return canCoachAccessMember(actor, memberId);
 }
 
 /**

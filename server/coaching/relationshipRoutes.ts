@@ -29,7 +29,7 @@ import { zodMessage } from "../../shared/utils/zodMessage.js";
 import { users } from "../../shared/models/auth.js";
 import { assignCoachSchema, coachRelationships } from "../../shared/schema.js";
 import { atLeast, effectiveRole } from "../../shared/models/access.js";
-import { assignCoach, clientsOf, coachOf, endCoaching } from "./relationships.js";
+import { assignCoach, coachOf, endCoaching } from "./relationships.js";
 
 /** What a member or a coach may see of another person. Never the whole row. */
 const personColumns = {
@@ -90,41 +90,15 @@ export function registerCoachRelationshipRoutes(app: Express): void {
   });
 
   // ── Coach ────────────────────────────────────────────────────────────────
-
-  /**
-   * My clients — the ones assigned to me, and no others.
-   *
-   * Scoped by the authenticated coach's own id rather than by anything in the
-   * request, so there is no parameter to tamper with. An admin calling this
-   * gets their own roster, which is usually empty; the admin view of everybody
-   * is a different endpoint with a different capability behind it.
-   */
-  app.get("/api/coach/clients", isAuthenticated, async (req: Request, res: Response) => {
-    try {
-      const userId = req.session!.userId!;
-      const rows = await clientsOf(userId);
-      if (!rows.length) return res.json({ clients: [] });
-
-      const people = await db
-        .select(personColumns)
-        .from(users)
-        .where(inArray(users.id, rows.map((r) => r.memberUserId)));
-
-      const byId = new Map(people.map((p) => [p.id, p]));
-
-      res.json({
-        clients: rows
-          .map((r) => {
-            const person = byId.get(r.memberUserId);
-            if (!person) return null;
-            return { ...person, name: displayName(person), since: r.startedAt };
-          })
-          .filter(Boolean),
-      });
-    } catch (err) {
-      fail(res, "clients", err);
-    }
-  });
+  //
+  // `GET /api/coach/clients` and the client workspace beneath it live in
+  // ./clientRoutes.ts. The roster started here as a bare list of names, and it
+  // needs terrain, plan and conversation state to be worth opening — which is a
+  // projection of member data rather than a fact about the relationship, and
+  // belongs with the rest of that projection.
+  //
+  // Registered in one place, deliberately: two handlers on one path is a bug
+  // Express reports by silently running the first.
 
   // ── Admin ────────────────────────────────────────────────────────────────
 

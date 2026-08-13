@@ -4,6 +4,7 @@
 
 export { registerCoachingRoutes } from "./routes.js";
 export { registerCoachRelationshipRoutes } from "./relationshipRoutes.js";
+export { registerCoachClientRoutes } from "./clientRoutes.js";
 export {
   requireCoachOf,
   activeRelationship,

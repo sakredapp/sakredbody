@@ -96,7 +96,16 @@ async function context(
   const subjectId = subjectOf(actor, paramUserId === undefined ? null : param(paramUserId));
   if (!subjectId) {
     habitDenied("subject", { actorId: actor.userId, subjectId: param(paramUserId), role: actor.role });
-    res.status(403).json({ message: "You don't have access to that" });
+    /**
+     * 404, not 403 — the same answer `requireCoachOf` gives.
+     *
+     * These routes only carry a `:userId` on the coach family, so the denial
+     * always means "you are not this person's coach". Saying "forbidden"
+     * confirms the id belongs to a real Sakred member, which is the one thing
+     * somebody walking ids is trying to learn. A coach with no relationship to
+     * them is not entitled to that from a status code.
+     */
+    res.status(404).json({ message: "No such member" });
     return null;
   }
   return { actor, subjectId, today: await memberToday(subjectId) };

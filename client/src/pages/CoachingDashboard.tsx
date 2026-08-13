@@ -27,6 +27,7 @@ import {
   useAssignHabit,
   useCreateCustomHabit,
   useUnassignHabit,
+  useMyCoach,
   type Habit,
   type WellnessRoutine,
   type RangeDataPoint,
@@ -1339,6 +1340,8 @@ interface CoachingMessageData {
 
 export function CoachChat() {
   const { toast } = useToast();
+  /** Who this conversation is actually with — canonical, from the relationship. */
+  const coach = useMyCoach().data?.coach ?? null;
   const [messageText, setMessageText] = useState("");
   const [messageType, setMessageType] = useState<"text" | "progress_update">("text");
   const [pendingFile, setPendingFile] = useState<{ file: File; preview?: string } | null>(null);
@@ -1484,12 +1487,32 @@ export function CoachChat() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-180px)] max-h-[700px]">
-      {/* Header */}
-      <div className="mb-4">
-        <h2 className="text-lg font-display font-semibold tracking-tight">Coach</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Share updates, progress, and connect with your coach
-        </p>
+      {/*
+        Header — the actual person, now that we know who they are.
+
+        This said "Coach" and "connect with your coach" to everybody, because
+        until `coach_relationships` there was no way to find out who that was.
+        A named human is not decoration: it is the difference between a support
+        inbox and somebody Sarah has met. The generic wording stays as the
+        fallback for the moment the name is still loading, rather than a blank
+        that fills in — arriving is fine, changing under you is not.
+      */}
+      <div className="mb-4 flex items-center gap-3">
+        {coach?.profileImageUrl && (
+          <img
+            src={coach.profileImageUrl}
+            alt=""
+            className="h-9 w-9 rounded-full object-cover shrink-0"
+          />
+        )}
+        <div className="min-w-0">
+          <h2 className="text-lg font-display font-semibold tracking-tight truncate">
+            {coach?.name ?? "Coach"}
+          </h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {coach ? "Sakred Coach" : "Share updates, progress, and connect with your coach"}
+          </p>
+        </div>
       </div>
 
       {/* Messages area */}

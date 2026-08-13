@@ -22,6 +22,7 @@ const LoginPage = lazyRoute("LoginPage", () => import("@/pages/LoginPage"));
 const ResetPasswordPage = lazyRoute("ResetPasswordPage", () => import("@/pages/ResetPasswordPage"));
 const MemberDashboard = lazyRoute("MemberDashboard", () => import("@/pages/MemberDashboard"));
 const AdminPortal = lazyRoute("AdminPortal", () => import("@/pages/AdminPortal"));
+const CoachWorkspace = lazyRoute("CoachWorkspace", () => import("@/pages/CoachWorkspace"));
 const Privacy = lazyRoute("Privacy", () => import("@/pages/Privacy"));
 const Terms = lazyRoute("Terms", () => import("@/pages/Terms"));
 const DeleteAccount = lazyRoute("DeleteAccount", () => import("@/pages/DeleteAccount"));
@@ -131,6 +132,12 @@ function Router() {
       <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/member" component={MemberDashboard} />
       <Route path="/coaching" component={MemberDashboard} />
+      {/*
+        Coach is its own destination, not a mode inside /member. A coach who
+        is also a member keeps their own Sakred untouched — see the note at
+        the top of CoachWorkspace.
+      */}
+      <Route path="/coach" component={CoachWorkspace} />
       <Route path="/admin" component={AdminPortal} />
       <Route path="/admin/coaching" component={AdminPortal} />
       <Route path="/admin/masterclass" component={AdminPortal} />

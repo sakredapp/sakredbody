@@ -406,6 +406,25 @@ export default function MemberDashboard() {
                 is a coach who sees their cohort and nothing else, this link
                 still needs to appear for them, and a string comparison
                 against a two-state field can't express that. */}
+            {/*
+              The door to the coach workspace, for anybody who can coach.
+              `atLeast("coach")` rather than `isStaff` — the two are not the
+              same question, and an admin who does not coach still gets the
+              link because the roster it opens is scoped to them and will
+              simply be empty. What it must not do is replace this member's own
+              dashboard: Nick coaches and also trains, and the second is not
+              forfeit for taking on the first.
+            */}
+            {access.atLeast("coach") && (
+              <Link
+                href="/coach"
+                className="tap inline-flex items-center gap-1.5 px-3 rounded-full border border-gold/35 text-gold text-xs uppercase tracking-widest hover:border-gold/70 transition-colors"
+                data-testid="link-coach"
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Coach</span>
+              </Link>
+            )}
             {access.isStaff && (
               <Link
                 href="/admin"

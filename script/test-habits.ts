@@ -557,7 +557,17 @@ console.log("\nWho may act on whose habits\n");
 
 const nick = { userId: "nick", role: "member" as const };
 const otherMember = { userId: "sam", role: "member" as const };
-const coach = { userId: "gerard", role: "coach" as const };
+/**
+ * Gerard coaches Nick and nobody else.
+ *
+ * `clientIds` is the roster, resolved from `coach_relationships` per request
+ * and handed to these pure decisions as data. It used to not exist: the rule
+ * was `atLeast(role, "coach")`, so every coach — and every moderator and admin
+ * above them on the ladder — could read any member by changing an id in a URL.
+ */
+const coach = { userId: "gerard", role: "coach" as const, clientIds: ["nick"] };
+const unassignedCoach = { userId: "nina", role: "coach" as const, clientIds: [] };
+const moderator = { userId: "mo", role: "moderator" as const, clientIds: [] };
 const admin = { userId: "jace", role: "admin" as const };
 const owner = { userId: "owner", role: "owner" as const };
 
@@ -565,8 +575,17 @@ check("a member reaches their own habits", canCoachAccessMember(nick, "nick"));
 check("a member cannot reach another member's", !canCoachAccessMember(nick, "sam"));
 check("a member cannot write to another member's",
   !canCoachModifyMemberHabit(otherMember, "nick"));
-check("a coach reaches a member's", canCoachAccessMember(coach, "nick"));
-check("a coach may write to a member's", canCoachModifyMemberHabit(coach, "nick"));
+check("a coach reaches their own client's", canCoachAccessMember(coach, "nick"));
+check("a coach may write to their own client's", canCoachModifyMemberHabit(coach, "nick"));
+check("but not a member who is not theirs", !canCoachAccessMember(coach, "sam"));
+check("nor write to one", !canCoachModifyMemberHabit(coach, "sam"));
+check("a coach with no clients reaches nobody", !canCoachAccessMember(unassignedCoach, "nick"));
+/**
+ * A moderator outranks a coach and coaches nobody. If rank alone ever decides
+ * this again, this is the assertion that catches it.
+ */
+check("outranking a coach is not coaching anybody", !canCoachAccessMember(moderator, "nick"));
+/** Admin and owner pass on `manageMembers` — a named capability, not the rung. */
 check("an admin reaches a member's", canCoachAccessMember(admin, "nick"));
 check("an owner does too", canCoachAccessMember(owner, "nick"));
 
@@ -583,7 +602,9 @@ check("an empty id means the actor themselves", subjectOf(nick, "") === "nick");
 check("their own id is fine", subjectOf(nick, "nick") === "nick");
 check("somebody else's id from a member is refused", subjectOf(nick, "sam") === null);
 check("a made-up id from a member is refused", subjectOf(nick, "../../admin") === null);
-check("a coach passing a member id gets that member", subjectOf(coach, "nick") === "nick");
+check("a coach passing their client's id gets that member", subjectOf(coach, "nick") === "nick");
+/** Null is what the route turns into a 404 — a 403 would confirm sam exists. */
+check("a coach passing a stranger's id is refused", subjectOf(coach, "sam") === null);
 check("an unknown role is refused rather than defaulted",
   subjectOf({ userId: "x", role: "ghost" as never }, "nick") === null);
 

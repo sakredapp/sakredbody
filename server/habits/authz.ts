@@ -29,10 +29,14 @@
  *
  * ── Who a coach can see ───────────────────────────────────────────────────
  *
- * The platform has no coach↔client table: staff at coach level and above work
- * with every member. `canCoachAccessMember` encodes exactly that and nothing
- * more, so the day rosters arrive it is one function to change rather than
- * thirty route handlers to find.
+ * The members assigned to them, and no others. `canCoachAccessMember` is the
+ * one function that decides it, which is what made closing the old hole a
+ * one-file change: before `coach_relationships` existed this said "coach rank
+ * or above may read anybody", and every `/api/coach/members/:userId/…` route
+ * inherited that.
+ *
+ * The roster is resolved here, once per request, and handed to the pure
+ * decision as data — see `actorFrom`.
  */
 
 import type { Request, Response } from "express";
@@ -45,8 +49,9 @@ import {
   habitEntries,
   habitProposals,
 } from "../../shared/models/trackedHabits.js";
-import { atLeast, effectiveRole } from "../../shared/models/access.js";
+import { atLeast, can, effectiveRole } from "../../shared/models/access.js";
 import type { Actor as SharedActor } from "../../shared/models/habitAccess.js";
+import { clientsOf } from "../coaching/relationships.js";
 
 export type Actor = SharedActor & {
   /** Coach level or above. Attached so a handler can branch without a lookup. */
@@ -72,7 +77,26 @@ export async function actorFrom(req: Request, res: Response): Promise<Actor | nu
     return null;
   }
   const role = effectiveRole(user);
-  return { userId, role, isStaff: atLeast(role, "coach") };
+  const isStaff = atLeast(role, "coach");
+
+  /**
+   * A coach's roster, resolved once and carried on the actor.
+   *
+   * Only for staff, so an ordinary member's request — the overwhelming majority
+   * — costs nothing extra. Admins skip it too: `canCoachAccessMember` lets them
+   * through on the `manageMembers` capability, and fetching a roster they do
+   * not consult would be a query per request to no end.
+   *
+   * Read per request rather than cached on the session, for the same reason the
+   * role is: ending a coaching relationship has to take effect on the coach's
+   * next request, not their next login.
+   */
+  const clientIds =
+    isStaff && !can(role, "manageMembers")
+      ? (await clientsOf(userId)).map((r) => r.memberUserId)
+      : [];
+
+  return { userId, role, isStaff, clientIds };
 }
 
 // ─── The four questions ────────────────────────────────────────────────────
