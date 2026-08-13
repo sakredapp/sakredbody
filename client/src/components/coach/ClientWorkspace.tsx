@@ -51,6 +51,7 @@ import {
   type ResolvedHabitView,
 } from "@/hooks/use-coach";
 import type { HealthWorkout } from "@shared/schema";
+import { CheckinRequests } from "@/components/coach/CheckinRequests";
 import { cn } from "@/lib/utils";
 
 type Tab = "overview" | "activity" | "habits" | "plan" | "messages";
@@ -216,7 +217,7 @@ function WeekBalance({ build, restore, days }: { build: number; restore: number;
 
 // ─── Overview ──────────────────────────────────────────────────────────────
 
-function Overview({ memberId }: { memberId: string }) {
+function Overview({ memberId, memberName }: { memberId: string; memberName: string }) {
   const { data, isLoading, error } = useClientOverview(memberId);
 
   if (isLoading) return <Loading />;
@@ -274,6 +275,15 @@ function Overview({ memberId }: { memberId: string }) {
       )}
 
       {checkin && <Checkin checkin={checkin} today={onDate} />}
+
+      {/*
+        Asking for a fresher read, next to the last one — which is where a coach
+        actually forms the thought. It writes to the member's own canonical
+        check-in; there is no second questionnaire behind this.
+      */}
+      <Section title="Check-ins" kind="member">
+        <CheckinRequests memberId={memberId} memberName={memberName} />
+      </Section>
 
       {plan && (
         <Section title="Coach's plan">
@@ -805,7 +815,7 @@ export function ClientWorkspace({
         ))}
       </div>
 
-      {tab === "overview" && <Overview memberId={memberId} />}
+      {tab === "overview" && <Overview memberId={memberId} memberName={name} />}
       {tab === "activity" && <Activity memberId={memberId} />}
       {tab === "habits" && <Habits memberId={memberId} />}
       {tab === "plan" && <Plan memberId={memberId} memberName={name} />}

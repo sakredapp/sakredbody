@@ -450,8 +450,21 @@ export function terrainHeadline(reading: TerrainReading): string {
       return "You're short on recovery";
     case "build":
       return "You have room for more movement";
+    /**
+     * Not "you're well recovered" any more.
+     *
+     * That was true while this read instruments only: nothing arguing either
+     * way meant nothing was wrong. Composition changed what `either` can mean.
+     * It is now also the word for a genuine disagreement — sleep down thirty
+     * minutes against somebody who says they feel fine — and calling that "well
+     * recovered" picks a winner in an argument the reading deliberately did not
+     * settle, using the more reassuring of the two answers.
+     *
+     * A tie is not a clean bill of health. It is a day to stay responsive on,
+     * which is what the reasons underneath are for.
+     */
     case "either":
-      return "You're well recovered";
+      return "Keep today adjustable";
     case "unknown":
       return "Not enough yet to tell";
   }

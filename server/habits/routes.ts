@@ -31,6 +31,7 @@ import {
 } from "../../shared/models/trackedHabits.js";
 import { routineHabits } from "../../shared/models/coaching.js";
 import { terrainCheckins, terrainCheckinSchema } from "../../shared/models/terrainSignals.js";
+import { saveCheckin } from "./checkin.js";
 import { scheduleToColumns } from "../../shared/models/habitSchedule.js";
 import { itemTypeOf, unitFor } from "../../shared/models/habitTracking.js";
 import { memberToday } from "../coaching/enrollment.js";
@@ -615,17 +616,9 @@ export function registerHabitRoutes(app: Express): void {
     await handle(res, async () => {
       const onDate = parsed.data.onDate ?? ctx.today;
       if (onDate > ctx.today) throw new ContractError(400, "That day hasn't happened yet.");
-      const { onDate: _drop, ...values } = parsed.data;
-      const [row] = await db
-        .insert(terrainCheckins)
-        .values({ userId: ctx.subjectId, onDate, ...values })
-        .onConflictDoUpdate({
-          target: [terrainCheckins.userId, terrainCheckins.onDate],
-          set: { ...values, updatedAt: new Date() },
-        })
-        .returning();
-      habitEvent("terrain.checkin", { subjectId: ctx.subjectId, onDate });
-      return row;
+      // Through `saveCheckin`, which the coach-requested door also uses. One
+      // upsert, one conflict target, one canonical row per day.
+      return saveCheckin({ userId: ctx.subjectId, onDate, values: parsed.data });
     });
   });
 

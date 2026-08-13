@@ -39,6 +39,7 @@ import { db } from "../db.js";
 import { storage } from "../storage.js";
 import { coachRelationships } from "../../shared/schema.js";
 import { can, effectiveRole, atLeast } from "../../shared/models/access.js";
+import { closeRequestsFromFormerCoaches } from "./checkinRoutes.js";
 
 /** The live relationship between a coach and a member, if there is one. */
 export async function activeRelationship(coachUserId: string, memberUserId: string) {
@@ -201,6 +202,28 @@ export async function assignCoach(input: {
       })
       .returning();
 
+    /**
+     * The old coach's open questions close with the relationship.
+     *
+     * A check-in request is an ask from a particular person, not a task in a
+     * queue. Left open, Sarah opens Today tomorrow to "Nick asked for a quick
+     * check-in" from somebody who no longer coaches her — she either answers a
+     * stranger or is stuck with a card she cannot clear.
+     *
+     * Cancelled, never deleted, and *completed* ones are untouched. What she
+     * already answered is her history and stays attributed to the coach who
+     * asked. History stays true; the ability to act follows the live
+     * relationship.
+     *
+     * In this transaction, so a reassignment cannot half-happen.
+     */
+    await closeRequestsFromFormerCoaches(
+      input.memberUserId,
+      input.coachUserId,
+      input.assignedBy,
+      tx,
+    );
+
     return row;
   });
 }
@@ -217,5 +240,8 @@ export async function endCoaching(memberUserId: string) {
       ),
     )
     .returning();
+  // Coaching ending outright is the same fact as reassignment for the member's
+  // Today: nobody is asking any more, so no question should be waiting there.
+  if (row) await closeRequestsFromFormerCoaches(memberUserId, null, memberUserId);
   return row ?? null;
 }

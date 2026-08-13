@@ -23,7 +23,8 @@
  */
 
 import { useState } from "react";
-import { CoachPlanCard } from "@/components/portal/CoachPlanCard";
+import { CoachPlanCard, useHasActiveCoachPlan } from "@/components/portal/CoachPlanCard";
+import { CheckinRequestCard, useOpenCheckinRequest } from "@/components/portal/CheckinRequestCard";
 import { ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useHealthSummary } from "@/hooks/use-health";
@@ -144,10 +145,22 @@ export function TodayBody({ onOpenTrends }: { onOpenTrends?: () => void }) {
   const days = (data?.days ?? []) as DaySeries[];
   const workouts = data?.workouts ?? [];
 
-  // Nothing at all rather than an empty frame. A member who has not connected a
-  // phone is not missing a feature here; the rhythm below is still the page.
+  /**
+   * Nothing at all rather than an empty frame. A member who has not connected a
+   * phone is not missing a feature here; the rhythm below is still the page.
+   *
+   * But "no synced metrics" is not the same as "nothing to show". Terrain now
+   * reads a member's own check-in, so somebody with no wearable can have a
+   * reading — and a coached member can have a plan or a question waiting.
+   * Gating all of that behind a phone would have hidden their coach's question
+   * from the people least likely to have a watch.
+   */
   const present = HEADLINE_METRICS.filter((m) => days.some((d) => typeof d[m] === "number"));
-  if (!present.length && !workouts.length) return null;
+  const hasPlan = useHasActiveCoachPlan();
+  const { data: requests } = useOpenCheckinRequest();
+  const hasCoachingToShow = hasPlan || (requests?.length ?? 0) > 0;
+  const hasReading = Boolean(terrain) && terrain!.lean !== "unknown";
+  if (!present.length && !workouts.length && !hasReading && !hasCoachingToShow) return null;
 
   return (
     <div className="space-y-5">
@@ -189,6 +202,16 @@ export function TodayBody({ onOpenTrends }: { onOpenTrends?: () => void }) {
         was more important. Renders nothing when there is no plan.
       */}
       <CoachPlanCard terrainLean={terrain?.lean ?? null} />
+
+      {/*
+        A question their coach asked, if there is one.
+
+        Here rather than in a navigation tab because it is an action relevant
+        now, and it disappears the moment it is answered or withdrawn. It renders
+        nothing when there is no open request — including for the large majority
+        of members who have no coach at all.
+      */}
+      <CheckinRequestCard />
 
       <MetricDetail metric={open} days={days} onClose={() => setOpen(null)} />
     </div>

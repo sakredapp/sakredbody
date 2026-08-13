@@ -198,6 +198,19 @@ for (const reading of [depleted, read({ daysSinceLastSession: 6 }), read({})]) {
   check(`"${line}" gives no instruction`, !/\byou should\b|\btry to\b|\bmake sure\b/i.test(line));
   check(`"${line}" does not personify the body`, !/\bbody is asking\b|\basking for\b/i.test(line));
 }
+/**
+ * `either` now also means "the instruments and the person disagree", so it
+ * cannot claim recovery. A tie is a day to stay responsive on, not a clean bill
+ * of health picked from the more reassuring of two answers.
+ */
+check(
+  "a tie does not claim the member is recovered",
+  !/recover/i.test(terrainHeadline({ ...read(), lean: "either" })),
+);
+check(
+  "it says what a tie is actually good for",
+  terrainHeadline({ ...read(), lean: "either" }) === "Keep today adjustable",
+);
 check(
   "fresh reads as having room",
   terrainHeadline(read({ daysSinceLastSession: 6 })).includes("room for more movement"),
