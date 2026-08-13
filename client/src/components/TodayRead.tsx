@@ -291,7 +291,23 @@ export function TodayRead({
   side,
   onOpenCategory,
   onCheckIn,
+  suppressRelatingIds,
 }: {
+  /**
+   * Guidance ids another component on this screen is already showing in full.
+   *
+   * Restore renders both this and the Rhythm section, and both draw the same
+   * relational guidance from the same generator — so a member saw "Low energy
+   * this week isn't disinterest" twice, once as a teaser and once in full,
+   * consuming two large pieces of one page.
+   *
+   * Passed as ids rather than compared as text. Deduping on the rendered
+   * sentence would mean a copy edit silently un-fixes this, and two genuinely
+   * different branches whose wording drifted together would wrongly collapse
+   * into one. Suppression is per-surface, never global: the teaser is still the
+   * right presentation anywhere the full Rhythm card is absent.
+   */
+  suppressRelatingIds?: string[];
   /**
    * Which half of the practice this screen is.
    *
@@ -363,7 +379,9 @@ export function TodayRead({
         ))}
       </div>
 
-      {data.relating?.map((note, i) => (
+      {data.relating
+        ?.filter((note) => !suppressRelatingIds?.includes(note.id))
+        .map((note, i) => (
         <RelatingCard key={`${note.title}-${i}`} note={note} />
       ))}
 
