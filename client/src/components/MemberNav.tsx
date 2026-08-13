@@ -24,7 +24,7 @@
  * nothing is hidden behind a scroll nobody knows to perform.
  */
 
-import { useMemo, type ComponentType } from "react";
+import { useMemo } from "react";
 import {
   Home as HomeIcon,
   Dumbbell,
@@ -39,6 +39,7 @@ import {
   Activity,
   GraduationCap,
   Settings,
+  type LucideIcon,
 } from "lucide-react";
 import {
   Sheet,
@@ -83,7 +84,7 @@ export type CoachingTab =
 interface Destination {
   id: MemberSection;
   label: string;
-  icon: ComponentType<{ className?: string }>;
+  icon: LucideIcon;
   /** One line, shown only in the More sheet — the bar itself stays wordless. */
   note?: string;
 }
@@ -235,7 +236,14 @@ export function MemberBottomNav({
               )}
               data-testid={`nav-${id}`}
             >
-              <Icon className="h-5 w-5" />
+              {/*
+                Thinner than Lucide's 2px default, which reads as heavy at
+                20px against this ground. Only the stroke changes — the box,
+                the tap target, the spacing and the active colour are all
+                untouched. Below about 1.4 the symbols start to disappear on a
+                non-retina Android panel, so this is as fine as it goes.
+              */}
+              <Icon className="h-5 w-5" strokeWidth={1.6} />
               {/* The label stays. An icon-only bar is a guessing game, and
                   these four icons are not universal enough to carry it. */}
               <span className="text-[10px] leading-none">{label}</span>

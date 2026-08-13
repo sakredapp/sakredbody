@@ -205,7 +205,26 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
   const sleep = mean(days, "sleepMinutes");
   const hrv = mean(days, "heartRateVariability");
   const rhr = mean(days, "restingHeartRate");
-  const nothingSynced = sleep === null && hrv === null && rhr === null;
+  /**
+   * Connected, and having readings, are two different questions.
+   *
+   * This used to be one: `sleep === null && hrv === null && rhr === null` was
+   * treated as "not connected", so a member whose watch had simply not reported
+   * sleep, HRV or resting heart rate was shown a **Connect health data** button
+   * for data that was already connected — while the rest of the same screen
+   * quoted their sleep back to them.
+   *
+   * `connected` is the server's own answer, from the health connection rows
+   * rather than inferred from whether any metric happens to be non-null. Three
+   * states, named, because two of them look identical if you only ask about
+   * values:
+   *
+   *     loading      we do not know yet — say nothing
+   *     !connected   genuinely nothing linked — offer the CTA
+   *     connected    linked; may still have no readings this week
+   */
+  const connected = health.data?.connected === true;
+  const noReadings = sleep === null && hrv === null && rhr === null;
 
   return (
     <div className="space-y-6">
@@ -260,7 +279,10 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">
-            Nothing to read yet. Connect health data or log a session.
+            {/* Only suggest connecting to somebody who has not. */}
+            {connected
+              ? "Nothing to read yet. Log a session and this starts filling in."
+              : "Nothing to read yet. Connect health data or log a session."}
           </p>
         )}
       </Panel>
@@ -268,13 +290,13 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
       {/* ── The numbers this half of the app runs on ── */}
       <Panel
         title="Sleep and recovery"
-        action={nothingSynced ? undefined : "Stats"}
-        onAction={nothingSynced ? undefined : () => onOpen("coaching")}
+        action={noReadings ? undefined : "Stats"}
+        onAction={noReadings ? undefined : () => onOpen("coaching")}
         data-testid="restore-recovery"
       >
         {health.isLoading ? (
           <Skeleton className="h-14 w-full" />
-        ) : nothingSynced ? (
+        ) : !connected ? (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
               Nothing synced from your phone yet. Sleep, heart rate variability
@@ -284,6 +306,16 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
               Connect health data
             </Button>
           </div>
+        ) : noReadings ? (
+          /*
+            Connected, with nothing to show this week. Deliberately no CTA —
+            there is nothing for the member to do, and offering one implies they
+            failed a setup step they already completed.
+          */
+          <p className="text-sm text-muted-foreground">
+            Nothing recorded in the last week. Sleep, heart rate variability and
+            resting heart rate appear here once your phone reports them.
+          </p>
         ) : (
           <div className="grid grid-cols-3 gap-3">
             <Metric
@@ -303,7 +335,7 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
             />
           </div>
         )}
-        {!nothingSynced && !health.isLoading && (
+        {!noReadings && !health.isLoading && (
           <p className="text-[11px] text-muted-foreground mt-3">Averaged over the last 7 days.</p>
         )}
       </Panel>
@@ -375,15 +407,23 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
       <RhythmSection />
 
       {/* ── The reading from the inside ── */}
+      {/*
+        The door to The Body, which is now the Sakred Body Map — seven
+        territories rather than nine centres. The nine centres remain a real
+        tributary and return later as an optional traditional lens, but they are
+        no longer the primary model, so this door should not advertise them as
+        though they were.
+      */}
       <Panel
-        title="The nine centres"
-        action="Read"
+        title="The Body Map"
+        action="Open"
         onAction={() => onOpen("body")}
-        data-testid="restore-centres"
+        data-testid="restore-body-map"
       >
         <p className="text-sm text-muted-foreground">
           What the phone measures is one account of your terrain. What you
-          notice is another, and it is usually earlier.
+          notice is another, and it is usually earlier. The map is where you
+          learn to read it.
         </p>
       </Panel>
     </div>

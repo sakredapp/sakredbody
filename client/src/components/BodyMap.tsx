@@ -7,45 +7,43 @@
  * can I notice in each, and what does Sakred currently know about them?
  *
  * It deliberately does not ask "is your crown blocked, stirring or open?".
- * That is what this replaces. Nine centres with a three-state selector made
- * energetic anatomy the master ontology and asked people to diagnose an
- * energetic condition they do not experience themselves as having — while
- * quietly running a *second* subjective check-in beside the canonical one. A
- * member could report clarity 2/5 on Restore and "crown: open" here, five
- * minutes apart, about the same lived state, with nothing to reconcile them.
+ * That is what this replaced. Nine centres with a three-state selector made
+ * energetic anatomy the master ontology and asked people to diagnose a
+ * condition they do not experience themselves as having — while quietly running
+ * a *second* subjective check-in beside the canonical one. A member could report
+ * clarity 2/5 on Restore and "crown: open" here five minutes later, about the
+ * same lived state, with nothing to reconcile them.
  *
  * The nine centres are not deleted from Sakred and should not be. They are one
  * way of reading the body — a real tributary — and belong later as an optional
- * traditional lens in the Library, not as the frame everything else hangs from.
- * The server tables and use-energy hooks are untouched for exactly that reason.
+ * traditional lens in the Library, not as the frame everything hangs from. The
+ * server tables and use-energy hooks are untouched for exactly that reason.
  *
- * ── One body, one subjective history ─────────────────────────────────────
+ * ── One canon, two surfaces ──────────────────────────────────────────────
  *
- * Nothing here is an input. The seven canonical signals are answered once a
- * day in the check-in and read back here, source-labelled, only where the
- * member actually answered. See client/src/lib/bodySignals.ts for which signal
- * a region may speak to, and why those mappings are editorial rather than
- * physiological.
+ * The seven territories, their names and their order come from
+ * shared/models/bodyMap.ts. The words on this screen come from
+ * client/src/data/bodyMapApp.ts, which is the app's own.
  *
- * ── One map across surfaces ──────────────────────────────────────────────
+ * This screen used to read the website's content object directly, which meant a
+ * copy edit to a marketing page silently changed how a member's health screen
+ * explained their body. Sharing the taxonomy is the point; sharing the prose was
+ * a mistake. A test asserts both surfaces cover all seven keys, so they teach
+ * one Sakred model without either owning the other's language.
  *
- * The seven regions and their content come from client/src/data/bodyMap.ts,
- * which the public Body Map also renders. The website teaches the philosophy;
- * the app makes it personal. Same intellectual system, two expressions — and
- * one file, so they cannot drift into two vocabularies for one body.
+ * ── Nothing here is an input ─────────────────────────────────────────────
+ *
+ * The seven canonical signals are answered once a day in the check-in and read
+ * back here — labelled *Related today*, never as a reading of the territory.
+ * Nothing in Sakred measures Flow. See client/src/lib/bodySignals.ts.
  */
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
-import { MAP_REGIONS } from "@/data/bodyMap";
-import {
-  REGION_NOTICE,
-  REGION_ORDER,
-  signalsForRegion,
-  type ReportedToday,
-  type RegionKey,
-} from "@/lib/bodySignals";
+import { APP_REGIONS } from "@/data/bodyMapApp";
+import { signalsForRegion, type ReportedToday } from "@/lib/bodySignals";
+import { BODY_REGION_NAMES, BODY_REGION_ORDER, type BodyRegionKey } from "@shared/models/bodyMap";
 import { TERRAIN_SIGNALS } from "@shared/models/terrainSignals";
 import { cn } from "@/lib/utils";
 import { SectionHeading } from "@/components/portal/Panel";
@@ -55,30 +53,24 @@ const SIGNAL_LABEL = Object.fromEntries(TERRAIN_SIGNALS.map((s) => [s.id, s.labe
   string
 >;
 
-/** Regions in reading order, head to ground, with the site's content attached. */
-const REGIONS = REGION_ORDER.map((key) => ({
-  key,
-  region: MAP_REGIONS.find((r) => r.key === key)!,
-})).filter((r) => r.region);
-
 // ─── The axis ──────────────────────────────────────────────────────────────
 
 function Axis({
   selectedKey,
   onSelect,
 }: {
-  selectedKey: RegionKey;
-  onSelect: (key: RegionKey) => void;
+  selectedKey: BodyRegionKey;
+  onSelect: (key: BodyRegionKey) => void;
 }) {
   return (
-    <div className="relative w-full" style={{ height: `${REGIONS.length * 62 + 40}px` }}>
+    <div className="relative w-full" style={{ height: `${BODY_REGION_ORDER.length * 62 + 40}px` }}>
       {/* The spine, engraved rather than drawn — the same register as the
           constellation figure behind it and TerrainWheel elsewhere. */}
       <svg className="absolute inset-0 w-full h-full" aria-hidden="true">
         <line x1="24" y1="10" x2="24" y2="100%" stroke="hsl(var(--gold) / 0.14)" strokeWidth="1" />
       </svg>
 
-      {REGIONS.map(({ key, region }, i) => {
+      {BODY_REGION_ORDER.map((key, i) => {
         const selected = selectedKey === key;
         return (
           <button
@@ -115,7 +107,7 @@ function Axis({
                   selected ? "text-foreground" : "text-muted-foreground group-hover:text-foreground",
                 )}
               >
-                {region.name}
+                {BODY_REGION_NAMES[key]}
               </span>
             </span>
           </button>
@@ -133,14 +125,20 @@ function Label({ children }: { children: React.ReactNode }) {
   );
 }
 
-function RegionDetail({ regionKey, reported }: { regionKey: RegionKey; reported: ReportedToday | null }) {
-  const region = MAP_REGIONS.find((r) => r.key === regionKey)!;
+function RegionDetail({
+  regionKey,
+  reported,
+}: {
+  regionKey: BodyRegionKey;
+  reported: ReportedToday | null;
+}) {
+  const region = APP_REGIONS[regionKey];
   const signals = signalsForRegion(regionKey, reported);
 
   return (
     <div className="space-y-8">
       <div className="space-y-2">
-        <h2 className="font-serif text-3xl">{region.name}</h2>
+        <h2 className="font-serif text-3xl">{BODY_REGION_NAMES[regionKey]}</h2>
         <Label>{region.covers}</Label>
         <p className="text-sm text-muted-foreground leading-relaxed pt-1">{region.governs}</p>
       </div>
@@ -148,7 +146,7 @@ function RegionDetail({ regionKey, reported }: { regionKey: RegionKey; reported:
       <div className="space-y-3">
         <Label>What you might notice</Label>
         <ul className="space-y-1.5">
-          {REGION_NOTICE[regionKey].map((line) => (
+          {region.notice.map((line) => (
             <li key={line} className="text-sm text-muted-foreground leading-relaxed">
               {line}
             </li>
@@ -157,19 +155,30 @@ function RegionDetail({ regionKey, reported }: { regionKey: RegionKey; reported:
       </div>
 
       {/*
-        Only what Sakred actually knows.
+        Only what Sakred actually knows — and only as *related*, never as a
+        reading of the territory.
 
-        Rendered from the member's own check-in and nothing else. No section at
-        all when they have not answered — an empty reading invented to fill a
-        slot is worse than a screen that admits it does not know, and this is
-        the majority case rather than an edge one.
+        "Related today" rather than "Today" is load-bearing. Nothing here
+        measures Flow or the Organ Network; these are canonical check-in answers
+        whose subject matter overlaps with what somebody might notice in this
+        part of the body. Each keeps its own name and its own provenance so it
+        stays legible as the member's own words about their day, and can never
+        collapse into "Your Flow: 2/5" — a number we have no basis to produce.
+
+        No section at all when they have not answered. An invented reading is
+        worse than a screen admitting it does not know, and that is the majority
+        case rather than an edge one.
       */}
       {signals.length > 0 && (
         <div className="space-y-3">
-          <Label>Today</Label>
+          <Label>Related today</Label>
           <div className="space-y-2">
             {signals.map((s) => (
-              <div key={s.id} className="flex items-baseline gap-3" data-testid={`region-signal-${s.id}`}>
+              <div
+                key={s.id}
+                className="flex items-baseline gap-3"
+                data-testid={`region-signal-${s.id}`}
+              >
                 <span className="text-sm w-32 shrink-0">{SIGNAL_LABEL[s.id] ?? s.id}</span>
                 <span className="text-sm tabular-nums">{s.value}/5</span>
                 <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/60">
@@ -191,13 +200,12 @@ function RegionDetail({ regionKey, reported }: { regionKey: RegionKey; reported:
       */}
       <div className="space-y-3 pt-2 border-t border-border/40">
         <Label>Traditional lens</Label>
-        <p className="text-xs text-muted-foreground/80">{region.traditions}</p>
-        <p className="text-sm text-muted-foreground leading-relaxed">{region.lens}</p>
+        <p className="text-sm text-muted-foreground leading-relaxed">{region.traditional}</p>
       </div>
 
       <div className="space-y-3">
         <Label>Modern lens</Label>
-        <p className="text-sm text-muted-foreground leading-relaxed">{region.measured}</p>
+        <p className="text-sm text-muted-foreground leading-relaxed">{region.modern}</p>
       </div>
 
       <div className="space-y-3">
@@ -225,7 +233,7 @@ function RegionDetail({ regionKey, reported }: { regionKey: RegionKey; reported:
 // ─── The screen ────────────────────────────────────────────────────────────
 
 export function BodyMap() {
-  const [selectedKey, setSelectedKey] = useState<RegionKey>(REGION_ORDER[0]!);
+  const [selectedKey, setSelectedKey] = useState<BodyRegionKey>(BODY_REGION_ORDER[0]!);
 
   /**
    * Today's check-in, read and never written.
