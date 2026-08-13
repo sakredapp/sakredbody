@@ -27,10 +27,11 @@
  *
  * ── The boundary ──────────────────────────────────────────────────────────
  *
- * Every route that names a member goes through `requireCoachOf("memberId")`.
- * Not the entry route with the rest trusting it — each one, because the twelfth
- * handler is the one somebody forgets, and here the twelfth handler returns
- * somebody's sleep.
+ * Every route that names a member goes through a gate — `requireCoachOf` for
+ * the client projections, `requireConversation` for the thread, and they agree
+ * for a current coach. Not the entry route with the rest trusting it: each one,
+ * because the twelfth handler is the one somebody forgets, and here the twelfth
+ * handler returns somebody's sleep.
  */
 
 import type { Express, Request, Response } from "express";
@@ -48,6 +49,8 @@ import { trackedHabits, trackedHabitPhases } from "../../shared/models/trackedHa
 import { terrainCheckins } from "../../shared/models/terrainSignals.js";
 import { categoryOrientation } from "../../shared/models/training.js";
 import { requireCoachOf, clientsOf } from "./relationships.js";
+import { requireConversation } from "./conversation.js";
+import { threadFor } from "./messageRoutes.js";
 import { getActiveEnrollment, memberToday, settleRoutines } from "./enrollment.js";
 import { terrainFor, RECENT_DAYS } from "../terrain/read.js";
 import { recentMovement } from "../movement/history.js";
@@ -238,6 +241,7 @@ export function registerCoachClientRoutes(app: Express): void {
             userId: coachingMessages.userId,
             createdAt: coachingMessages.createdAt,
             senderRole: coachingMessages.senderRole,
+            readAt: coachingMessages.readAt,
           })
           .from(coachingMessages)
           .where(inArray(coachingMessages.userId, memberIds))
@@ -247,9 +251,20 @@ export function registerCoachClientRoutes(app: Express): void {
       const byId = new Map(people.map((p) => [p.id, p]));
       /** Rows arrive newest-first, so the first one seen per member is theirs. */
       const latestMessage = new Map<string, { createdAt: Date | null; senderRole: string }>();
+      /**
+       * What the coach has not read — their client's messages, not their own.
+       *
+       * One count per client and nothing else. Not presence, not typing, not
+       * delivery receipts: the roster answers "who needs me today", and a
+       * number is the whole of what that question needs.
+       */
+      const unread = new Map<string, number>();
       for (const m of lastMessages) {
         if (!latestMessage.has(m.userId)) {
           latestMessage.set(m.userId, { createdAt: m.createdAt, senderRole: m.senderRole });
+        }
+        if (m.senderRole === "member" && !m.readAt) {
+          unread.set(m.userId, (unread.get(m.userId) ?? 0) + 1);
         }
       }
 
@@ -284,6 +299,7 @@ export function registerCoachClientRoutes(app: Express): void {
             lastMessage: message
               ? { at: message.createdAt, from: message.senderRole }
               : null,
+            unread: unread.get(r.memberUserId) ?? 0,
           };
         }),
       );
@@ -499,26 +515,26 @@ export function registerCoachClientRoutes(app: Express): void {
   );
 
   /**
-   * The existing conversation, read through the relationship.
+   * The client's conversation, with the files in it.
    *
    * `coaching_messages` stays the messaging system — this is a way in, not a
-   * second one. Sending is unchanged and still goes through the routes that
-   * already own it.
+   * second one, and it returns exactly what the member's own thread returns so
+   * the two sides cannot render different histories.
+   *
+   * Gated by `requireConversation` rather than `requireCoachOf`. They agree for
+   * a current coach and differ for a former one: `requireCoachOf` asks whether
+   * an active relationship exists, which is also what conversation access
+   * requires, but the conversation gate is the rule that owns this question and
+   * having one of the five conversation routes ask a different one is how they
+   * drift apart. Sending and reading now pass the same check.
    */
   app.get(
     "/api/coach/clients/:memberId/messages",
     isAuthenticated,
-    requireCoachOf("memberId"),
+    requireConversation("memberId"),
     async (req: Request, res: Response) => {
       try {
-        const memberId = memberIdOf(req);
-        const rows = await db
-          .select()
-          .from(coachingMessages)
-          .where(eq(coachingMessages.userId, memberId))
-          .orderBy(coachingMessages.createdAt)
-          .limit(200);
-        res.json(rows);
+        res.json(await threadFor(req.conversationMemberId!));
       } catch (err) {
         fail(res, "messages", err);
       }

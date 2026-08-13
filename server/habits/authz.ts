@@ -84,7 +84,7 @@ export async function actorFrom(req: Request, res: Response): Promise<Actor | nu
    *
    * Only for staff, so an ordinary member's request — the overwhelming majority
    * — costs nothing extra. Admins skip it too: `canCoachAccessMember` lets them
-   * through on the `manageMembers` capability, and fetching a roster they do
+   * through on the `superviseCoaching` capability, and fetching a roster they do
    * not consult would be a query per request to no end.
    *
    * Read per request rather than cached on the session, for the same reason the
@@ -92,7 +92,7 @@ export async function actorFrom(req: Request, res: Response): Promise<Actor | nu
    * next request, not their next login.
    */
   const clientIds =
-    isStaff && !can(role, "manageMembers")
+    isStaff && !can(role, "superviseCoaching")
       ? (await clientsOf(userId)).map((r) => r.memberUserId)
       : [];
 

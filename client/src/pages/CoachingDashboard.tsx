@@ -34,6 +34,7 @@ import {
   type CatalogHabit,
 } from "@/hooks/use-coaching";
 import { useToast } from "@/hooks/use-toast";
+import { Conversation } from "@/components/coach/Conversation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -77,12 +78,6 @@ import {
   Pause,
   Trash2,
   Info,
-  Send,
-  MessageCircle,
-  Paperclip,
-  FileText,
-  Image as ImageIcon,
-  Download,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DailyRitual } from "@/components/DailyRitual";
@@ -1326,178 +1321,30 @@ export function AnalyticsTab() {
 
 // ─── Coach Chat / Share Progress ─────────────────────────────────────────
 
-interface CoachingMessageData {
-  id: string;
-  userId: string;
-  senderRole: string;
-  messageType: string;
-  content: string;
-  imageUrl: string | null;
-  metadata: string | null;
-  readAt: string | null;
-  createdAt: string;
-}
-
+/**
+ * The member's side of their coaching conversation.
+ *
+ * ── What this replaced ────────────────────────────────────────────────────
+ *
+ * Four hundred lines that uploaded a file to a *public* bucket, got a permanent
+ * URL back, and posted that URL as `imageUrl` on the message — so a progress
+ * photo or a blood panel stayed retrievable by anyone holding the link, forever
+ * and without a session. It also had no preview before sending, no failure
+ * state, no way to remove a chosen file, and rendered every attachment as an
+ * `<img>` including the PDFs.
+ *
+ * The thread itself is now `Conversation`, shared with the coach's side. Two
+ * renderings of one conversation is how the two people in it end up disagreeing
+ * about what was said.
+ */
 export function CoachChat() {
-  const { toast } = useToast();
-  /** Who this conversation is actually with — canonical, from the relationship. */
   const coach = useMyCoach().data?.coach ?? null;
-  const [messageText, setMessageText] = useState("");
-  const [messageType, setMessageType] = useState<"text" | "progress_update">("text");
-  const [pendingFile, setPendingFile] = useState<{ file: File; preview?: string } | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const messagesQuery = useQuery<CoachingMessageData[]>({
-    queryKey: ["/api/coaching/messages"],
-    queryFn: async () => {
-      const res = await fetch("/api/coaching/messages", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load messages");
-      return res.json();
-    },
-    refetchInterval: 15000,
-  });
-
-  const sendMutation = useMutation({
-    mutationFn: async (data: { content: string; messageType: string; imageUrl?: string; metadata?: string }) => {
-      const res = await apiRequest("POST", "/api/coaching/messages", data);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/coaching/messages"] });
-      setMessageText("");
-      setMessageType("text");
-      setPendingFile(null);
-    },
-    onError: () => {
-      toast({ title: "Failed to send", description: "Please try again.", variant: "destructive" });
-    },
-  });
-
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messagesQuery.data]);
-
-  // Clean up preview URL
-  useEffect(() => {
-    return () => {
-      if (pendingFile?.preview) URL.revokeObjectURL(pendingFile.preview);
-    };
-  }, [pendingFile]);
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-      toast({ title: "File too large", description: "Maximum 10 MB allowed.", variant: "destructive" });
-      return;
-    }
-    const preview = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
-    setPendingFile({ file, preview });
-    e.target.value = "";
-  };
-
-  const uploadAndSend = async () => {
-    const text = messageText.trim();
-    if (!text && !pendingFile) return;
-    if (sendMutation.isPending || isUploading) return;
-
-    let imageUrl: string | undefined;
-    let metadata: string | undefined;
-
-    if (pendingFile) {
-      setIsUploading(true);
-      try {
-        const formData = new FormData();
-        formData.append("file", pendingFile.file);
-        const res = await fetch("/api/coaching/upload", {
-          method: "POST",
-          body: formData,
-          credentials: "include",
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ message: "Upload failed" }));
-          throw new Error(err.message);
-        }
-        const data = await res.json();
-        imageUrl = data.url;
-        metadata = JSON.stringify({ fileName: data.fileName, mimeType: data.mimeType, size: data.size });
-      } catch (err: any) {
-        toast({ title: "Upload failed", description: err.message || "Please try again.", variant: "destructive" });
-        setIsUploading(false);
-        return;
-      }
-      setIsUploading(false);
-    }
-
-    const msgType = pendingFile?.file.type.startsWith("image/") ? "photo" : (pendingFile ? "text" : messageType);
-    sendMutation.mutate({
-      content: text || `📎 ${pendingFile?.file.name || "File"}`,
-      messageType: msgType,
-      imageUrl,
-      metadata,
-    });
-  };
-
-  const handleSend = () => uploadAndSend();
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
-  const messages = messagesQuery.data || [];
-
-  // Group messages by date
-  const groupedMessages = useMemo(() => {
-    const groups: { date: string; messages: CoachingMessageData[] }[] = [];
-    let currentDate = "";
-    for (const msg of messages) {
-      const d = new Date(msg.createdAt).toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-      });
-      if (d !== currentDate) {
-        currentDate = d;
-        groups.push({ date: d, messages: [msg] });
-      } else {
-        groups[groups.length - 1].messages.push(msg);
-      }
-    }
-    return groups;
-  }, [messages]);
-
-  if (messagesQuery.isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-6 w-32" />
-        <Skeleton className="h-64 w-full rounded-md" />
-        <Skeleton className="h-16 w-full rounded-md" />
-      </div>
-    );
-  }
+  const name = coach?.name ?? "your coach";
+  const firstName = coach?.firstName || name;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-180px)] max-h-[700px]">
-      {/*
-        Header — the actual person, now that we know who they are.
-
-        This said "Coach" and "connect with your coach" to everybody, because
-        until `coach_relationships` there was no way to find out who that was.
-        A named human is not decoration: it is the difference between a support
-        inbox and somebody Sarah has met. The generic wording stays as the
-        fallback for the moment the name is still loading, rather than a blank
-        that fills in — arriving is fine, changing under you is not.
-      */}
-      <div className="mb-4 flex items-center gap-3">
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
         {coach?.profileImageUrl && (
           <img
             src={coach.profileImageUrl}
@@ -1506,221 +1353,31 @@ export function CoachChat() {
           />
         )}
         <div className="min-w-0">
+          {/* The actual person. Generic only while we genuinely don't know. */}
           <h2 className="text-lg font-display font-semibold tracking-tight truncate">
             {coach?.name ?? "Coach"}
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {coach ? "Sakred Coach" : "Share updates, progress, and connect with your coach"}
+            {coach ? "Sakred Coach" : "Share updates and ask questions"}
           </p>
         </div>
       </div>
 
-      {/* Messages area */}
-      <Card className="flex-1 overflow-hidden flex flex-col">
-        <div
-          ref={scrollRef}
-          className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin"
-        >
-          {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center py-12 px-4">
-              <div className="w-14 h-14 rounded-full bg-[hsl(var(--gold))]/10 flex items-center justify-center mb-4">
-                <MessageCircle className="w-7 h-7 text-[hsl(var(--gold))]" />
-              </div>
-              <h3 className="text-sm font-medium mb-1">Start the Conversation</h3>
-              <p className="text-xs text-muted-foreground max-w-xs">
-                Share your progress, ask questions, or send updates to your coach.
-                They'll respond here.
-              </p>
-            </div>
-          ) : (
-            groupedMessages.map((group) => (
-              <div key={group.date}>
-                {/* Date divider */}
-                <div className="flex items-center gap-3 my-3">
-                  <Separator className="flex-1" />
-                  <span className="text-[10px] text-muted-foreground font-medium whitespace-nowrap">
-                    {group.date}
-                  </span>
-                  <Separator className="flex-1" />
-                </div>
-
-                {/* Messages */}
-                <div className="space-y-3">
-                  {group.messages.map((msg) => {
-                    const isMember = msg.senderRole === "member";
-                    const isProgressUpdate = msg.messageType === "progress_update";
-                    const time = new Date(msg.createdAt).toLocaleTimeString("en-US", {
-                      hour: "numeric",
-                      minute: "2-digit",
-                    });
-
-                    return (
-                      <div
-                        key={msg.id}
-                        className={`flex ${isMember ? "justify-end" : "justify-start"}`}
-                      >
-                        <div
-                          className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
-                            isMember
-                              ? "bg-[hsl(var(--gold))]/15 text-foreground rounded-br-md"
-                              : "bg-muted text-foreground rounded-bl-md"
-                          }`}
-                        >
-                          {/* Sender label */}
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[10px] font-medium opacity-70">
-                              {isMember ? "You" : "Coach"}
-                            </span>
-                            {isProgressUpdate && (
-                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4">
-                                Progress Update
-                              </Badge>
-                            )}
-                          </div>
-
-                          {/* Message content */}
-                          <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
-                            {msg.content}
-                          </p>
-
-                          {/* Attachment */}
-                          {msg.imageUrl && (() => {
-                            const meta = msg.metadata ? JSON.parse(msg.metadata) : null;
-                            const isImage = msg.messageType === "photo" || meta?.mimeType?.startsWith("image/");
-                            return isImage ? (
-                              <a href={msg.imageUrl} target="_blank" rel="noopener noreferrer" className="block mt-2">
-                                <img
-                                  src={msg.imageUrl}
-                                  alt={meta?.fileName || "Attachment"}
-                                  className="max-w-full max-h-60 rounded-lg object-cover border border-border/30"
-                                />
-                              </a>
-                            ) : (
-                              <a
-                                href={msg.imageUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-background/50 border border-border/30 hover:bg-muted/50 transition-colors"
-                              >
-                                <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
-                                <span className="text-xs truncate flex-1">{meta?.fileName || "File"}</span>
-                                <Download className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                              </a>
-                            );
-                          })()}
-
-                          {/* Timestamp */}
-                          <div className={`flex ${isMember ? "justify-end" : "justify-start"} mt-1`}>
-                            <span className="text-[9px] text-muted-foreground">{time}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* Input area */}
-        <div className="border-t border-border/50 p-3 bg-background/50">
-          {/* Hidden file input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*,.pdf,.doc,.docx,.txt"
-            className="hidden"
-            onChange={handleFileSelect}
-          />
-
-          {/* Pending file preview */}
-          {pendingFile && (
-            <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-muted/50 border border-border/30">
-              {pendingFile.preview ? (
-                <img src={pendingFile.preview} alt="" className="w-10 h-10 rounded object-cover" />
-              ) : (
-                <FileText className="w-5 h-5 text-muted-foreground" />
-              )}
-              <span className="text-xs truncate flex-1">{pendingFile.file.name}</span>
-              <span className="text-[10px] text-muted-foreground">
-                {(pendingFile.file.size / 1024).toFixed(0)} KB
-              </span>
-              <button onClick={() => setPendingFile(null)} className="text-muted-foreground hover:text-foreground">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
-
-          {/* Message type toggle */}
-          <div className="flex items-center gap-1.5 mb-2">
-            <button
-              onClick={() => setMessageType("text")}
-              className={`text-[10px] px-2.5 py-1 rounded-full transition-colors ${
-                messageType === "text"
-                  ? "bg-foreground text-background font-medium"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Message
-            </button>
-            <button
-              onClick={() => setMessageType("progress_update")}
-              className={`text-[10px] px-2.5 py-1 rounded-full transition-colors ${
-                messageType === "progress_update"
-                  ? "bg-[hsl(var(--gold))]/20 text-[hsl(var(--gold))] font-medium"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Progress Update
-            </button>
-          </div>
-
-          <div className="flex items-end gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="h-[44px] w-[44px] shrink-0 text-muted-foreground hover:text-foreground"
-              title="Attach file"
-            >
-              <Paperclip className="w-4 h-4" />
-            </Button>
-            <Textarea
-              ref={textareaRef}
-              value={messageText}
-              onChange={e => setMessageText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={
-                messageType === "progress_update"
-                  ? "Share what you accomplished today..."
-                  : "Type a message to your coach..."
-              }
-              className="flex-1 min-h-[44px] max-h-32 resize-none text-sm"
-              rows={1}
-            />
-            <Button
-              size="icon"
-              onClick={handleSend}
-              disabled={(!messageText.trim() && !pendingFile) || sendMutation.isPending || isUploading}
-              className="h-[44px] w-[44px] shrink-0 bg-[hsl(var(--gold))] hover:bg-[hsl(var(--gold))]/80 text-background"
-            >
-              {isUploading ? (
-                <div className="w-4 h-4 border-2 border-background/30 border-t-background rounded-full animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
-            </Button>
-          </div>
-        </div>
-      </Card>
+      <Conversation
+        side={{
+          threadUrl: "/api/coaching/messages",
+          sendUrl: "/api/coaching/messages",
+          readUrl: "/api/coaching/messages/read",
+          uploadUrl: "/api/coaching/attachments",
+          mine: "member",
+          otherName: firstName,
+          emptyTitle: "Your coaching space is ready.",
+          emptyBody: `Ask a question, share an update, or send ${firstName} something you'd like them to look at.`,
+        }}
+      />
     </div>
   );
 }
-
-// ─── Main Dashboard ──────────────────────────────────────────────────────
 
 type Tab = "today" | "journey" | "routines" | "catalog" | "analytics";
 

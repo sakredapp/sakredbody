@@ -58,6 +58,8 @@ export type ClientCard = {
   terrain: TerrainSummary | null;
   plan: { name: string | null; currentDay: number; totalDays: number } | null;
   lastMessage: { at: string | null; from: string } | null;
+  /** Messages from this client the coach hasn't read. A number, and nothing else. */
+  unread: number;
 };
 
 export function useMyClients() {
@@ -214,23 +216,8 @@ export function useClientTrends(memberId: string | null, days = 30) {
   });
 }
 
-export type ClientMessage = {
-  id: string;
-  userId: string;
-  senderRole: string;
-  senderUserId: string | null;
-  messageType: string;
-  content: string;
-  imageUrl: string | null;
-  readAt: string | null;
-  createdAt: string;
-};
-
-export function useClientMessages(memberId: string | null) {
-  return useQuery<ClientMessage[]>({
-    queryKey: ["/api/coach/clients", memberId, "messages"],
-    queryFn: () => read(`/api/coach/clients/${memberId}/messages`),
-    enabled: Boolean(memberId),
-    retry: false,
-  });
-}
+/*
+ * The thread is read by `Conversation`, which both sides share — so there is
+ * deliberately no coach-only message hook here. A second one would be a second
+ * shape for one conversation.
+ */

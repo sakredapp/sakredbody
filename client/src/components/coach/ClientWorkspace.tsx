@@ -35,10 +35,10 @@ import {
 import { METRIC_DISPLAY, dayLabel } from "@/lib/healthDisplay";
 import type { HealthMetric } from "@shared/schema";
 import { workoutSource } from "@/components/portal/TodaysMovement";
+import { Conversation } from "@/components/coach/Conversation";
 import {
   useClientActivity,
   useClientHabits,
-  useClientMessages,
   useClientOverview,
   useClientPlan,
   useClientTrends,
@@ -613,45 +613,30 @@ function HealthContext({
 // ─── Messages ──────────────────────────────────────────────────────────────
 
 /**
- * The existing conversation, read-only in this slice.
+ * The coach's side of the same conversation the member sees.
  *
- * `coaching_messages` remains the messaging system — this is a way into it, not
- * a second one. Sending, attachments and the rest are Slice 3, which starts
- * with the fact that coaching uploads are currently public URLs.
+ * `Conversation` is shared with the member's screen — one component, because
+ * there is one conversation, and two renderings is how two people end up
+ * disagreeing about what was said.
  */
 function Messages({ memberId, memberName }: { memberId: string; memberName: string }) {
-  const { data, isLoading, error } = useClientMessages(memberId);
-
-  if (isLoading) return <Loading />;
-  if (error) return <Empty>{(error as Error).message}</Empty>;
-  if (!data || data.length === 0) {
-    return (
-      <Section title="Messages">
-        <Empty>No messages yet.</Empty>
-      </Section>
-    );
-  }
-
+  const first = memberName.split(" ")[0] || memberName;
   return (
     <Section title="Messages">
-      <div className="space-y-3">
-        {data.map((m) => (
-          <div key={m.id} className="text-sm">
-            <p className="text-[10px] uppercase tracking-widest text-muted-foreground/70">
-              {m.senderRole === "coach" ? "Coach" : memberName}
-              {m.createdAt && (
-                <span className="ml-2 normal-case tracking-normal text-muted-foreground/50">
-                  {new Date(m.createdAt).toLocaleDateString()}
-                </span>
-              )}
-            </p>
-            <p className="mt-0.5">{m.content}</p>
-          </div>
-        ))}
-      </div>
-      <p className="text-[10px] text-muted-foreground/50 mt-4">
-        Replying happens in the member conversation for now.
-      </p>
+      <Conversation
+        side={{
+          threadUrl: `/api/coach/clients/${memberId}/messages`,
+          sendUrl: `/api/coach/clients/${memberId}/messages`,
+          readUrl: `/api/coach/clients/${memberId}/messages/read`,
+          uploadUrl: `/api/coaching/attachments?memberId=${encodeURIComponent(memberId)}`,
+          mine: "coach",
+          otherName: first,
+          emptyTitle: "No messages yet.",
+          // Restrained on purpose — the overview already told the coach about
+          // this member's terrain, and the chat does not need to repeat it.
+          emptyBody: "Start the conversation.",
+        }}
+      />
     </Section>
   );
 }

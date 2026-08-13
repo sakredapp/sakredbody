@@ -57,7 +57,7 @@ export type Actor = {
  * `coach_relationships` answers the question properly, so it is asked properly:
  *
  *   themselves       always
- *   manageMembers    a named administrative capability, not a rank
+ *   superviseCoaching  a named administrative capability, not a rank
  *   coach            only the members actually assigned to them
  *   anyone else      no
  *
@@ -68,7 +68,7 @@ export type Actor = {
  */
 export function canCoachAccessMember(actor: Actor, memberId: string): boolean {
   if (actor.userId === memberId) return true;
-  if (can(actor.role, "manageMembers")) return true;
+  if (can(actor.role, "superviseCoaching")) return true;
   if (!atLeast(actor.role, "coach")) return false;
   return (actor.clientIds ?? []).includes(memberId);
 }

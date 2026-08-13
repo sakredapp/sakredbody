@@ -37,13 +37,11 @@
 
 import type { Express, Request, Response, NextFunction } from "express";
 import { zodMessage } from "../../shared/utils/zodMessage.js";
-import multer from "multer";
 import { db } from "../db.js";
 import { eq, and, desc, count, sql, gte, lte } from "drizzle-orm";
 import { z } from "zod";
 import { isAuthenticated } from "../auth/index.js";
 import { storage } from "../storage.js";
-import { uploadFile, isStorageConfigured } from "../supabaseStorage.js";
 import { track, trackError } from "../telemetry/index.js";
 import { awardWins } from "../wins/index.js";
 import {
@@ -1123,54 +1121,17 @@ export function registerCoachingRoutes(app: Express): void {
   // ═══════════════════════════════════════════════════════════════════════
 
   // ── Get my messages ──────────────────────────────────────────────────
-  app.get("/api/coaching/messages", isAuthenticated, async (req: Request, res: Response) => {
-    try {
-      const userId = req.session!.userId!;
-      const messages = await db
-        .select()
-        .from(coachingMessages)
-        .where(eq(coachingMessages.userId, userId))
-        .orderBy(coachingMessages.createdAt);
-      res.json(messages);
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ message: "Internal Server Error" });
-    }
-  });
-
-  // ── Send a message ───────────────────────────────────────────────────
-  app.post("/api/coaching/messages", isAuthenticated, async (req: Request, res: Response) => {
-    try {
-      const userId = req.session!.userId!;
-      const { content, messageType, imageUrl, metadata } = z.object({
-        content: z.string().min(1).max(5000),
-        messageType: z.enum(["text", "progress_update", "photo"]).default("text"),
-        imageUrl: z.string().optional(),
-        metadata: z.string().optional(),
-      }).parse(req.body);
-
-      const [msg] = await db.insert(coachingMessages).values({
-        userId,
-        senderRole: "member",
-        // Who, not just which side. `senderRole` alone was survivable while
-        // there was no such thing as a specific coach; once a member can be
-        // reassigned, "a coach wrote this" is not something anyone can act on.
-        senderUserId: userId,
-        messageType,
-        content,
-        imageUrl: imageUrl || null,
-        metadata: metadata || null,
-      }).returning();
-
-      res.status(201).json(msg);
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: zodMessage(err) });
-      }
-      console.error(err);
-      res.status(500).json({ message: "Internal Server Error" });
-    }
-  });
+  // ── The member's conversation ────────────────────────────────────────
+  //
+  // GET/POST /api/coaching/messages and the upload endpoint moved to
+  // ./messageRoutes.ts, where every path through a conversation — reading,
+  // sending, uploading, retrieving a file, marking read — passes one gate.
+  //
+  // They were three different rules living in three places: the thread read was
+  // session-scoped, the send trusted a client-supplied `imageUrl` pointing
+  // anywhere on the internet, and the upload was `isAuthenticated` alone. Two
+  // handlers on one path is a bug Express reports by silently running the first,
+  // so they are removed here rather than left as a fallback.
 
   // ── Admin: get all conversations (grouped by user) ───────────────────
   app.get("/api/admin/coaching/messages", isAuthenticated, isAdmin, async (_req: Request, res: Response) => {
@@ -1278,56 +1239,18 @@ export function registerCoachingRoutes(app: Express): void {
     }
   });
 
-  // ═══════════════════════════════════════════════════════════════════════
-  // FILE UPLOAD (Supabase Storage)
-  // ═══════════════════════════════════════════════════════════════════════
-
-  const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
-    fileFilter: (_req, file, cb) => {
-      const allowed = [
-        "image/jpeg", "image/png", "image/gif", "image/webp",
-        "application/pdf",
-        "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "text/plain",
-      ];
-      if (allowed.includes(file.mimetype)) {
-        cb(null, true);
-      } else {
-        cb(new Error("File type not allowed. Accepted: images, PDF, Word, text."));
-      }
-    },
-  });
-
-  // ── Upload a file and get its public URL ─────────────────────────────
-  app.post("/api/coaching/upload", isAuthenticated, upload.single("file"), async (req: Request, res: Response) => {
-    try {
-      if (!isStorageConfigured()) {
-        return res.status(503).json({ message: "File storage not configured" });
-      }
-      const file = (req as any).file;
-      if (!file) {
-        return res.status(400).json({ message: "No file provided" });
-      }
-
-      const userId = req.session!.userId!;
-      const url = await uploadFile(userId, file.buffer, file.originalname, file.mimetype);
-
-      if (!url) {
-        return res.status(500).json({ message: "Upload failed" });
-      }
-
-      res.json({ url, fileName: file.originalname, mimeType: file.mimetype, size: file.size });
-    } catch (err: any) {
-      if (err.message?.includes("File type not allowed")) {
-        return res.status(400).json({ message: err.message });
-      }
-      console.error(err);
-      res.status(500).json({ message: "Internal Server Error" });
-    }
-  });
+  // ── Uploads ──────────────────────────────────────────────────────────
+  //
+  // POST /api/coaching/upload is gone. It was `isAuthenticated` and nothing
+  // else — any account could put a file in the bucket — and it answered with a
+  // permanent Supabase *public* URL, so a member's progress photo or lab result
+  // stayed retrievable forever by anyone holding the link.
+  //
+  // ./messageRoutes.ts stages files against a named conversation, into a
+  // private bucket, and hands back an id. See ./attachmentStore.ts for why the
+  // private bucket is a second one rather than the old bucket flipped: profile
+  // photos and community voice memos share that bucket and are meant to be
+  // fetchable.
 
   // ═══════════════════════════════════════════════════════════════════════
   // ADMIN: MEMBER COACHING SNAPSHOT

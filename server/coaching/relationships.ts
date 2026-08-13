@@ -28,8 +28,9 @@
  *   allow
  *
  * Admin bypass is deliberate and explicit rather than a side effect of rank:
- * an admin holds `manageMembers`, which is the capability that already means
- * "may act on any member operationally", and it is checked by name.
+ * an admin holds `superviseCoaching`, which names this authority exactly —
+ * reading a member's coaching data without being their coach — rather than
+ * borrowing `manageMembers`, which is about accounts, tiers and bookings.
  */
 
 import type { Request, Response, NextFunction } from "express";
@@ -138,7 +139,7 @@ export function requireCoachOf(param = "memberId") {
       }
 
       // The operational bypass, named rather than inherited from rank.
-      if (can(role, "manageMembers")) {
+      if (can(role, "superviseCoaching")) {
         req.coachAccess = "admin";
         return next();
       }

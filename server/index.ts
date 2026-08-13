@@ -4,6 +4,7 @@ import { setupAuth, registerAuthRoutes } from "./auth/index.js";
 import { serveStatic } from "./static.js";
 import { createServer } from "http";
 import { ensureStorageBucket } from "./supabaseStorage.js";
+import { ensureCoachingBucket } from "./coaching/attachmentStore.js";
 import { securityHeaders } from "./security/headers.js";
 import { cors } from "./security/cors.js";
 import { bearerAuth } from "./auth/bearerAuth.js";
@@ -88,6 +89,8 @@ app.use((req, res, next) => {
 
   // Ensure Supabase Storage bucket exists (idempotent)
   ensureStorageBucket().catch((err) => console.warn("Storage bucket init:", err.message));
+  // The private one, separate on purpose — see server/coaching/attachmentStore.ts.
+  ensureCoachingBucket().catch((err) => console.warn("Coaching bucket init:", err.message));
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

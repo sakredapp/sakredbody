@@ -21,10 +21,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useMyClients, type ClientCard } from "@/hooks/use-coach";
 import { cn } from "@/lib/utils";
 
-type Filter = "all" | "plan" | "no-plan";
+type Filter = "all" | "unread" | "plan" | "no-plan";
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "all", label: "All" },
+  { id: "unread", label: "Unread" },
   { id: "plan", label: "On a plan" },
   { id: "no-plan", label: "No plan" },
 ];
@@ -75,7 +76,18 @@ function ClientRow({ client, onOpen }: { client: ClientCard; onOpen: () => void 
         </Avatar>
 
         <div className="min-w-0 flex-1">
-          <p className="text-sm truncate">{client.name}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm truncate">{client.name}</p>
+            {/* One number. Not presence, not typing, not delivery receipts. */}
+            {client.unread > 0 && (
+              <span
+                className="shrink-0 rounded-full bg-[hsl(var(--gold))]/15 px-1.5 py-0.5 text-[10px] text-[hsl(var(--gold))]"
+                data-testid={`client-unread-${client.id}`}
+              >
+                {client.unread}
+              </span>
+            )}
+          </div>
 
           {/*
             The reading, not a number. "Recovery reduced" is something a coach
@@ -134,6 +146,7 @@ export function ClientRoster({
     const q = query.trim().toLowerCase();
     return clients.filter((c) => {
       if (q && !c.name.toLowerCase().includes(q)) return false;
+      if (filter === "unread" && c.unread === 0) return false;
       if (filter === "plan" && !c.plan) return false;
       if (filter === "no-plan" && c.plan) return false;
       return true;

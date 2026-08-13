@@ -18,7 +18,7 @@
  * Run: tsx script/test-coaching-access.ts
  */
 
-import { atLeast, can, effectiveRole, ROLES } from "../shared/models/access.js";
+import { atLeast, can, CAPABILITIES, effectiveRole, ROLES } from "../shared/models/access.js";
 import { assignCoachSchema } from "../shared/models/coaching.js";
 import {
   canCoachAccessMember,
@@ -58,6 +58,24 @@ check(
 check("an admin may act on any member operationally", can("admin", "manageMembers"));
 check("a coach may not", !can("coach", "manageMembers"));
 check("nor a moderator", !can("moderator", "manageMembers"));
+
+/**
+ * And the two authorities are named separately.
+ *
+ * `manageMembers` is accounts — tiers, partners, bookings. Reading somebody's
+ * sleep, terrain and their coach's private notes is `superviseCoaching`. Same
+ * rank today, which is exactly why the distinction has to be in the name: a
+ * capability that does not describe what it grants cannot be audited from its
+ * call site.
+ */
+check("supervising coaching is its own capability", can("admin", "superviseCoaching"));
+check("a coach does not hold it", !can("coach", "superviseCoaching"));
+check("nor a moderator", !can("moderator", "superviseCoaching"));
+check(
+  "it is a distinct name, not an alias",
+  CAPABILITIES.superviseCoaching !== undefined &&
+    Object.keys(CAPABILITIES).includes("manageMembers"),
+);
 
 console.log("\nThe legacy flag and the role cannot disagree\n");
 
@@ -125,8 +143,8 @@ check(
 /** The bypass is the named capability, and it is the *only* way past. */
 check("an admin reaches anybody", canCoachAccessMember(ADMIN, "u-sarah"));
 check(
-  "and only because of manageMembers, not rank",
-  can(ADMIN.role, "manageMembers") && !can(MODERATOR.role, "manageMembers"),
+  "and only because of superviseCoaching, not rank",
+  can(ADMIN.role, "superviseCoaching") && !can(MODERATOR.role, "superviseCoaching"),
 );
 
 /**

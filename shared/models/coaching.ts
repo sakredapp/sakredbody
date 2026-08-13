@@ -19,6 +19,7 @@ import {
   date,
   timestamp,
   index,
+  uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
@@ -463,6 +464,97 @@ export const insertCoachingMessageSchema = createInsertSchema(coachingMessages).
 
 export type CoachingMessage = typeof coachingMessages.$inferSelect;
 export type InsertCoachingMessage = z.infer<typeof insertCoachingMessageSchema>;
+
+// ─── What gets sent with a message ─────────────────────────────────────────
+
+/**
+ * A file in a coaching conversation — identified, not linked to.
+ *
+ * ── The thing this exists to stop ─────────────────────────────────────────
+ *
+ * `coaching_messages.image_url` held a permanent Supabase *public* URL. Anyone
+ * holding the link could retrieve a member's progress photo or lab result
+ * forever — no session, no authorization, no expiry. The only control was that
+ * the URL was hard to guess, which is not a control.
+ *
+ * So the row records *which object*, and a URL is minted per request after
+ * access has been checked. A signed URL is never persisted: it expires, so
+ * storing one makes the row wrong on a timer.
+ *
+ * ── And it is not called a photo ──────────────────────────────────────────
+ *
+ * The uploader has always accepted PDF, Word and text as well as images, while
+ * the message model had `message_type = 'photo'` and a column named
+ * `image_url`. A member's blood panel was being filed as a photograph. The mime
+ * type is recorded and believed instead.
+ */
+export const coachingAttachments = pgTable(
+  "coaching_attachments",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+
+    /**
+     * Null while staged.
+     *
+     * The file has to be authorized, stored and previewed *before* the sender
+     * presses send, or the preview is a promise about something that has not
+     * happened. The row is claimed by the message afterwards.
+     */
+    messageId: uuid("message_id"),
+
+    /**
+     * Whose conversation this is — always the member, never the coach.
+     *
+     * Denormalized on purpose: retrieval must answer "may you see this" for a
+     * staged row that has no message to join through. One indexed read, and it
+     * never depends on the link existing.
+     */
+    userId: varchar("user_id").notNull(),
+
+    /** Which human put it there. A different question from whose it is. */
+    uploadedByUserId: varchar("uploaded_by_user_id").notNull(),
+
+    storageBucket: text("storage_bucket").notNull(),
+    storagePath: text("storage_path").notNull(),
+
+    mimeType: text("mime_type").notNull(),
+    originalFilename: text("original_filename").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_coaching_attachment_object").on(t.storageBucket, t.storagePath),
+    index("idx_coaching_attachment_message").on(t.messageId),
+    index("idx_coaching_attachment_user").on(t.userId, t.createdAt),
+  ],
+);
+
+export type CoachingAttachment = typeof coachingAttachments.$inferSelect;
+
+/**
+ * What a client may say about a file it is sending.
+ *
+ * Almost nothing. The bucket, the path, the size and the uploader are the
+ * server's to decide — a client that could name its own storage path could
+ * name somebody else's.
+ */
+export const sendMessageSchema = z.object({
+  content: z.string().max(5000).default(""),
+  messageType: z.enum(["text", "progress_update"]).default("text"),
+  /**
+   * Attachments by id, already uploaded and already authorized.
+   *
+   * This replaces a client-supplied `imageUrl: z.string()`, which accepted any
+   * URL in the world and rendered it into the thread — so the field was both a
+   * privacy hole and a way to put arbitrary remote content on somebody else's
+   * screen.
+   */
+  attachmentIds: z.array(z.string().uuid()).max(10).default([]),
+  metadata: z.string().max(4000).optional(),
+}).refine((v) => v.content.trim().length > 0 || v.attachmentIds.length > 0, {
+  message: "Say something, or attach something.",
+});
 
 // ─── Who coaches whom ──────────────────────────────────────────────────────
 

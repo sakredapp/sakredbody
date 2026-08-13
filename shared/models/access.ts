@@ -84,8 +84,34 @@ export const CAPABILITIES = {
   reviewApplications: "moderator",
   /** Cohort rosters and schedules. */
   manageCohorts: "coach",
-  /** Members, tiers, partners, bookings. */
+  /** Members, tiers, partners, bookings. Accounts — not what is in them. */
   manageMembers: "admin",
+  /**
+   * Read a member's coaching data without being their coach.
+   *
+   * ── Why this is not `manageMembers` ──────────────────────────────────────
+   *
+   * It was, briefly, and the name was doing work it had not agreed to.
+   * `manageMembers` means accounts, tiers, partners and bookings: changing
+   * somebody's plan, fixing their timezone, assigning them a coach. Reading
+   * their sleep, their terrain, their habit adherence and their coach's
+   * private notes is a different authority that happens to be held by the same
+   * people today.
+   *
+   * "Happens to be held by the same people today" is exactly how the last hole
+   * opened — `atLeast(role, "coach")` was a true description of the platform
+   * when it was written, and stayed in the code after it stopped being one. A
+   * capability whose name does not describe what it grants cannot be audited,
+   * because reading the call site tells you nothing about what is being
+   * allowed.
+   *
+   * Same rank, so nothing changes about who can do this now. What changes is
+   * that moving it — a compliance officer who may read wellbeing data but must
+   * not touch billing, say — is one line here rather than an archaeology
+   * exercise across every route that said `manageMembers` and meant one of two
+   * different things.
+   */
+  superviseCoaching: "admin",
   /** Retreats, offerings, library, apothecary — anything the site publishes. */
   manageContent: "admin",
   /** Make someone else staff. */
