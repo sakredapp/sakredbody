@@ -17,12 +17,12 @@
  */
 
 import { and, eq } from "drizzle-orm";
-import { db } from "../db.js";
+import { db, type Tx } from "../db.js";
 import {
   terrainCheckins,
   type TerrainCheckinInput,
 } from "../../shared/models/terrainSignals.js";
-import { habitEvent } from "./log.js";
+import { habitEventOnCommit } from "./log.js";
 
 /**
  * Record how somebody is, for one day.
@@ -35,12 +35,24 @@ export async function saveCheckin(opts: {
   /** Already resolved to the member's own local date by the caller. */
   onDate: string;
   values: TerrainCheckinInput;
+  /**
+   * Supplied when saving is one step of a larger all-or-nothing change.
+   *
+   * Completing a coach's request is three writes — the answer, the request's
+   * completion, the coach's notification — and they are one fact. Without this
+   * they were three independent commits, and a failure between the first and
+   * second left Sarah's answer saved against a request still marked open: she
+   * would be asked the same question again, and Nick would never learn she had
+   * replied.
+   */
+  tx?: Tx;
 }) {
   // `onDate` is settled by the caller; taking it from the body here too would
   // give a client two ways to name a day and one of them would win.
   const { onDate: _fromBody, ...values } = opts.values;
 
-  const [row] = await db
+  const conn = opts.tx ?? db;
+  const [row] = await conn
     .insert(terrainCheckins)
     .values({ userId: opts.userId, onDate: opts.onDate, ...values })
     .onConflictDoUpdate({
@@ -50,8 +62,12 @@ export async function saveCheckin(opts: {
     .returning();
 
   // The date, never the answers. A 1/5 in a log line is health data in whatever
-  // aggregates the logs.
-  habitEvent("terrain.checkin", { subjectId: opts.userId, onDate: opts.onDate });
+  // aggregates the logs. Held until commit when this is part of a larger
+  // change, so a rolled-back completion does not announce itself.
+  habitEventOnCommit(opts.tx ?? null, "terrain.checkin", {
+    subjectId: opts.userId,
+    onDate: opts.onDate,
+  });
   return row;
 }
 

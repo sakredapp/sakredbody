@@ -18,7 +18,7 @@
 
 import type { Express, Request, Response } from "express";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { db } from "../db.js";
+import { db, transactionally } from "../db.js";
 import { users } from "../../shared/models/auth.js";
 import { terrainCheckins, terrainCheckinSchema } from "../../shared/models/terrainSignals.js";
 import {
@@ -30,7 +30,8 @@ import { isAuthenticated } from "../auth/sessionAuth.js";
 import { memberToday } from "./enrollment.js";
 import { activeRelationship } from "./relationships.js";
 import { saveCheckin } from "../habits/checkin.js";
-import { habitEvent, habitDenied } from "../habits/log.js";
+import { habitEvent, habitEventOnCommit, habitDenied } from "../habits/log.js";
+import { notify } from "../notifications/create.js";
 
 /** A path segment, never trusted as anything but an opaque id. */
 function param(v: unknown): string {
@@ -151,27 +152,46 @@ export function registerCheckinRequestRoutes(app: Express): void {
       const dueOn = parsed.data.dueOn && parsed.data.dueOn >= memberDate ? parsed.data.dueOn : null;
 
       try {
-        const [row] = await db
-          .insert(coachingCheckinRequests)
-          .values({
-            memberUserId: memberId,
-            coachUserId: actorId,
-            relationshipId: rel?.id ?? null,
-            // From the session. A coach id in a request body is a coach id
-            // somebody chose.
-            requestedByUserId: actorId,
-            kind: parsed.data.kind,
-            coachPrompt: parsed.data.coachPrompt?.trim() || null,
-            dueOn,
-          })
-          .returning();
+        /**
+         * The question and the member learning about it are one fact.
+         *
+         * A request that commits without its notification is a question asked
+         * into a void — it would sit open on the coach's screen while the
+         * member's Today shows a card they were never told to look for.
+         */
+        const row = await transactionally(async (tx) => {
+          const [created] = await tx
+            .insert(coachingCheckinRequests)
+            .values({
+              memberUserId: memberId,
+              coachUserId: actorId,
+              relationshipId: rel?.id ?? null,
+              // From the session. A coach id in a request body is a coach id
+              // somebody chose.
+              requestedByUserId: actorId,
+              kind: parsed.data.kind,
+              coachPrompt: parsed.data.coachPrompt?.trim() || null,
+              dueOn,
+            })
+            .returning();
 
-        habitEvent("checkin.requested", {
-          subjectId: memberId,
-          actorId,
-          requestId: row.id,
-          kind: row.kind,
+          await notify(tx, {
+            recipientId: memberId,
+            type: "coaching.checkin_requested",
+            actorId,
+            resourceType: "coaching_checkin_request",
+            resourceId: created.id,
+          });
+
+          habitEventOnCommit(tx, "checkin.requested", {
+            subjectId: memberId,
+            actorId,
+            requestId: created.id,
+            kind: created.kind,
+          });
+          return created;
         });
+
         return res.status(201).json(row);
       } catch (err) {
         /**
@@ -311,34 +331,65 @@ export function registerCheckinRequestRoutes(app: Express): void {
       return res.status(400).json({ message: "That day hasn't happened yet." });
     }
 
-    const checkin = await saveCheckin({ userId, onDate, values: parsed.data });
+    /**
+     * Three writes, one fact.
+     *
+     * The answer, the request's completion, and the coach learning she replied.
+     * These used to be three independent commits, which meant a failure between
+     * the first and second saved her answer against a request still marked open
+     * — she would be asked the same question again tomorrow, and Nick would
+     * never learn she had replied to the first one.
+     */
+    const row = await transactionally(async (tx) => {
+      const checkin = await saveCheckin({ userId, onDate, values: parsed.data, tx });
 
-    const [row] = await db
-      .update(coachingCheckinRequests)
-      .set({
-        status: "completed",
-        completedAt: new Date(),
-        // A pointer to her canonical row. Nothing is copied out of it, so a
-        // revision at 6pm is simply what this now points at.
-        checkinId: checkin.id,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(coachingCheckinRequests.id, request.id),
-          eq(coachingCheckinRequests.status, "open"),
-        ),
-      )
-      .returning();
+      const [updated] = await tx
+        .update(coachingCheckinRequests)
+        .set({
+          status: "completed",
+          completedAt: new Date(),
+          // A pointer to her canonical row. Nothing is copied out of it, so a
+          // revision at 6pm is simply what this now points at.
+          checkinId: checkin.id,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(coachingCheckinRequests.id, request.id),
+            eq(coachingCheckinRequests.status, "open"),
+          ),
+        )
+        .returning();
+
+      if (!updated) return null;
+
+      /**
+       * The coach who asked, not whoever coaches her now.
+       *
+       * He asked the question; the answer is to him. If she has since been
+       * reassigned this request would already have been cancelled by the
+       * reassignment sweep, so reaching here means the relationship still
+       * stands — and reading the current coach instead would send Gerard an
+       * answer to a question he never asked.
+       */
+      await notify(tx, {
+        recipientId: updated.coachUserId,
+        type: "coaching.checkin_completed",
+        actorId: userId,
+        resourceType: "coaching_checkin_request",
+        resourceId: updated.id,
+      });
+
+      habitEventOnCommit(tx, "checkin.completed", {
+        subjectId: userId,
+        requestId: updated.id,
+        // Who asked, so the loop is traceable. Never what she said.
+        coachUserId: updated.coachUserId,
+      });
+      return updated;
+    });
 
     if (!row) return res.status(409).json({ message: "That request was already answered." });
-
-    habitEvent("checkin.completed", {
-      subjectId: userId,
-      requestId: row.id,
-      // Who asked, so the loop is traceable. Never what she said.
-      coachUserId: row.coachUserId,
-    });
     res.json((await withAnswer([row]))[0]);
   });
 }

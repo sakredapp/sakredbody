@@ -9,6 +9,7 @@ import { securityHeaders } from "./security/headers.js";
 import { cors } from "./security/cors.js";
 import { bearerAuth } from "./auth/bearerAuth.js";
 import { registerNotificationRoutes } from "./notifications/routes.js";
+import { registerNotificationInboxRoutes } from "./notifications/inbox.js";
 import { registerSupportRoutes } from "./support/routes.js";
 import { registerApplicationRoutes } from "./applications/routes.js";
 import { registerRetreatAdminRoutes } from "./retreats/routes.js";
@@ -79,6 +80,7 @@ app.use((req, res, next) => {
   app.use(bearerAuth);
   registerAuthRoutes(app);
   registerNotificationRoutes(app);
+  registerNotificationInboxRoutes(app);
   registerSupportRoutes(app);
   // The back office for the three things that had tables but no routes:
   // the intake inbox, retreats, and masterminds.

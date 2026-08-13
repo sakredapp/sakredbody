@@ -52,6 +52,7 @@ import { addTrackedHabit, reconfigure, completePhase, ContractError } from "../h
 import { terrainFor } from "../terrain/read.js";
 import { memberToday } from "./enrollment.js";
 import { habitEventOnCommit } from "../habits/log.js";
+import { notify } from "../notifications/create.js";
 
 /** The catalogue rows a review needs, for the habits a plan names. */
 async function catalogueFor(routineHabitIds: string[]): Promise<ReviewHabit[]> {
@@ -351,6 +352,28 @@ export async function activatePlan(opts: {
         updatedAt: new Date(),
       })
       .where(eq(coachingPlans.id, plan.id));
+
+    /**
+     * The member learns their plan changed, in the same transaction.
+     *
+     * So a rolled-back activation cannot notify — not because a handler
+     * remembered to check, but because the row would roll back with everything
+     * else. Draft saves reach none of this; only activation does.
+     *
+     * The name is the plan's coach only when the plan's coach is the one
+     * activating it. An admin intervening under `superviseCoaching` gets the
+     * impersonal sentence: telling Sarah that Nick updated her plan when Nick
+     * did not is the same lie the plan tables refuse to store, and a
+     * notification is no place to start telling it.
+     */
+    await notify(tx, {
+      recipientId: plan.memberUserId,
+      type: "coaching.plan_activated",
+      actorId,
+      resourceType: "coaching_plan",
+      resourceId: plan.id,
+      ...(actorId === plan.coachUserId ? {} : { nameOverride: "" }),
+    });
 
     // Held, not emitted. It publishes with everything else the activation
     // earned, once — and only if the whole transition survived.

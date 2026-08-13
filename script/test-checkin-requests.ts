@@ -411,7 +411,7 @@ console.log("\nThe doorway says what is behind it\n");
   const dash = code("client/src/pages/MemberDashboard.tsx");
   check(
     "the Coach tab appears only with a live relationship",
-    /hasCoach \? \[\{ id: "coach" as const, label: "Coach" \}\] : \[\]/.test(dash),
+    /hasCoach\s*\?\s*\[\{ id: "coach" as const, label: [^\]]*\}\]\s*:\s*\[\]/.test(dash),
   );
   check(
     "and a member sitting on it when it ends is moved, not stranded",

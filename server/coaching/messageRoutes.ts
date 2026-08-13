@@ -30,7 +30,7 @@
 import type { Express, Request, Response } from "express";
 import multer from "multer";
 import { and, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
-import { db } from "../db.js";
+import { db, transactionally } from "../db.js";
 import { isAuthenticated } from "../auth/index.js";
 import { zodMessage } from "../../shared/utils/zodMessage.js";
 import { users } from "../../shared/models/auth.js";
@@ -40,6 +40,8 @@ import {
   sendMessageSchema,
 } from "../../shared/models/coaching.js";
 import { conversationAccess, requireConversation, senderRoleFor } from "./conversation.js";
+import { coachOf } from "./relationships.js";
+import { notify, markResourceSeen } from "../notifications/create.js";
 import {
   ALLOWED_ATTACHMENT_TYPES,
   MAX_ATTACHMENT_BYTES,
@@ -161,7 +163,7 @@ async function sendInto(req: Request, res: Response) {
   const { content, messageType, attachmentIds, metadata } = parsed.data;
 
   try {
-    const message = await db.transaction(async (tx) => {
+    const message = await transactionally(async (tx) => {
       const [msg] = await tx
         .insert(coachingMessages)
         .values({
@@ -196,6 +198,35 @@ async function sendInto(req: Request, res: Response) {
           );
       }
 
+      /**
+       * The other person, resolved here from canonical state.
+       *
+       * Not from who else is in the thread — a former coach is in the thread
+       * and must not be notified — and not from rank. Coach writes, the member
+       * hears; member writes, the coach who is currently theirs hears. When
+       * nobody is coaching them, a member's message notifies no one, which is
+       * correct: there is no one waiting for it.
+       */
+      const coach = await coachOf(memberUserId);
+      const recipientId = actorId === memberUserId ? (coach?.coachUserId ?? null) : memberUserId;
+
+      if (recipientId) {
+        await notify(tx, {
+          recipientId,
+          type: "coaching.message",
+          actorId,
+          resourceType: "coaching_message",
+          resourceId: msg.id,
+          /*
+            An admin reading a thread under superviseCoaching is not the
+            member's coach, and their name on a notification would tell the
+            member somebody they have no relationship with is in their
+            conversation. The impersonal sentence is the honest one.
+          */
+          ...(access === "admin" ? { nameOverride: "" } : {}),
+        });
+      }
+
       return msg;
     });
 
@@ -222,7 +253,7 @@ async function markRead(req: Request, res: Response) {
   // A member reads what their coach wrote; a coach reads what the member wrote.
   const theirs = access === "self" ? "coach" : "member";
   try {
-    await db
+    const read = await db
       .update(coachingMessages)
       .set({ readAt: new Date() })
       .where(
@@ -231,7 +262,29 @@ async function markRead(req: Request, res: Response) {
           eq(coachingMessages.senderRole, theirs),
           sql`${coachingMessages.readAt} is null`,
         ),
-      );
+      )
+      .returning({ id: coachingMessages.id });
+
+    /**
+     * The two unread systems, reconciled here and only here.
+     *
+     * `coaching_messages.read_at` answers "has this message been seen" and is
+     * the older, authoritative one for the thread. A notification answers "has
+     * this event been acknowledged". They are genuinely different questions and
+     * both are worth having — but a member who opens Nick's conversation and
+     * reads everything must not be left with a badge insisting there is one
+     * unread message, forever, because two systems never spoke.
+     *
+     * So opening the conversation settles both. Deliberately not the reverse:
+     * dismissing a badge should not mark a message read, because the member has
+     * not read it.
+     */
+    await markResourceSeen({
+      userId: req.session!.userId!,
+      type: "coaching.message",
+      resourceIds: read.map((m) => m.id),
+    });
+
     res.json({ ok: true });
   } catch (err) {
     fail(res, "mark read", err);

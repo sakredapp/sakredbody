@@ -72,6 +72,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useEffect } from "react";
 import { useHasCoach } from "@/hooks/use-coaching";
+import { useUnreadCoachMessages } from "@/hooks/use-notifications";
 import { scheduleMorningNotice } from "@/lib/morningNotice";
 import { updateWidget } from "@/lib/widget";
 
@@ -195,6 +196,7 @@ export default function MemberDashboard() {
   const [retreatView, setRetreatView] = useState<"book" | "services" | "my-bookings" | "masterminds">("masterminds");
   const [coachingTab, setCoachingTab] = useState<CoachingTab>("today");
   const hasCoach = useHasCoach();
+  const unreadCoach = useUnreadCoachMessages();
 
   /**
    * Never stranded on a tab that stopped existing.
@@ -535,7 +537,16 @@ export default function MemberDashboard() {
             { id: "today", label: "Today" },
             { id: "routines", label: "Routines" },
             { id: "catalog", label: "Habits" },
-            ...(hasCoach ? [{ id: "coach" as const, label: "Coach" }] : []),
+            /*
+              The count comes from unread coaching.message notifications, not
+              from a second unread system — opening the conversation settles
+              both, so this cannot sit at 1 over a thread with nothing new in
+              it. Messages only: "Coach · 1" beside a plan activation would send
+              somebody to a conversation to find nothing there.
+            */
+            ...(hasCoach
+              ? [{ id: "coach" as const, label: unreadCoach > 0 ? `Coach · ${unreadCoach}` : "Coach" }]
+              : []),
           ]}
         />
       )}

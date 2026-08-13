@@ -55,6 +55,7 @@ const initPromise = (async () => {
     const { bearerAuth } = await import("../server/auth/bearerAuth.js");
     const { registerRoutes } = await import("../server/routes.js");
     const { registerNotificationRoutes } = await import("../server/notifications/routes.js");
+    const { registerNotificationInboxRoutes } = await import("../server/notifications/inbox.js");
     const { registerSupportRoutes } = await import("../server/support/routes.js");
     const { registerApplicationRoutes } = await import("../server/applications/routes.js");
     const { registerRetreatAdminRoutes } = await import("../server/retreats/routes.js");
@@ -66,6 +67,7 @@ const initPromise = (async () => {
     app.use(bearerAuth);
     registerAuthRoutes(app);
     registerNotificationRoutes(app);
+    registerNotificationInboxRoutes(app);
     registerSupportRoutes(app);
     // This file is the production entry point, not server/index.ts — that one
     // only runs locally. A route module registered there and not here builds,

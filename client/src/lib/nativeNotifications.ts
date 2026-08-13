@@ -1,7 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { FirebaseMessaging } from "@capacitor-firebase/messaging";
-import { apiUrl } from "./apiBase";
+import { apiFetch } from "./apiFetch";
 
 /**
  * Notifications for the iOS/Android shells.
@@ -23,6 +23,30 @@ import { apiUrl } from "./apiBase";
 
 export const isNative = () => Capacitor.isNativePlatform();
 
+/**
+ * Remote push is not enabled, and asking for permission would be dishonest.
+ *
+ * ── What is missing, precisely ────────────────────────────────────────────
+ *
+ *   · No Firebase server credentials — nothing can send.
+ *   · iOS ships `aps-environment: development`, so no TestFlight or App Store
+ *     build would receive a push even if something could send one.
+ *   · No delivery adapter on the server.
+ *   · No notification-tap handling in either shell, so a tap can only
+ *     cold-open the app.
+ *
+ * iOS lets an app ask exactly once, ever. Spending that on a prompt that
+ * cannot be honoured — "Allow Sakred to send notifications?" followed by
+ * nothing, forever — costs the permission and the member's trust in the same
+ * moment, and it cannot be taken back.
+ *
+ * The registration path below is built and correct so that flipping this is a
+ * one-line change once delivery genuinely exists. Until then the durable
+ * notifications the server writes are the truth, and members see them when
+ * they open Sakred.
+ */
+export const PUSH_DELIVERY_ENABLED = false;
+
 /** Stable id so re-scheduling replaces the reminder rather than stacking them. */
 const DAILY_RITUAL_ID = 1;
 
@@ -36,6 +60,9 @@ const DAILY_RITUAL_ID = 1;
  */
 export async function initNativeNotifications(): Promise<string | null> {
   if (!isNative()) return null;
+  // Deliberate. See PUSH_DELIVERY_ENABLED — do not remove this to "turn
+  // notifications on"; there is nothing on the other end yet.
+  if (!PUSH_DELIVERY_ENABLED) return null;
 
   // Local and remote permissions are separate grants on iOS; Android 13+
   // funnels both through the single POST_NOTIFICATIONS runtime permission.
@@ -70,20 +97,62 @@ export async function initNativeNotifications(): Promise<string | null> {
 /**
  * Hand the token to the server so it can be stored against the member.
  *
- * NOTE: POST /api/notifications/token does not exist yet — see the note in
- * this file's PR. It needs to upsert (user_id, token, platform) and must be
- * keyed on the token, since one member can hold several devices.
+ * ── Why this must be `apiFetch` and not `fetch` ───────────────────────────
+ *
+ * It used to be a bare `fetch(apiUrl(...))`, which looked fine and could never
+ * have worked. Native builds authenticate with a bearer token — the session
+ * cookie cannot ride cross-site from `capacitor://localhost`, and WebKit drops
+ * it regardless — and the global fetch patch that adds that header only touches
+ * *relative* `/api/...` paths. `apiUrl()` had already made this one absolute,
+ * so it sailed past the patch and arrived at an `isAuthenticated` route with no
+ * credentials at all. Every registration would have 401'd, inside a catch that
+ * said nothing.
+ *
+ * The endpoint upserts on the token, so several devices per member is the
+ * normal case and a resold phone re-points to whoever is signed in now.
  */
 async function registerPushToken(token: string): Promise<void> {
   try {
-    await fetch(apiUrl("/api/notifications/token"), {
+    const res = await apiFetch("/api/notifications/token", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token, platform: Capacitor.getPlatform() }),
     });
+    // Status only, never the token — a push token in a log is a way to send a
+    // member notifications. A silent failure here is a device that quietly
+    // never receives anything, which is exactly the bug that hid for months.
+    if (!res.ok) console.warn(`push registration failed: ${res.status}`);
   } catch {
     // Offline at launch is normal. The tokenReceived listener re-fires on the
     // next rotation, and login re-runs init, so this self-heals.
+  }
+}
+
+/**
+ * Detach this device on sign-out.
+ *
+ * Without it a shared or resold phone keeps a token pointed at whoever signed
+ * in last, and the next person's coach messages arrive on it. That is the one
+ * notification failure that is a privacy incident rather than an inconvenience,
+ * and the server route for it has existed with nothing calling it.
+ *
+ * Called before the bearer token is cleared, because the route is
+ * authenticated — after, and it silently 401s.
+ */
+export async function unregisterPushToken(): Promise<void> {
+  if (!isNative()) return;
+  try {
+    const { token } = await FirebaseMessaging.getToken();
+    if (!token) return;
+    const res = await apiFetch("/api/notifications/token", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+    if (!res.ok) console.warn(`push unregistration failed: ${res.status}`);
+  } catch {
+    // No token to remove, or offline. The server also re-points a token to
+    // whoever registers it next, so this is a belt to that brace.
   }
 }
 
