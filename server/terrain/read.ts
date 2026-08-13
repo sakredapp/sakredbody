@@ -37,7 +37,7 @@ import { healthDays, healthWorkouts, workoutSessions } from "../../shared/schema
 import { readTerrain, composeTerrainNow, terrainHeadline } from "../../shared/models/terrain.js";
 import { terrainCheckins } from "../../shared/models/terrainSignals.js";
 import { DEMANDING_EXTERNAL_TYPES, categoryOrientation } from "../../shared/models/training.js";
-import { recentMovement } from "../movement/history.js";
+import { movementEvents, recentMovement } from "../movement/history.js";
 import { addDaysToString } from "../../shared/utils/dates.js";
 
 /** Matches healthSignals: enough for a baseline, recent enough to be "lately". */
@@ -233,5 +233,33 @@ export async function terrainFor(userId: string, onDate: string) {
     source: m.source,
   }));
 
-  return { ...reading, headline: terrainHeadline(reading), movement, onDate };
+  /**
+   * What actually happened, as distinct from what the reading reasoned over.
+   *
+   * `movement` above is the (day, category) projection the load model uses —
+   * correct for terrain, wrong as a diary, because two workouts sharing a
+   * category collapse into one and only one of their names survives. A screen
+   * showing somebody their week needs the events themselves.
+   *
+   * A separate field rather than a changed meaning for `movement`: the reduced
+   * shape has callers that want exactly what it is, and quietly widening it
+   * would make every one of them a guess.
+   */
+  const events = await movementEvents(userId, addDaysToString(onDate, -RECENT_DAYS));
+  const movementEventList = events.map((e) => ({
+    id: e.id,
+    onDate: e.onDate,
+    category: e.category,
+    activity: e.activity,
+    orientation: categoryOrientation(e.category),
+    source: e.source,
+  }));
+
+  return {
+    ...reading,
+    headline: terrainHeadline(reading),
+    movement,
+    movementEvents: movementEventList,
+    onDate,
+  };
 }
