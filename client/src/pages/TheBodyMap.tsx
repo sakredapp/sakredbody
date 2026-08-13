@@ -49,6 +49,7 @@ import { cn } from "@/lib/utils";
 import { MAP_REGIONS } from "@/data/bodyMap";
 import { EMBODIED_PRACTICE } from "@/data/territories";
 import { usePageMeta } from "@/hooks/use-page-meta";
+import { usePrefersReducedMotion } from "@/hooks/use-reduced-motion";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 26 },
@@ -136,6 +137,7 @@ export default function TheBodyMap() {
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   /** While the keyboard is in the selector, the figure stops cycling. */
   const [tabFocus, setTabFocus] = useState(false);
+  const reduced = usePrefersReducedMotion();
 
   /** Standard tablist keyboard behaviour: move focus and select together. */
   const onTabKey = (e: React.KeyboardEvent, i: number) => {
@@ -186,7 +188,14 @@ export default function TheBodyMap() {
             <SectionHeader
               eyebrow="One Body, Many Lenses"
               title={<>Different cultures. Different lenses. <span className="text-gold">One human body.</span></>}
-              intro="No single tradition owns the human body. Touch a region on the figure, choose one below it, or let it move on its own."
+              /* The figure does not cycle under reduced motion, so the line
+                 promising it does is only true for some visitors. The
+                 normal-motion version keeps its full sentence. */
+              intro={
+                reduced
+                  ? "No single tradition owns the human body. Explore the seven territories below the figure."
+                  : "No single tradition owns the human body. Touch a region on the figure, choose one below it, or let it move on its own."
+              }
               testId="text-figure-headline"
             />
           </motion.div>

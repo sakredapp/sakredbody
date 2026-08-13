@@ -49,7 +49,7 @@ import { hash01, mountStage } from "@/lib/canvasStage";
  * kept, repainting a single composed frame each time the region changes.
  */
 
-interface Star {
+export interface Star {
   /** Normalised to a 100 × 200 figure, origin at the top of the head. */
   x: number;
   y: number;
@@ -58,8 +58,15 @@ interface Star {
   region: string;
 }
 
-/** The figure. Anchors first, then the chain that strings them. */
-const STARS: Star[] = [
+/**
+ * The figure. Anchors first, then the chain that strings them.
+ *
+ * Exported because SignalChain draws it faintly behind the reading. The body
+ * is what the reading is *about*, and a diagram whose centre is a glowing box
+ * says the algorithm is. One definition, so the two can never be different
+ * bodies.
+ */
+export const STARS: Star[] = [
   // Head and throat
   { x: 50, y: 8, mag: 1.6, region: "crown" },
   { x: 44, y: 14, mag: 0.8, region: "crown" },
@@ -102,7 +109,7 @@ const STARS: Star[] = [
 ];
 
 /** The fascia. Indices into STARS — one continuous web, not a skeleton. */
-const FASCIA: [number, number][] = [
+export const FASCIA: [number, number][] = [
   [0, 1], [0, 2], [1, 3], [2, 3],
   [3, 4], [3, 5], [3, 10],
   [4, 6], [6, 8], [5, 7], [7, 9],
