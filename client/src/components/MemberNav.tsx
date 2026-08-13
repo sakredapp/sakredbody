@@ -130,7 +130,24 @@ export const SECONDARY: Destination[] = [
    * "Today" tab; what it actually contains is whatever a coach has assigned,
    * which most members do not have.
    */
-  { id: "coaching", label: "Coach's Plan", icon: Sun, note: "What your coach has you on" },
+  /*
+    "Your Plan", not "Coach's Plan", and not "Coaching".
+
+    The gate is an active `coaching_plan`, and a plan can outlive the coaching
+    relationship that produced it — its habit contracts are still governing the
+    member's day. "Coaching" would therefore be a lie in exactly the case the
+    gates were drawn to protect, and "Coach's Plan" quietly implies a coach is
+    still there. It is the member's current practice either way.
+
+    The attribution is not lost, it moves inside: the plan itself names the human
+    who wrote it, where that is historically accurate, rather than the doorway
+    depending on who authored it.
+
+    The `id` stays `coaching` because it addresses an existing section. It is an
+    address, not a claim — nothing may gate this destination on a coaching
+    relationship. See `useSecondary`.
+  */
+  { id: "coaching", label: "Your Plan", icon: Sun, note: "What you're working on now" },
   { id: "retreat", label: "What's On", icon: CalendarDays, note: "Retreats, masterminds and talks" },
   /**
    * "The Body", and not "Terrain".

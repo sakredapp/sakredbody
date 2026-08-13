@@ -130,8 +130,8 @@ interface Pillar {
 const PILLARS: Pillar[] = [
   {
     key: "protocol",
-    title: "Coach's Plan",
-    blurb: "What your coach has you on.",
+    title: "Your Plan",
+    blurb: "What you're working on now.",
     image: "/images/rugged-cliffs.webp",
     section: "coaching",
     /*

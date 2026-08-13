@@ -165,6 +165,21 @@ export function TodayBody({ onOpenTrends }: { onOpenTrends?: () => void }) {
 
   return (
     <div className="space-y-5">
+      {/*
+        What is being asked of this person, first.
+
+        The nav calls this destination "Your Plan", so a member who came through
+        that door has to land on the plan rather than scroll past four metric
+        tiles to find it. Below these, the same page still answers what the body
+        actually did — which is the context the plan is held against, not a
+        replacement for it.
+
+        Both render nothing at all when there is no plan and no open request,
+        which is most people. Their Today is unchanged.
+      */}
+      <CoachPlanCard terrainLean={terrain?.lean ?? null} />
+      <CheckinRequestCard />
+
       {present.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-baseline justify-between gap-3">
@@ -193,26 +208,6 @@ export function TodayBody({ onOpenTrends }: { onOpenTrends?: () => void }) {
 
       <TodaysMovement workouts={workouts} />
       <TerrainNow />
-
-      {/*
-        The plan, and the tension with it.
-
-        Placed under the live reading on purpose: the coach's instruction and the
-        body's answer belong on one screen, next to each other, so the member is
-        the one holding both rather than being handed whichever the app decided
-        was more important. Renders nothing when there is no plan.
-      */}
-      <CoachPlanCard terrainLean={terrain?.lean ?? null} />
-
-      {/*
-        A question their coach asked, if there is one.
-
-        Here rather than in a navigation tab because it is an action relevant
-        now, and it disappears the moment it is answered or withdrawn. It renders
-        nothing when there is no open request — including for the large majority
-        of members who have no coach at all.
-      */}
-      <CheckinRequestCard />
 
       <MetricDetail metric={open} days={days} onClose={() => setOpen(null)} />
     </div>

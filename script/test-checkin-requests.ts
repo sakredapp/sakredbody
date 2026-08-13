@@ -377,5 +377,71 @@ console.log("\nOne answer to 'does this member have a plan'\n");
   );
 }
 
+console.log("\nThe doorway says what is behind it\n");
+
+/**
+ * ── Five states, and none of them is a dead-state card ────────────────────
+ *
+ *   coach + plan        Coach available · Your Plan available
+ *   coach + no plan     Coach available · Your Plan absent
+ *   no coach + plan     Coach absent    · Your Plan available
+ *   neither             both absent
+ *   self-enrolled only  Routines reflects it · Your Plan still absent
+ *
+ * The third row is the one that decides the naming. A plan can outlive the
+ * relationship that produced it — its habit contracts are still governing the
+ * member's day — so a destination called "Coaching" would be false exactly
+ * where these gates were drawn to protect. It is the member's practice either
+ * way, and the attribution lives inside the plan instead of in the doorway.
+ */
+{
+  const nav = code("client/src/components/MemberNav.tsx");
+  check(
+    "the plan destination is named for the member's practice",
+    /label: "Your Plan"/.test(nav),
+  );
+  check("not for a relationship it does not require", !/label: "Coaching"/.test(nav));
+  check(
+    "and it is gated on the plan, not on having a coach",
+    /hasPlan \? SECONDARY/.test(nav) && !/useHasCoach\b/.test(nav),
+    "the plan door depends on a coach — it would vanish while its habits are live",
+  );
+
+  /** Coach stays relationship-driven, and only that. */
+  const dash = code("client/src/pages/MemberDashboard.tsx");
+  check(
+    "the Coach tab appears only with a live relationship",
+    /hasCoach \? \[\{ id: "coach" as const, label: "Coach" \}\] : \[\]/.test(dash),
+  );
+  check(
+    "and a member sitting on it when it ends is moved, not stranded",
+    /if \(!hasCoach && coachingTab === "coach"\) setCoachingTab\("today"\)/.test(dash),
+  );
+  check("the destination opens on the plan's own tab", /useState<CoachingTab>\("today"\)/.test(dash));
+
+  /** Routines is self-enrollment and is never gated on, or by, a plan. */
+  check(
+    "Routines is offered regardless of any plan",
+    /\{ id: "routines", label: "Routines" \}/.test(dash),
+  );
+  const home = code("client/src/components/PillarHome.tsx");
+  check("and the plan door does not open the routine catalogue", !/tab: "routines"/.test(home));
+
+  /** The plan leads the page the plan door opens. */
+  const today = code("client/src/components/portal/TodayBody.tsx");
+  const planAt = today.indexOf("<CoachPlanCard");
+  const tilesAt = today.indexOf("<Tile key=");
+  const terrainAt = today.indexOf("<TerrainNow />");
+  check("the plan card is on the page at all", planAt > 0);
+  check("above the body's own record", planAt < tilesAt, `${planAt} vs ${tilesAt}`);
+  check("and above the live reading", planAt < terrainAt, `${planAt} vs ${terrainAt}`);
+  check("the requested check-in is up there with it", today.indexOf("<CheckinRequestCard />") < tilesAt);
+
+  /** Attribution moved inside the plan rather than being lost. */
+  const card = code("client/src/components/portal/CoachPlanCard.tsx");
+  check("the plan still names the human who wrote it", /coachName/.test(card));
+  check("under a heading that says whose it is", /Coach's plan/.test(card));
+}
+
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);
