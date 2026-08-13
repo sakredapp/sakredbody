@@ -13,9 +13,12 @@
     <color name="sakredInk">#1C1A17</color>
     <!--
         The tint behind the status-bar mark, and the accent Android draws on the
-        expanded notification. hsl(39 48% 56%) — the `--gold` token in
+        expanded notification. hsl(39 48% 56%) is the gold token in
         client/src/index.css, so the tray matches the app it came from rather
         than falling back to the system accent, which on most devices is blue.
+
+        (Written without a double hyphen on purpose: XML forbids one inside a
+        comment, and naming the CSS variable literally fails the resource merge.)
     -->
     <color name="sakredNotification">#C59F59</color>
 </resources>
