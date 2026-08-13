@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { TOTAL_FOODS } from "@/data/foodCount";
 import { TERRITORIES } from "@/data/territories";
+import { MAP_REGIONS } from "@/data/bodyMap";
 import { responsive, SIZES_FULL_BLEED } from "@/lib/img";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
@@ -112,8 +113,13 @@ const PORTAL_LAYERS = [
     body: "Guides and ebooks paired to the protocol you're running, in a reader that hands you back to the practice at the last chapter.",
   },
   {
-    title: "The Body Map",
-    body: "Nine energy centres — the body read as regions and flows rather than organs and labs. Readings are kept in sequence, so your coach sees movement instead of a snapshot.",
+    /* Renamed from "The Body Map". That name now belongs to the public page
+       at /the-body-map, which is the whole worldview; the nine centres are one
+       lens inside it, not the map itself. The in-app label still reads "The
+       Body" — MemberNav and components/BodyMap.tsx are the portal session's
+       files, so the rename there is theirs to make. */
+    title: "The Nine Centres",
+    body: "Energy centres — the body read as regions and flows rather than organs and labs. Readings are kept in sequence, so your coach sees movement instead of a snapshot.",
   },
   {
     title: "Masterminds",
@@ -284,6 +290,50 @@ export default function Home() {
             <Link href="/philosophy">
               <Button variant="outline" className="border-gold-subtle text-gold" data-testid="button-philosophy-page">
                 Read the Full Philosophy <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </motion.div>
+        </motion.div>
+      </Section>
+
+      {/* ── The Body Map ─────────────────────────────────────
+          A door, not a second philosophy section. Home stays clean; the
+          explanation lives on the page this links to.
+
+          Deliberately no ConstellationBody here. The figure is already the
+          hero of this page, forty lines up — running the site's signature
+          animation twice on one screen would spend it. What this section
+          shows instead is the thing the hero cannot: the breadth. Seven
+          regions with the traditions that studied each one, which is new
+          information rather than the figure restated. */}
+      <Section tone="raised" width="max-w-4xl">
+        <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
+          <motion.div variants={fadeInUp}>
+            <SectionHeader
+              eyebrow="The Body Map"
+              title={<>Many traditions. <span className="text-gold">One living system.</span></>}
+              intro="Across cultures and centuries, people studied breath, digestion, organs, movement, plants, strength and recovery. Sakred brings those perspectives into conversation around the thing they were all looking at."
+              testId="text-bodymap-teaser"
+            />
+          </motion.div>
+
+          <motion.ul variants={fadeInUp} className="divide-y divide-border/60 border-y border-border/60">
+            {MAP_REGIONS.map((r) => (
+              <li
+                key={r.key}
+                className="py-4 flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1"
+                data-testid={`teaser-region-${r.key}`}
+              >
+                <span className="font-display text-xl">{r.name}</span>
+                <span className="text-xs text-muted-foreground sm:text-right">{r.traditions}</span>
+              </li>
+            ))}
+          </motion.ul>
+
+          <motion.div variants={fadeInUp} className="text-center mt-9">
+            <Link href="/the-body-map">
+              <Button variant="outline" className="border-gold-subtle text-gold" data-testid="button-body-map">
+                Explore the Body Map <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
           </motion.div>

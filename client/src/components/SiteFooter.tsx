@@ -18,8 +18,7 @@ const PATH_LINKS = [
 /** Worldview pages. */
 const PHILOSOPHY_LINKS = [
   { label: "What Is a Sakred Body?", href: "/philosophy" },
-  { label: "The Terrain", href: "/the-terrain" },
-  { label: "Body Literacy", href: "/body-literacy" },
+  { label: "The Body Map", href: "/the-body-map" },
 ];
 
 /** Product + tools. */

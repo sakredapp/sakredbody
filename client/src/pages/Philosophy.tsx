@@ -258,7 +258,7 @@ export default function Philosophy() {
             Everything else is built on it. If you only read one more page, read this one.
           </motion.p>
           <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/the-terrain">
+            <Link href="/the-body-map">
               <Button size="lg" className="gold-metallic-btn px-8 w-full sm:w-auto" data-testid="button-terrain">
                 Understand the Terrain <ArrowRight className="ml-2 h-5 w-5" />
               </Button>

@@ -12,8 +12,7 @@ import Home from "@/pages/Home";
 const Philosophy = lazyRoute("Philosophy", () => import("@/pages/Philosophy"));
 const Restore = lazyRoute("Restore", () => import("@/pages/Restore"));
 const Build = lazyRoute("Build", () => import("@/pages/Build"));
-const Terrain = lazyRoute("Terrain", () => import("@/pages/Terrain"));
-const BodyLiteracy = lazyRoute("BodyLiteracy", () => import("@/pages/BodyLiteracy"));
+const TheBodyMap = lazyRoute("TheBodyMap", () => import("@/pages/TheBodyMap"));
 const Retreats = lazyRoute("Retreats", () => import("@/pages/Retreats"));
 const Executive = lazyRoute("Executive", () => import("@/pages/Executive"));
 const FoodChart = lazyRoute("FoodChart", () => import("@/pages/FoodChart"));
@@ -72,8 +71,7 @@ const MARKETING_PATHS: [string, React.ComponentType][] = [
   ["/philosophy", Philosophy],
   ["/restore", Restore],
   ["/build", Build],
-  ["/the-terrain", Terrain],
-  ["/body-literacy", BodyLiteracy],
+  ["/the-body-map", TheBodyMap],
   ["/retreats", Retreats],
   ["/executive", Executive],
   ["/food-chart", FoodChart],
@@ -100,11 +98,20 @@ function Router() {
           {() => (isAppHost ? <Redirect to="/member" /> : <Page />)}
         </Route>
       ))}
-      {/* Embodiment is what living the system produces, not a destination.
-          The page retired into Body Literacy, which teaches the same thing —
-          reading your own state and choosing a direction. Redirected rather
-          than dropped: it sat in the primary nav for months. */}
-      <Route path="/embody">{() => <Redirect to="/body-literacy" />}</Route>
+      {/* The Terrain and Body Literacy were one argument told twice — the body
+          is a connected chain, and you have to be able to read where you are in
+          it. Neither was a whole page, and "The Intelligence" held four items
+          that read as a pile. Both retired into /the-body-map, which adds the
+          part missing from each: the figure, and the traditions behind it.
+
+          Redirected rather than dropped. Both sat in the primary nav for
+          months and /the-terrain in particular is the concept the brand is
+          named around, so the URL will be in inboxes and decks. */}
+      <Route path="/the-terrain">{() => <Redirect to="/the-body-map" />}</Route>
+      <Route path="/body-literacy">{() => <Redirect to="/the-body-map" />}</Route>
+      {/* Embodiment is what living the system produces, not a destination. It
+          retired into Body Literacy, which has now retired in turn. */}
+      <Route path="/embody">{() => <Redirect to="/the-body-map" />}</Route>
 
       {/* The app and the portal are the same product. Old /app links land there. */}
       <Route path="/app">{() => <Redirect to="/member" />}</Route>

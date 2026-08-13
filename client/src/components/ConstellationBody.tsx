@@ -98,11 +98,29 @@ export const BODY_REGIONS: BodyRegion[] = [
   { key: "legs", name: "The Pump", reads: "Lymph moves when you move." },
 ];
 
-export function ConstellationBody({ className }: { className?: string }) {
+export function ConstellationBody({
+  className,
+  /**
+   * Fires with the region key whenever the lit region changes — whether the
+   * pointer chose it or the cycle did. The Body Map reads it to keep a panel
+   * of text beside the figure in step with what is actually glowing.
+   *
+   * Emitted from a ref comparison inside the animation loop rather than on
+   * every frame: `lit` is recomputed sixty times a second, and calling a React
+   * setter that often would re-render the page under the canvas.
+   */
+  onActive,
+}: {
+  className?: string;
+  onActive?: (key: string) => void;
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
   const [active, setActive] = useState(0);
   const activeRef = useRef(0);
   const hoverRef = useRef<string | null>(null);
+  const litRef = useRef<string | null>(null);
+  const onActiveRef = useRef(onActive);
+  onActiveRef.current = onActive;
   activeRef.current = active;
 
   // Cycle through the regions unless a pointer is holding one.
@@ -161,6 +179,11 @@ export function ConstellationBody({ className }: { className?: string }) {
         }
         hoverRef.current = hovered;
         const lit = hovered ?? BODY_REGIONS[activeRef.current].key;
+
+        if (lit !== litRef.current) {
+          litRef.current = lit;
+          onActiveRef.current?.(lit);
+        }
 
         for (const r of BODY_REGIONS) {
           const target = r.key === lit ? 1 : 0;

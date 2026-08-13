@@ -52,6 +52,13 @@ export interface NavEntry {
  *                      tell. Seasons and elements live in here, one level
  *                      down, where they read as depth rather than as a
  *                      prerequisite.
+ *
+ *                      This held four items and read as a pile, largely
+ *                      because two of them — The Terrain and Body Literacy —
+ *                      were one argument split across two pages. They are now
+ *                      The Body Map, and what is left is three things that are
+ *                      genuinely different in kind: the map, the manifesto and
+ *                      the tool.
  *   Gather           — where the practice becomes an experience with other
  *                      people. Already a coherent trio in WaysToWork.tsx.
  *
@@ -70,8 +77,7 @@ export const SITE_NAV: NavEntry[] = [
   {
     label: "The Intelligence",
     children: [
-      { label: "The Terrain", href: "/the-terrain", note: "Why the same input helps or harms" },
-      { label: "Body Literacy", href: "/body-literacy", note: "Learn which direction you need" },
+      { label: "The Body Map", href: "/the-body-map", note: "How the body works, and who taught us to read it" },
       { label: "What Is a Sakred Body?", href: "/philosophy", note: "The manifesto" },
       { label: "Food Chart", href: "/food-chart", note: "What food actually does" },
     ],
