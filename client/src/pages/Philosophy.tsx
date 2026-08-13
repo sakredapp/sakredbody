@@ -43,8 +43,16 @@ export default function Philosophy() {
     <div className="tone-ink min-h-screen bg-background text-foreground font-sans">
       <SiteHeader overHero={false} />
 
+      {/* The eyebrow used to read "The Philosophy" above a title reading "The
+          Philosophy." — the page introducing itself twice before saying
+          anything, and the only hero on the site that does it. Every other
+          eyebrow frames its title rather than repeating it: "The Skill" over
+          Body Literacy, "Yin · The Receding Force" over Restore.
+
+          "What We Believe" is the site's own name for this page — it is the
+          label on Home's second hero button. */}
       <PageHero
-        eyebrow="The Philosophy"
+        eyebrow="What We Believe"
         title={<>The Philosophy.</>}
         testId="text-philosophy-headline"
         ambient={<Constellation className="absolute inset-0 w-full h-full opacity-80" />}
