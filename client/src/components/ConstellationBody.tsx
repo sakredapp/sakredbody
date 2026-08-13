@@ -156,19 +156,44 @@ const NEIGHBOURS: Record<string, { key: string; w: number }[]> = {
   arms: [{ key: "root", w: 0.25 }, { key: "legs", w: 0.15 }],
 };
 
-/** Centre of each region, for a hit area a thumb can actually find. */
-const CENTROIDS: Record<string, { x: number; y: number }> = (() => {
-  const acc: Record<string, { x: number; y: number; n: number }> = {};
-  for (const s of STARS) {
-    const a = (acc[s.region] ??= { x: 0, y: 0, n: 0 });
-    a.x += s.x;
-    a.y += s.y;
-    a.n += 1;
-  }
-  const out: Record<string, { x: number; y: number }> = {};
-  for (const k of Object.keys(acc)) out[k] = { x: acc[k].x / acc[k].n, y: acc[k].y / acc[k].n };
-  return out;
-})();
+/**
+ * Where each region can be touched — declared, not derived.
+ *
+ * This was the mean of a region's stars, and for the paired regions that is
+ * demonstrably the wrong place. Arms and legs are symmetric, so their centroid
+ * lands on the midline — in the middle of the chest, where no arm is. Touching
+ * a hand at (18, 62) measured 36 to the arms centroid and 33 to the gut's, so
+ * the hand lit The Middle. Clever nearest-point maths that is occasionally,
+ * confidently wrong is worse than large zones that are simply right.
+ *
+ * So: hand-placed circles in figure space, several per region where the region
+ * has several places. Overlaps resolve by `d / r`, which lets a small zone hold
+ * its ground inside a big one — the throat keeps its own target even though the
+ * arm zones reach across it. Outside every zone, `pick` returns null and the
+ * figure goes back to demonstrating itself.
+ */
+const HIT: Record<string, { x: number; y: number; r: number }[]> = {
+  crown: [{ x: 50, y: 11, r: 13 }],
+  throat: [{ x: 50, y: 22, r: 10 }],
+  heart: [{ x: 50, y: 36, r: 13 }],
+  gut: [{ x: 50, y: 54, r: 15 }],
+  root: [{ x: 50, y: 71, r: 12 }],
+  // Shoulders/upper arm, then forearm and hand.
+  arms: [
+    { x: 33, y: 30, r: 13 },
+    { x: 67, y: 30, r: 13 },
+    { x: 20, y: 53, r: 15 },
+    { x: 80, y: 53, r: 15 },
+  ],
+  // Thigh-and-knee, then shin-and-foot. The pairs overlap on purpose: two
+  // circles that merely touch leave a dead band across the middle of the shin.
+  legs: [
+    { x: 39, y: 104, r: 26 },
+    { x: 61, y: 104, r: 26 },
+    { x: 36, y: 146, r: 24 },
+    { x: 64, y: 146, r: 24 },
+  ],
+};
 
 /** A particle riding the fascia. */
 interface Mote {
@@ -233,12 +258,32 @@ export function ConstellationBody({
 
     /** Set by the tap handler below, consumed on the next frame. */
     let tapped: { x: number; y: number } | null = null;
+    /**
+     * A finger is not a hovering mouse.
+     *
+     * mountStage reports any pointer as `inside`, and on a touchscreen a
+     * *scroll* is a stream of pointermove events. Left alone, dragging the page
+     * past the figure hovered every region the finger swept over — so the panel
+     * beside it thrashed through four headings while somebody was only trying
+     * to get down the page, and the whole figure leaned toward the thumb as it
+     * went. The page still scrolled; it just narrated itself while you did it.
+     *
+     * Touch therefore gets the tap path only, which is the deliberate gesture.
+     * Latched rather than cleared on release, because a device that has sent
+     * one touch has no hover to go back to.
+     */
+    let touchInput = false;
     const onDown = (e: PointerEvent) => {
+      if (e.pointerType === "touch") touchInput = true;
       if (!interactiveRef.current) return;
       const rect = canvas.getBoundingClientRect();
       tapped = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     };
+    const onMoveKind = (e: PointerEvent) => {
+      if (e.pointerType === "touch") touchInput = true;
+    };
     canvas.addEventListener("pointerdown", onDown);
+    canvas.addEventListener("pointermove", onMoveKind);
 
     const teardown = mountStage(canvas, (S) => {
       /** Primary activation, eased so regions fade rather than switch. */
@@ -290,8 +335,12 @@ export function ConstellationBody({
         // moves least of the moving ones because it is the thing being looked
         // at — the sense of depth comes from what sits behind and in front of
         // it drifting differently.
-        const pxN = S.inside ? (S.px - w / 2) / (w / 2) : 0;
-        const pyN = S.inside ? (S.py - h / 2) / (h / 2) : 0;
+        // Everything a pointer drives — depth, attraction, hover — is gated on
+        // this rather than on S.inside, so a scrolling finger moves nothing.
+        const hovering = S.inside && !touchInput;
+
+        const pxN = hovering ? (S.px - w / 2) / (w / 2) : 0;
+        const pyN = hovering ? (S.py - h / 2) / (h / 2) : 0;
         const plane = (depth: number) => ({ x: -pxN * depth, y: -pyN * depth });
         const planeBack = plane(2);
         const planeFlow = plane(5);
@@ -302,32 +351,35 @@ export function ConstellationBody({
         const oy = h / 2 - FIG_CY * scale;
 
         // ── Interaction ──────────────────────────────────────
-        // Nearest region centre rather than nearest star. A thumb cannot find
-        // a 3px point, and a pointer should not have to.
+        // Declared zones rather than nearest anything. A thumb cannot find a
+        // 3px point, and a pointer should not have to. `d / r` so a small zone
+        // still wins inside a large one that overlaps it.
         const pick = (cx: number, cy: number) => {
           let best = Infinity;
           let key: string | null = null;
           for (const r of BODY_REGIONS) {
-            const c = CENTROIDS[r.key];
-            const d = Math.hypot(ox + c.x * scale - cx, oy + c.y * scale - cy);
-            if (d < best) {
-              best = d;
-              key = r.key;
+            for (const z of HIT[r.key] ?? []) {
+              const d = Math.hypot(ox + z.x * scale - cx, oy + z.y * scale - cy) / (z.r * scale);
+              if (d < best) {
+                best = d;
+                key = r.key;
+              }
             }
           }
-          // Generous, but not the whole canvas — outside this the figure goes
-          // back to demonstrating itself.
-          return best < 46 * scale * 0.45 ? key : null;
+          return best <= 1 ? key : null;
         };
 
         if (interactiveRef.current) {
           if (tapped) {
+            // A tap is deliberate, and on a phone it is the *only* way in —
+            // there is no hover to keep it alive while the copy is read. Long
+            // enough to finish the panel beside it: a tradition line, a name,
+            // the anatomy, what it governs, the lens, the measure.
             const k = pick(tapped.x, tapped.y);
-            // A tap is deliberate, so it holds far longer than a hover.
-            if (k) holdRef.current = { key: k, until: t + 7 };
+            if (k) holdRef.current = { key: k, until: t + 14 };
             tapped = null;
           }
-          if (S.inside) {
+          if (hovering) {
             const k = pick(S.px, S.py);
             // Refreshed every frame the pointer is near, so the decay only
             // starts once it actually leaves.
@@ -410,7 +462,7 @@ export function ConstellationBody({
 
           // The body noticed you. 1–3px, and it returns — this is attention,
           // not gravity, and it must never deform the anatomy.
-          if (S.inside) {
+          if (hovering) {
             const dx = S.px - X;
             const dy = S.py - Y;
             const d = Math.hypot(dx, dy);
@@ -570,6 +622,7 @@ export function ConstellationBody({
 
     return () => {
       canvas.removeEventListener("pointerdown", onDown);
+      canvas.removeEventListener("pointermove", onMoveKind);
       teardown();
     };
   }, []);
