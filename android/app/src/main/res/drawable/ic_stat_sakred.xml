@@ -1,0 +1,27 @@
+<!--
+    The status-bar mark.
+
+    Android does not draw this icon; it draws its *alpha channel*, filled with
+    one colour of the system's choosing. Anything with colour, gradient or
+    detail — the launcher artwork, for instance — arrives as a white blob. So
+    this is deliberately a single flat silhouette at 24dp, which is the size it
+    is actually rendered at, rather than a scaled-down version of something
+    designed for a home screen.
+
+    A leaf, because that is the mark the product already uses, and because a
+    notification from Sakred should look like the quietest thing in the tray.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- The blade: two mirrored curves meeting at a point top and bottom. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,2 C17,7 17,13 12,18 C7,13 7,7 12,2 Z" />
+    <!-- The stem. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M11.4,16.5 h1.2 v5.5 h-1.2 z" />
+</vector>

@@ -199,6 +199,30 @@ export default function MemberDashboard() {
   const unreadCoach = useUnreadCoachMessages();
 
   /**
+   * A notification tapped before this screen existed.
+   *
+   * Claimed once, on mount, and only after auth has resolved — which is what
+   * makes this safe: by the time it runs, the member is signed in and every
+   * panel underneath fetches under their own authorization. The destination
+   * moves the view; it does not carry any state with it. A `plan_activated`
+   * from a plan that has since ended lands on Today and finds Today's truth.
+   */
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    void (async () => {
+      const { claimDestination } = await import("@/lib/notificationRoutes");
+      const destination = await claimDestination();
+      if (cancelled || !destination || destination.app !== "member") return;
+      setSection(destination.section as MemberSection);
+      if (destination.tab) setCoachingTab(destination.tab as CoachingTab);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
+
+  /**
    * Never stranded on a tab that stopped existing.
    *
    * `hasCoach` resolves after a request, and a member can be sitting on Coach

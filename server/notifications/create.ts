@@ -15,10 +15,19 @@
  * `onConflictDoNothing` against the unique index. A retried request, a
  * double-tapped send, two instances racing — one notification. Nothing here
  * remembers anything; the constraint is the mechanism.
+ *
+ * ── And the push waits for the commit ─────────────────────────────────────
+ *
+ * Writing the row is the notification; the push is a consequence of it, queued
+ * through `onCommit` and sent only once the transaction the caller was in has
+ * actually committed. The row is what a member can always come back to. The
+ * push is a tap on the shoulder that may never land — no permission, no device,
+ * a Firebase outage — and nothing about the product depends on it landing.
  */
 
 import { and, eq, inArray, isNull } from "drizzle-orm";
-import { db, type Tx } from "../db.js";
+import { db, onCommit, type Tx } from "../db.js";
+import { pushToUser } from "./push.js";
 import { users } from "../../shared/models/auth.js";
 import {
   notifications,
@@ -97,7 +106,42 @@ export async function notify(
     .onConflictDoNothing({ target: notifications.dedupeKey })
     .returning({ id: notifications.id });
 
-  return rows.length > 0;
+  if (!rows.length) return false;
+
+  /**
+   * The phone hears about it only if the database kept it.
+   *
+   * Queued rather than sent, because this statement is still a proposal — see
+   * `onCommit` in db.ts. Two things fall out of putting it here rather than in
+   * each producer, and both are the point:
+   *
+   *   · Every producer gets delivery by writing a notification, so "we forgot to
+   *     push for check-in completions" is not a bug that can be introduced.
+   *   · The dedupe is the same dedupe. A retried request that inserts no row
+   *     returns above and sends nothing — one notification, one push, enforced
+   *     by the unique index rather than by anyone remembering.
+   */
+  onCommit(tx, () =>
+    pushToUser(input.recipientId, {
+      title: copy.title,
+      body: copy.body ?? null,
+      data: {
+        notificationId: rows[0]!.id,
+        type: input.type,
+        resourceType: input.resourceType,
+        resourceId: input.resourceId,
+        /**
+         * Which client a coach's tap should open. An opaque id and nothing
+         * else — the workspace still has to find it in its own authorized
+         * client list before any thread opens, so a notification about a member
+         * since reassigned away resolves to nothing.
+         */
+        actorUserId: input.actorId ?? "",
+      },
+    }),
+  );
+
+  return true;
 }
 
 /**

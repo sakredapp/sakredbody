@@ -38,6 +38,22 @@ async function logout(): Promise<void> {
     // Web build, or the module failed to load. Sign-out continues.
   }
 
+  /**
+   * And drop any tap that has not been honoured yet.
+   *
+   * A destination outlives the page load it was stored to survive, so without
+   * this a notification tapped by the person signing out would be waiting for
+   * whoever signs in next — landing them in a coach thread that was never
+   * theirs. The screen would fetch under their own authorization and show them
+   * nothing, but being sent there at all is the wrong answer.
+   */
+  try {
+    const { forgetDestination } = await import("@/lib/notificationRoutes");
+    await forgetDestination();
+  } catch {
+    // Same as above: never a reason to fail a sign-out.
+  }
+
   // Sent while the token is still attached — the server revokes the bearer
   // row it was presented with, so the device is signed out server-side rather
   // than merely forgetting its credential locally.

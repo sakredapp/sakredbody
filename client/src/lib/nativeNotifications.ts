@@ -1,7 +1,16 @@
 import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
+import { Preferences } from "@capacitor/preferences";
 import { FirebaseMessaging } from "@capacitor-firebase/messaging";
 import { apiFetch } from "./apiFetch";
+import { queryClient } from "./queryClient";
+import {
+  destinationFor,
+  rememberDestination,
+  viewerFromRole,
+  type NotificationData,
+  type Viewer,
+} from "./notificationRoutes";
 
 /**
  * Notifications for the iOS/Android shells.
@@ -24,31 +33,200 @@ import { apiFetch } from "./apiFetch";
 export const isNative = () => Capacitor.isNativePlatform();
 
 /**
- * Remote push is not enabled, and asking for permission would be dishonest.
+ * Remote push is live. Every part of the chain exists.
  *
- * ── What is missing, precisely ────────────────────────────────────────────
+ * This constant stayed `false` for as long as any link was missing, because iOS
+ * lets an app ask for notification permission exactly once, ever — and a prompt
+ * that cannot be honoured spends both the permission and the member's trust in
+ * the same moment. What it was waiting for, and what is now true:
  *
- *   · No Firebase server credentials — nothing can send.
- *   · iOS ships `aps-environment: development`, so no TestFlight or App Store
- *     build would receive a push even if something could send one.
- *   · No delivery adapter on the server.
- *   · No notification-tap handling in either shell, so a tap can only
- *     cold-open the app.
+ *   · An APNs auth key uploaded to Firebase, so FCM can reach Apple.
+ *   · A service account in the server environment, verified to mint a real
+ *     OAuth token for the messaging scope — not merely present.
+ *   · A delivery adapter that sends post-commit and retires dead tokens.
+ *   · Tap handling in the shells, so a notification leads somewhere rather
+ *     than only cold-opening the app.
  *
- * iOS lets an app ask exactly once, ever. Spending that on a prompt that
- * cannot be honoured — "Allow Sakred to send notifications?" followed by
- * nothing, forever — costs the permission and the member's trust in the same
- * moment, and it cannot be taken back.
+ * The distribution entitlement was never the blocker it appeared to be: the
+ * source file says `development` and the exported, store-signed IPA carries
+ * `production`, because Xcode rewrites it from the provisioning profile at
+ * signing time. Do not "fix" that file.
  *
- * The registration path below is built and correct so that flipping this is a
- * one-line change once delivery genuinely exists. Until then the durable
- * notifications the server writes are the truth, and members see them when
- * they open Sakred.
+ * Turning this off again is a safe thing to do. The durable notifications the
+ * server writes remain the truth, and members still see everything when they
+ * open Sakred; only the tap on the shoulder stops.
  */
-export const PUSH_DELIVERY_ENABLED = false;
+export const PUSH_DELIVERY_ENABLED = true;
 
 /** Stable id so re-scheduling replaces the reminder rather than stacking them. */
 const DAILY_RITUAL_ID = 1;
+
+/** Remembers that we asked, so a decline is not asked again on the next launch. */
+const ASKED_KEY = "sakred.push.asked";
+
+// ─── Taps ──────────────────────────────────────────────────────────────────
+
+/**
+ * Listen for notification taps, from the moment the app has JavaScript.
+ *
+ * Registered at boot and not behind permission or sign-in, because a tap is the
+ * *first* thing that happens on a cold start: the OS launches the app because
+ * somebody tapped, and the event is delivered as soon as something is listening.
+ * Register it late and the launch that mattered most is the one that lands on
+ * the default screen.
+ *
+ * This only records where to go. It never navigates, never fetches, and never
+ * decides anybody is allowed to see anything — see notificationRoutes.ts.
+ */
+export async function installNotificationTapRouting(): Promise<void> {
+  if (!isNative()) return;
+
+  await ensureCoachingChannel();
+
+  await FirebaseMessaging.addListener("notificationActionPerformed", (event) => {
+    const data = (event.notification?.data ?? {}) as NotificationData;
+    void rememberDestination(destinationFor(data, currentViewer()));
+  });
+
+  /**
+   * Arriving while the app is open.
+   *
+   * Deliberately does not show anything. The screen the member is looking at is
+   * more current than any banner we could raise over it, and a notification
+   * about the conversation already on screen is noise. What it does do is
+   * refresh the counts, so the badge agrees with what just arrived rather than
+   * waiting out its stale window.
+   */
+  await FirebaseMessaging.addListener("notificationReceived", () => {
+    for (const key of ["/api/notifications/unread-count", "/api/notifications"]) {
+      void queryClient.invalidateQueries({ queryKey: [key] });
+    }
+  });
+}
+
+/**
+ * One channel, named for what it actually is.
+ *
+ * Android 8+ gives the member the switches, not us: a channel is the unit they
+ * can silence. One called "Sakred Coaching" is a decision they can make — mute
+ * the coach, keep everything else — where four channels split across message,
+ * check-in requested, check-in completed and plan activated would be four
+ * decisions nobody asked for, about distinctions only the schema cares about.
+ * If a real reason to separate them appears, splitting later is additive.
+ *
+ * Created here rather than in the manifest so the name and description sit
+ * beside the rest of the notification copy. Creating a channel that already
+ * exists is a no-op, and its importance cannot be raised afterwards — Android
+ * hands that control to the member the moment it exists, which is the right
+ * place for it.
+ */
+async function ensureCoachingChannel(): Promise<void> {
+  if (Capacitor.getPlatform() !== "android") return;
+  try {
+    await LocalNotifications.createChannel({
+      id: "coaching",
+      name: "Sakred Coaching",
+      description: "Messages from your coach, check-in requests, and plan changes.",
+      // High, because these are person-to-person and time-bound: a coach's reply
+      // batched until the next maintenance window is a reply that arrived
+      // tomorrow. Matches the priority the server sends.
+      importance: 4,
+      // Shown on the lock screen, with content hidden when the member has asked
+      // the system to hide sensitive notifications. The copy is already safe to
+      // read over a shoulder; this respects the choice anyway.
+      visibility: 0,
+    });
+  } catch {
+    // An older device or a refused channel. Firebase falls back to its default
+    // channel, which still delivers — the member simply gets one less switch.
+  }
+}
+
+/**
+ * Which side of a coaching relationship this device is on.
+ *
+ * Read from the cached account rather than the payload; the same event means
+ * different things to each end, and the device knows which end it is. Defaults
+ * to `member`, which is the larger population and the safer place to land.
+ */
+function currentViewer(): Viewer {
+  const cached = queryClient.getQueryData<{ role?: string }>(["/api/auth/user"]);
+  return viewerFromRole(cached?.role);
+}
+
+// ─── Permission ────────────────────────────────────────────────────────────
+
+/** What the OS currently thinks, without asking it to prompt. */
+export async function pushPermissionState(): Promise<"granted" | "denied" | "prompt"> {
+  if (!isNative()) return "denied";
+  try {
+    const { receive } = await FirebaseMessaging.checkPermissions();
+    if (receive === "granted") return "granted";
+    if (receive === "denied") return "denied";
+    return "prompt";
+  } catch {
+    return "denied";
+  }
+}
+
+/**
+ * Have we already spent the one ask?
+ *
+ * iOS grants exactly one system prompt per install: after a decline, calling
+ * `requestPermissions` again returns denied without showing anything. Asking
+ * again is therefore not persistence, it is a no-op the member never sees — so
+ * the only honest follow-up is a Settings link, offered once somewhere calm,
+ * never a dialog on every launch.
+ */
+export async function hasAskedForPush(): Promise<boolean> {
+  if (!isNative()) return true;
+  try {
+    const { value } = await Preferences.get({ key: ASKED_KEY });
+    return value === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Where a "not now" is remembered, so it means something. */
+const DEFERRED_KEY = "sakred.push.deferred";
+const DEFER_MS = 14 * 24 * 60 * 60 * 1000;
+
+/**
+ * "Not now" has to actually mean not now.
+ *
+ * A dismissal that reappears on the next launch is the nag with better manners,
+ * and it teaches people to dismiss without reading. Two weeks is long enough
+ * that the next time is a fresh question rather than the same one repeated,
+ * and the OS prompt has still not been spent — so it remains available if they
+ * change their mind.
+ */
+export async function deferPushPrompt(): Promise<void> {
+  try {
+    await Preferences.set({ key: DEFERRED_KEY, value: String(Date.now()) });
+  } catch {
+    // The panel reappears next launch. Mildly annoying, never harmful.
+  }
+}
+
+export async function pushPromptDeferred(): Promise<boolean> {
+  try {
+    const { value } = await Preferences.get({ key: DEFERRED_KEY });
+    const at = Number(value);
+    return Number.isFinite(at) && at > 0 && Date.now() - at < DEFER_MS;
+  } catch {
+    return false;
+  }
+}
+
+async function markAsked(): Promise<void> {
+  try {
+    await Preferences.set({ key: ASKED_KEY, value: "1" });
+  } catch {
+    // A lost flag costs one extra prompt on a device that has already answered
+    // it; `checkPermissions` above still prevents a second dialog appearing.
+  }
+}
 
 /**
  * Ask for notification permission and register for remote push.
@@ -63,6 +241,15 @@ export async function initNativeNotifications(): Promise<string | null> {
   // Deliberate. See PUSH_DELIVERY_ENABLED — do not remove this to "turn
   // notifications on"; there is nothing on the other end yet.
   if (!PUSH_DELIVERY_ENABLED) return null;
+
+  // Asking a device that has already refused shows nothing and returns denied,
+  // so the only effect of trying again is to hide that fact from us.
+  if ((await pushPermissionState()) === "denied") return null;
+
+  // Recorded before the prompt, not after. If the app is killed mid-dialog, the
+  // ask has still been spent, and a flag written only on success would send us
+  // back to a prompt the OS will never show again.
+  await markAsked();
 
   // Local and remote permissions are separate grants on iOS; Android 13+
   // funnels both through the single POST_NOTIFICATIONS runtime permission.

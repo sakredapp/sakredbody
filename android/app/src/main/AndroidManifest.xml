@@ -100,6 +100,25 @@
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
+
+        <!--
+            What a coaching notification looks like in the tray.
+
+            Without these, Firebase falls back to the launcher icon, which
+            Android reduces to its alpha channel — a solid white square. The
+            channel is created at runtime rather than declared here, so its name
+            and description are written once, in the same place as the copy the
+            member reads.
+        -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_sakred" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/sakredNotification" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="coaching" />
     </application>
 
     <!-- Permissions -->

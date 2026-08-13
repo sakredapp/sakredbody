@@ -26,6 +26,8 @@ import {
   type NotificationType,
 } from "../shared/models/notifications.js";
 import { SIGNAL_KEYS } from "../shared/models/terrainSignals.js";
+import { isDeadToken } from "../server/notifications/fcmErrors.js";
+import { destinationFor, viewerFromRole } from "../client/src/lib/notificationRoutes.js";
 
 let passed = 0;
 let failed = 0;
@@ -39,6 +41,19 @@ function check(name: string, cond: boolean, detail?: string) {
 }
 
 const src = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
+
+/**
+ * `a` appears before `b`, and both actually appear.
+ *
+ * `indexOf(a) < indexOf(b)` is true when `a` is missing entirely, so an
+ * ordering assertion written that way passes loudest exactly when the thing it
+ * guards has been deleted.
+ */
+const before = (haystack: string, a: string, b: string) => {
+  const i = haystack.indexOf(a);
+  const j = haystack.indexOf(b);
+  return i >= 0 && j >= 0 && i < j;
+};
 const code = (p: string) =>
   src(p)
     .replace(/\/\*[\s\S]*?\*\//g, "")
@@ -263,9 +278,14 @@ console.log("\nWe do not ask for permission we cannot honour\n");
 {
   const native = src("client/src/lib/nativeNotifications.ts");
   const nativeCode = code("client/src/lib/nativeNotifications.ts");
-  check("push delivery is explicitly off", /export const PUSH_DELIVERY_ENABLED = false;/.test(native));
+  check("push delivery is on", /export const PUSH_DELIVERY_ENABLED = true;/.test(native));
+  /**
+   * The gate stays in the code with the prompt behind it, so turning delivery
+   * off again is one line rather than an excavation — and so nothing can ask
+   * for permission if it is ever turned off.
+   */
   check(
-    "and init returns before asking for anything",
+    "and init still returns before asking for anything when it is off",
     /if \(!PUSH_DELIVERY_ENABLED\) return null;/.test(nativeCode),
   );
   {
@@ -274,13 +294,22 @@ console.log("\nWe do not ask for permission we cannot honour\n");
     const ask = init.indexOf("requestPermissions");
     check("the gate comes before the prompt", gate >= 0 && gate < ask);
   }
-  check("nothing calls init yet", !/initNativeNotifications\(\)/.test(
+  /**
+   * The OS dialog is reached from exactly one place: a member pressing a button
+   * on a panel that told them what it is for. Not from boot, not from sign-in,
+   * not from mounting a dashboard.
+   */
+  check("nothing asks at launch or sign-in", !/initNativeNotifications\(\)/.test(
     [
       "client/src/pages/MemberDashboard.tsx",
       "client/src/hooks/use-auth.ts",
       "client/src/main.tsx",
     ].map(code).join("\n"),
   ));
+  check(
+    "only the pre-prompt does",
+    /await initNativeNotifications\(\)/.test(code("client/src/components/portal/NotificationPrompt.tsx")),
+  );
 
   /** The registration bug: an absolute URL sails past the bearer-token patch. */
   check("registration authenticates", /await apiFetch\("\/api\/notifications\/token"/.test(nativeCode));
@@ -293,16 +322,219 @@ console.log("\nWe do not ask for permission we cannot honour\n");
   check("sign-out unregisters the device", /unregisterPushToken\(\)/.test(auth));
   check(
     "before the bearer token is cleared",
-    auth.indexOf("unregisterPushToken") < auth.indexOf("clearAuthToken()"),
+    before(auth, "unregisterPushToken", "clearAuthToken()"),
   );
 }
 
-/** No firebase-admin, no dead provider code that cannot authenticate. */
+console.log("\nDelivery\n");
+
+/**
+ * One provider, and the smallest thing that talks to it.
+ *
+ * `firebase-admin` would arrive with Firestore, Storage and Realtime Database
+ * for the sake of a single POST. No direct-APNs client either: iOS push rides
+ * FCM through the Firebase bridge, so a second sender would be a second thing
+ * to keep in step with the first.
+ */
 {
   const pkg = JSON.parse(src("package.json"));
   const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-  check("no server delivery SDK is installed yet", !("firebase-admin" in deps));
-  check("nor an APNs client", !("apn" in deps) && !("@parse/node-apn" in deps));
+  check("the token signer is installed", "google-auth-library" in deps);
+  check("without the whole Admin SDK", !("firebase-admin" in deps));
+  check("and no second, direct APNs sender", !("apn" in deps) && !("@parse/node-apn" in deps));
+}
+
+/**
+ * A dead token is a narrow thing.
+ *
+ * These are the assertions that matter most in the file: every false positive
+ * here is a member who silently stops receiving anything.
+ */
+{
+  check("an uninstalled app retires its token", isDeadToken(404, '{"errorCode":"UNREGISTERED"}'));
+  check(
+    "so does a token that was never valid",
+    isDeadToken(400, '{"status":"INVALID_ARGUMENT","message":"Invalid registration token"}'),
+  );
+
+  check("but a bad credential does not", !isDeadToken(401, "UNAUTHENTICATED"));
+  check("nor a permission problem", !isDeadToken(403, "SENDER_ID_MISMATCH"));
+  check("nor being rate limited", !isDeadToken(429, "QUOTA_EXCEEDED"));
+  check("nor Google having a bad day", !isDeadToken(503, "UNAVAILABLE"));
+  check("nor a 500", !isDeadToken(500, "INTERNAL"));
+  /** A 404 that is not about the registration is about the request. */
+  check("nor a 404 that says nothing about the token", !isDeadToken(404, "NOT_FOUND"));
+  /** INVALID_ARGUMENT is also how a malformed *payload* comes back. */
+  check(
+    "nor a rejected payload",
+    !isDeadToken(400, '{"status":"INVALID_ARGUMENT","message":"Invalid JSON payload"}'),
+  );
+}
+
+/** The push waits for the commit, and the row is what survives either way. */
+{
+  const create = code("server/notifications/create.ts");
+  const dbc = code("server/db.ts");
+
+  check("delivery is queued, not sent inline", /onCommit\(tx, \(\) =>\s*pushToUser\(/.test(create));
+  check(
+    "and nothing sends outside that queue",
+    (create.match(/pushToUser\(/g) ?? []).length === 1,
+  );
+  /**
+   * The dedupe is the same dedupe. A retried request inserts no row, returns
+   * early, and therefore queues no push — one notification, one buzz, enforced
+   * by the unique index rather than by anyone remembering.
+   */
+  check(
+    "a deduped notification sends nothing",
+    before(create, "if (!rows.length) return false;", "onCommit(tx"),
+  );
+
+  check("committed work runs only after the transaction resolves", /await runAfterCommit\(opened\)/.test(dbc));
+  check(
+    "after the events, in the same order the reader was promised",
+    before(dbc, "publishPending(opened)", "await runAfterCommit(opened)"),
+  );
+  check("and a rollback drops it", /discardAfterCommit\(opened\)/.test(dbc));
+  check(
+    "the queue is held against the transaction, not a module global",
+    /new WeakMap<object, Array<\(\) => Promise<void>>>\(\)/.test(dbc),
+  );
+  /**
+   * A push that fails must not tell a coach their message did not send. The
+   * transaction has already committed by then; there is nothing to undo and
+   * nothing useful for the caller to do.
+   */
+  check("a failed send cannot fail the request", /catch \(err\)/.test(dbc.slice(dbc.indexOf("runAfterCommit"))));
+}
+
+/** Nothing about a body, and nothing that could send on our behalf, in a log. */
+{
+  const push = src("server/notifications/push.ts");
+  const pushCode = code("server/notifications/push.ts");
+
+  check("a token is only ever traced by its tail", /token\.slice\(-6\)/.test(pushCode));
+  check("never logged whole", !/\$\{token\}/.test(push) && !/\$\{device\.token\}/.test(push));
+  check("and the credential is never printed", !/private_key["'\s:]*\$\{/.test(push));
+
+  /** The payload is the safe copy the row already holds, plus ids to route by. */
+  const create = code("server/notifications/create.ts");
+  const payload = create.slice(create.indexOf("pushToUser("), create.indexOf("return true;"));
+  check("the push carries the notification's own copy", /title: copy\.title/.test(payload));
+  check("and ids, not content", /resourceId: input\.resourceId/.test(payload));
+  check(
+    "no message body reaches a lock screen",
+    !/\bcontent\b|\bmessage\.body\b|answers/.test(payload),
+  );
+
+  /** Absent credentials are a normal state, not a crash. */
+  check("a missing credential degrades to in-app only", /notifications are in-app only/.test(push));
+  check("and is reported once, not per send", /configured = null/.test(pushCode));
+  check("pushToUser never throws at its caller", !/^\s*throw /m.test(
+    pushCode.slice(pushCode.indexOf("export async function pushToUser")),
+  ));
+}
+
+console.log("\nWhere a tap lands\n");
+
+/**
+ * The same event, read from each end.
+ *
+ * A coach and a member both receive `coaching.message`, and it means opposite
+ * things — "your coach wrote to you" and "your client wrote to you". Getting
+ * this backwards would send a coach into their own member dashboard looking for
+ * a thread that is not there.
+ */
+{
+  check("a member's message opens the coach thread", (() => {
+    const d = destinationFor({ type: "coaching.message" }, "member");
+    return d.app === "member" && d.section === "coaching" && d.tab === "coach";
+  })());
+
+  check("a coach's message opens that client", (() => {
+    const d = destinationFor({ type: "coaching.message", actorUserId: "m1" }, "coach");
+    return d.app === "coach" && d.clientUserId === "m1";
+  })());
+
+  check("a completed check-in opens the client who answered", (() => {
+    const d = destinationFor({ type: "coaching.checkin_completed", actorUserId: "m2" }, "coach");
+    return d.app === "coach" && d.clientUserId === "m2";
+  })());
+
+  /** Both are things to do today, and Today is where current state lives. */
+  for (const type of ["coaching.checkin_requested", "coaching.plan_activated"]) {
+    const d = destinationFor({ type }, "member");
+    check(`${type} lands on Today`, d.app === "member" && d.tab === "today");
+  }
+
+  /** A build that ships a type before the screen for it must still open. */
+  const unknown = destinationFor({ type: "coaching.something_new" }, "member");
+  check("an unknown type still lands somewhere real", unknown.app === "member");
+  check("and never nowhere", Boolean((unknown as { section?: string }).section));
+
+  /** An actor-less event cannot fabricate a client to open. */
+  const noActor = destinationFor({ type: "coaching.message" }, "coach");
+  check("no actor means no client opened", (noActor as { clientUserId?: string | null }).clientUserId === null);
+
+  /** Which end of the relationship, from the account rather than the payload. */
+  check("a coach reads as a coach", viewerFromRole("coach") === "coach");
+  check("an admin supervising reads as a coach", viewerFromRole("admin") === "coach");
+  check("an owner too", viewerFromRole("owner") === "coach");
+  check("a member reads as a member", viewerFromRole("member") === "member");
+  check("and so does an unknown role", viewerFromRole(null) === "member");
+}
+
+/** A notification names a destination. It never carries authority. */
+{
+  const routes = code("client/src/lib/notificationRoutes.ts");
+  const workspace = code("client/src/pages/CoachWorkspace.tsx");
+  const dash = code("client/src/pages/MemberDashboard.tsx");
+
+  check("nothing is fetched to decide a destination", !/fetch\(|useQuery/.test(routes));
+  check(
+    "a coach's tap is checked against the current roster",
+    /roster\.find\(\(c\) => c\.id === destination\.clientUserId\)/.test(workspace),
+  );
+  check(
+    "and opens nothing when that client is gone",
+    /if \(client\) setOpenClient/.test(workspace),
+  );
+  check(
+    "the name shown comes from the roster, not the push",
+    /name: client\.name/.test(workspace) && !/destination\.name/.test(workspace),
+  );
+  check("the member claims a destination only once signed in", /if \(!isAuthenticated\) return;/.test(dash));
+  check("a destination is removed as it is claimed", before(routes, "Preferences.remove", "JSON.parse(value)"));
+  check("and expires rather than ambushing a later launch", /PENDING_TTL_MS/.test(routes));
+
+  /** Sign-out must not leave a destination for the next person. */
+  const authSrc = code("client/src/hooks/use-auth.ts");
+  check("sign-out drops any pending destination", /forgetDestination\(\)/.test(authSrc));
+}
+
+/** We ask once, in context, of people it would serve. */
+{
+  const prompt = code("client/src/components/portal/NotificationPrompt.tsx");
+  const native = code("client/src/lib/nativeNotifications.ts");
+  const today = code("client/src/components/portal/TodayBody.tsx");
+
+  check("the prompt is gated on relevance", /if \(!relevant/.test(prompt));
+  check("and on the platform being able to honour it", /PUSH_DELIVERY_ENABLED/.test(prompt));
+  check("a self-guided member is never asked", /relevant=\{hasCoach \|\| hasCoachingToShow\}/.test(today));
+  check("a declined permission is not re-asked", /=== "denied"\) return null;/.test(native));
+  check("the ask is recorded before the dialog, not after", before(native, "await markAsked();", "LocalNotifications.requestPermissions()"));
+  check("'not now' actually defers", /deferPushPrompt\(\)/.test(prompt));
+  check("for a fixed window rather than forever", /DEFER_MS/.test(native));
+
+  /** One channel, not one per event type. */
+  check("android gets a single coaching channel", (native.match(/createChannel\(/g) ?? []).length === 1);
+  check("named for what it is", /name: "Sakred Coaching"/.test(native));
+
+  /** Foreground arrival refreshes counts and shows nothing over the screen. */
+  const received = native.slice(native.indexOf('"notificationReceived"'));
+  check("an in-app arrival raises no banner", !/toast|alert\(|LocalNotifications\.schedule/.test(received.slice(0, 400)));
+  check("but does reconcile the badge", /invalidateQueries/.test(received.slice(0, 400)));
 }
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);

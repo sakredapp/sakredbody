@@ -20,23 +20,52 @@
  * label fixes. More sections when there is more to put in them.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useAccess } from "@/hooks/use-access";
+import { useMyClients } from "@/hooks/use-coach";
 import { ClientRoster } from "@/components/coach/ClientRoster";
 import { ClientWorkspace } from "@/components/coach/ClientWorkspace";
+import { NotificationPrompt } from "@/components/portal/NotificationPrompt";
 
 export default function CoachWorkspacePage() {
   const { user, isLoading } = useAuth();
   const access = useAccess();
+  const clients = useMyClients();
   /**
    * The name comes along so the header has something to show while the
    * overview is still in flight. It is replaced by the server's answer the
    * moment that lands — the roster's copy is a placeholder, not a source.
    */
   const [openClient, setOpenClient] = useState<{ id: string; name: string } | null>(null);
+
+  /**
+   * A tapped notification about a client, honoured only if they are still one.
+   *
+   * The push carries an id; the roster decides whether that id still means
+   * anything. Waiting for the roster to load is the point — a coach whose
+   * relationship ended between the notification and the tap finds the id absent
+   * and lands on the roster, which is the truthful answer. Nothing is opened on
+   * the strength of the notification alone, and the name shown comes from the
+   * authorized list rather than from the payload.
+   */
+  const roster = clients.data?.clients;
+  useEffect(() => {
+    if (!roster) return;
+    let cancelled = false;
+    void (async () => {
+      const { claimDestination } = await import("@/lib/notificationRoutes");
+      const destination = await claimDestination();
+      if (cancelled || destination?.app !== "coach" || !destination.clientUserId) return;
+      const client = roster.find((c) => c.id === destination.clientUserId);
+      if (client) setOpenClient({ id: client.id, name: client.name });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [roster]);
 
   if (isLoading) {
     return <div className="min-h-screen bg-background" />;
@@ -102,7 +131,16 @@ export default function CoachWorkspacePage() {
             onBack={() => setOpenClient(null)}
           />
         ) : (
-          <ClientRoster onOpen={(id, name) => setOpenClient({ id, name })} />
+          <div className="space-y-5">
+            {/*
+              On the roster rather than inside a client, and only for a coach who
+              actually has clients. A coach with an empty roster has nothing to
+              be notified about yet, and asking them would spend the one prompt
+              iOS allows before there is anything to justify it.
+            */}
+            <NotificationPrompt audience="coach" relevant={(roster?.length ?? 0) > 0} />
+            <ClientRoster onOpen={(id, name) => setOpenClient({ id, name })} />
+          </div>
         )}
       </div>
     </div>

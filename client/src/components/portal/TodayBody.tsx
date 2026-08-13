@@ -26,6 +26,8 @@ import { useState } from "react";
 import { CoachPlanCard } from "@/components/portal/CoachPlanCard";
 import { useHasActiveCoachPlan } from "@/hooks/use-coach-plan";
 import { CheckinRequestCard, useOpenCheckinRequest } from "@/components/portal/CheckinRequestCard";
+import { NotificationPrompt } from "@/components/portal/NotificationPrompt";
+import { useHasCoach } from "@/hooks/use-coaching";
 import { ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useHealthSummary } from "@/hooks/use-health";
@@ -158,6 +160,7 @@ export function TodayBody({ onOpenTrends }: { onOpenTrends?: () => void }) {
    */
   const present = HEADLINE_METRICS.filter((m) => days.some((d) => typeof d[m] === "number"));
   const hasPlan = useHasActiveCoachPlan();
+  const hasCoach = useHasCoach();
   const { data: requests } = useOpenCheckinRequest();
   const hasCoachingToShow = hasPlan || (requests?.length ?? 0) > 0;
   const hasReading = Boolean(terrain) && terrain!.lean !== "unknown";
@@ -179,6 +182,15 @@ export function TodayBody({ onOpenTrends }: { onOpenTrends?: () => void }) {
       */}
       <CoachPlanCard terrainLean={terrain?.lean ?? null} />
       <CheckinRequestCard />
+
+      {/*
+        Asked only of someone it would serve, and only on a phone that could
+        honour it. `relevant` is the same condition the modules above render on:
+        a coach, a plan, or a question waiting. A self-guided member sees nothing
+        here, which is the point — the notification system stays invisible to
+        the people who have nothing to be notified about.
+      */}
+      <NotificationPrompt audience="member" relevant={hasCoach || hasCoachingToShow} />
 
       {present.length > 0 && (
         <div className="space-y-2">
