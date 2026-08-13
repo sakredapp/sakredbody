@@ -107,6 +107,10 @@ export const BEATS: Beat[] = [
     eyebrow: "What you're left with",
     line: "The pieces are all still here.",
     gold: "Now they have somewhere to belong.",
-    body: "Not a cure, and not a claim about your health. A different relationship with the thing you live in — and enough room in it to adapt.",
+    // Was "Not a cure, and not a claim about your health." — correct, and
+    // compliance copy that had wandered onto a philosophical page. The
+    // animation has already made the point: what moved was relationship, not
+    // anybody's medical state, so the line does not need to disclaim it.
+    body: "What changed was the ability to see the whole — a different relationship with the thing you live in, and enough room in it to adapt.",
   },
 ];
