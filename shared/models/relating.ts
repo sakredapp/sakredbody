@@ -84,6 +84,23 @@ const AUTHORITY_RANK: Readonly<Record<Authority, number>> = {
 };
 
 export type RelationalGuidance = {
+  /**
+   * What this guidance *is*, independent of how it currently reads.
+   *
+   * Namespaced and stable: `self.load.hard-block`. It names the branch that
+   * produced the card, never the English it produced — reword the title and the
+   * id must not move; two genuinely different branches must not share one
+   * because their copy happens to resemble each other.
+   *
+   * Added because the same note was rendering twice on Restore — once as a
+   * teaser, once in full inside My Rhythm — and there was nothing to dedupe on
+   * but the sentence itself. Comparing English is how a copy edit silently
+   * un-fixes a layout bug. It is required rather than optional so new guidance
+   * cannot quietly become identity-less again, and it is worth more than this
+   * one bug: suppression, placement and analytics all want to name a piece of
+   * guidance without quoting it.
+   */
+  id: string;
   audience: Audience;
   /** The practical consequence. Always first, always plain. */
   title: string;
@@ -127,6 +144,7 @@ const CONTEXT_GUIDANCE: Readonly<
   Record<RhythmContextKind, Omit<RelationalGuidance, "audience" | "authority" | "basis">>
 > = {
   work_stress: {
+    id: "other.sleep.debt",
     title: "Keep tonight low-friction",
     detail: "You mentioned they're under heavier work pressure at the moment.",
     goodMove: "Take one decision off them rather than adding a plan they have to respond to.",
@@ -137,6 +155,7 @@ const CONTEXT_GUIDANCE: Readonly<
       "Sustained mental load keeps the stress response partly switched on through the evening. Appetite, patience and sleep onset are the first things it costs.",
   },
   short_sleep: {
+    id: "other.recovery.low",
     title: "Expect a shorter fuse, including yours",
     detail: "You mentioned they slept badly.",
     goodMove: "Make the evening simple and early. Don't save a difficult conversation for tonight.",
@@ -146,6 +165,7 @@ const CONTEXT_GUIDANCE: Readonly<
       "A single short night measurably reduces emotional regulation and raises reactivity the following evening. It resolves with one good night's sleep.",
   },
   training_hard: {
+    id: "other.day.heavy",
     title: "Give them some runway",
     detail: "You mentioned they've been training hard.",
     goodMove: "Food and an early night do more here than anything else you could offer.",
@@ -155,6 +175,7 @@ const CONTEXT_GUIDANCE: Readonly<
       "Heavy training keeps resting heart rate up and appetite unpredictable for a day or two afterwards. Being flat is the repair, not a setback.",
   },
   travel: {
+    id: "other.load.high",
     title: "Let the day land before you plan anything",
     detail: "You mentioned they're travelling or just back.",
     goodMove: "Keep the first evening back unscheduled.",
@@ -164,6 +185,7 @@ const CONTEXT_GUIDANCE: Readonly<
       "Sleep timing takes roughly a day per hour of time difference to resettle, and appetite lags behind that.",
   },
   illness: {
+    id: "other.event.run-up",
     title: "Take things off the list, don't add to it",
     detail: "You mentioned they're unwell.",
     goodMove: "Handle the practical things without being asked, and don't make it a project.",
@@ -172,6 +194,7 @@ const CONTEXT_GUIDANCE: Readonly<
     physiology: null,
   },
   big_event: {
+    id: "other.support.offer",
     title: "Protect the run-up, not just the day",
     detail: "You mentioned they've got something big coming.",
     goodMove: "Reduce what else is on them this week rather than offering encouragement.",
@@ -180,6 +203,7 @@ const CONTEXT_GUIDANCE: Readonly<
     physiology: null,
   },
   wants_space: {
+    id: "other.cycle.hard-phase",
     title: "Give it, and say you're around",
     detail: "You mentioned they've asked for some space.",
     goodMove: "Take it at face value once, and say plainly that you're there when they want you.",
@@ -210,6 +234,7 @@ const CYCLE_PARTNER_GUIDANCE: Readonly<
   Record<CyclePhase, Omit<RelationalGuidance, "audience" | "authority" | "basis">>
 > = {
   menstrual: {
+    id: "other.cycle.good-phase",
     title: "Make today easier, without making it a thing",
     detail:
       "By the dates you entered, her period is likely started. Some women want a much lower-output day here; plenty carry on as normal.",
@@ -221,6 +246,7 @@ const CYCLE_PARTNER_GUIDANCE: Readonly<
       "Both main hormones are at their lowest at the start of a cycle, and cramping is caused by the uterus contracting. Iron loss over the days of a period is real and is part of why energy can drop.",
   },
   follicular: {
+    id: "other.cycle.plan-ahead",
     title: "Good week to suggest something",
     detail: "By the dates you entered, she's in the stretch after her period.",
     goodMove: "This is usually the easiest week to plan something active or social into.",
@@ -230,6 +256,7 @@ const CYCLE_PARTNER_GUIDANCE: Readonly<
       "Oestrogen climbs through this stretch toward ovulation, and training tolerance and mood tend to climb with it.",
   },
   ovulatory: {
+    id: "other.cycle.evening",
     title: "Make the time, don't predict the mood",
     detail:
       "By the dates you entered, she's around the middle of her cycle. This is the least certain estimate in the whole model.",
@@ -240,6 +267,7 @@ const CYCLE_PARTNER_GUIDANCE: Readonly<
     physiology: null,
   },
   luteal: {
+    id: "other.unknown.ask",
     title: "Keep tonight uncomplicated",
     detail:
       "By the dates you entered, she's in the stretch before her next period. Energy, appetite and bandwidth can shift as it goes on — more often late than early.",
@@ -343,6 +371,7 @@ export function relationshipGuidance(input: RelationshipInput): RelationalGuidan
 export function generalRelationshipGuidance(): RelationalGuidance {
   return {
     audience: "relationship",
+    id: "self.sleep.debt",
     title: "Check instead of guessing",
     detail:
       "Sakred doesn't know anything about their day — it only knows what you tell it. That makes asking better than assuming.",
@@ -448,6 +477,7 @@ export function selfRelationalReads(
   if (shortNightsRunning != null && shortNightsRunning >= 3) {
     out.push(
       selfCard({
+        id: "self.sleep.short",
         title: "Three short nights is where people get snappy",
         detail: `You've been under your usual for ${shortNightsRunning} nights running. That accumulates in a way one bad night doesn't.`,
         goodMove:
@@ -462,6 +492,7 @@ export function selfRelationalReads(
   } else if (sleepDeficit != null && sleepDeficit >= 60) {
     out.push(
       selfCard({
+        id: "self.stress.threat-bias",
         title: "Short fuse tonight, and it isn't about them",
         detail: `You slept about ${Math.round(sleepDeficit / 60)}h under your usual.`,
         goodMove: "Keep the evening simple and don't start anything that needs patience.",
@@ -479,6 +510,7 @@ export function selfRelationalReads(
     if (out.length < 2) {
       out.push(
         selfCard({
+          id: "self.load.hard-block",
           title: "You'll read neutral as hostile today",
           detail:
             nervousSystem != null && nervousSystem <= 2
@@ -501,6 +533,7 @@ export function selfRelationalReads(
   if (hardSessionsRecently >= 3 && out.length < 2) {
     out.push(
       selfCard({
+        id: "self.cycle.low-phase",
         title: "Low energy this week isn't disinterest",
         detail: "You've trained hard several times in the last few days.",
         goodMove:
@@ -522,6 +555,7 @@ export function selfRelationalReads(
   if (cycleApplies && out.length < 2) {
     out.push(
       selfCard({
+        id: "self.recovery.low",
         title: "Your bandwidth may be lower than usual",
         detail:
           "This stretch of your cycle is where a lot of women notice less patience for other people — though how much varies enormously.",
@@ -540,6 +574,7 @@ export function selfRelationalReads(
   if (!out.length && read.level === "depleted") {
     out.push(
       selfCard({
+        id: "self.capacity.good",
         title: "You're running low on bandwidth",
         detail: "Your own numbers are down today, and that shows up in how you are with people before you notice it yourself.",
         goodMove: "Eat, decompress, and say out loud that you're cooked rather than going quiet.",
@@ -553,6 +588,7 @@ export function selfRelationalReads(
   if (!out.length && read.level === "primed") {
     out.push(
       selfCard({
+        id: "self.capacity.good",
         title: "You've got some to give today",
         detail: "You're reading well-recovered, which is worth spending on somebody as well as on training.",
         goodMove: "Do the thing you've been meaning to do for someone. It costs you least on a day like this.",

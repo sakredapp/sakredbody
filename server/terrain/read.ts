@@ -228,6 +228,7 @@ export async function terrainFor(userId: string, onDate: string) {
   const movement = categories.map((m) => ({
     onDate: m.onDate,
     category: m.category,
+    activity: m.activity,
     orientation: categoryOrientation(m.category),
     source: m.source,
   }));

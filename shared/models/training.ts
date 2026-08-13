@@ -710,6 +710,39 @@ export const EXTERNAL_ACTIVITY_CATEGORY: Readonly<Record<string, string>> = {
  * shown but contributes no load, which is the honest treatment of an activity
  * whose character we do not know.
  */
+/**
+ * What a member would call an imported activity.
+ *
+ * The stored `workout_type` is already normalized to a plain lowercase word —
+ * "yoga", "running", "strength" — rather than a platform identifier, so this is
+ * presentation only and deliberately small. It is not a second taxonomy: the
+ * category remains what the load model reads.
+ *
+ * Anything with its own capitalization gets it; everything else is title-cased.
+ * Unknown words pass through title-cased rather than being dropped, because a
+ * word the member's phone chose is still more use to them than a blank.
+ */
+const ACTIVITY_LABEL: Readonly<Record<string, string>> = {
+  hiit: "HIIT",
+  tai_chi: "Tai chi",
+  taichi: "Tai chi",
+  jump_rope: "Jump rope",
+  strength_training: "Strength",
+  functional_strength: "Strength",
+  cross_training: "Cross-training",
+  high_intensity: "HIIT",
+};
+
+export function activityLabel(workoutType: string | null | undefined): string | null {
+  if (!workoutType) return null;
+  const key = workoutType.trim().toLowerCase();
+  if (!key) return null;
+  const known = ACTIVITY_LABEL[key];
+  if (known) return known;
+  const words = key.replace(/[_-]+/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 export function externalActivityCategory(workoutType: string | null | undefined): string | null {
   if (!workoutType) return null;
   return EXTERNAL_ACTIVITY_CATEGORY[workoutType.trim().toLowerCase()] ?? null;

@@ -38,11 +38,32 @@ import {
 } from "../../shared/schema.js";
 import { externalActivityCategory } from "../../shared/models/training.js";
 
-/** One thing the member did, reduced to the two facts every caller needs. */
+/**
+ * One thing the member did.
+ *
+ * `category` is what the *load* model reads and must stay a Sakred word.
+ * `activity` is what a *person* reads, and it was missing: this type described
+ * itself as "reduced to the two facts every caller needs", which was true while
+ * the only caller was the load calculation and false the moment a screen wanted
+ * to show somebody what they had done. Restore ended up printing the broad
+ * category — three rows of "Recovery" — for a week that had actually been yoga,
+ * mobility and a walk.
+ *
+ * Nothing was lost at ingestion. `health_workouts.workout_type` held it, and
+ * this reader already selected it in order to derive the category, then dropped
+ * it on the way out. Carrying it needs no migration and no re-import.
+ */
 export type MovementDay = {
   onDate: string;
   /** A Sakred category — never a platform's word. Callers read load from it. */
   category: string;
+  /**
+   * What the member would call it: "yoga", "running", "strength".
+   *
+   * Null for Sakred-logged sessions, where the category *is* the identity — a
+   * logged session is a set of exercises, not an activity with a name.
+   */
+  activity: string | null;
   /** Where it came from, for callers that surface provenance. */
   source: "sakred" | "imported";
 };
@@ -104,7 +125,7 @@ export async function recentMovement(
     const key = `${row.onDate}|${row.category}`;
     if (claimed.has(key)) continue;
     claimed.add(key);
-    out.push({ onDate: row.onDate, category: row.category, source: "sakred" });
+    out.push({ onDate: row.onDate, category: row.category, activity: null, source: "sakred" });
   }
 
   for (const row of imported) {
@@ -121,7 +142,7 @@ export async function recentMovement(
     const key = `${row.onDate}|${category}`;
     if (claimed.has(key)) continue;
     claimed.add(key);
-    out.push({ onDate: row.onDate, category, source: "imported" });
+    out.push({ onDate: row.onDate, category, activity: row.workoutType ?? null, source: "imported" });
   }
 
   // Newest first, which is what every caller wants and none of them should

@@ -36,7 +36,7 @@ import { Panel, SectionHeading } from "@/components/portal/Panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useHealthSummary } from "@/hooks/use-health";
-import { EXERCISE_CATEGORIES, CATEGORY_LOAD } from "@shared/models/training";
+import { EXERCISE_CATEGORIES, CATEGORY_LOAD, activityLabel } from "@shared/models/training";
 import { HabitPanel } from "@/components/habits/HabitPanel";
 import { TerrainCheckin } from "@/components/habits/TerrainCheckin";
 import type { MemberSection } from "@/components/MemberNav";
@@ -45,6 +45,8 @@ import { cn } from "@/lib/utils";
 type MovementEntry = {
   onDate: string;
   category: string;
+  /** What the member would call it, when the source gave us a name. */
+  activity: string | null;
   orientation: "yin" | "yang" | "both" | "neutral";
   source: "sakred" | "imported";
 };
@@ -61,16 +63,19 @@ type Reading = {
 
 const CATEGORY_LABEL = new Map(EXERCISE_CATEGORIES.map((c) => [c.id as string, c.label as string]));
 
-/** "Today", "Yesterday", then the weekday. Nobody needs a date for this week. */
+/**
+ * A stable calendar date, localized.
+ *
+ * This used to say "today", "yesterday", then the weekday. That reads well in a
+ * sentence and badly in a list: three rows of "Monday", "Tuesday", "yesterday"
+ * give no way to tell which week you are looking at, and "Monday" is ambiguous
+ * the moment the list reaches back more than seven days. History wants a date.
+ */
 function whenShort(onDate: string): string {
-  const today = new Date().toISOString().slice(0, 10);
-  if (onDate === today) return "today";
-  const days = Math.round(
-    (new Date(`${today}T12:00:00`).getTime() - new Date(`${onDate}T12:00:00`).getTime()) /
-      86_400_000,
-  );
-  if (days === 1) return "yesterday";
-  return new Date(`${onDate}T12:00:00`).toLocaleDateString(undefined, { weekday: "long" });
+  return new Date(`${onDate}T12:00:00`).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 /**
@@ -98,28 +103,45 @@ function MovementBehindTheReading({ movement }: { movement: MovementEntry[] }) {
   const demanding = movement.filter((m) => m.orientation === "yang" || m.orientation === "both");
   const restoring = movement.filter((m) => m.orientation === "yin" || m.orientation === "both");
 
+  /**
+   * What they did, then when.
+   *
+   * The activity name first where the source gave us one — "Yoga", "Running" —
+   * falling back to the Sakred category only when it did not. The category is
+   * what the load model reads; it was never meant to be the word a member sees,
+   * and using it produced three rows of "Recovery" for a week of yoga, mobility
+   * and a walk.
+   */
   const line = (m: MovementEntry) =>
-    `${CATEGORY_LABEL.get(m.category) ?? m.category} · ${whenShort(m.onDate)}`;
+    `${activityLabel(m.activity) ?? CATEGORY_LABEL.get(m.category) ?? m.category} · ${whenShort(m.onDate)}`;
 
   return (
     <div className="space-y-3 pt-3 border-t border-[hsl(var(--gold))]/10">
       {demanding.length > 0 && (
         <div className="space-y-1">
           <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-            What you're recovering from
+            Recent demanding movement
           </p>
-          <p className="text-xs text-muted-foreground">
-            {demanding.length} demanding session{demanding.length === 1 ? "" : "s"} this week
-          </p>
+          {/*
+            No count here, deliberately.
+
+            This list is grouped per (day, category) by `recentMovement`, so its
+            length is a number of movement *days*, not of sessions — and it sat
+            directly under a terrain line counting actual sessions, reading as
+            "11 demanding sessions this week" above "5 demanding sessions this
+            week". Both were right about different things and the shared noun
+            made one of them a lie. The canonical session count stays where it
+            is; this section simply stops competing with it.
+          */}
           <ul className="space-y-0.5">
             {demanding.slice(0, 5).map((m, i) => (
-              <li key={`${m.onDate}-${m.category}-${i}`} className="text-xs flex items-baseline gap-2">
-                <span className="truncate">{line(m)}</span>
-                {/* Where it came from, because a session the member never
-                    logged needs to explain its own presence. */}
-                {m.source === "imported" && (
-                  <span className="text-[10px] text-muted-foreground/70 shrink-0">from your phone</span>
-                )}
+              /*
+                Provenance is retained on the row and deliberately not printed.
+                "from your phone" on every imported line was most of the visual
+                weight of the list while answering a question nobody asks twice.
+              */
+              <li key={`${m.onDate}-${m.category}-${i}`} className="text-xs truncate">
+                {line(m)}
               </li>
             ))}
           </ul>
@@ -128,7 +150,7 @@ function MovementBehindTheReading({ movement }: { movement: MovementEntry[] }) {
 
       <div className="space-y-1">
         <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-          Your restore movement
+          Your restorative movement
         </p>
         {restoring.length > 0 ? (
           <ul className="space-y-0.5">
@@ -174,6 +196,16 @@ function hoursMinutes(mins: number): string {
 
 export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
   const terrain = useQuery<Reading>({ queryKey: ["/api/terrain/today"] });
+  /**
+   * What the Rhythm section below is already going to say in full.
+   *
+   * Same query key it uses, so this is the cache rather than a second fetch.
+   * Restore prefers the fuller presentation and suppresses the teaser for the
+   * same guidance id; every other surface that renders TodayRead without a
+   * Rhythm section passes nothing and keeps the teaser.
+   */
+  const rhythm = useQuery<{ relating?: { id: string }[] }>({ queryKey: ["/api/rhythm"] });
+  const rhythmRelatingIds = (rhythm.data?.relating ?? []).map((g) => g.id);
   const health = useHealthSummary(7);
   const qc = useQueryClient();
 
@@ -401,7 +433,7 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
         and the terrain reading, on a screen a member reached deliberately.
         Restore only shows the restorative side; Build shows the other.
       */}
-      <TodayRead side="restore" onOpenCategory={() => undefined} />
+      <TodayRead side="restore" onOpenCategory={() => undefined} suppressRelatingIds={rhythmRelatingIds} />
 
       {/* Rhythm is terrain context, so it belongs on the terrain screen. */}
       <RhythmSection />
