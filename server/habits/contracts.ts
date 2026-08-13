@@ -19,7 +19,7 @@
  */
 
 import { and, eq, desc, sql } from "drizzle-orm";
-import { db } from "../db.js";
+import { db, transactionally, type Tx } from "../db.js";
 import {
   trackedHabits,
   trackedHabitPhases,
@@ -34,7 +34,7 @@ import {
   addDays,
 } from "../../shared/models/habitSchedule.js";
 import { defaultEntryOp, manualFallbackAllowed } from "../../shared/models/habitMeasurement.js";
-import { habitEvent } from "./log.js";
+import { habitEvent, habitEventOnCommit } from "./log.js";
 
 export class ContractError extends Error {
   constructor(
@@ -44,8 +44,6 @@ export class ContractError extends Error {
     super(message);
   }
 }
-
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /**
  * Run this write in a transaction — joining the caller's, if it has one.
@@ -67,9 +65,13 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
  *
  * So a coordinating caller passes its `tx`, and these writes land on its
  * connection, inside its transaction, and roll back with it.
+ *
+ * The caller also inherits the other half: whoever opens the transaction
+ * publishes the events it earned, because only they find out whether it
+ * committed.
  */
 function inTransaction<T>(tx: Tx | undefined, fn: (tx: Tx) => Promise<T>): Promise<T> {
-  return tx ? fn(tx) : db.transaction(fn);
+  return tx ? fn(tx) : transactionally(fn);
 }
 
 /** Config as the columns a phase stores, with the catalogue supplying defaults. */
@@ -171,7 +173,7 @@ export async function addTrackedHabit(opts: {
         )
         .limit(1);
       if (live) {
-        habitEvent("tracked.duplicate", { subjectId: opts.subjectId, trackedHabitId: existing.id });
+        habitEventOnCommit(tx, "tracked.duplicate", { subjectId: opts.subjectId, trackedHabitId: existing.id });
         return { tracked: existing, phase: live, created: false };
       }
       // Tracked but with nothing live — a paused or completed habit being
@@ -222,7 +224,7 @@ export async function addTrackedHabit(opts: {
       actorId: opts.actorId,
     });
 
-    habitEvent("tracked.added", {
+    habitEventOnCommit(tx, "tracked.added", {
       subjectId: opts.subjectId,
       trackedHabitId: tracked.id,
       phaseId: phase.id,
@@ -335,7 +337,7 @@ export async function reconfigure(opts: {
       .set({ status: "active", updatedAt: new Date() })
       .where(eq(trackedHabits.id, tracked.id));
 
-    habitEvent("phase.reconfigured", {
+    habitEventOnCommit(tx, "phase.reconfigured", {
       subjectId: opts.subjectId,
       trackedHabitId: tracked.id,
       fromPhaseId: live?.id ?? null,
@@ -365,7 +367,7 @@ export async function pauseTracked(opts: {
   trackedHabitId: string;
   today: string;
 }) {
-  return db.transaction(async (tx) => {
+  return transactionally(async (tx) => {
     const [live] = await tx
       .select()
       .from(trackedHabitPhases)
@@ -396,7 +398,7 @@ export async function pauseTracked(opts: {
       )
       .returning();
     if (!tracked) throw new ContractError(404, "Not found");
-    habitEvent("tracked.paused", { subjectId: opts.subjectId, trackedHabitId: tracked.id });
+    habitEventOnCommit(tx, "tracked.paused", { subjectId: opts.subjectId, trackedHabitId: tracked.id });
     return tracked;
   });
 }
@@ -415,7 +417,7 @@ export async function resumeTracked(opts: {
   today: string;
   actorId: string;
 }) {
-  return db.transaction(async (tx) => {
+  return transactionally(async (tx) => {
     const [tracked] = await tx
       .select()
       .from(trackedHabits)
@@ -461,7 +463,7 @@ export async function resumeTracked(opts: {
       .set({ status: "active", updatedAt: new Date() })
       .where(eq(trackedHabits.id, tracked.id));
 
-    habitEvent("tracked.resumed", {
+    habitEventOnCommit(tx, "tracked.resumed", {
       subjectId: opts.subjectId,
       trackedHabitId: tracked.id,
       phaseId: phase.id,
@@ -509,7 +511,7 @@ export async function completePhase(opts: {
         .update(trackedHabits)
         .set({ status: "completed", updatedAt: new Date() })
         .where(eq(trackedHabits.id, opts.trackedHabitId));
-      habitEvent("phase.completed", {
+      habitEventOnCommit(tx, "phase.completed", {
         subjectId: opts.subjectId,
         trackedHabitId: opts.trackedHabitId,
         phaseId: live.id,
@@ -539,7 +541,7 @@ export async function completePhase(opts: {
       })
       .returning();
 
-    habitEvent("phase.completed", {
+    habitEventOnCommit(tx, "phase.completed", {
       subjectId: opts.subjectId,
       trackedHabitId: opts.trackedHabitId,
       phaseId: live.id,
@@ -563,7 +565,7 @@ export async function removeTracked(opts: {
   trackedHabitId: string;
   today: string;
 }) {
-  return db.transaction(async (tx) => {
+  return transactionally(async (tx) => {
     const [live] = await tx
       .select()
       .from(trackedHabitPhases)
@@ -593,7 +595,7 @@ export async function removeTracked(opts: {
       )
       .returning();
     if (!tracked) throw new ContractError(404, "Not found");
-    habitEvent("tracked.removed", { subjectId: opts.subjectId, trackedHabitId: tracked.id });
+    habitEventOnCommit(tx, "tracked.removed", { subjectId: opts.subjectId, trackedHabitId: tracked.id });
     return tracked;
   });
 }
@@ -706,7 +708,7 @@ export async function acceptProposal(opts: {
   today: string;
   actorId: string;
 }) {
-  return db.transaction(async (tx) => {
+  return transactionally(async (tx) => {
     const [proposal] = await tx
       .select()
       .from(habitProposals)
@@ -811,7 +813,7 @@ export async function acceptProposal(opts: {
       .set({ status: "accepted", respondedAt: new Date(), resultingPhaseId: phase.id })
       .where(eq(habitProposals.id, proposal.id));
 
-    habitEvent("proposal.accepted", {
+    habitEventOnCommit(tx, "proposal.accepted", {
       subjectId: opts.subjectId,
       proposalId: proposal.id,
       trackedHabitId: tracked.id,

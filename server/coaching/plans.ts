@@ -28,7 +28,7 @@
  */
 
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { db } from "../db.js";
+import { db, transactionally } from "../db.js";
 import {
   coachingPlans,
   coachingPlanItems,
@@ -51,7 +51,7 @@ import {
 import { addTrackedHabit, reconfigure, completePhase, ContractError } from "../habits/contracts.js";
 import { terrainFor } from "../terrain/read.js";
 import { memberToday } from "./enrollment.js";
-import { habitEvent } from "../habits/log.js";
+import { habitEventOnCommit } from "../habits/log.js";
 
 /** The catalogue rows a review needs, for the habits a plan names. */
 async function catalogueFor(routineHabitIds: string[]): Promise<ReviewHabit[]> {
@@ -241,8 +241,12 @@ export async function activatePlan(opts: {
    * Passing `tx` is what makes the guarantee real: their statements run on this
    * connection, in this transaction, and roll back with it. That is also why
    * none of them were reimplemented here — every rule they enforce still applies.
+   *
+   * `transactionally` rather than `db.transaction` for the same reason one step
+   * out: the events this earns are held until the commit returns. A member
+   * should never be told about a change the database refused.
    */
-  await db.transaction(async (tx) => {
+  await transactionally(async (tx) => {
     for (const item of items) {
       const change = byId.get(item.routineHabitId);
       if (!change || change.action === "keep") continue;
@@ -340,13 +344,15 @@ export async function activatePlan(opts: {
         updatedAt: new Date(),
       })
       .where(eq(coachingPlans.id, plan.id));
-  });
 
-  habitEvent("plan.activated", {
-    subjectId: plan.memberUserId,
-    planId: plan.id,
-    actorId,
-    changes: review.changes.filter((c) => c.action !== "keep").length,
+    // Held, not emitted. It publishes with everything else the activation
+    // earned, once — and only if the whole transition survived.
+    habitEventOnCommit(tx, "plan.activated", {
+      subjectId: plan.memberUserId,
+      planId: plan.id,
+      actorId,
+      changes: review.changes.filter((c) => c.action !== "keep").length,
+    });
   });
 
   const [updated] = await db.select().from(coachingPlans).where(eq(coachingPlans.id, plan.id));

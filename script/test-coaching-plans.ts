@@ -27,6 +27,12 @@ import {
   PLAN_STATUSES,
 } from "../shared/models/coachingPlans.js";
 import { stressLoadOf } from "../shared/models/loadClass.js";
+import {
+  habitEventOnCommit,
+  publishPending,
+  discardPending,
+  pendingCount,
+} from "../server/habits/log.js";
 
 let passed = 0;
 let failed = 0;
@@ -384,6 +390,101 @@ check(
 check("an open-ended plan never claims to have finished",
   !planRanItsCourse({ endedAt: "2026-08-20T10:00:00Z", endsOn: null }));
 
+console.log("\nAn event is what happened, not what was attempted\n");
+
+/**
+ * These run for real. `log.ts` imports nothing, so unlike the transaction
+ * plumbing it can be exercised rather than read.
+ *
+ * The ordering being pinned:
+ *
+ *     what became true  →  what happened  →  what a person is told
+ *
+ * A statement inside an open transaction is at the first stage only. Emitting
+ * there is announcing a change the database is still free to refuse — today a
+ * misleading log line, and the moment anything acts on events, a notification
+ * about something that never happened.
+ */
+function emitted(fn: () => void): string[] {
+  const lines: string[] = [];
+  const real = console.log;
+  console.log = (line: string) => void lines.push(String(line));
+  try {
+    fn();
+  } finally {
+    console.log = real;
+  }
+  return lines;
+}
+
+/** A failed activation. Three mutations' worth of events, then a rollback. */
+{
+  const tx = {};
+  const lines = emitted(() => {
+    habitEventOnCommit(tx, "phase.reconfigured", { trackedHabitId: "t-protein" });
+    habitEventOnCommit(tx, "tracked.added", { trackedHabitId: "t-downshift" });
+    habitEventOnCommit(tx, "plan.activated", { planId: "p1", changes: 3 });
+    discardPending(tx);
+  });
+  check("a failed activation publishes nothing at all", lines.length === 0);
+  check("and is left holding nothing", pendingCount(tx) === 0);
+}
+
+/** The same activation, committed. */
+{
+  const tx = {};
+  habitEventOnCommit(tx, "phase.reconfigured", { trackedHabitId: "t-protein" });
+  habitEventOnCommit(tx, "tracked.added", { trackedHabitId: "t-downshift" });
+  habitEventOnCommit(tx, "plan.activated", { planId: "p1", changes: 3 });
+  check("events are held while the transaction is open", pendingCount(tx) === 3);
+
+  const lines = emitted(() => publishPending(tx));
+  check("committing publishes them", lines.length === 3);
+  check(
+    "each exactly once",
+    ["phase.reconfigured", "tracked.added", "plan.activated"].every(
+      (e) => lines.filter((l) => JSON.parse(l).event === e).length === 1,
+    ),
+  );
+  check("in the order the changes were made", JSON.parse(lines[0]).event === "phase.reconfigured");
+  check("and the plan's own event last", JSON.parse(lines[2]).event === "plan.activated");
+
+  /** A retry, a double-await, a stray call — the events do not come round again. */
+  check("publishing a second time republishes nothing", emitted(() => publishPending(tx)).length === 0);
+}
+
+/**
+ * Without a transaction this is the old behaviour, and should be: a single
+ * autocommitted statement has already succeeded by the time the event is
+ * reached, so there is nothing left to wait for.
+ */
+{
+  const lines = emitted(() => habitEventOnCommit(null, "entry.logged", { onDate: "2026-08-13" }));
+  check("an un-transacted write still emits immediately", lines.length === 1);
+}
+
+/** Two members' activations at once. Neither publishes the other's. */
+{
+  const a = {};
+  const b = {};
+  habitEventOnCommit(a, "plan.activated", { planId: "p-a" });
+  habitEventOnCommit(b, "plan.activated", { planId: "p-b" });
+  const lines = emitted(() => publishPending(a));
+  check("one transaction publishes only its own", lines.length === 1);
+  check("and it is the right one", JSON.parse(lines[0]).planId === "p-a");
+  check("the other is still waiting on its own commit", pendingCount(b) === 1);
+  discardPending(b);
+}
+
+/** Holding an event changes nothing about what may be in one. */
+{
+  const tx = {};
+  habitEventOnCommit(tx, "phase.reconfigured", { trackedHabitId: "t1", target: 165 });
+  const line = JSON.parse(emitted(() => publishPending(tx))[0]);
+  check("a target is still dropped on the way out", !("target" in line));
+  check("while the ids survive", line.trackedHabitId === "t1");
+}
+
 console.log("\nActivation is one transaction — and one connection\n");
 
 /**
@@ -413,7 +514,7 @@ const contractsSrc = readFileSync(new URL("../server/habits/contracts.ts", impor
 const plansSrc = readFileSync(new URL("../server/coaching/plans.ts", import.meta.url), "utf8");
 const activation = plansSrc.slice(plansSrc.indexOf("export async function activatePlan"));
 
-check("activation opens a transaction", /await db\.transaction\(async \(tx\) => \{/.test(activation));
+check("activation opens a transaction", /await transactionally\(async \(tx\) => \{/.test(activation));
 
 for (const writer of ["addTrackedHabit", "reconfigure", "completePhase"] as const) {
   const at = activation.indexOf(`${writer}({`);
@@ -440,17 +541,38 @@ for (const writer of ["addTrackedHabit", "reconfigure", "completePhase"] as cons
 
 /**
  * And the helper itself. `fn(tx)` — the caller's transaction, used directly.
- * Anything that reaches for `db` here is a new connection again.
+ * Anything that opens its own here is a new connection again.
  */
 {
-  const helper = contractsSrc.slice(
-    contractsSrc.indexOf("function inTransaction"),
-    contractsSrc.indexOf("function inTransaction") + 400,
-  );
-  const body = helper.slice(helper.indexOf("{")).replace(/\s+/g, " ");
+  const at = contractsSrc.indexOf("function inTransaction");
+  const body = contractsSrc.slice(at, at + 400).replace(/\s+/g, " ");
   check(
     "a supplied transaction is used as-is",
-    body.includes("return tx ? fn(tx) : db.transaction(fn);"),
+    body.includes("return tx ? fn(tx) : transactionally(fn);"),
+  );
+}
+
+/**
+ * The failure mode the new mechanism can introduce: an event held against a
+ * transaction nobody ever publishes. `transactionally` is the only thing that
+ * calls `publishPending`, so a writer that holds events while opening with a
+ * bare `db.transaction` would drop them silently — the opposite mistake, and
+ * just as quiet.
+ */
+{
+  const bodies = contractsSrc.replace(/^ \*.*$/gm, "");
+  check(
+    "no writer holds events on a transaction that never publishes them",
+    !/db\.transaction\(/.test(bodies),
+    "contracts.ts opens a transaction directly — anything it holds is lost",
+  );
+  check(
+    "activation publishes what it earned, once its commit returns",
+    /await transactionally\(async \(tx\) => \{/.test(activation),
+  );
+  check(
+    "and the plan's own event is held with the rest",
+    /habitEventOnCommit\(tx, "plan\.activated"/.test(activation),
   );
 }
 
