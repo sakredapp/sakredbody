@@ -29,8 +29,15 @@ export const SAKRED_HEALTH_URL = "https://www.sakredhealth.com";
 export interface NavEntry {
   label: string;
   href?: string;
-  /** When present the entry becomes a dropdown and `href` is ignored. */
-  children?: { label: string; href: string; note?: string }[];
+  /**
+   * When present the entry becomes a dropdown and `href` is ignored.
+   *
+   * `tool` marks an entry that is not the same kind of thing as the ones above
+   * it. The Intelligence holds three philosophy pages and one utility; without
+   * the distinction a visitor reads four equal destinations and has to work
+   * out for themselves that one of them is a lookup table.
+   */
+  children?: { label: string; href: string; note?: string; tool?: boolean }[];
 }
 
 /**
@@ -80,7 +87,7 @@ export const SITE_NAV: NavEntry[] = [
       { label: "The Body Map", href: "/the-body-map", note: "How the body works, and who taught us to read it" },
       { label: "How Sakred Works", href: "/how-sakred-works", note: "The philosophy inside the app" },
       { label: "The Manifesto", href: "/manifesto", note: "Why modern health feels fragmented" },
-      { label: "Food Chart", href: "/food-chart", note: "What food actually does" },
+      { label: "Food Chart", href: "/food-chart", note: "What food actually does", tool: true },
     ],
   },
   {

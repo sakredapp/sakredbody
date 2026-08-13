@@ -116,12 +116,22 @@ export function SiteHeader({ navItems = SITE_NAV, cta, overHero = true }: SiteHe
                         href={c.href}
                         className={cn(
                           "block px-5 py-3.5 hover-elevate transition-colors border-b border-border/40 last:border-0",
+                          // A tool is not the same kind of thing as the pages
+                          // above it. The heavier rule and the label stop the
+                          // group reading as four equal destinations when it is
+                          // three and a lookup table.
+                          c.tool && "border-t border-t-gold/25 bg-black/10",
                           isActive(c.href) && "bg-gold/5",
                         )}
                         data-testid={`nav-${c.href.replace(/\//g, "")}`}
                       >
                         <span className={cn("block text-sm", isActive(c.href) ? "text-gold" : "text-foreground")}>
                           {c.label}
+                          {c.tool && (
+                            <span className="ml-2 align-middle text-[0.6rem] uppercase tracking-[0.16em] text-gold/70">
+                              Tool
+                            </span>
+                          )}
                         </span>
                         {c.note && (
                           <span className="block text-xs text-muted-foreground mt-0.5">{c.note}</span>

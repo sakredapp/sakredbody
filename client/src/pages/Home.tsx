@@ -194,7 +194,7 @@ export default function Home() {
             </h1>
 
             <motion.div variants={fadeInUp}>
-              <ConstellationBody />
+              <ConstellationBody interactive={false} />
             </motion.div>
 
             {/* Three things and nothing else: the name, the figure, the way
