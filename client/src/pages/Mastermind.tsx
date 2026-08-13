@@ -321,7 +321,9 @@ export default function Mastermind() {
         <div className="max-w-2xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-display font-normal mb-6" data-testid="text-final-cta-headline">You've invested in your business.<br/><span className="text-gold">Now invest in yourself.</span></h2>
           <p className="text-muted-foreground text-lg mb-10 leading-relaxed">
-            Sakred Body is for people who are done running on empty and ready to build a real foundation — physically, mentally, and personally.
+            {/* "done running on empty" was the same idiom as the "running on
+                fumes" card further up the page. One of them had to go. */}
+            Sakred Body is for people ready to build a real foundation — physically, mentally, and personally.
           </p>
           <Button onClick={openApplication} size="lg" className="text-base px-10 gold-metallic-btn" data-testid="button-apply-final">
             Apply to Join Sakred Body <ArrowRight className="ml-2 h-5 w-5" />

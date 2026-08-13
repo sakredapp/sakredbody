@@ -109,7 +109,11 @@ export default function Philosophy() {
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
-              eyebrow="The Architecture"
+              /* Home's territories section already uses "The Architecture",
+                 over the same TERRITORIES data. Home teases the three and
+                 links here for the full version; sharing the eyebrow made the
+                 pair read as one section pasted twice. */
+              eyebrow="The Three Territories"
               title={<>Restore. Build. <span className="text-gold">Gather.</span></>}
               testId="text-territories-headline"
             />

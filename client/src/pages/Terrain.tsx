@@ -73,7 +73,11 @@ export default function Terrain() {
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
-              eyebrow="The Chain"
+              /* "The Chain" over a title reading "The Cycle", with the hero
+                 marks directly above saying "A closed loop" — three names for
+                 one structure inside a single screen. The eyebrow now frames
+                 the diagram instead of renaming it. */
+              eyebrow="How It Connects"
               title={<>The Cycle</>}
               intro="Every stage sets the conditions for the next."
               testId="text-chain-headline"
