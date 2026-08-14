@@ -71,14 +71,32 @@ function eventLabel(e: MovementEvent): string {
 
 export function TodaysBuild({ onCheckIn }: { onCheckIn?: () => void }) {
   const { data } = useToday();
-  if (!data) return null;
+
+  /**
+   * No reading, no card — and crucially, no crash.
+   *
+   * `terrain` is absent whenever the server predates this client, which is the
+   * normal condition for a bundled native app between a store release and a
+   * deploy rather than an exotic one. Build 23 shipped dereferencing it
+   * unconditionally and took down the entire section with
+   * `undefined is not an object (evaluating 's.terrain.lean')` — the
+   * prescription, the history, the habits and the session builder all gone,
+   * because the recommendation on top of them could not be formed.
+   *
+   * Today's Build is optional. Build is not. Anything that cannot honestly
+   * produce a recommendation omits itself and leaves the rest of the screen
+   * standing.
+   */
+  if (!data?.terrain) return null;
 
   const gate = buildGate({
     lean: data.terrain.lean,
-    reasons: data.terrain.reasons,
+    // Same rule as `terrain` itself: an older server is a legitimate peer, and
+    // a missing array must degrade rather than throw inside the gate.
+    reasons: data.terrain.reasons ?? [],
     hasReport: data.terrain.hasReport,
     read: data.read,
-    suggestions: data.suggestions,
+    suggestions: data.suggestions ?? [],
   });
 
   return (

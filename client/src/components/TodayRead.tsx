@@ -72,8 +72,22 @@ export type TodayResponse = {
    * The same reading Home shows, not a second one — see
    * `shared/models/buildToday.ts` for why every capacity claim has to defer to
    * it rather than to the readiness level sitting beside it here.
+   *
+   * ── Optional, and permanently so ────────────────────────────────────────
+   *
+   * A native build and a server deploy are never atomic. The client is bundled
+   * into an artifact that goes through App Review and then sits on somebody's
+   * phone for as long as they leave it there; the server ships on push. So the
+   * two are always skewed in one direction or the other, and every field a
+   * native client reads is optional whether or not the current server sends it.
+   *
+   * This was learned the hard way: build 23 shipped reading `data.terrain.lean`
+   * while the deploy carrying `terrain` was still queued, and Build crashed to
+   * an error screen — `undefined is not an object` — for the whole section.
+   * Marking it required in the type made the compiler agree with an assumption
+   * that was never true at runtime.
    */
-  terrain: {
+  terrain?: {
     lean: TerrainLean;
     headline: string;
     reasons: TerrainReason[];

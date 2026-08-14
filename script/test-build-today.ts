@@ -295,5 +295,94 @@ console.log("\nNo invented muscle groups\n");
   check("and falls back to the category, not a body part", /CATEGORY_LABEL\.get/.test(ui));
 }
 
+console.log("\nThe shape that actually crashed on a phone\n");
+
+{
+  /**
+   * Build 23, production account, 14 Aug. Read out of the database rather than
+   * imagined: sleep present, no HRV, no resting heart rate, movement across six
+   * days, and no check-in — terrain_checkins is empty product-wide.
+   *
+   * Home rendered "Keep today adjustable" from exactly this while Build showed
+   * an error screen, so the reading was never the problem. Pinned because it is
+   * the one input set proven to exist.
+   */
+  const trained = [
+    "endurance", "recovery",
+    "endurance", "recovery",
+    "strength", "recovery",
+    "endurance", "strength", "recovery",
+    "recovery",
+    "strength", "recovery",
+  ];
+  const measured = readTerrain({
+    sleepRecent: 462, sleepBaseline: 406,
+    hrvRecent: null, hrvBaseline: null,
+    rhrRecent: null, rhrBaseline: null,
+    trainedCategories: trained,
+    daysSinceLastSession: 1,
+    recentDays: 7, baselineDays: 28,
+  });
+  const terrain = composeTerrainNow({ measured, reported: null });
+  const readiness = readReadiness({
+    sleepMinutes: 531, sleepBaselineMinutes: 406,
+    hrv: null, hrvBaseline: null,
+    restingHeartRate: null, restingHeartRateBaseline: null,
+    hardSessionsRecently: 3, daysSinceLastSession: 1, terrainLean: null,
+  });
+  const suggestions = suggestToday({ read: readiness, recentCategories: ["endurance", "recovery", "strength"], excluded: [] });
+
+  check("terrain is adjustable, as the phone showed", terrain.lean === "either", terrain.lean);
+  check("no wearable beyond sleep", terrain.hasBody === true);
+  check("and no report", terrain.hasReport === false);
+
+  const gate = buildGate({
+    lean: terrain.lean, reasons: terrain.reasons,
+    hasReport: terrain.hasReport, read: readiness, suggestions,
+  });
+
+  check("a recommendation forms", !gate.insufficient);
+  check("it is conditional, not triumphant", /warm-up agrees/.test(gate.headline), gate.headline);
+  check("no capacity claim Terrain did not make", !PUSH_WORDS.test(gate.headline));
+  check("options are offered", gate.options.length > 0);
+  check("and the check-in is invited", gate.invitesReport);
+}
+
+console.log("\nA missing contract omits the card, never the screen\n");
+
+{
+  /**
+   * The actual defect behind the crash.
+   *
+   * A native build and a server deploy are never atomic — the client sits on a
+   * phone through App Review while the server ships on push — so `terrain` is
+   * absent whenever the deployed server predates the installed app. Build 23
+   * dereferenced it unconditionally and took down the prescription, the
+   * history, the habits and the session builder along with it.
+   */
+  const ui = code("client/src/components/build/BuildToday.tsx");
+
+  /**
+   * Both present, and in that order. `indexOf(a) < indexOf(b)` alone passes
+   * when `a` is missing entirely, which is the one case this has to catch.
+   */
+  const guard = ui.indexOf("if (!data?.terrain) return null");
+  const deref = ui.indexOf("data.terrain.lean");
+  check("the card guards at all", guard !== -1);
+  check("it still dereferences after that", deref !== -1);
+  check("and the guard comes first", guard !== -1 && deref !== -1 && guard < deref);
+  check("and its own arrays degrade rather than throw", /suggestions: data\.suggestions \?\? \[\]/.test(ui));
+  check("history is a separate query", /queryKey: \["\/api\/terrain\/today"\]/.test(ui));
+  check("so it survives the card being absent", /terrain\.data\?\.movementEvents \?\? \[\]/.test(ui));
+
+  /** The type must not promise what the wire cannot guarantee. */
+  const today = code("client/src/components/TodayRead.tsx");
+  check("the response type marks terrain optional", /terrain\?: \{/.test(today));
+
+  /** Nothing else on Build may hard-require it either. */
+  const tab = code("client/src/components/BuildTab.tsx");
+  check("the tab reads no terrain of its own", !/\.terrain\./.test(tab));
+}
+
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);
