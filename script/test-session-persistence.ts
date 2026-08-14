@@ -124,6 +124,31 @@ console.log("\nOne open workout, refused rather than merged\n");
   check("because it finishes in the same breath", /sessions\/\$\{id\}\/finish/.test(practice));
 }
 
+console.log("\nA half-written practice log leaves no ghost\n");
+
+{
+  /**
+   * The one-shot flow is still three calls: create, write the set, finish. If
+   * the second or third fails, an empty finished session is left behind — and
+   * the question that matters is whether that inert row can masquerade as
+   * training the member never did.
+   *
+   * It cannot. `movementEvents` selects FROM workout_sets and reaches the
+   * session through an inner join, so a session with no sets contributes no
+   * rows at all — not to history, not to the load projection, not to terrain.
+   * Confirmed against production, where four finished sessions with zero sets
+   * currently exist and produce zero events between them.
+   *
+   * So the failure mode is an inert record rather than a fabricated workout.
+   * Worth removing by making the write atomic; not worth blocking on.
+   */
+  const history = code("server/movement/history.ts");
+  check("events are selected from the sets", /\.from\(workoutSets\)/.test(history));
+  check("and reach the session by inner join", /innerJoin\(workoutSessions/.test(history));
+  check("so an empty session cannot contribute", !/\.from\(workoutSessions\)[\s\S]{0,200}leftJoin\(workoutSets/.test(history));
+  check("a finished session is still required", /finishedAt\} is not null/.test(history));
+}
+
 console.log("\nA refusal is answered, not toasted\n");
 
 {
