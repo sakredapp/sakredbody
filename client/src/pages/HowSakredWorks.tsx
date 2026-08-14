@@ -19,6 +19,7 @@ import { ArrowRight } from "lucide-react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
+import { SectionBridge } from "@/components/SectionBridge";
 import { PageHero, SectionHeader } from "@/components/PageHero";
 import { Constellation } from "@/components/Constellation";
 import { MoonPhase, moonPhaseName } from "@/components/MoonPhase";
@@ -90,8 +91,10 @@ export default function HowSakredWorks() {
         </motion.div>
       </Section>
 
+      <SectionBridge />
+
       {/* ── Two kinds of information ─────────────────────────── */}
-      <Section tone="raised" width="max-w-4xl">
+      <Section tone="raised" containerClassName="max-w-4xl">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
@@ -140,6 +143,8 @@ export default function HowSakredWorks() {
           </p>
         </div>
       </Section>
+
+      <SectionBridge />
 
       {/* ── The loop ─────────────────────────────────────────── */}
       <Section tone="raised">
@@ -192,7 +197,7 @@ export default function HowSakredWorks() {
       </Section>
 
       {/* ── CTA ──────────────────────────────────────────────── */}
-      <Section tone="raised" width="max-w-3xl" className="text-center">
+      <Section tone="raised" containerClassName="max-w-3xl" className="text-center">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.h2 variants={fadeInUp} className="text-3xl md:text-4xl font-display font-normal mb-6">
             The goal is a body <span className="text-gold">you can adjust from.</span>

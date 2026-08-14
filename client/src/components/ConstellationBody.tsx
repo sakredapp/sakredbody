@@ -159,8 +159,13 @@ export const BODY_REGIONS: BodyRegion[] = [
  * Written as relationships rather than "everything affects everything" — a
  * figure where the whole body lights at 20% whenever anything is touched says
  * nothing at all. A strong neighbour is a quarter, a secondary is an eighth.
+ *
+ * Exported because the Body Map panel names these as "connected to". One
+ * definition, so what the figure lights and what the words claim cannot drift
+ * — a panel listing a relationship the canvas never draws is worse than no
+ * panel at all.
  */
-const NEIGHBOURS: Record<string, { key: string; w: number }[]> = {
+export const NEIGHBOURS: Record<string, { key: string; w: number }[]> = {
   crown: [{ key: "throat", w: 0.25 }, { key: "root", w: 0.12 }],
   throat: [{ key: "legs", w: 0.25 }, { key: "root", w: 0.25 }, { key: "heart", w: 0.12 }],
   root: [{ key: "arms", w: 0.25 }, { key: "throat", w: 0.25 }],

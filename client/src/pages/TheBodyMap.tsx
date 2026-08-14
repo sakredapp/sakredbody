@@ -36,8 +36,9 @@ import { ArrowRight } from "lucide-react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
+import { SectionBridge } from "@/components/SectionBridge";
 import { PageHero, SectionHeader } from "@/components/PageHero";
-import { ConstellationBody } from "@/components/ConstellationBody";
+import { ConstellationBody, NEIGHBOURS } from "@/components/ConstellationBody";
 import { ImageBand } from "@/components/ImageBand";
 import { TerrainWheel } from "@/components/TerrainWheel";
 import { FlipCards } from "@/components/FlipCards";
@@ -117,6 +118,51 @@ const CONFUSIONS = [
     body: "Poor drainage, low thyroid output, and sluggish circulation feel like a character flaw from the inside. It usually isn't one.",
   },
 ];
+
+/**
+ * One labelled block inside the region panel.
+ *
+ * A quiet heading and a hairline, not a card. The panel holds five different
+ * kinds of statement — anatomy, tradition, measurement, relationship,
+ * practice — and without labels they read as one long paragraph in which the
+ * lens and the measurement blur into each other, which is the exact merge
+ * data/bodyMap.ts exists to prevent.
+ */
+function Facet({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="mt-5 pt-4 border-t border-gold/12 first:mt-0 first:pt-0 first:border-0">
+      <p className="text-[0.6rem] uppercase tracking-[0.2em] text-gold/70 mb-2">{label}</p>
+      {children}
+    </div>
+  );
+}
+
+/** A middot-separated run of names. Reads as a set, not as a ranking. */
+function Names({ items }: { items: string[] }) {
+  return (
+    <p className="text-sm text-foreground/85 leading-relaxed">
+      {items.map((it, i) => (
+        <span key={it}>
+          {i > 0 && <span className="text-gold/40 mx-1.5">·</span>}
+          {it}
+        </span>
+      ))}
+    </p>
+  );
+}
+
+/**
+ * What this region answers in, named from the same map the canvas lights.
+ *
+ * NEIGHBOURS is keyed by the figure's geometry; the visitor reads the
+ * conceptual names. Resolving through MAP_REGIONS means the panel can never
+ * claim a relationship the figure does not draw.
+ */
+function connectedTo(key: string): string[] {
+  return (NEIGHBOURS[key] ?? [])
+    .map((n) => MAP_REGIONS.find((r) => r.key === n.key)?.name)
+    .filter((n): n is string => !!n);
+}
 
 export default function TheBodyMap() {
   usePageMeta(
@@ -200,9 +246,17 @@ export default function TheBodyMap() {
             />
           </motion.div>
 
-          <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
-            <motion.div variants={fadeInUp} className="order-1">
+          {/* One composition, not a figure with a text block under it. On a
+              wide screen the body and what it is saying sit side by side and
+              the seven selectors run beneath both, so the row reads as
+              navigation for the whole thing. On a phone it stacks — and the
+              selectors stay *between* the figure and the panel, because
+              putting them last would mean scrolling past the answer to reach
+              the question. */}
+          <div className="grid lg:grid-cols-2 gap-y-8 gap-x-10 lg:gap-x-16 items-center">
+            <motion.div variants={fadeInUp} className="order-1 lg:col-start-1 lg:row-start-1">
               <ConstellationBody value={activeKey} onActive={setActiveKey} paused={tabFocus} />
+            </motion.div>
 
               {/* ── The seven, named ─────────────────────────
                   Not only an accessibility fallback, though it is that: the
@@ -219,11 +273,12 @@ export default function TheBodyMap() {
                   Wrapping rather than scrolling sideways: the entire purpose is
                   that all seven are visible, so hiding some off the edge of a
                   phone would defeat it. Two quiet rows is the right answer. */}
-              <div
-                role="tablist"
-                aria-label="Body territories"
-                aria-orientation="horizontal"
-                className="flex flex-wrap justify-center gap-2 mt-6"
+            <motion.div
+              variants={fadeInUp}
+              role="tablist"
+              aria-label="Body territories"
+              aria-orientation="horizontal"
+              className="order-2 lg:col-span-2 lg:row-start-2 flex flex-wrap justify-center gap-2"
                 onFocus={() => setTabFocus(true)}
                 onBlur={(e) => {
                   if (!e.currentTarget.contains(e.relatedTarget as Node)) setTabFocus(false);
@@ -257,7 +312,6 @@ export default function TheBodyMap() {
                     </button>
                   );
                 })}
-              </div>
             </motion.div>
 
             {/* min-h so the column doesn't resize as regions of different
@@ -270,7 +324,7 @@ export default function TheBodyMap() {
                 which one is selected, and what that one means. */}
             <motion.div
               variants={fadeInUp}
-              className="order-2 min-h-[22rem] flex flex-col justify-center"
+              className="order-3 lg:order-none lg:col-start-2 lg:row-start-1 min-h-[22rem] flex flex-col justify-center"
               role="tabpanel"
               id="region-panel"
               aria-labelledby={`region-tab-${region.key}`}
@@ -284,18 +338,33 @@ export default function TheBodyMap() {
                   transition={{ duration: 0.35, ease: "easeOut" }}
                   data-testid={`region-${region.key}`}
                 >
-                  <p className="text-[0.7rem] uppercase tracking-[0.22em] text-gold mb-3">
-                    {region.traditions}
-                  </p>
-                  <h3 className="font-display text-4xl md:text-5xl mb-2 tracking-tight">{region.name}</h3>
-                  {/* The anatomy, so a conceptual name still lands on a body
-                      part rather than floating free of the figure beside it. */}
-                  <p className="text-xs text-muted-foreground mb-5">{region.covers}</p>
-                  <p className="text-foreground leading-relaxed mb-5">{region.governs}</p>
+                  <h3 className="font-display text-4xl md:text-5xl mb-3 tracking-tight">{region.name}</h3>
+                  <p className="text-foreground leading-relaxed mb-7">{region.governs}</p>
 
-                  {/* The two sentences stay two sentences. See data/bodyMap.ts. */}
-                  <p className="text-muted-foreground leading-relaxed mb-4">{region.lens}</p>
-                  <p className="text-muted-foreground leading-relaxed">{region.measured}</p>
+                  {/* The traditions are met through the part of the body being
+                      explored, rather than in a directory somewhere else on the
+                      page. Selecting Breath is how you find out that pranayama
+                      and respiratory physiology were looking at one thing. */}
+                  <Facet label="The body">
+                    <p className="text-sm text-muted-foreground">{region.covers}</p>
+                  </Facet>
+
+                  {/* The two lenses stay two lenses, each with its own heading
+                      and its own sentence. See data/bodyMap.ts for why the
+                      merge is the thing being prevented. */}
+                  <Facet label="Traditional lenses">
+                    <Names items={region.traditional} />
+                    <p className="text-sm text-muted-foreground leading-relaxed mt-2">{region.lens}</p>
+                  </Facet>
+
+                  <Facet label="Modern lens">
+                    <Names items={region.modern} />
+                    <p className="text-sm text-muted-foreground leading-relaxed mt-2">{region.measured}</p>
+                  </Facet>
+
+                  <Facet label="Connected to">
+                    <Names items={connectedTo(region.key)} />
+                  </Facet>
 
                   <ul className="flex flex-wrap gap-2 mt-7">
                     {region.practice.map((p) => (
@@ -356,6 +425,8 @@ export default function TheBodyMap() {
           </motion.div>
         </motion.div>
       </Section>
+
+      <SectionBridge />
 
       {/* ── Consequences ─────────────────────────────────────── */}
       <Section tone="ink">
@@ -423,7 +494,7 @@ export default function TheBodyMap() {
       </ImageBand>
 
       {/* ── The practice ─────────────────────────────────────── */}
-      <Section tone="ink" width="max-w-4xl">
+      <Section tone="ink" containerClassName="max-w-4xl">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
@@ -434,28 +505,59 @@ export default function TheBodyMap() {
             />
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-10 items-center">
-            <motion.div variants={fadeInUp}>
-              <p className="text-muted-foreground leading-relaxed mb-6">{EMBODIED_PRACTICE.body}</p>
-              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
-                {EMBODIED_PRACTICE.domains.map((d) => (
-                  <li key={d} className="text-sm text-muted-foreground flex gap-2.5">
-                    <span className="text-gold shrink-0" aria-hidden="true">·</span>
-                    {d}
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
+          {/* The argument stays centred with the heading above it. It used to
+              be the left half of a two-column grid, so the section opened
+              centred and then the one paragraph that carried the point swung
+              hard left under it — which reads as a layout accident rather than
+              a decision. The list below is where the composition becomes
+              structured, on purpose. */}
+          <motion.p
+            variants={fadeInUp}
+            className="text-muted-foreground leading-relaxed text-center max-w-2xl mx-auto"
+          >
+            {EMBODIED_PRACTICE.body}
+          </motion.p>
 
-            <motion.div variants={fadeInUp}>
-              <BreathPacer className="w-full" />
-            </motion.div>
-          </div>
+          <motion.div variants={fadeInUp} className="mt-14 pt-10 border-t border-gold/12">
+            <div className="grid md:grid-cols-[1fr_auto] gap-10 md:gap-14 items-center">
+              <div>
+                <p className="text-[0.6rem] uppercase tracking-[0.2em] text-gold/70 mb-5">In practice</p>
+                {/* Left aligned deliberately — eight short labels are read by
+                    scanning down a column, not by reading a centred block. */}
+                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5">
+                  {EMBODIED_PRACTICE.domains.map((d) => (
+                    <li key={d} className="text-sm text-muted-foreground flex gap-2.5">
+                      <span className="text-gold shrink-0" aria-hidden="true">·</span>
+                      {d}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* The pacer is not filling space. It is the shortest possible
+                  demonstration of the sentence beside it: a practice is
+                  something you enter and keep time with, not something you
+                  read about. The caption says so, so it cannot be mistaken
+                  for a glowing circle. */}
+              <div className="md:w-[15rem] shrink-0">
+                <BreathPacer className="w-full" />
+                <p className="text-[0.6rem] uppercase tracking-[0.2em] text-gold/60 text-center mt-4">
+                  Practice becomes rhythm
+                </p>
+                <p className="text-xs text-muted-foreground text-center mt-2 leading-relaxed">
+                  Four in, six out. Follow it for a minute and the section stops being something you're
+                  reading.
+                </p>
+              </div>
+            </div>
+          </motion.div>
         </motion.div>
       </Section>
 
+      <SectionBridge />
+
       {/* ── CTA ──────────────────────────────────────────────── */}
-      <Section tone="raised" width="max-w-3xl" className="text-center">
+      <Section tone="raised" containerClassName="max-w-3xl" className="text-center">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.h2 variants={fadeInUp} className="text-3xl md:text-4xl font-display font-normal mb-6">
             The map becomes <span className="text-gold">practice.</span>

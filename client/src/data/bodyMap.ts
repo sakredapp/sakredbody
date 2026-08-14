@@ -48,8 +48,18 @@ export interface MapRegion {
   covers: string;
   /** What it governs, in one line. */
   governs: string;
-  /** The traditions that studied it, named rather than blended. */
-  traditions: string;
+  /**
+   * The traditions that studied it, named rather than blended.
+   *
+   * Two lists, not one string. A single line reading "Pranayama · Qi Gong ·
+   * respiratory physiology" quietly implies those are the same kind of claim,
+   * and the whole discipline of this file is that they are not. Kept plural
+   * per region on purpose: this page shows convergence, never ownership —
+   * nobody gets assigned a body part, and the regions where four traditions
+   * arrived at the same observation are the interesting ones.
+   */
+  traditional: string[];
+  modern: string[];
   /** What those traditions observed, in their own terms. */
   lens: string;
   /** What can be measured — kept deliberately apart from `lens`. */
@@ -65,7 +75,8 @@ export const MAP_REGIONS: MapRegion[] = [
     short: "Mind",
     covers: "Brain · attention · perception · state",
     governs: "Light, sleep, and the clock everything downstream runs on.",
-    traditions: "Meditative and contemplative systems · Yoga · neuroscience",
+    traditional: ["Contemplative and meditative systems", "Yoga", "Vedic and Buddhist attention practice"],
+    modern: ["Chronobiology", "Circadian science", "Sleep research"],
     lens:
       "Contemplative traditions spent centuries on attention itself — what the mind is doing, and what that does to the body underneath it.",
     measured:
@@ -78,7 +89,8 @@ export const MAP_REGIONS: MapRegion[] = [
     short: "Breath",
     covers: "Face · jaw · throat · ribcage · diaphragm",
     governs: "The switch between states — the one autonomic function you can take by hand.",
-    traditions: "Pranayama · Qi Gong · breath disciplines · respiratory physiology",
+    traditional: ["Pranayama", "Qi Gong", "Traditional breath disciplines"],
+    modern: ["Respiratory physiology", "Diaphragm mechanics", "Autonomic regulation"],
     lens:
       "Indian and Chinese breath disciplines treated the breath as the handle on everything involuntary, and built long, specific practices around it.",
     measured:
@@ -91,7 +103,8 @@ export const MAP_REGIONS: MapRegion[] = [
     short: "Axis",
     covers: "Spine · posture · nervous system",
     governs: "The line everything else hangs from, and the state it sets.",
-    traditions: "Yoga · Kundalini · energetic anatomy · biomechanics",
+    traditional: ["Yoga", "Kundalini and energetic anatomy", "Daoist spinal practice"],
+    modern: ["Biomechanics", "Nervous-system physiology", "Osteopathic and fascial thinking"],
     lens:
       "Indian movement and contemplative traditions read the spine as more than scaffolding: an axis of posture, breath, attention and state.",
     measured:
@@ -104,7 +117,8 @@ export const MAP_REGIONS: MapRegion[] = [
     short: "Organs",
     covers: "Heart · lungs · liver · kidneys",
     governs: "Circulation, filtration, and whether the day's charge settles at night.",
-    traditions: "Traditional Chinese Medicine · Taoist traditions · organ physiology",
+    traditional: ["Traditional Chinese Medicine", "Daoist organ theory", "Ayurvedic organ relationships"],
+    modern: ["Heart-rate variability", "Hepatic and renal physiology", "Recovery and sleep science"],
     lens:
       "Chinese medicine reads organs relationally — through rhythm, function and what they do to each other — rather than as parts in isolation.",
     measured:
@@ -117,7 +131,8 @@ export const MAP_REGIONS: MapRegion[] = [
     short: "Middle",
     covers: "Gut · digestion · microbiome · absorption",
     governs: "Where what you take in becomes what you're made of — or doesn't.",
-    traditions: "Ayurveda · TCM · European herbalism · modern physiology",
+    traditional: ["Ayurveda — agni", "TCM — spleen and stomach", "European herbalism and bitters", "Fermentation traditions"],
+    modern: ["Digestive physiology", "Microbiome research", "Enzyme and absorption science"],
     lens:
       "This is where the traditions converge rather than divide. Agni in Ayurveda, spleen and stomach in Chinese medicine, bitters and fermentation in Europe — four vocabularies, one recurring observation.",
     measured:
@@ -130,7 +145,8 @@ export const MAP_REGIONS: MapRegion[] = [
     short: "Flow",
     covers: "Blood · lymph · hydration · fluids",
     governs: "Drainage and transport. It moves when you move, and stalls when you don't.",
-    traditions: "Walking and natural movement · martial traditions · European nature cure",
+    traditional: ["Walking and natural-movement traditions", "Martial and standing forms", "European nature cure"],
+    modern: ["Lymphatic physiology", "Circulatory science", "Hydration and mineral balance"],
     lens:
       "Traditions that never used the word lymph arrived at the practice anyway — daily walking, standing forms, sweat, cold water, time on the ground and in weather.",
     measured:
@@ -143,7 +159,8 @@ export const MAP_REGIONS: MapRegion[] = [
     short: "Structure",
     covers: "Fascia · joints · muscle · bone · force",
     governs: "What carries load, and what happens when nothing asks it to.",
-    traditions: "Physical culture · strength traditions · osteopathic and fascial thinking",
+    traditional: ["Physical culture and strength traditions", "Osteopathic and fascial thinking", "Load-bearing work in every culture"],
+    modern: ["Strength and hypertrophy science", "Bone-density research", "Fascia research"],
     lens:
       "Strength is not a modern module bolted onto an older system. Every culture that carried, built or fought developed one, and treated capacity as something owed to the body rather than displayed by it.",
     measured:

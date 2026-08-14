@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
+import { SectionBridge } from "@/components/SectionBridge";
 import { YinYang } from "@/components/YinYang";
 import { Constellation } from "@/components/Constellation";
 import { ConstellationBody } from "@/components/ConstellationBody";
@@ -22,7 +23,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { TOTAL_FOODS } from "@/data/foodCount";
 import { TERRITORIES } from "@/data/territories";
-import { MAP_REGIONS } from "@/data/bodyMap";
 import { responsive, SIZES_FULL_BLEED } from "@/lib/img";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
@@ -211,16 +211,21 @@ export default function Home() {
                   Enter the Portal <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Magnetic>
+              {/* The figure above has already told the visitor there is a
+                  system here; this is the door into it, not a scroll cue.
+                  It used to say "What We Believe" and jump down the page,
+                  which answered a question the figure had not raised. */}
               <Magnetic>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="text-base px-8 border-white/20 text-white backdrop-blur-sm bg-white/5"
-                  onClick={() => document.getElementById("territories")?.scrollIntoView({ behavior: "smooth" })}
-                  data-testid="button-philosophy"
-                >
-                  What We Believe
-                </Button>
+                <Link href="/the-body-map" className="w-full sm:w-auto">
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="text-base px-8 border-white/20 text-white backdrop-blur-sm bg-white/5 w-full sm:w-auto"
+                    data-testid="button-philosophy"
+                  >
+                    Explore the Body Map
+                  </Button>
+                </Link>
               </Magnetic>
             </motion.div>
           </motion.div>
@@ -296,52 +301,18 @@ export default function Home() {
         </motion.div>
       </Section>
 
-      {/* ── The Body Map ─────────────────────────────────────
-          A door, not a second philosophy section. Home stays clean; the
-          explanation lives on the page this links to.
+      {/* The Body Map teaser used to sit here: the seven regions listed with
+          the traditions that studied each. It was accurate and it read as a
+          settings table — a spreadsheet under the sentence "one living
+          system". The homepage does not need to prove the Body Map exists.
+          The living figure at the top already says there is a deeper system
+          here, and the hero's second button is the door into it. Home teases;
+          /the-body-map teaches. */}
 
-          Deliberately no ConstellationBody here. The figure is already the
-          hero of this page, forty lines up — running the site's signature
-          animation twice on one screen would spend it. What this section
-          shows instead is the thing the hero cannot: the breadth. Seven
-          regions with the traditions that studied each one, which is new
-          information rather than the figure restated. */}
-      <Section tone="raised" width="max-w-4xl">
-        <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
-          <motion.div variants={fadeInUp}>
-            <SectionHeader
-              eyebrow="The Body Map"
-              title={<>Many traditions. <span className="text-gold">One living system.</span></>}
-              intro="Across cultures and centuries, people studied breath, digestion, organs, movement, plants, strength and recovery. Sakred brings those perspectives into conversation around the thing they were all looking at."
-              testId="text-bodymap-teaser"
-            />
-          </motion.div>
-
-          <motion.ul variants={fadeInUp} className="divide-y divide-border/60 border-y border-border/60">
-            {MAP_REGIONS.map((r) => (
-              <li
-                key={r.key}
-                className="py-4 flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1"
-                data-testid={`teaser-region-${r.key}`}
-              >
-                <span className="font-display text-xl">{r.name}</span>
-                <span className="text-xs text-muted-foreground sm:text-right">{r.traditions}</span>
-              </li>
-            ))}
-          </motion.ul>
-
-          <motion.div variants={fadeInUp} className="text-center mt-9">
-            <Link href="/the-body-map">
-              <Button variant="outline" className="border-gold-subtle text-gold" data-testid="button-body-map">
-                Explore the Body Map <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
-          </motion.div>
-        </motion.div>
-      </Section>
+      <SectionBridge />
 
       {/* ── Core lessons ─────────────────────────────────────── */}
-      <Section id="lessons" tone="raised" width="max-w-3xl" className="py-10 md:py-12">
+      <Section id="lessons" tone="raised">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.p
             variants={fadeInUp}
@@ -393,7 +364,7 @@ export default function Home() {
       />
 
       {/* ── Food ─────────────────────────────────────────────── */}
-      <Section tone="raised" width="max-w-3xl">
+      <Section tone="raised" containerClassName="max-w-3xl">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={staggerContainer}>
           <motion.div variants={fadeInUp} className="text-center max-w-2xl mx-auto mb-10">
             <p className="text-xs uppercase tracking-widest text-gold mb-4 rule-gold rule-gold-center">Food</p>
@@ -567,7 +538,7 @@ export default function Home() {
       {/* No orb behind this one. The aurora is built for an ink ground — its
           blooms are additive, and clipped to a sphere they read as a grey
           disc sitting behind the headline on a cream panel. */}
-      <Section tone="raised" width="max-w-3xl" className="text-center overflow-hidden">
+      <Section tone="raised" containerClassName="max-w-3xl" className="text-center overflow-hidden">
         <motion.div
           initial="hidden"
           whileInView="visible"

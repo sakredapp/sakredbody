@@ -21,6 +21,7 @@ import { ArrowRight } from "lucide-react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Section } from "@/components/Section";
+import { SectionBridge } from "@/components/SectionBridge";
 import { PageHero, SectionHeader } from "@/components/PageHero";
 import { StarDust } from "@/components/StarDust";
 import { ManifestoField } from "@/components/ManifestoField";
@@ -74,7 +75,7 @@ export default function Manifesto() {
           See the header of ManifestoField.tsx. */}
       <ManifestoField />
 
-      <Section tone="ink" width="max-w-2xl">
+      <Section tone="ink" containerClassName="max-w-2xl">
         <motion.div
           initial="hidden"
           whileInView="visible"
@@ -105,7 +106,7 @@ export default function Manifesto() {
       </ImageBand>
 
       {/* ── Both halves ──────────────────────────────────────── */}
-      <Section tone="raised" width="max-w-4xl">
+      <Section tone="raised" containerClassName="max-w-4xl">
         <motion.div
           initial="hidden"
           whileInView="visible"
@@ -168,12 +169,14 @@ export default function Manifesto() {
         </motion.div>
       </Section>
 
+      <SectionBridge />
+
       {/* ── The definition ───────────────────────────────────
           Last rather than first. It was the second section of the old page,
           which meant a visitor met a seven-line definition before they had
           been given a reason to want one. As the close it reads as the answer
           the argument arrives at. */}
-      <Section tone="raised" width="max-w-3xl">
+      <Section tone="raised" containerClassName="max-w-3xl">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.div variants={fadeInUp}>
             <SectionHeader
@@ -203,7 +206,7 @@ export default function Manifesto() {
       </Section>
 
       {/* ── CTA ──────────────────────────────────────────────── */}
-      <Section tone="ink" width="max-w-3xl" className="text-center">
+      <Section tone="ink" containerClassName="max-w-3xl" className="text-center">
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger}>
           <motion.h2 variants={fadeInUp} className="text-3xl md:text-4xl font-display font-normal mb-6">
             The map was never the destination.

@@ -14,13 +14,20 @@ interface SectionProps extends React.HTMLAttributes<HTMLElement> {
   tone?: SectionTone;
   containerClassName?: string;
   /**
-   * How wide the raised panel itself is drawn — a Tailwind `max-w-*`.
+   * Narrows the raised panel itself. Rarely what you want — see below.
    *
-   * A panel is a card, and a card should be the size of what's on it. This
-   * used to stretch to the viewport with the content capped at max-w-6xl
-   * inside it, which on a wide monitor meant a slab most of a screen across
-   * with a narrow column of type down the middle and nothing either side of
-   * it. Sections whose content is a centred column pass a narrower value.
+   * ── One outer geometry, varying inner content ───────────────────────────
+   *
+   * Every page was passing this to size its panel to its content, so a wide
+   * section sat above a narrow one and the stack read as components that had
+   * each picked their own width rather than as a designed page. The shells
+   * now share a geometry and the *content* varies: pass `containerClassName`
+   * with a `max-w-*` instead, which narrows the column inside a panel that
+   * still lines up with the ones above and below it.
+   *
+   * It also only ever applied to `raised`. An ink section passing `width` was
+   * silently doing nothing, which is how several of them ended up full width
+   * while claiming otherwise.
    */
   width?: string;
 }
