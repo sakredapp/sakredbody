@@ -70,7 +70,11 @@ export function LogPractice({ onClose, onLogged }: { onClose: () => void; onLogg
   const log = useMutation({
     mutationFn: async () => {
       if (!chosen || !mins) throw new Error("How long was it?");
-      const started = await apiRequest("POST", "/api/training/sessions", { title: chosen.name });
+      const started = await apiRequest("POST", "/api/training/sessions", {
+        title: chosen.name,
+        // Created, written and finished in three calls — see `immediate`.
+        immediate: true,
+      });
       const { id } = (await started.json()) as { id: string };
 
       const km = Number(distanceKm);

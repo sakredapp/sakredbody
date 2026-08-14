@@ -508,6 +508,25 @@ export function registerTrainingRoutes(app: Express) {
         .object({
           habitId: z.string().uuid().nullable().optional(),
           title: z.string().max(120).nullable().optional(),
+          /**
+           * This session will be logged and finished in the same breath.
+           *
+           * `LogPractice` records something already done — forty-five minutes of
+           * Reformer — by creating a session, writing one set and finishing it
+           * across three calls. It is open for about as long as that takes, and
+           * it is not a workout the member is going to return to.
+           *
+           * Without this distinction the one-open-session rule would refuse to
+           * let somebody log a finished yoga class because they left a lifting
+           * session open on Tuesday, which is not what the rule is for. The rule
+           * exists to stop a second *interactive* workout hiding the first.
+           *
+           * The durable fix is for that flow to be one atomic endpoint, so
+           * there is no window and a failure halfway cannot orphan anything.
+           * Until then this is a declared intent rather than a loophole, and it
+           * is worth noting a client could pass it wrongly.
+           */
+          immediate: z.boolean().optional(),
         })
         .parse(req.body ?? {});
 
@@ -519,6 +538,42 @@ export function registerTrainingRoutes(app: Express) {
           .from(habits)
           .where(and(eq(habits.id, input.habitId), eq(habits.userId, userId)));
         if (!owned) return res.status(404).json({ message: "No such session" });
+      }
+
+      /**
+       * One open workout per member, refused rather than silently merged.
+       *
+       * Nothing enforced this and it had already happened in production: five
+       * unfinished sessions across two accounts, one of them carrying two
+       * logged sets. Because the open-session route returns the *newest*, an
+       * older one becomes unreachable the moment a newer starts — it can never
+       * be finished, never reaches `movementEvents`, and the work in it is
+       * invisible to the member and to every reading built on their history.
+       *
+       * A 409 rather than returning the existing session with a 200. The caller
+       * asked to start a back session; handing it a chest session under a
+       * success code invites it to say "Back started" over the top of a
+       * workout that has been running for forty minutes. Refusing states what
+       * is true and hands over what is needed to resume.
+       */
+      const [running] = input.immediate ? [] : await db
+        .select({
+          id: workoutSessions.id,
+          title: workoutSessions.title,
+          habitId: workoutSessions.habitId,
+          startedAt: workoutSessions.createdAt,
+        })
+        .from(workoutSessions)
+        .where(and(eq(workoutSessions.userId, userId), isNull(workoutSessions.finishedAt)))
+        .orderBy(desc(workoutSessions.createdAt))
+        .limit(1);
+
+      if (running) {
+        return res.status(409).json({
+          error: "open_session_exists",
+          message: "You already have a workout in progress.",
+          session: running,
+        });
       }
 
       const [row] = await db

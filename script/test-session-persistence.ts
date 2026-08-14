@@ -88,5 +88,35 @@ console.log("\nNavigating away is not cancelling\n");
   check("no navigation handler ends one", !/onOpen\([^)]*\)[\s\S]{0,80}finish\.mutate/.test(tab));
 }
 
+console.log("\nOne open workout, refused rather than merged\n");
+
+{
+  const routes = code("server/training/routes.ts");
+  const create = routes.slice(routes.indexOf('app.post("/api/training/sessions"'));
+  const body = create.slice(0, 2600);
+
+  check("a second interactive start is refused", /status\(409\)/.test(body));
+  check("with a machine-readable reason", /open_session_exists/.test(body));
+  /**
+   * And it hands back what the caller needs to resume. A 409 that only says no
+   * leaves the UI unable to offer the one useful action.
+   */
+  check("and the session to resume", /session: running/.test(body));
+  check("including when it began", /startedAt: workoutSessions\.createdAt/.test(body));
+
+  /**
+   * Not a 200 carrying the existing session. The caller asked to start a back
+   * session; a success code invites it to say "Back started" over a chest
+   * workout that has been running for forty minutes.
+   */
+  check("never a success code", !/status\(200\)[\s\S]{0,80}running/.test(body));
+
+  /** A finished-on-arrival log is not a competing workout. */
+  check("one-shot logging is exempt", /input\.immediate \? \[\]/.test(body));
+  const practice = code("client/src/components/build/LogPractice.tsx");
+  check("and declares itself", /immediate: true/.test(practice));
+  check("because it finishes in the same breath", /sessions\/\$\{id\}\/finish/.test(practice));
+}
+
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);
