@@ -378,6 +378,35 @@ export const healthWorkouts = pgTable(
      */
     userOrientationOverride: text("user_orientation_override"),
 
+    /**
+     * What the member says they actually trained.
+     *
+     * An imported `strength` workout carries no muscle-group truth: only a
+     * Sakred-logged session reaches `exercises.muscleGroups` through its sets.
+     * So Sakred must never infer "yesterday was legs" from a watch — but there
+     * is no reason it cannot simply ask, and this is where the answer lives.
+     *
+     * Enrichment, not correction. The platform still said Strength Training and
+     * the load model still reads the category; this adds the one thing neither
+     * of them can know. Once it exists, "Chest has had more room than Back
+     * recently" becomes a sentence Sakred is entitled to say.
+     */
+    userFocus: text("user_focus"),
+
+    /** Their own name for it — "Back day". Never generated, only typed. */
+    userLabel: text("user_label"),
+
+    /**
+     * When they looked at it, whether or not they added anything.
+     *
+     * Separate from the answers because "reviewed and had nothing to add" and
+     * "never asked" are different states, and only the second is worth
+     * prompting about again. Without this the confirmation card has no way to
+     * stop asking, which is how a feature becomes a feed of twenty identical
+     * cards about walks.
+     */
+    reviewedAt: timestamp("reviewed_at"),
+
     syncedAt: timestamp("synced_at").defaultNow(),
   },
   (t) => [

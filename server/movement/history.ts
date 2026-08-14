@@ -141,6 +141,25 @@ export type MovementEvent = {
   /** What the member would call it, where the source named it. */
   activity: string | null;
   source: "sakred" | "imported";
+  /**
+   * What the member said this was, where they said anything.
+   *
+   * ── Enrichment beside the event, never instead of it ────────────────────
+   *
+   * An imported `strength` workout carries no muscle-group truth, so Sakred
+   * cannot infer "yesterday was legs" from a watch — but it can ask, and this
+   * is that answer travelling with the event.
+   *
+   * Deliberately additive fields rather than a rewritten `activity` or an
+   * edited `categories`. The platform still said Strength Training and the
+   * load model still reads the category, so a member calling a hard session
+   * restorative in intent changes how it reads and not what it cost. An
+   * annotation that could delete demand would let somebody quietly erase a
+   * week of training from their own terrain.
+   */
+  memberFocus: string | null;
+  memberOrientation: string | null;
+  memberLabel: string | null;
 };
 
 /**
@@ -177,6 +196,9 @@ export async function movementEvents(userId: string, since: string): Promise<Mov
         onDate: healthWorkouts.onDate,
         startAt: healthWorkouts.startAt,
         workoutType: healthWorkouts.workoutType,
+        userFocus: healthWorkouts.userFocus,
+        userOrientationOverride: healthWorkouts.userOrientationOverride,
+        userLabel: healthWorkouts.userLabel,
       })
       .from(healthWorkouts)
       .where(and(eq(healthWorkouts.userId, userId), gte(healthWorkouts.onDate, since))),
@@ -213,6 +235,10 @@ export async function movementEvents(userId: string, since: string): Promise<Mov
       categories: [row.category],
       activity: row.title?.trim() || null,
       source: "sakred",
+      // A logged session's detail lives in its sets, not in an annotation.
+      memberFocus: null,
+      memberOrientation: null,
+      memberLabel: null,
     });
   }
   for (const e of Array.from(bySession.values())) {
@@ -233,6 +259,9 @@ export async function movementEvents(userId: string, since: string): Promise<Mov
       categories: [category],
       activity: row.workoutType ?? null,
       source: "imported",
+      memberFocus: row.userFocus ?? null,
+      memberOrientation: row.userOrientationOverride ?? null,
+      memberLabel: row.userLabel?.trim() || null,
     });
   }
 

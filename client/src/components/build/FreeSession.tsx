@@ -342,7 +342,11 @@ export function FreeSession({
                 className="text-xs text-muted-foreground/70 tap-clean shrink-0"
                 data-testid="button-discard-session"
               >
-                {confirmDiscard ? "Discard — tap again" : "Discard"}
+                {confirmDiscard
+                  ? logged > 0
+                    ? `Discard ${logged} ${logged === 1 ? "set" : "sets"} — tap again`
+                    : "Discard — tap again"
+                  : "Discard"}
               </button>
             </div>
           )}
