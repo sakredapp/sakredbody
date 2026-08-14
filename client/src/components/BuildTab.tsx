@@ -40,6 +40,7 @@ import { TodayRead } from "@/components/TodayRead";
 import { MemberBuild } from "@/components/build/MemberBuild";
 import { FreeSession } from "@/components/build/FreeSession";
 import { TodaysBuild, RecentBuild } from "@/components/build/BuildToday";
+import { Elapsed } from "@/components/build/Elapsed";
 import type { MemberSection } from "@/components/MemberNav";
 import { Dumbbell, Check, Plus, Trophy, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -149,7 +150,13 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
    * certainly not looking at your step count mid-workout.
    */
   const openSession = useQuery<{
-    session: { id: string; title: string | null; startedAt: string; sets: number } | null;
+    session: {
+      id: string;
+      title: string | null;
+      habitId: string | null;
+      startedAt: string;
+      sets: number;
+    } | null;
   }>({
     queryKey: ["/api/training/sessions/open"],
     queryFn: async () => {
@@ -161,12 +168,29 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
     staleTime: 15_000,
   });
 
+  /**
+   * Recover whatever is actually running, from the server rather than memory.
+   *
+   * Two shapes, one truth. A session carrying a `habitId` is a coach's
+   * prescription being worked through; one without is the member's own. Both
+   * are the same row in `workout_sessions`, and which local state they restore
+   * into is a presentation detail — so the branch is on the data, not on how
+   * the component happened to be entered.
+   *
+   * The prescribed half of this was missing entirely. `sessionId` was plain
+   * `useState`, so leaving Build and coming back left the log buttons disabled
+   * on a session that was still open on the server with sets already in it.
+   * Nothing was lost and there was no way to add to it.
+   */
   useEffect(() => {
     const open = openSession.data?.session;
-    if (open && !freeSession) {
+    if (!open) return;
+    if (open.habitId) {
+      if (!sessionId) setSessionId(open.id);
+    } else if (!freeSession) {
       setFreeSession({ id: open.id, title: open.title ?? "Your session" });
     }
-  }, [openSession.data, freeSession]);
+  }, [openSession.data, freeSession, sessionId]);
 
   /** Finishing is the only thing that clears it, on the server and here. */
   const clearSession = () => {
@@ -190,7 +214,12 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
       const res = await apiRequest("POST", "/api/training/sessions", { habitId });
       return (await res.json()) as { id: string };
     },
-    onSuccess: (data) => setSessionId(data.id),
+    onSuccess: (data) => {
+      setSessionId(data.id);
+      // So the running time appears immediately rather than on the next
+      // refetch — `startedAt` only arrives with the open-session answer.
+      qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
+    },
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
@@ -212,6 +241,15 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
       apiRequest("POST", `/api/training/sessions/${sessionId}/finish`, { shareWithCoach: true }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/training/today"] });
+      /**
+       * And the open-session query, or finishing does not stick.
+       *
+       * The rehydration effect above restores `sessionId` from whatever the
+       * server calls open. Leave that answer cached after a finish and the
+       * effect immediately puts the session back, so the member presses
+       * Finish, sees the toast, and watches the workout reappear.
+       */
+      qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
       setSessionId(null);
       setEntries({});
       toast({ title: "Session logged." });
@@ -270,6 +308,7 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
           <FreeSession
             sessionId={freeSession.id}
             title={freeSession.title}
+            startedAt={openSession.data?.session?.startedAt}
             unit={unit}
             onDone={clearSession}
           />
@@ -382,6 +421,19 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
         return (
           <div key={s.habitId} className="space-y-4">
             <Panel title={s.title}>
+              {/* Running time, so the screen says out loud that a workout is
+                  happening. Derived from the server's own timestamp — see
+                  Elapsed — so it survives leaving Build and coming back. */}
+              {active && openSession.data?.session?.startedAt && (
+                <p className="text-xs text-muted-foreground mb-3 flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--gold))]" />
+                  In progress ·{" "}
+                  <Elapsed
+                    startedAt={openSession.data.session.startedAt}
+                    className="tabular-nums"
+                  />
+                </p>
+              )}
               <div className="grid grid-cols-3 gap-3">
                 <StatTile label="Sets logged" value={`${done}/${allRows.length}`} />
                 <StatTile label={`Volume ${unit}`} value={volume.toLocaleString()} />
@@ -616,6 +668,7 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
         <FreeSession
           sessionId={freeSession.id}
           title={freeSession.title}
+          startedAt={openSession.data?.session?.startedAt}
           unit={unit}
           onDone={clearSession}
         />

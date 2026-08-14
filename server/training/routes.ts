@@ -721,6 +721,17 @@ export function registerTrainingRoutes(app: Express) {
           id: workoutSessions.id,
           title: workoutSessions.title,
           onDate: workoutSessions.onDate,
+          /**
+           * Which prescription this session belongs to, if any.
+           *
+           * Without it the prescribed path had nothing to rehydrate from: the
+           * session id lived in `useState`, so navigating to Home and back left
+           * a member looking at their coach's session with every log button
+           * inert, as though the workout they were halfway through had never
+           * been started. The sets were all safely on the server; only the
+           * screen had forgotten.
+           */
+          habitId: workoutSessions.habitId,
           // The timer is derived from this, never from a counter the client
           // increments — a counter dies with the component it lives in.
           startedAt: workoutSessions.createdAt,

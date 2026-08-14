@@ -19,6 +19,7 @@ import { Plus, Check, X, Send, ChevronUp, ChevronDown, Users } from "lucide-reac
 import { isPracticeCategory } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Elapsed } from "@/components/build/Elapsed";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -95,12 +96,18 @@ function LastTime({ exerciseId }: { exerciseId: string }) {
 
 export function FreeSession({
   sessionId,
+  startedAt,
   title,
   unit,
   onDone,
 }: {
   sessionId: string;
   title: string;
+  /**
+   * When the server says this session began. Optional only because a session
+   * created a moment ago renders before the open-session query has answered.
+   */
+  startedAt?: string;
   unit: "kg" | "lb";
   onDone: () => void;
 }) {
@@ -287,6 +294,15 @@ export function FreeSession({
     <div className="space-y-4">
       <Panel title={title}>
         <div className="space-y-4">
+          {/* Says out loud that a workout is running, and keeps saying it
+              after a trip to Home — the time is derived from the server's
+              timestamp rather than counted here. */}
+          {startedAt && (
+            <p className="text-xs text-muted-foreground flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--gold))]" />
+              In progress · <Elapsed startedAt={startedAt} className="tabular-nums" />
+            </p>
+          )}
           {blocks.length === 0 && (
             <p className="text-xs text-muted-foreground">
               Add what you're doing as you go.
