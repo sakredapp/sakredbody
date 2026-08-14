@@ -28,6 +28,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Panel } from "@/components/portal/Panel";
+import { WorkoutInProgress } from "@/components/build/WorkoutInProgress";
+import { startSession as beginSession, type RunningSession } from "@/lib/startSession";
 import { MovementPicker, type Movement } from "./MovementPicker";
 import { LogPractice } from "./LogPractice";
 import { RecentSessions } from "./RecentSessions";
@@ -73,13 +75,32 @@ export function MemberBuild({ onStarted }: { onStarted: (sessionId: string, titl
 
   const workouts = useQuery<SavedWorkout[]>({ queryKey: ["/api/training/workouts"] });
 
+  /**
+   * A workout already running when they tried to begin another.
+   *
+   * Held rather than toasted, so the card can offer the way back into it.
+   */
+  const [collision, setCollision] = useState<RunningSession | null>(null);
+
   const startSession = useMutation({
-    mutationFn: async (title: string) => {
-      const res = await apiRequest("POST", "/api/training/sessions", { title: title || null });
-      return (await res.json()) as { id: string };
-    },
+    mutationFn: (title: string) => beginSession({ title: title || null }),
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
+
+  /**
+   * Start, unless one is already open.
+   *
+   * Returns null when it collided, so both call sites stop rather than
+   * announcing a session that was never created.
+   */
+  const begin = async (title: string): Promise<{ id: string } | null> => {
+    const result = await startSession.mutateAsync(title);
+    if ("conflict" in result) {
+      setCollision(result.conflict);
+      return null;
+    }
+    return result.started;
+  };
 
   const remove = useMutation({
     mutationFn: async (id: string) => apiRequest("DELETE", `/api/training/workouts/${id}`),
@@ -104,6 +125,15 @@ export function MemberBuild({ onStarted }: { onStarted: (sessionId: string, titl
       */}
       <TodaysMovement />
 
+      {collision && (
+        <WorkoutInProgress
+          session={collision}
+          onResume={() => {
+            onStarted(collision.id, collision.title ?? "Your session");
+            setCollision(null);
+          }}
+        />
+      )}
       <Panel title="Your own training">
         <div className="space-y-4">
           <p className="text-xs text-muted-foreground leading-relaxed">
@@ -121,8 +151,8 @@ export function MemberBuild({ onStarted }: { onStarted: (sessionId: string, titl
             <Button
               size="sm"
               onClick={async () => {
-                const s = await startSession.mutateAsync("");
-                onStarted(s.id, "Today's session");
+                const s = await begin("");
+                if (s) onStarted(s.id, "Today's session");
               }}
               disabled={startSession.isPending}
               data-testid="build-start-empty"
@@ -175,8 +205,8 @@ export function MemberBuild({ onStarted }: { onStarted: (sessionId: string, titl
                     variant="ghost"
                     className="shrink-0"
                     onClick={async () => {
-                      const s = await startSession.mutateAsync(w.name);
-                      onStarted(s.id, w.name);
+                      const s = await begin(w.name);
+                      if (s) onStarted(s.id, w.name);
                     }}
                     data-testid={`start-workout-${w.id}`}
                   >

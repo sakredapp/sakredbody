@@ -118,5 +118,35 @@ console.log("\nOne open workout, refused rather than merged\n");
   check("because it finishes in the same breath", /sessions\/\$\{id\}\/finish/.test(practice));
 }
 
+console.log("\nA refusal is answered, not toasted\n");
+
+{
+  /**
+   * The server hands back the running session so the member can be offered the
+   * one useful action. A toast throws that away and leaves them on a screen
+   * that just failed to do what they asked.
+   */
+  const helper = code("client/src/lib/startSession.ts");
+  check("409 is a shape, not an exception", /status === 409/.test(helper));
+  check("and carries the running session", /conflict: data\.session/.test(helper));
+  check("it does not go through apiRequest", !/apiRequest/.test(helper));
+
+  const card = code("client/src/components/build/WorkoutInProgress.tsx");
+  check("the card names what is running", /session\.title/.test(card));
+  check("shows how long it has been", /<Elapsed/.test(card));
+  check("and offers the way back in", /Resume workout/.test(card));
+  /** Ending somebody's training does not belong on a collision card. */
+  check("it cannot finish the workout", !/finish|discard/i.test(card.replace(/Finish or discard it before beginning another\./, "")));
+
+  for (const [name, path] of [
+    ["the prescribed start", "client/src/components/BuildTab.tsx"],
+    ["the ad-hoc start", "client/src/components/build/MemberBuild.tsx"],
+  ] as const) {
+    const src = code(path);
+    check(`${name} handles the collision`, /"conflict" in result/.test(src));
+    check(`${name} renders the card`, /<WorkoutInProgress/.test(src));
+  }
+}
+
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

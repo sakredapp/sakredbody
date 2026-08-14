@@ -41,6 +41,8 @@ import { MemberBuild } from "@/components/build/MemberBuild";
 import { FreeSession } from "@/components/build/FreeSession";
 import { TodaysBuild, RecentBuild } from "@/components/build/BuildToday";
 import { Elapsed } from "@/components/build/Elapsed";
+import { WorkoutInProgress } from "@/components/build/WorkoutInProgress";
+import { startSession, type RunningSession } from "@/lib/startSession";
 import type { MemberSection } from "@/components/MemberNav";
 import { Dumbbell, Check, Plus, Trophy, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -136,6 +138,13 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
   const [entries, setEntries] = useState<Record<string, Entry[]>>({});
   /** An ad-hoc or template-started session, which has no prescription behind it. */
   const [freeSession, setFreeSession] = useState<{ id: string; title: string } | null>(null);
+  /**
+   * A workout that was already running when they tried to start another.
+   *
+   * Held so the collision can be shown where they tapped, and cleared the
+   * moment they resume it — see `WorkoutInProgress`.
+   */
+  const [collision, setCollision] = useState<RunningSession | null>(null);
 
   /**
    * What is actually still running, according to the server.
@@ -210,12 +219,15 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
   const start = useMutation({
     // `apiRequest` resolves to the Response, not the body — it throws on a
     // non-2xx and hands back the raw response, so the JSON has to be read here.
-    mutationFn: async (habitId: string) => {
-      const res = await apiRequest("POST", "/api/training/sessions", { habitId });
-      return (await res.json()) as { id: string };
-    },
-    onSuccess: (data) => {
-      setSessionId(data.id);
+    mutationFn: (habitId: string) => startSession({ habitId }),
+    onSuccess: (result) => {
+      // A refusal is a true answer, not a failure — the member has a workout
+      // open and needs the way back into it rather than an error.
+      if ("conflict" in result) {
+        setCollision(result.conflict);
+        return;
+      }
+      setSessionId(result.started.id);
       // So the running time appears immediately rather than on the next
       // refetch — `startedAt` only arrives with the open-session answer.
       qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
@@ -445,7 +457,29 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
                 />
               </div>
 
-              {!active && (
+              {/* Where they tapped, so the answer arrives where the question
+                  was asked rather than as a toast in the corner. */}
+              {collision && (
+                <div className="mt-4">
+                  <WorkoutInProgress
+                    session={collision}
+                    onResume={() => {
+                      // Adopt whatever is actually running — the same branch the
+                      // rehydration effect uses, because it is the same truth.
+                      if (collision.habitId) setSessionId(collision.id);
+                      else
+                        setFreeSession({
+                          id: collision.id,
+                          title: collision.title ?? "Your session",
+                        });
+                      setCollision(null);
+                      qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
+                    }}
+                  />
+                </div>
+              )}
+
+              {!active && !collision && (
                 <Button
                   className="w-full mt-4 bg-gold border-gold-border text-white"
                   onClick={() => start.mutate(s.habitId)}
