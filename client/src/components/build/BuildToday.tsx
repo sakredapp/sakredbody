@@ -47,6 +47,13 @@ type MovementEvent = {
 
 type TerrainReading = { movementEvents?: MovementEvent[]; movement?: MovementEvent[] };
 
+/** The same small-caps label the rest of the portal uses for a sub-heading. */
+function Label({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground/70">{children}</p>
+  );
+}
+
 /** Matches Restore, deliberately — one history, described the same way twice. */
 function whenShort(onDate: string): string {
   return new Date(`${onDate}T12:00:00`).toLocaleDateString(undefined, {
@@ -99,6 +106,18 @@ export function TodaysBuild({ onCheckIn }: { onCheckIn?: () => void }) {
     suggestions: data.suggestions ?? [],
   });
 
+  /**
+   * The one being recommended is the one the headline already named — the first
+   * demanding option where Terrain allows one, and otherwise the first
+   * restorative one. Derived from the gate's own ordering rather than chosen
+   * again here, so the card underneath can never disagree with the sentence
+   * above it.
+   */
+  const primary = gate.allowsBuild
+    ? (gate.options.find((s) => s.side === "build") ?? gate.options[0])
+    : gate.options[0];
+  const alternates = gate.options.filter((s) => s !== primary);
+
   return (
     <Panel title="Today's Build">
       <div className="space-y-4">
@@ -113,27 +132,57 @@ export function TodaysBuild({ onCheckIn }: { onCheckIn?: () => void }) {
           </p>
         )}
 
-        {/* No chevron and no tap target on these rows. Starting one means
-            composing a session, which is the builder further down the screen —
-            and a row that looks tappable and is not is a worse screen than one
-            that plainly reads as information. */}
-        {gate.options.length > 0 && (
+        {/*
+          One recommendation, then alternatives — not three peers.
+
+          The engine returns a spread on purpose, so that a single suggestion
+          never reads as a command. But rendering all three identically made
+          the screen argue with itself: three equal cards, each repeating "You
+          slept well — 8h 51m", which is one fact about the day rather than
+          three reasons for three different sessions.
+
+          So the `because` appears once, on the option actually being
+          recommended, and the rest are listed as what else the day is good
+          for. Same options, same order, honest about which is which.
+
+          No chevron and no tap target yet. Starting one of these means
+          composing a session, which is the builder further down the screen,
+          and a row that looks tappable and is not is worse than one that
+          plainly reads as information.
+        */}
+        {primary && (
           <div className="space-y-2">
-            {gate.options.map((s) => (
-              <div
-                key={s.category}
-                className="rounded-xl border border-border/50 px-3 py-2.5"
-                data-testid={`build-option-${s.category}`}
-              >
-                <p className="text-sm">{s.label}</p>
-                <p className="text-xs text-muted-foreground leading-relaxed">{s.headline}</p>
-                {/* Only where the engine had a basis. An invented because is
-                    worse than none — see recommend.ts. */}
-                {s.because && (
-                  <p className="text-[11px] text-muted-foreground/70 mt-0.5">{s.because}</p>
-                )}
-              </div>
-            ))}
+            <Label>Suggested</Label>
+            <div
+              className="rounded-xl border border-border/50 px-3 py-2.5"
+              data-testid={`build-option-${primary.category}`}
+            >
+              <p className="text-sm">{primary.label}</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">{primary.headline}</p>
+              {/* Only where the engine had a basis. An invented because is
+                  worse than none — see recommend.ts. */}
+              {primary.because && (
+                <p className="text-[11px] text-muted-foreground/70 mt-0.5">{primary.because}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {alternates.length > 0 && (
+          <div className="space-y-2">
+            <Label>Other good uses of today</Label>
+            <div className="space-y-1.5">
+              {alternates.map((s) => (
+                <div
+                  key={s.category}
+                  className="flex items-baseline justify-between gap-3"
+                  data-testid={`build-option-${s.category}`}
+                >
+                  <span className="text-sm">{s.label}</span>
+                  <span className="text-xs text-muted-foreground text-right">{s.headline}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

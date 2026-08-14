@@ -175,7 +175,7 @@ export function LogPractice({ onClose, onLogged }: { onClose: () => void; onLogg
                   placeholder="km"
                   value={distanceKm}
                   onChange={(e) => setDistanceKm(e.target.value)}
-                  className="h-9 w-28 text-sm"
+                  className="h-9 w-28"
                   aria-label="Distance in kilometres"
                 />
               </div>

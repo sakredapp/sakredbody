@@ -345,7 +345,7 @@ export function FreeSession({
                       value={r.weight}
                       onChange={(e) => patch(bi, ri, { weight: e.target.value })}
                       disabled={r.logged}
-                      className="h-9 text-sm"
+                      className="h-9"
                       aria-label={`Weight, set ${ri + 1}`}
                     />
                   )}
@@ -358,7 +358,7 @@ export function FreeSession({
                       value={r.seconds}
                       onChange={(e) => patch(bi, ri, { seconds: e.target.value })}
                       disabled={r.logged}
-                      className="h-9 text-sm"
+                      className="h-9"
                       aria-label={
                         isPracticeCategory(b.movement.category)
                           ? `Minutes, set ${ri + 1}`
@@ -373,7 +373,7 @@ export function FreeSession({
                       value={r.reps}
                       onChange={(e) => patch(bi, ri, { reps: e.target.value })}
                       disabled={r.logged}
-                      className="h-9 text-sm"
+                      className="h-9"
                       aria-label={`Reps, set ${ri + 1}`}
                     />
                   )}

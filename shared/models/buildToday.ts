@@ -119,7 +119,17 @@ export function buildGate(input: {
 }): BuildGate {
   const { lean, reasons, hasReport, read, suggestions } = input;
 
-  const rationale = reasons.map((r) => r.text);
+  /**
+   * Terrain's reasons are written as standalone clauses and carry no terminal
+   * punctuation, because Home renders them as separate rows. Joined into one
+   * paragraph they ran together on a phone:
+   *
+   *     12 demanding sessions this week You have been restoring alongside it
+   *
+   * So they are terminated here rather than at the point of display, and every
+   * surface that reads `rationale` gets sentences instead of fragments.
+   */
+  const rationale = reasons.map((r) => (/[.!?]$/.test(r.text.trim()) ? r.text.trim() : `${r.text.trim()}.`));
 
   /**
    * Nothing measured and nothing reported. `unknown` is Terrain's own word for
