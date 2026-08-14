@@ -215,7 +215,19 @@ export function gatedLine(lean: TerrainLean, line: string, read: Pick<ReadinessR
  * Separate from the headline so it can never be mistaken for the capacity
  * claim: this asks a question, and the sentence above it makes an assertion.
  */
+/**
+ * Says why the question exists, not what to press.
+ *
+ * `terrain_checkins` is empty product-wide: the subjective layer shipped and
+ * nobody has ever used it. That is very unlikely to mean it is unwanted —
+ * "Complete terrain check-in" is an instruction to perform a chore, and it
+ * never says what the member gets back. The contradiction this whole file
+ * guards against is precisely the case that cannot be read correctly until
+ * somebody supplies the one signal no sensor holds, so the invitation has to
+ * earn the tap rather than demand it.
+ */
 export const REPORT_INVITE = {
-  title: "How are you actually doing?",
-  body: "If you feel substantially better than this suggests, check in before choosing today's load.",
+  title: "How are you actually feeling?",
+  body: "Your health data tells us part of the picture. A quick check-in helps Sakred understand what the sensors can't.",
+  action: "Check in",
 } as const;
