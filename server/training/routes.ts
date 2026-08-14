@@ -583,6 +583,24 @@ export function registerTrainingRoutes(app: Express) {
           habitId: input.habitId ?? null,
           onDate: await memberToday(userId),
           title: input.title ?? null,
+          /**
+           * A one-shot log is born finished.
+           *
+           * `uniq_open_workout_per_member` makes one open session a fact about
+           * the database rather than a promise the handler keeps, and that
+           * turned the `immediate` exemption into a landmine: a member logging
+           * a finished yoga class while a lifting session was open would have
+           * hit a unique violation and seen a 500.
+           *
+           * Never entering the open state is the honest fix. It is not
+           * competing for the slot because it was never in it — so the flag
+           * changes what gets created rather than skipping a check, and there
+           * is no longer a loophole for a client to pass wrongly.
+           *
+           * The caller still finishes it afterwards, which restamps this and
+           * runs the coach share. That update is deliberately idempotent.
+           */
+          ...(input.immediate ? { finishedAt: new Date() } : {}),
         })
         .returning();
 

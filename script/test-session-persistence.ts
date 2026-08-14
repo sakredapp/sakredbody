@@ -113,6 +113,12 @@ console.log("\nOne open workout, refused rather than merged\n");
 
   /** A finished-on-arrival log is not a competing workout. */
   check("one-shot logging is exempt", /input\.immediate \? \[\]/.test(body));
+  /**
+   * And never occupies the slot it is exempt from. The partial unique index
+   * makes one open session a database fact, so a one-shot log that entered the
+   * open state would collide and 500 — it is born finished instead.
+   */
+  check("a one-shot log is born finished", /input\.immediate \? \{ finishedAt: new Date\(\) \}/.test(body));
   const practice = code("client/src/components/build/LogPractice.tsx");
   check("and declares itself", /immediate: true/.test(practice));
   check("because it finishes in the same breath", /sessions\/\$\{id\}\/finish/.test(practice));
