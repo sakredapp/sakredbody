@@ -30,7 +30,7 @@
 
 import type { Express, Request, Response } from "express";
 import { zodMessage } from "../../shared/utils/zodMessage.js";
-import { db } from "../db.js";
+import { db, transactionally } from "../db.js";
 import { and, asc, desc, eq, gte, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { isAuthenticated } from "../auth/index.js";
@@ -508,25 +508,6 @@ export function registerTrainingRoutes(app: Express) {
         .object({
           habitId: z.string().uuid().nullable().optional(),
           title: z.string().max(120).nullable().optional(),
-          /**
-           * This session will be logged and finished in the same breath.
-           *
-           * `LogPractice` records something already done — forty-five minutes of
-           * Reformer — by creating a session, writing one set and finishing it
-           * across three calls. It is open for about as long as that takes, and
-           * it is not a workout the member is going to return to.
-           *
-           * Without this distinction the one-open-session rule would refuse to
-           * let somebody log a finished yoga class because they left a lifting
-           * session open on Tuesday, which is not what the rule is for. The rule
-           * exists to stop a second *interactive* workout hiding the first.
-           *
-           * The durable fix is for that flow to be one atomic endpoint, so
-           * there is no window and a failure halfway cannot orphan anything.
-           * Until then this is a declared intent rather than a loophole, and it
-           * is worth noting a client could pass it wrongly.
-           */
-          immediate: z.boolean().optional(),
         })
         .parse(req.body ?? {});
 
@@ -556,7 +537,7 @@ export function registerTrainingRoutes(app: Express) {
        * workout that has been running for forty minutes. Refusing states what
        * is true and hands over what is needed to resume.
        */
-      const [running] = input.immediate ? [] : await db
+      const [running] = await db
         .select({
           id: workoutSessions.id,
           title: workoutSessions.title,
@@ -583,24 +564,6 @@ export function registerTrainingRoutes(app: Express) {
           habitId: input.habitId ?? null,
           onDate: await memberToday(userId),
           title: input.title ?? null,
-          /**
-           * A one-shot log is born finished.
-           *
-           * `uniq_open_workout_per_member` makes one open session a fact about
-           * the database rather than a promise the handler keeps, and that
-           * turned the `immediate` exemption into a landmine: a member logging
-           * a finished yoga class while a lifting session was open would have
-           * hit a unique violation and seen a 500.
-           *
-           * Never entering the open state is the honest fix. It is not
-           * competing for the slot because it was never in it — so the flag
-           * changes what gets created rather than skipping a check, and there
-           * is no longer a loophole for a client to pass wrongly.
-           *
-           * The caller still finishes it afterwards, which restamps this and
-           * runs the coach share. That update is deliberately idempotent.
-           */
-          ...(input.immediate ? { finishedAt: new Date() } : {}),
         })
         .returning();
 
@@ -701,6 +664,86 @@ export function registerTrainingRoutes(app: Express) {
    * finished-but-empty rows already taught us to avoid. The sets go with it,
    * which is why the client asks first.
    */
+  /**
+   * Record a practice that already happened, in one transaction.
+   *
+   * ── Why this exists beside the session routes ─────────────────────────────
+   *
+   * Logging forty-five minutes of Reformer used to be three calls: create a
+   * session, write one set, finish it. A failure between any two of them left a
+   * finished session with nothing in it — harmless, as it turned out, because
+   * movementEvents selects FROM workout_sets and an empty session contributes
+   * no rows. Harmless is not the same as correct: the contract worth having is
+   * that the request either produces a complete practice or produces nothing.
+   *
+   * It also removes the last reason for the `immediate` flag, which existed so
+   * a create-then-finish flow could sidestep the one-open-workout rule. Nothing
+   * here is ever open, so there is nothing to sidestep.
+   */
+  app.post("/api/training/practice", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      const input = z
+        .object({
+          exerciseId: z.string().uuid(),
+          title: z.string().max(120),
+          durationMinutes: z.number().int().min(1).max(1440),
+          distanceM: z.number().min(0).max(1_000_000).optional(),
+          rpe: z.number().int().min(1).max(10).optional(),
+          shareWithCoach: z.boolean().optional(),
+        })
+        .parse(req.body ?? {});
+
+      const onDate = await memberToday(userId);
+
+      const sessionId = await transactionally<string>(async (tx) => {
+        const [session] = await tx
+          .insert(workoutSessions)
+          .values({
+            userId,
+            onDate,
+            title: input.title,
+            durationMinutes: input.durationMinutes,
+            // Born finished. It is a record of something already done, and it
+            // must never occupy the one open-workout slot.
+            finishedAt: new Date(),
+          })
+          .returning();
+
+        await tx.insert(workoutSets).values({
+          sessionId: session.id,
+          exerciseId: input.exerciseId,
+          durationSeconds: input.durationMinutes * 60,
+          ...(input.distanceM != null ? { distanceM: input.distanceM } : {}),
+          ...(input.rpe != null ? { rpe: input.rpe } : {}),
+        });
+
+        return session.id;
+      });
+      // Drizzle's transaction return widens to unknown through this helper;
+      // the insert is `.returning()` so the id is a string by construction.
+      const practiceId = sessionId as string;
+
+      // The same event a finished session emits, because that is what this is —
+      // one that happened to be recorded after the fact rather than during.
+      track("training.session_finish", { userId, surface: "build", subjectId: practiceId });
+
+      // Best-effort and after the commit, so a coach-thread failure cannot roll
+      // back a practice the member definitely did.
+      if (input.shareWithCoach) {
+        try {
+          await shareSessionWithCoach(userId, practiceId);
+        } catch (err) {
+          trackError("training.share", err, { userId });
+        }
+      }
+
+      res.status(201).json({ id: practiceId });
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
   app.delete("/api/training/sessions/:id", isAuthenticated, async (req, res) => {
     try {
       const userId = req.session!.userId!;

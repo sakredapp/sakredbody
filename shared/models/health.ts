@@ -445,14 +445,45 @@ export type HealthWorkoutInput = z.infer<typeof healthWorkoutSchema>;
  * to the platform, and an endpoint that let them be edited would quietly turn
  * imported measurements into self-reported ones.
  */
+/**
+ * What a member may say they trained.
+ *
+ * Deliberately short. A watch cannot know this and Sakred must not guess it,
+ * but that is not a reason to build a bodybuilding taxonomy — `other` plus a
+ * free label carries Olympic lifting, climbing, kettlebells or an athletic
+ * circuit without prematurely turning each into an enum nobody asked for.
+ */
+export const WORKOUT_FOCUSES = [
+  "chest", "back", "legs", "shoulders", "arms", "core",
+  "full_body", "conditioning", "other",
+] as const;
+export type WorkoutFocus = (typeof WORKOUT_FOCUSES)[number];
+
 export const workoutFeedbackSchema = z
   .object({
     response: z.enum(WORKOUT_RESPONSES).nullable().optional(),
     placement: z.enum(WORKOUT_PLACEMENTS).nullable().optional(),
+    focus: z.enum(WORKOUT_FOCUSES).nullable().optional(),
+    /** Their own words. Trimmed, bounded, never generated. */
+    label: z.string().trim().max(60).nullable().optional(),
+    /**
+     * Looked at, whether or not anything was added.
+     *
+     * Its own field because Confirm is a complete action: a member who reads
+     * the card and has nothing to add has still answered, and must not be asked
+     * again. Sending only this is the Confirm button.
+     */
+    reviewed: z.boolean().optional(),
   })
-  .refine((v) => v.response !== undefined || v.placement !== undefined, {
-    message: "Nothing to change.",
-  });
+  .refine(
+    (v) =>
+      v.response !== undefined ||
+      v.placement !== undefined ||
+      v.focus !== undefined ||
+      v.label !== undefined ||
+      v.reviewed !== undefined,
+    { message: "Nothing to change." },
+  );
 export type WorkoutFeedbackInput = z.infer<typeof workoutFeedbackSchema>;
 
 // ─── 5. THE SYNC ENVELOPE ──────────────────────────────────────────────────

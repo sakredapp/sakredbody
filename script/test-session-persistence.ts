@@ -111,17 +111,23 @@ console.log("\nOne open workout, refused rather than merged\n");
    */
   check("never a success code", !/status\(200\)[\s\S]{0,80}running/.test(body));
 
-  /** A finished-on-arrival log is not a competing workout. */
-  check("one-shot logging is exempt", /input\.immediate \? \[\]/.test(body));
   /**
-   * And never occupies the slot it is exempt from. The partial unique index
-   * makes one open session a database fact, so a one-shot log that entered the
-   * open state would collide and 500 — it is born finished instead.
+   * The exemption is gone entirely. A one-shot practice is its own endpoint
+   * now, so there is no flag a client could pass to sidestep this rule.
    */
-  check("a one-shot log is born finished", /input\.immediate \? \{ finishedAt: new Date\(\) \}/.test(body));
+  check("no bypass flag survives", !/input\.immediate/.test(routes));
+
   const practice = code("client/src/components/build/LogPractice.tsx");
-  check("and declares itself", /immediate: true/.test(practice));
-  check("because it finishes in the same breath", /sessions\/\$\{id\}\/finish/.test(practice));
+  check("practice logging is one call", /\/api\/training\/practice/.test(practice));
+  /**
+   * It still *invalidates* the sessions list, which is correct — a new
+   * practice belongs in history. What must be gone is creating one.
+   */
+  check(
+    "and no longer creates a session itself",
+    !/apiRequest\("POST", "\/api\/training\/sessions"/.test(practice),
+  );
+  check("nor finishes one", !/\/finish/.test(practice));
 }
 
 console.log("\nA half-written practice log leaves no ghost\n");
@@ -147,6 +153,33 @@ console.log("\nA half-written practice log leaves no ghost\n");
   check("and reach the session by inner join", /innerJoin\(workoutSessions/.test(history));
   check("so an empty session cannot contribute", !/\.from\(workoutSessions\)[\s\S]{0,200}leftJoin\(workoutSets/.test(history));
   check("a finished session is still required", /finishedAt\} is not null/.test(history));
+}
+
+console.log("\nA practice is written whole or not at all\n");
+
+{
+  const routes = code("server/training/routes.ts");
+  const practiceRoute = routes.slice(routes.indexOf('app.post("/api/training/practice"'));
+  const next = practiceRoute.indexOf("app.delete(");
+  const body = next === -1 ? practiceRoute : practiceRoute.slice(0, next);
+
+  check("the endpoint exists", body.length > 0);
+  /**
+   * One transaction. The three-call version left a finished session with
+   * nothing in it whenever a request failed partway — inert, because
+   * movementEvents selects FROM workout_sets, but inert is not correct.
+   */
+  check("session and set commit together", /transactionally/.test(body));
+  // Written across lines in the source, so the match spans them.
+  check("the set is written inside it", /tx\s*\.insert\(workoutSets\)/.test(body));
+  check("and the session too", /tx\s*\.insert\(workoutSessions\)/.test(body));
+  /** Born finished: it records something already done and must never be open. */
+  check("it is never open", /finishedAt: new Date\(\)/.test(body));
+  /**
+   * The coach share is deliberately outside the transaction and best-effort —
+   * a coach-thread failure must not roll back a practice the member did.
+   */
+  check("the share cannot roll it back", body.indexOf("transactionally") < body.indexOf("shareSessionWithCoach"));
 }
 
 console.log("\nA refusal is answered, not toasted\n");

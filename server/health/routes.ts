@@ -407,7 +407,7 @@ export function registerHealthRoutes(app: Express) {
     if (!parsed.success) return res.status(400).json({ message: zodMessage(parsed.error) });
 
     const userId = req.session!.userId!;
-    const { response, placement } = parsed.data;
+    const { response, placement, focus, label, reviewed } = parsed.data;
 
     // Checked before it reaches Postgres, which answers a malformed uuid with a
     // cast error and a 500 — an error page for what is really a 404.
@@ -424,6 +424,17 @@ export function registerHealthRoutes(app: Express) {
       // build an empty patch, which the schema's refinement prevents.
       if (response !== undefined) patch.userResponse = response;
       if (placement !== undefined) patch.userOrientationOverride = placement;
+      if (focus !== undefined) patch.userFocus = focus;
+      if (label !== undefined) patch.userLabel = label || null;
+      /**
+       * Any answer is also a review — otherwise a member who adds detail is
+       * asked about the same session again tomorrow. Confirm sends only
+       * `reviewed`, which is the whole of that action: no category changes, no
+       * inferred answers, nothing else touched.
+       */
+      if (reviewed || focus !== undefined || placement !== undefined || label !== undefined) {
+        patch.reviewedAt = new Date();
+      }
 
       /**
        * Scoped by user as well as id.

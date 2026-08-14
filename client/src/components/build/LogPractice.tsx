@@ -70,24 +70,22 @@ export function LogPractice({ onClose, onLogged }: { onClose: () => void; onLogg
   const log = useMutation({
     mutationFn: async () => {
       if (!chosen || !mins) throw new Error("How long was it?");
-      const started = await apiRequest("POST", "/api/training/sessions", {
-        title: chosen.name,
-        // Created, written and finished in three calls — see `immediate`.
-        immediate: true,
-      });
-      const { id } = (await started.json()) as { id: string };
-
+      /**
+       * One call, one transaction.
+       *
+       * This was three — create, write the set, finish — and a failure between
+       * any two left a finished session with nothing in it. Inert, as it turned
+       * out, because movementEvents selects FROM workout_sets and an empty
+       * session contributes no rows. Inert is not the same as correct: either
+       * the practice exists complete or it does not exist.
+       */
       const km = Number(distanceKm);
-      await apiRequest("POST", `/api/training/sessions/${id}/sets`, {
+      return apiRequest("POST", "/api/training/practice", {
         exerciseId: chosen.id,
-        durationSeconds: Math.round(mins * 60),
-        ...(km > 0 ? { distanceM: km * 1000 } : {}),
-        ...(rpe != null ? { rpe } : {}),
-      });
-
-      return apiRequest("POST", `/api/training/sessions/${id}/finish`, {
         title: chosen.name,
         durationMinutes: Math.round(mins),
+        ...(km > 0 ? { distanceM: km * 1000 } : {}),
+        ...(rpe != null ? { rpe } : {}),
         shareWithCoach,
       });
     },
