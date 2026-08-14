@@ -21,7 +21,7 @@
  */
 
 import { readFileSync } from "node:fs";
-import { buildGate, gatedLine } from "../shared/models/buildToday.js";
+import { buildGate, gatedLine, actionFor } from "../shared/models/buildToday.js";
 import { readReadiness, readLine, suggestToday, type Suggestion } from "../shared/models/recommend.js";
 import { readTerrain, composeTerrainNow, type TerrainLean } from "../shared/models/terrain.js";
 import { terrainLeanFrom, type ReportedSignals } from "../shared/models/terrainSignals.js";
@@ -382,6 +382,41 @@ console.log("\nA missing contract omits the card, never the screen\n");
   /** Nothing else on Build may hard-require it either. */
   const tab = code("client/src/components/BuildTab.tsx");
   check("the tab reads no terrain of its own", !/\.terrain\./.test(tab));
+}
+
+console.log("\nNot every recommendation means lifting\n");
+
+{
+  const mk = (category: string, label: string): Suggestion => ({
+    category, label, orientation: "yang", headline: "", because: "", isStretch: false, side: "build",
+  });
+
+  /**
+   * The destination follows the category's own group rather than an assumption
+   * about what Build means. A yoga class through the barbell logger would ask
+   * somebody to record "3 × 8" for forty-five minutes of Reformer.
+   */
+  check("a practice is logged, not run", actionFor(mk("class", "Classes")).kind === "practice");
+  check("endurance likewise", actionFor(mk("endurance", "Endurance")).kind === "practice");
+  check("a strength category is a session", actionFor(mk("chest", "Chest")).kind === "session");
+  /**
+   * Ground movement is `athletic`, not `practice`, so it resolves to a session
+   * — correct, since ground work is done in sets and rounds. Pinned because it
+   * is the case most likely to be guessed wrong in either direction.
+   */
+  const ground = actionFor(mk("ground", "Ground movement"));
+  check("ground movement is a session", ground.kind === "session");
+  check("and carries its focus", ground.kind === "session" && ground.focus === "ground");
+
+  const why = code("client/src/components/build/WhyToday.tsx");
+  check("a practice offers no start button", /isPractice \?/.test(why));
+  check("the condition survives the tap", /warm-up decide/.test(why));
+
+  const tab = code("client/src/components/BuildTab.tsx");
+  check("starting seeds only the name", /startFocus\.mutate\(a\.label\)/.test(tab));
+  /** No fabricated routine — there is no template system to draw one from. */
+  check("no invented exercise list", !/exercises: \[/.test(tab));
+  check("a practice creates nothing", /if \(a\.kind === "practice"\) return;/.test(tab));
 }
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);

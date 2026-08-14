@@ -28,7 +28,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useToday } from "@/components/TodayRead";
 import { Panel } from "@/components/portal/Panel";
-import { buildGate, REPORT_INVITE } from "@shared/models/buildToday";
+import { buildGate, actionFor, REPORT_INVITE, type BuildAction } from "@shared/models/buildToday";
 import { EXERCISE_CATEGORIES } from "@shared/models/training";
 import { ChevronRight } from "lucide-react";
 
@@ -76,7 +76,17 @@ function eventLabel(e: MovementEvent): string {
   return cats.map((c) => CATEGORY_LABEL.get(c) ?? c).join(" · ");
 }
 
-export function TodaysBuild({ onCheckIn }: { onCheckIn?: () => void }) {
+export function TodaysBuild({
+  onCheckIn,
+  /**
+   * Act on a recommendation. Absent on surfaces that can only show one — the
+   * card stays readable rather than becoming a dead tap target.
+   */
+  onAct,
+}: {
+  onCheckIn?: () => void;
+  onAct?: (action: BuildAction, why: string) => void;
+}) {
   const { data } = useToday();
 
   /**
@@ -145,26 +155,38 @@ export function TodaysBuild({ onCheckIn }: { onCheckIn?: () => void }) {
           recommended, and the rest are listed as what else the day is good
           for. Same options, same order, honest about which is which.
 
-          No chevron and no tap target yet. Starting one of these means
-          composing a session, which is the builder further down the screen,
-          and a row that looks tappable and is not is worse than one that
-          plainly reads as information.
+          Tapping one starts it. Where the surface cannot act — anywhere
+          `onAct` is absent — the rows render as plain information rather than
+          as tap targets that do nothing, which is the state they shipped in
+          for one build.
         */}
         {primary && (
           <div className="space-y-2">
             <Label>Suggested</Label>
-            <div
-              className="rounded-xl border border-border/50 px-3 py-2.5"
+            <button
+              type="button"
+              disabled={!onAct}
+              onClick={() => onAct?.(actionFor(primary), gate.rationale.join(" "))}
+              className="w-full text-left rounded-xl border border-border/50 px-3 py-2.5 flex items-start gap-3 tap-clean disabled:cursor-default"
               data-testid={`build-option-${primary.category}`}
             >
-              <p className="text-sm">{primary.label}</p>
-              <p className="text-xs text-muted-foreground leading-relaxed">{primary.headline}</p>
-              {/* Only where the engine had a basis. An invented because is
-                  worse than none — see recommend.ts. */}
-              {primary.because && (
-                <p className="text-[11px] text-muted-foreground/70 mt-0.5">{primary.because}</p>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm">{primary.label}</span>
+                <span className="block text-xs text-muted-foreground leading-relaxed">
+                  {primary.headline}
+                </span>
+                {/* Only where the engine had a basis. An invented because is
+                    worse than none — see recommend.ts. */}
+                {primary.because && (
+                  <span className="block text-[11px] text-muted-foreground/70 mt-0.5">
+                    {primary.because}
+                  </span>
+                )}
+              </span>
+              {onAct && (
+                <ChevronRight className="h-4 w-4 text-muted-foreground/40 mt-0.5 shrink-0" />
               )}
-            </div>
+            </button>
           </div>
         )}
 
@@ -173,14 +195,17 @@ export function TodaysBuild({ onCheckIn }: { onCheckIn?: () => void }) {
             <Label>Other good uses of today</Label>
             <div className="space-y-1.5">
               {alternates.map((s) => (
-                <div
+                <button
                   key={s.category}
-                  className="flex items-baseline justify-between gap-3"
+                  type="button"
+                  disabled={!onAct}
+                  onClick={() => onAct?.(actionFor(s), gate.rationale.join(" "))}
+                  className="w-full flex items-baseline justify-between gap-3 text-left tap-clean disabled:cursor-default"
                   data-testid={`build-option-${s.category}`}
                 >
                   <span className="text-sm">{s.label}</span>
                   <span className="text-xs text-muted-foreground text-right">{s.headline}</span>
-                </div>
+                </button>
               ))}
             </div>
           </div>

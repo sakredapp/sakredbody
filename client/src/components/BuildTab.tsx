@@ -42,7 +42,9 @@ import { FreeSession } from "@/components/build/FreeSession";
 import { TodaysBuild, RecentBuild } from "@/components/build/BuildToday";
 import { Elapsed } from "@/components/build/Elapsed";
 import { WorkoutInProgress } from "@/components/build/WorkoutInProgress";
+import { WhyToday } from "@/components/build/WhyToday";
 import { startSession, type RunningSession } from "@/lib/startSession";
+import type { BuildAction } from "@shared/models/buildToday";
 import type { MemberSection } from "@/components/MemberNav";
 import { Dumbbell, Check, Plus, Trophy, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -145,6 +147,14 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
    * moment they resume it — see `WorkoutInProgress`.
    */
   const [collision, setCollision] = useState<RunningSession | null>(null);
+  /**
+   * A recommendation the member tapped but has not started yet.
+   *
+   * Held so the "why today" can be read before committing — a recommendation
+   * that starts a workout on first tap gives somebody no way to look at the
+   * reasoning without becoming committed to it.
+   */
+  const [considering, setConsidering] = useState<{ action: BuildAction; why: string } | null>(null);
 
   /**
    * What is actually still running, according to the server.
@@ -235,6 +245,31 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
+  /**
+   * Start a session named for what was recommended.
+   *
+   * The name is the seed, and deliberately the whole of it. There is no
+   * `focus` column and no template system yet, so anything more would be
+   * fabricated structure — a screen of exercises nobody chose, justified by a
+   * recommendation that only ever said "chest looks useful today".
+   *
+   * So the member arrives in an empty session called Chest with the picker in
+   * front of them. That is honest about what Sakred currently knows, and the
+   * seam is there for saved routines and history to fill later.
+   */
+  const startFocus = useMutation({
+    mutationFn: (title: string) => startSession({ title }),
+    onSuccess: (result) => {
+      if ("conflict" in result) {
+        setCollision(result.conflict);
+        return;
+      }
+      setFreeSession({ id: result.started.id, title: result.started.title ?? "Your session" });
+      qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
   const logSet = useMutation({
     mutationFn: async (body: Record<string, unknown>) =>
       apiRequest("POST", `/api/training/sessions/${sessionId}/sets`, body),
@@ -292,7 +327,26 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
             the first meaningful thing on this screen, and on most days it is
             empty, so Build opened on a blank panel for a member the app knows
             a great deal about. */}
-        <TodaysBuild onCheckIn={onOpen ? () => onOpen("restore") : undefined} />
+        <TodaysBuild
+          onCheckIn={onOpen ? () => onOpen("restore") : undefined}
+          onAct={(action, why) => setConsidering({ action, why })}
+        />
+        {considering && (
+          <WhyToday
+            action={considering.action}
+            why={considering.why}
+            starting={start.isPending}
+            onDismiss={() => setConsidering(null)}
+            onStart={() => {
+              const a = considering.action;
+              setConsidering(null);
+              // A practice is logged after the fact, not run as a session —
+              // see `actionFor`. Nothing is created here for it.
+              if (a.kind === "practice") return;
+              startFocus.mutate(a.label);
+            }}
+          />
+        )}
         <RecentBuild />
 
       {/* The lifestyle half of Build — protein, steps, sunlight. Separate from

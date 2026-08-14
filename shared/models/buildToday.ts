@@ -43,6 +43,7 @@
  */
 
 import type { Suggestion, ReadinessRead } from "./recommend.js";
+import { isPracticeCategory } from "./training.js";
 import type { TerrainLean, TerrainReason } from "./terrain.js";
 
 export type BuildGate = {
@@ -241,3 +242,39 @@ export const REPORT_INVITE = {
   body: "Your health data tells us part of the picture. A quick check-in helps Sakred understand what the sensors can't.",
   action: "Check in",
 } as const;
+
+
+/**
+ * Where a recommendation actually goes when somebody taps it.
+ *
+ * ── Not every recommendation means lifting ────────────────────────────────
+ *
+ * Build is capacity, not bodybuilding. A recommendation to do a yoga class or
+ * an easy endurance hour is not a prescription for sets and reps, and sending
+ * it through the barbell logger would ask a member to record "3 × 8" for a
+ * forty-five minute Reformer session. That is the same mistake the prescribed
+ * row already learned once, where every movement was assumed to take a weight.
+ *
+ * So the destination follows the category's own group rather than an
+ * assumption about what Build means. `isPracticeCategory` is the existing
+ * answer to "is this measured in minutes rather than reps", and reusing it
+ * means a category added to the practice group routes correctly without this
+ * file being touched.
+ *
+ * Worth stating because it is easy to guess wrong: Ground movement is in the
+ * `athletic` group, not `practice`, so it resolves to a session. That is
+ * correct — ground work is done in sets and rounds — but it does mean "not
+ * everything is lifting" and "Ground movement goes somewhere else" are two
+ * different claims, and only the first one is true here.
+ */
+export type BuildAction =
+  /** Sets and reps, with the picker biased toward this category. */
+  | { kind: "session"; focus: string; label: string }
+  /** Something done for a length of time and logged once, afterwards. */
+  | { kind: "practice"; category: string; label: string };
+
+export function actionFor(s: Suggestion): BuildAction {
+  return isPracticeCategory(s.category)
+    ? { kind: "practice", category: s.category, label: s.label }
+    : { kind: "session", focus: s.category, label: s.label };
+}
