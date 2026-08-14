@@ -39,6 +39,8 @@ import { HabitPanel } from "@/components/habits/HabitPanel";
 import { TodayRead } from "@/components/TodayRead";
 import { MemberBuild } from "@/components/build/MemberBuild";
 import { FreeSession } from "@/components/build/FreeSession";
+import { TodaysBuild, RecentBuild } from "@/components/build/BuildToday";
+import type { MemberSection } from "@/components/MemberNav";
 import { Dumbbell, Check, Plus, Trophy, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { estimateOneRepMax, lbToKg, isPracticeCategory } from "@shared/models/training";
@@ -126,7 +128,7 @@ function targetLabel(l: PrescribedLift): string {
   return `${l.targetSets} sets`;
 }
 
-export function BuildTab() {
+export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -235,6 +237,14 @@ export function BuildTab() {
       <div className="space-y-6">
         <SectionHeading title="Build" subtitle="Strength, movement and resilience." />
 
+        {/* What today supports, and what they have been building — before
+            anything asking them to fill a box in. The habits card used to be
+            the first meaningful thing on this screen, and on most days it is
+            empty, so Build opened on a blank panel for a member the app knows
+            a great deal about. */}
+        <TodaysBuild onCheckIn={onOpen ? () => onOpen("restore") : undefined} />
+        <RecentBuild />
+
       {/* The lifestyle half of Build — protein, steps, sunlight. Separate from
           the workout builder on purpose: a session is an event with sets and
           weights, and "hit 165g" is a standing target. Collapsing them would
@@ -270,15 +280,11 @@ export function BuildTab() {
               qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
             }} />
 
-            {/*
-              An idea, if they want one — below the thing they came here to do.
-
-              This spent one build at the top of Home, where it stopped being
-              an optional prompt and became the app's opinion of your day. It
-              belongs next to the movement it is suggesting, on a screen
-              somebody opened having already decided to train.
-            */}
-            <TodayRead side="build" onOpenCategory={() => undefined} />
+            {/* `TodayRead side="build"` stood here and was the contradiction
+                vector: its headline comes from `readLine`, which is generated
+                from a readiness level with no knowledge of what Terrain
+                concluded. `TodaysBuild` above renders the same suggestions
+                through the gate instead. */}
             <p className="text-[11px] text-muted-foreground text-center max-w-sm mx-auto">
               When your coach plans a session for today, it appears at the top of this screen with
               its targets already worked out.
@@ -330,6 +336,18 @@ export function BuildTab() {
   return (
     <div className="space-y-6">
       <SectionHeading title="Build" subtitle="Strength, movement and resilience." />
+
+      {/*
+        The read comes first even when a coach has written the day.
+
+        A plan is context, not a state: it says what was intended, and Terrain
+        says what the body currently supports. Showing the prescription without
+        the read is how somebody ends up training through a day their own
+        signals were arguing about — so the plan stays, in full, underneath a
+        sentence that is honest about the terrain it lands in.
+      */}
+      <TodaysBuild onCheckIn={onOpen ? () => onOpen("restore") : undefined} />
+      <RecentBuild />
 
       {/* The lifestyle half of Build — protein, steps, sunlight. Separate from
           the workout builder on purpose: a session is an event with sets and

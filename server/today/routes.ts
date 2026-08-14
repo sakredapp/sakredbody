@@ -52,6 +52,8 @@ import {
   seasonGuidance,
   skyLine,
 } from "../../shared/models/recommend.js";
+import { gatedLine } from "../../shared/models/buildToday.js";
+import { terrainFor } from "../terrain/read.js";
 import { SELF_GUIDE, phaseLabel } from "../../shared/models/rhythm.js";
 import { relationshipGuidance, selfRelationalReads } from "../../shared/models/relating.js";
 import { moonState, elementalSeason } from "../../shared/utils/almanac.js";
@@ -161,12 +163,19 @@ export function registerTodayRoutes(app: Express): void {
        * of latency on the screen that opens first. None of them depends on
        * another's result, so none of them should wait for one.
        */
-      const [health, checkin, training, subjects, excluded] = await Promise.all([
+      const [health, checkin, training, subjects, excluded, terrain] = await Promise.all([
         healthReadings(userId, today),
         todaysCheckin(userId, today),
         trainingRead(userId, today),
         rhythmReads(userId, today),
         excludedCategories(userId, today),
+        /**
+         * The canonical state, so this screen cannot contradict Home.
+         *
+         * Alongside the others rather than after them — it shares their inputs
+         * but not their results, so making it wait would buy nothing.
+         */
+        terrainFor(userId, today),
       ]);
 
       const self = subjects.find((s) => s.relation === "self") ?? null;
@@ -196,8 +205,27 @@ export function registerTodayRoutes(app: Express): void {
       res.json({
         date: today,
         read,
-        line: readLine(read),
+        /**
+         * Terrain has the final say on direction.
+         *
+         * `readLine` is generated from a readiness level that can reach
+         * `primed` on a day canonical Terrain calls restore — good sleep, low
+         * resting heart rate, and a check-in saying they feel wrecked. Both
+         * sentences shipped, four seconds apart, off one database.
+         */
+        line: gatedLine(terrain.lean, readLine(read), read),
         suggestions,
+        /**
+         * The canonical state, passed through so Build can gate on it without
+         * a second request — and so nothing downstream has to re-derive it.
+         */
+        terrain: {
+          lean: terrain.lean,
+          headline: terrain.headline,
+          reasons: terrain.reasons,
+          hasBody: terrain.hasBody,
+          hasReport: terrain.hasReport,
+        },
         /**
          * Practice first, names second — the ordering rule the product runs
          * on. `sky` is the subtitle: "New moon · Late summer".

@@ -639,7 +639,7 @@ export default function MemberDashboard() {
             transition={{ duration: 0.2 }}
             className={`${PORTAL_COLUMN} py-6`}
           >
-            <BuildTab />
+            <BuildTab onOpen={setSection} />
           </motion.div>
         )}
 

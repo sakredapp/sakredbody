@@ -30,6 +30,7 @@ import { ChevronRight, MoreHorizontal, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Suggestion, MoonGuidance, SeasonGuidance, ReadinessRead } from "@shared/models/recommend";
 import type { RelationalGuidance } from "@shared/models/relating";
+import type { TerrainLean, TerrainReason } from "@shared/models/terrain";
 
 export type TodayStat = {
   metric: string;
@@ -65,6 +66,20 @@ export type TodayResponse = {
   sky: string | null;
   stats: TodayStat[];
   checkedIn: boolean;
+  /**
+   * Canonical Terrain, carried on this response so Build can gate against it.
+   *
+   * The same reading Home shows, not a second one — see
+   * `shared/models/buildToday.ts` for why every capacity claim has to defer to
+   * it rather than to the readiness level sitting beside it here.
+   */
+  terrain: {
+    lean: TerrainLean;
+    headline: string;
+    reasons: TerrainReason[];
+    hasBody: boolean;
+    hasReport: boolean;
+  };
   rhythm: RhythmSubjectView[];
   /**
    * How their own state is landing on other people — up to two, each naming
