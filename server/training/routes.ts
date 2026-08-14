@@ -687,6 +687,42 @@ export function registerTrainingRoutes(app: Express) {
     }
   });
 
+  /**
+   * Throw a session away, on purpose.
+   *
+   * The counterpart to Finish, and the only other thing that ends a workout.
+   * Without it a member who started one by accident had no way out: the
+   * partial unique index means that stray session blocks every subsequent
+   * start, so "I tapped the wrong thing" became a permanent condition.
+   *
+   * Deletes rather than closing. A finished session is a claim that training
+   * happened, and an accidental tap is not training — closing it would put a
+   * phantom workout in the member's history, which is precisely what the
+   * finished-but-empty rows already taught us to avoid. The sets go with it,
+   * which is why the client asks first.
+   */
+  app.delete("/api/training/sessions/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      const id = param(req, "id");
+
+      // Ownership in the predicate, so another member's id resolves to a
+      // refusal rather than to their workout.
+      const [owned] = await db
+        .select({ id: workoutSessions.id })
+        .from(workoutSessions)
+        .where(and(eq(workoutSessions.id, id), eq(workoutSessions.userId, userId)));
+      if (!owned) return res.status(404).json({ message: "No such session" });
+
+      await db.delete(workoutSets).where(eq(workoutSets.sessionId, id));
+      await db.delete(workoutSessions).where(eq(workoutSessions.id, id));
+
+      res.json({ ok: true });
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
   app.post("/api/training/sessions/:id/finish", isAuthenticated, async (req, res) => {
     try {
       const userId = req.session!.userId!;

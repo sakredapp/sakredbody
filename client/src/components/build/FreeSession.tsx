@@ -127,6 +127,8 @@ export function FreeSession({
    * already carries the button, and pressing it is one tap.
    */
   const [picking, setPicking] = useState(false);
+  /** Two taps, because this deletes logged sets. */
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [shareWithCoach, setShareWithCoach] = useState(true);
   /**
    * Offered after the fact, never before.
@@ -159,6 +161,22 @@ export function FreeSession({
     },
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
+
+  /**
+   * Throw the session away. Deletes rather than closes: a finished session is
+   * a claim that training happened, and an accidental tap is not training.
+   */
+  const discard = useMutation({
+    mutationFn: async () => apiRequest("DELETE", `/api/training/sessions/${sessionId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
+      qc.invalidateQueries({ queryKey: ["/api/training/sessions"] });
+      toast({ title: "Discarded." });
+      onDone();
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+  const discarding = discard.isPending;
 
   const finish = useMutation({
     mutationFn: async () =>
@@ -298,10 +316,35 @@ export function FreeSession({
               after a trip to Home — the time is derived from the server's
               timestamp rather than counted here. */}
           {startedAt && (
-            <p className="text-xs text-muted-foreground flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--gold))]" />
-              In progress · <Elapsed startedAt={startedAt} className="tabular-nums" />
-            </p>
+            <div className="flex items-center justify-between gap-3 -mt-1">
+              <p className="text-xs text-muted-foreground flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--gold))]" />
+                In progress · <Elapsed startedAt={startedAt} className="tabular-nums" />
+              </p>
+              {/*
+                The only other way out.
+                
+                Without it a session started by accident is permanent: the
+                partial unique index means that stray row blocks every
+                subsequent start. Confirmed first, because it deletes the sets
+                — and worded as what it is rather than as "Are you sure?".
+              */}
+              <button
+                onClick={() => {
+                  if (discarding) return;
+                  if (!confirmDiscard) {
+                    setConfirmDiscard(true);
+                    return;
+                  }
+                  discard.mutate();
+                }}
+                disabled={discarding}
+                className="text-xs text-muted-foreground/70 tap-clean shrink-0"
+                data-testid="button-discard-session"
+              >
+                {confirmDiscard ? "Discard — tap again" : "Discard"}
+              </button>
+            </div>
           )}
           {blocks.length === 0 && (
             <p className="text-xs text-muted-foreground">

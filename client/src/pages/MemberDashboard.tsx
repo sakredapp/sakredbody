@@ -58,6 +58,7 @@ import { useAccess } from "@/hooks/use-access";
 import { PortalBackdrop } from "@/components/portal/PortalBackdrop";
 import { PillarHome } from "@/components/PillarHome";
 import { BuildTab } from "@/components/BuildTab";
+import { ActiveWorkoutBar } from "@/components/build/ActiveWorkoutBar";
 import { RestoreTab } from "@/components/RestoreTab";
 import { SettingsTab } from "@/components/SettingsTab";
 import { useHealthAutoSync } from "@/hooks/use-health";
@@ -1103,6 +1104,16 @@ export default function MemberDashboard() {
       </AnimatePresence>
 
       <BottomNavSpacer />
+      {/*
+        Above the nav, below everything else. A workout that is running should
+        be reachable from wherever the member wandered to — and hidden on Build
+        itself, which is already showing it in full.
+      */}
+      <div className="fixed inset-x-0 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-40 px-4 pointer-events-none">
+        <div className="mx-auto max-w-md pointer-events-auto">
+          <ActiveWorkoutBar hidden={section === "build"} onResume={() => setSection("build")} />
+        </div>
+      </div>
       <MemberBottomNav section={section} onChange={setSection} />
 
       <Dialog open={showBookingDialog} onOpenChange={setShowBookingDialog}>

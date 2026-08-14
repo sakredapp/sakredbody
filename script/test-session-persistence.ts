@@ -179,5 +179,54 @@ console.log("\nA refusal is answered, not toasted\n");
   }
 }
 
+console.log("\nEvery screen knows a workout is running\n");
+
+{
+  const hook = code("client/src/hooks/use-open-workout.ts");
+  const bar = code("client/src/components/build/ActiveWorkoutBar.tsx");
+  const dash = code("client/src/pages/MemberDashboard.tsx");
+
+  /** One query key, or two screens disagree about whether training is happening. */
+  check("the banner reads the same query Build does", /\/api\/training\/sessions\/open/.test(hook));
+  check("and derives nothing from navigation", !/section|route|location/i.test(bar));
+
+  check("it shows how long", /<Elapsed/.test(bar));
+  check("and offers the way back", /onResume/.test(bar));
+  /** "0 sets" on a workout somebody just started reads as a reproach. */
+  check("it counts sets only once there are some", /sets > 0/.test(bar));
+
+  check("it is mounted app-wide", /<ActiveWorkoutBar/.test(dash));
+  check("and hides on the surface already showing it", /hidden=\{section === "build"\}/.test(dash));
+}
+
+console.log("\nOnly Finish or a confirmed Discard ends it\n");
+
+{
+  const routes = code("server/training/routes.ts");
+  const discardRoute = routes.slice(routes.indexOf('app.delete("/api/training/sessions/:id"'));
+  /**
+   * Bounded at the next route, not by a character count — a fixed slice ran
+   * into the finish handler below and found its `finishedAt`, which is how an
+   * assertion about this route ends up reading a different one.
+   */
+  const nextRoute = discardRoute.indexOf("app.post(", 1);
+  const body = nextRoute === -1 ? discardRoute : discardRoute.slice(0, nextRoute);
+
+  check("discarding is possible at all", discardRoute.length > 0);
+  /**
+   * Without it, a session started by accident is permanent — the partial
+   * unique index makes that stray row block every subsequent start.
+   */
+  check("ownership is in the predicate", /eq\(workoutSessions\.userId, userId\)/.test(body));
+  check("a stranger's id is a refusal", /status\(404\)/.test(body));
+  /** Deleted, not closed: an accidental tap is not training. */
+  check("the sets go too", /delete\(workoutSets\)/.test(body));
+  check("and it does not become history", !/finishedAt/.test(body));
+
+  const free = code("client/src/components/build/FreeSession.tsx");
+  check("the client asks first", /confirmDiscard/.test(free));
+  check("and says what will happen", /Discard — tap again/.test(free));
+}
+
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);
