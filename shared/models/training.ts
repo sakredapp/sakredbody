@@ -1110,6 +1110,42 @@ export const workoutSets = pgTable(
   ],
 );
 
+/**
+ * Is this day already accounted for by something the phone recorded?
+ *
+ * ── Why this is a function and not four lines in the route ───────────────
+ *
+ * Three cases have to hold, and only one of them is the interesting one:
+ *
+ *   nothing like it that day     write the historical activity
+ *   a generic import of the      refuse, hand it over, offer to put the detail
+ *   same kind                    on the record that already has the duration
+ *   two genuinely separate       both survive — a member can train twice, and
+ *   workouts                     the dedupe must never quietly merge them
+ *
+ * The third is why the match is by category and never by "there is a workout
+ * that day". Two leg sessions on a Saturday is unusual and completely
+ * legitimate, and a rule that collapsed them would silently delete half of
+ * somebody's week. It is also why `force` exists: the member is the one who
+ * knows, and refusing twice would be worse than not asking.
+ *
+ * Only unreviewed imports are candidates. One the member has already answered
+ * about is a record they have looked at and accepted, and offering to enrich
+ * it again is the queue behaviour Confirm Activity exists to avoid.
+ */
+export function alreadyImported<T extends { workoutType: string | null; reviewedAt?: unknown }>(
+  candidates: readonly T[],
+  /** The Sakred category of what the member is trying to record. */
+  category: string | null,
+): T | null {
+  if (!category) return null;
+  return (
+    candidates.find(
+      (w) => !w.reviewedAt && externalActivityCategory(w.workoutType) === category,
+    ) ?? null
+  );
+}
+
 // ─── 5. WHAT THE BODY SAID ─────────────────────────────────────────────────
 
 /**

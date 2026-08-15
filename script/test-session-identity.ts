@@ -136,7 +136,8 @@ console.log("\nThe mirror clears as well as sets\n");
    */
   const sheetSrc = code("client/src/components/build/WorkoutSheet.tsx");
   check("the layer reads the same query", /useOpenWorkout\(\)/.test(sheetSrc));
-  check("and closes itself when nothing is open", /if \(!session && expanded\) collapse\(\)/.test(sheetSrc));
+  check("and closes itself when nothing is open",
+    /if \(!session && expanded && !justFinished\) collapse\(\)/.test(sheetSrc));
   check("and renders nothing without one", /if \(!expanded \|\| !session/.test(sheetSrc));
 }
 
@@ -188,6 +189,34 @@ console.log("\nA 404 takes the screen down, and never invents a session\n");
     check(`${path.split("/").pop()} does not log sets itself`,
       !/sessions\/\$\{[^}]+\}\/sets/.test(code(path).replace(/\$\{sessionId\}\/sets/g, "PRESCRIBED")));
   }
+}
+
+console.log("\nAnd finishing says so to the cache\n");
+
+{
+  const sheet = code("client/src/components/build/WorkoutSheet.tsx");
+
+  /**
+   * Found by putting it on a phone-shaped screen, not by reading it.
+   *
+   * Finishing invalidated the history, today and terrain, and left the
+   * open-session answer alone — so for its full `staleTime` the resume strip
+   * went on offering a workout that had ended, which is the exact failure the
+   * strip's own file names as the reason it reads one shared query. Then the
+   * eventual refetch pulled the confirmation screen out from under whoever was
+   * reading it.
+   */
+  check("finishing ends the session in the cache",
+    /qc\.setQueryData\(OPEN_WORKOUT_KEY, \{ session: null \}\)/.test(sheet));
+  /**
+   * And the confirmation outlives the session it is about, held until the
+   * member presses Done rather than until a background refetch says otherwise.
+   */
+  check("the confirmation is held outside the session", /justFinished/.test(sheet));
+  check("and rendered when nothing is open", /if \(justFinished\) return <Logged \/>/.test(sheet));
+  check("the collapse-on-empty rule stands aside for it",
+    /if \(!session && expanded && !justFinished\) collapse\(\)/.test(sheet));
+  check("and only Done clears it", /setJustFinished\(null\);\s*collapse\(\)/.test(sheet));
 }
 
 console.log("\nOne discard, however fast the taps\n");

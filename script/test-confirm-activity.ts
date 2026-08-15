@@ -148,9 +148,24 @@ console.log("\nThe card keeps the three truths apart\n");
   check("focus comes from the canon", /WORKOUT_FOCUSES/.test(card));
   check("core is offered", WORKOUT_FOCUSES.includes("core" as never));
   check("and 'other' carries the rest", WORKOUT_FOCUSES.includes("other" as never));
-  /** The card is on Home, not buried in Build. */
-  const home = code("client/src/components/portal/TodayBody.tsx");
-  check("it lives on Home", /<ConfirmActivity \/>/.test(home));
+  /**
+   * ── On the Home a member actually opens ──
+   *
+   * This assertion used to read `portal/TodayBody.tsx` and call it Home. It is
+   * not: the member's Home tab renders `PillarHome`, and `TodayBody` belongs to
+   * the coaching screen. So the card was mounted somewhere no member could
+   * reach it, and the test passed for a year of nothing — which is what a
+   * browser render pass found in four minutes and no source assertion could.
+   *
+   * Pinned to the component the dashboard names for `section === "home"`, so a
+   * future move has to move this too.
+   */
+  const dash = code("client/src/pages/MemberDashboard.tsx");
+  check("Home is PillarHome", /section === "home"[\s\S]{0,400}<PillarHome/.test(dash));
+  const home = code("client/src/components/PillarHome.tsx");
+  check("and the card is on it", /<ConfirmActivity \/>/.test(home));
+  /** Below the reading, because it is about yesterday and Home opens on today. */
+  check("under the terrain reading", /<TerrainToday[\s\S]{0,600}<ConfirmActivity \/>/.test(home));
 }
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);

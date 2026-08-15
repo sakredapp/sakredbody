@@ -379,7 +379,10 @@ export function MemoryDisclosure() {
  */
 function SuggestionMemory({ category, label }: { category: string; label: string }) {
   const { data } = useTrainingMemory();
-  const found = recallForCategory(data?.observations ?? [], category);
+  /** Local, so a note "from last week" is judged against the member's week. */
+  const d = new Date();
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const found = recallForCategory(data?.observations ?? [], category, today);
   if (!found) return null;
 
   const line = recallLine(found, label);

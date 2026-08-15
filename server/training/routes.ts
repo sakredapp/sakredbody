@@ -62,6 +62,7 @@ import {
   communityMessages,
   healthWorkouts,
   externalActivityCategory,
+  alreadyImported,
   trainingObservations,
   observationSchema,
 } from "../../shared/schema.js";
@@ -770,8 +771,11 @@ export function registerTrainingRoutes(app: Express) {
           )
           .orderBy(desc(healthWorkouts.startAt));
 
-        const match = sameDay.find(
-          (w) => category != null && externalActivityCategory(w.workoutType) === category,
+        // The rule lives in the model, where all three cases are tested without
+        // a database. See `alreadyImported`.
+        const match = alreadyImported(
+          sameDay.map((w) => ({ ...w, reviewedAt: null })),
+          category,
         );
         if (match) {
           return res.status(409).json({

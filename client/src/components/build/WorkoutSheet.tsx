@@ -43,7 +43,17 @@ import {
   type ReactNode,
 } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Plus, Check, MoreHorizontal, Users, Send, MessageSquare, ChevronRight } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Check,
+  MoreHorizontal,
+  Users,
+  Send,
+  MessageSquare,
+} from "lucide-react";
 import { isPracticeCategory } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -71,21 +81,40 @@ type Sheet = {
   open: () => void;
   /** Put the app back. Does not touch the session. */
   collapse: () => void;
+  /**
+   * A session that has just been finished, held for one more screen.
+   *
+   * The confirmation — "12 sets saved, share it with the room" — is about a
+   * session that no longer exists, so it cannot live inside a component that
+   * only renders while one does. Held here, and cleared by the member pressing
+   * Done, so a background refetch cannot pull it out from under them.
+   */
+  justFinished: { id: string; sets: number; shared: boolean } | null;
+  setJustFinished: (v: { id: string; sets: number; shared: boolean } | null) => void;
 };
 
 const SheetContext = createContext<Sheet>({
   expanded: false,
   open: () => {},
   collapse: () => {},
+  justFinished: null,
+  setJustFinished: () => {},
 });
 
 export const useWorkoutSheet = () => useContext(SheetContext);
 
 export function WorkoutSheetProvider({ children }: { children: ReactNode }) {
   const [expanded, setExpanded] = useState(false);
+  const [justFinished, setJustFinished] = useState<Sheet["justFinished"]>(null);
   const value = useMemo<Sheet>(
-    () => ({ expanded, open: () => setExpanded(true), collapse: () => setExpanded(false) }),
-    [expanded],
+    () => ({
+      expanded,
+      open: () => setExpanded(true),
+      collapse: () => setExpanded(false),
+      justFinished,
+      setJustFinished,
+    }),
+    [expanded, justFinished],
   );
   return <SheetContext.Provider value={value}>{children}</SheetContext.Provider>;
 }
@@ -131,17 +160,23 @@ const blank = (): Draft => ({ weight: "", reps: "", seconds: "" });
 // ─── The layer ──────────────────────────────────────────────────────────────
 
 export function WorkoutSheet() {
-  const { expanded, collapse } = useWorkoutSheet();
+  const { expanded, collapse, justFinished } = useWorkoutSheet();
   const { data } = useOpenWorkout();
   const session = data?.session ?? null;
 
   /**
    * Nothing running means nothing to show, and the collapsed state is reset so
    * the next workout opens rather than reappearing already put away.
+   *
+   * Except while a confirmation is being held: that screen is about a session
+   * that has deliberately just ceased to exist.
    */
   useEffect(() => {
-    if (!session && expanded) collapse();
-  }, [session, expanded, collapse]);
+    if (!session && expanded && !justFinished) collapse();
+  }, [session, expanded, collapse, justFinished]);
+
+  // The one screen that outlives the session it is about.
+  if (justFinished) return <Logged />;
 
   /**
    * A prescribed session keeps its own screen.
@@ -156,7 +191,7 @@ export function WorkoutSheet() {
 }
 
 function Sheet() {
-  const { collapse } = useWorkoutSheet();
+  const { collapse, setJustFinished } = useWorkoutSheet();
   const { toast } = useToast();
   const qc = useQueryClient();
   const { data } = useOpenWorkout();
@@ -183,9 +218,9 @@ function Sheet() {
   const [noting, setNoting] = useState<string | null>(null);
   /** Finish opens the response loop rather than committing straight away. */
   const [reviewing, setReviewing] = useState(false);
+  /** Held rather than posted on tap, so "Save & finish" has something to save. */
+  const [allGood, setAllGood] = useState(false);
   const [shareWithCoach, setShareWithCoach] = useState(true);
-  const [finished, setFinished] = useState(false);
-  const [shared, setShared] = useState(false);
 
   const logged = session.logged ?? [];
   const observations = session.observations ?? [];
@@ -315,19 +350,19 @@ function Sheet() {
       qc.invalidateQueries({ queryKey: ["/api/terrain/today"] });
       // What was just said becomes what gets remembered.
       qc.invalidateQueries({ queryKey: MEMORY_KEY });
-      setFinished(true);
+      /**
+       * And the session is over, said to the cache rather than left to expire.
+       *
+       * This was missing, and the consequence was not cosmetic: the open-session
+       * answer stayed valid for its full `staleTime`, so the resume strip went on
+       * offering a workout that had ended — the exact failure the strip's own file
+       * names as the reason it reads one shared query. Then the eventual refetch
+       * would pull the confirmation screen out from under whoever was reading it.
+       */
+      qc.setQueryData(OPEN_WORKOUT_KEY, { session: null });
+      setJustFinished({ id: session.id, sets: total, shared: false });
     },
     onError: failed,
-  });
-
-  const shareToRoom = useMutation({
-    mutationFn: async () => apiRequest("POST", `/api/training/sessions/${session.id}/share`, {}),
-    onSuccess: () => {
-      setShared(true);
-      qc.invalidateQueries({ queryKey: ["/api/community/messages"] });
-      toast({ title: "Posted to the room." });
-    },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
   // ── Editing ──────────────────────────────────────────────────────────────
@@ -381,45 +416,6 @@ function Sheet() {
 
   const total = logged.length;
 
-  // ── Saved ────────────────────────────────────────────────────────────────
-
-  if (finished) {
-    return (
-      <Layer>
-        <div className="flex-1 grid place-items-center px-6">
-          <div className="w-full max-w-sm space-y-5 text-center">
-            <div className="space-y-1">
-              <p className="font-display text-2xl">Logged</p>
-              <p className="text-sm text-muted-foreground">
-                {total} {total === 1 ? "set" : "sets"} saved
-                {shareWithCoach ? ", and your coach can see it" : ""}.
-              </p>
-            </div>
-
-            {shared ? (
-              <p className="text-sm text-[hsl(var(--gold))]">It's in the room.</p>
-            ) : (
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => shareToRoom.mutate()}
-                disabled={shareToRoom.isPending}
-                data-testid="share-to-room"
-              >
-                <Users className="h-3.5 w-3.5 mr-1.5" />
-                {shareToRoom.isPending ? "Posting…" : "Share it with the room"}
-              </Button>
-            )}
-
-            <Button variant="ghost" className="w-full text-muted-foreground" onClick={collapse}>
-              Done
-            </Button>
-          </div>
-        </div>
-      </Layer>
-    );
-  }
-
   // ── Leaving a note ───────────────────────────────────────────────────────
 
   if (noting !== null) {
@@ -445,12 +441,36 @@ function Sheet() {
   if (reviewing) {
     return (
       <Layer>
-        <div className="shrink-0 px-4 pt-3 pb-2 border-b border-border/40">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground/70">
-            How did that land?
-          </p>
+        {/*
+          ── Nobody is held here ──
+
+          A feedback screen with no way past it is how somebody ends up
+          believing they finished while the timer runs for another two hours.
+          So there are three ways out and all of them are visible: back to the
+          workout, finish with what you said, and finish without saying
+          anything. The workout is still running until one of the last two is
+          pressed, and the header says so rather than leaving it to be
+          inferred.
+        */}
+        <div className="shrink-0 px-4 pt-2 pb-2 border-b border-border/40">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setReviewing(false)}
+              className="h-9 w-9 -ml-1.5 grid place-items-center rounded-full text-muted-foreground tap-clean"
+              aria-label="Back to the workout"
+              data-testid="review-back"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground/70">
+              How did that land?
+            </p>
+          </div>
           <p className="font-display text-xl mt-0.5">
             {session.title?.trim() || "Your session"}
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            Still running · <Elapsed startedAt={session.startedAt} className="tabular-nums" />
           </p>
         </div>
 
@@ -471,6 +491,26 @@ function Sheet() {
             Anything feel off? What you say here shapes your next warm-up and what
             Sakred suggests — see below.
           </p>
+
+          {/* The whole answer, for the sessions that do not need one. Recorded
+              rather than skipped: "it landed fine" is what makes the one
+              evening it does not land legible. */}
+          <button
+            onClick={() => setAllGood((v) => !v)}
+            className={cn(
+              "w-full rounded-xl border px-3 py-2.5 text-left text-sm tap-clean transition-colors",
+              allGood
+                ? "border-[hsl(var(--gold))]/50 bg-[hsl(var(--gold))]/10"
+                : "border-border/60 text-muted-foreground",
+            )}
+            aria-pressed={allGood}
+            data-testid="review-all-good"
+          >
+            <span className="inline-flex items-center gap-2">
+              {allGood && <Check className="h-3.5 w-3.5 text-[hsl(var(--gold))]" />}
+              No — it all felt good
+            </span>
+          </button>
 
           <div className="space-y-1">
             {groups.map((g) => {
@@ -516,43 +556,50 @@ function Sheet() {
           </p>
         </div>
 
-        <div className="shrink-0 px-4 py-3 pb-safe border-t border-border/40 flex gap-2">
-          {/* The fast path, and it records something rather than nothing: "the
-              session landed fine" is a real answer and is what makes the one
-              evening it does not land readable. */}
+        <div className="shrink-0 px-4 py-3 pb-safe border-t border-border/40 space-y-2">
           <Button
-            variant="ghost"
-            className="flex-1 text-muted-foreground"
+            className="w-full bg-gold border-gold-border text-white"
             disabled={observe.isPending || finish.isPending}
             onClick={async () => {
-              try {
-                await observe.mutateAsync({
-                  exerciseId: null,
-                  note: null,
-                  quality: "good",
-                  side: null,
-                });
-              } catch {
-                return;
+              /**
+               * Per-movement notes are already on the server — they were saved
+               * as each was written. The only thing this still has to commit is
+               * the "it all felt good" answer, which is held here so that the
+               * two buttons below mean two different things rather than being
+               * the same action wearing two labels.
+               */
+              if (allGood) {
+                try {
+                  await observe.mutateAsync({
+                    exerciseId: null,
+                    note: null,
+                    quality: "good",
+                    side: null,
+                  });
+                } catch {
+                  return;
+                }
               }
               finish.mutate();
             }}
-            data-testid="review-all-good"
-          >
-            No — felt good
-          </Button>
-          <Button
-            className="flex-1 bg-gold border-gold-border text-white"
-            disabled={finish.isPending}
-            onClick={() => finish.mutate()}
             data-testid="review-finish"
           >
-            {finish.isPending ? "Saving…" : "Finish"}
+            {finish.isPending || observe.isPending ? "Saving…" : "Save & finish"}
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full text-muted-foreground"
+            disabled={finish.isPending}
+            onClick={() => finish.mutate()}
+            data-testid="review-finish-bare"
+          >
+            Finish without feedback
           </Button>
         </div>
       </Layer>
     );
   }
+
 
   // ── Adding a movement ────────────────────────────────────────────────────
 
@@ -861,6 +908,78 @@ function Sheet() {
           <p className="text-[11px] text-muted-foreground text-right">
             {total === 0 ? "Log a set before finishing." : "Collapse and it keeps running."}
           </p>
+        </div>
+      </div>
+    </Layer>
+  );
+}
+
+/**
+ * Saved — and now, if they want, said out loud.
+ *
+ * Its own component, outside the session's lifetime, because the session it is
+ * about has deliberately just stopped existing. Held until the member presses
+ * Done: a background refetch must not be able to take this screen away while
+ * somebody is deciding whether to post their workout to the room.
+ *
+ * Sharing with a coach is part of the arrangement they signed up for and
+ * happens on finish. Telling forty other people is a decision, and one people
+ * make after they see what they actually did — so it is offered here rather
+ * than as another checkbox to consider mid-workout.
+ */
+function Logged() {
+  const { justFinished, setJustFinished, collapse } = useWorkoutSheet();
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const done = justFinished!;
+
+  const share = useMutation({
+    mutationFn: async () => apiRequest("POST", `/api/training/sessions/${done.id}/share`, {}),
+    onSuccess: () => {
+      setJustFinished({ ...done, shared: true });
+      qc.invalidateQueries({ queryKey: ["/api/community/messages"] });
+      toast({ title: "Posted to the room." });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <Layer>
+      <div className="flex-1 grid place-items-center px-6">
+        <div className="w-full max-w-sm space-y-5 text-center">
+          <div className="space-y-1">
+            <p className="font-display text-2xl">Logged</p>
+            <p className="text-sm text-muted-foreground">
+              {done.sets} {done.sets === 1 ? "set" : "sets"} saved.
+            </p>
+          </div>
+
+          {done.shared ? (
+            <p className="text-sm text-[hsl(var(--gold))]">It's in the room.</p>
+          ) : (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => share.mutate()}
+              disabled={share.isPending}
+              data-testid="share-to-room"
+            >
+              <Users className="h-3.5 w-3.5 mr-1.5" />
+              {share.isPending ? "Posting…" : "Share it with the room"}
+            </Button>
+          )}
+
+          <Button
+            variant="ghost"
+            className="w-full text-muted-foreground"
+            onClick={() => {
+              setJustFinished(null);
+              collapse();
+            }}
+            data-testid="logged-done"
+          >
+            Done
+          </Button>
         </div>
       </div>
     </Layer>

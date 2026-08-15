@@ -25,6 +25,7 @@
 
 import { readFileSync } from "node:fs";
 import {
+  MEMORY_ALIKE_DAYS,
   MEMORY_DISCLOSURE,
   MEMORY_WINDOW_DAYS,
   isNotable,
@@ -186,6 +187,34 @@ console.log("\nRecalled where it could change a decision\n");
   /** No pattern, no shape match — a guess dressed as a recall. */
   check("and never on a missing pattern", recallFor([rdl], { id: "x", pattern: null, category: "legs" }) === null);
 
+  /**
+   * ── And a shape match fades ──
+   *
+   * "You noted this on a single-leg RDL, and today is a B-stance RDL" is worth
+   * saying the week after. Saying it for six weeks turns one sentence into a
+   * standing warning across every leg day, which is the opposite of adapting to
+   * what is true now. The exact movement keeps the full window; coming back to
+   * the same lift is precisely when somebody wants reminding.
+   */
+  const old = obs({ ...rdl, onDate: "2026-07-01" });
+  check("a recent lookalike still speaks",
+    recallFor([rdl], bStance, "2026-08-20") !== null);
+  check("an old one does not", recallFor([old], bStance, "2026-08-20") === null);
+  check("but the exact movement still does at the same age",
+    recallFor([old], hinge, "2026-08-20") !== null);
+  /** Exactly at the boundary, so the rule is a date and not a vibe. */
+  check("the boundary is inclusive",
+    recallFor([obs({ ...rdl, onDate: "2026-08-06" })], bStance, "2026-08-20") !== null);
+  check("and one day past it is not",
+    recallFor([obs({ ...rdl, onDate: "2026-08-05" })], bStance, "2026-08-20") === null);
+  check("a shorter clock than the window", MEMORY_ALIKE_DAYS < MEMORY_WINDOW_DAYS,
+    `${MEMORY_ALIKE_DAYS} vs ${MEMORY_WINDOW_DAYS}`);
+  /** A recommendation is an inference about a kind of work, on the same clock. */
+  check("the category recall fades too",
+    recallForCategory([old], "legs", "2026-08-20") === null);
+  check("and speaks while it is fresh",
+    recallForCategory([rdl], "legs", "2026-08-20") !== null);
+
   /** Exact beats alike even when the alike one is newer. */
   const newerAlike = obs({ ...rdl, exerciseId: "dumbbell-romanian-deadlift", onDate: "2026-08-14" });
   check("the exact match wins over a newer lookalike",
@@ -276,10 +305,29 @@ console.log("\nWritten where it happens, read where it matters\n");
   check("which lists what was done", /data-testid=\{`review-\$\{g\.movement\.id\}`\}/.test(sheet));
   check("offers a session note", /data-testid="review-session-note"/.test(sheet));
   /** And a fast path that still records something. */
-  check("the fast path records that it landed fine", /data-testid="review-all-good"/.test(sheet));
-  check("as a real observation", /quality: "good"/.test(sheet));
+  /** The fast answer is held rather than fired, so both exits mean something. */
+  check("there is a fast answer", /data-testid="review-all-good"/.test(sheet));
+  check("held locally", /const \[allGood, setAllGood\]/.test(sheet));
+  check("and written on save as a real observation", /if \(allGood\)[\s\S]{0,300}quality: "good"/.test(sheet));
   /** The boundary is stated where somebody is about to describe a symptom. */
   check("the boundary is said on that screen", /doesn't diagnose/.test(sheet));
+
+  /**
+   * ── And nobody is held there ──
+   *
+   * A feedback screen with no way past it is how somebody ends up believing
+   * they finished while the timer runs for another two hours. Three exits, all
+   * visible.
+   */
+  check("back to the workout", /data-testid="review-back"/.test(sheet));
+  check("which does not end the session", /onClick=\{\(\) => setReviewing\(false\)\}/.test(sheet));
+  check("and says it is still running", /Still running/.test(sheet));
+  check("finish with what was said", /data-testid="review-finish"/.test(sheet));
+  check("and finish without saying anything", /data-testid="review-finish-bare"/.test(sheet));
+  /** The bare exit writes nothing — otherwise the label is a lie. */
+  const bare = sheet.slice(sheet.indexOf('data-testid="review-finish-bare"') - 400,
+                           sheet.indexOf('data-testid="review-finish-bare"'));
+  check("the bare exit records nothing", !/observe\.mutate/.test(bare));
 
   /** One observation per movement per session, replaced rather than stacked. */
   const post = routes.slice(routes.indexOf('"/api/training/sessions/:id/observations"'));
@@ -304,6 +352,20 @@ console.log("\nWritten where it happens, read where it matters\n");
   const surface = code("client/src/components/build/TrainingMemory.tsx");
   check("one note, never a history", !/\.map\(/.test(surface));
   check("and nothing at all when there is nothing", /return null/.test(surface));
+
+  /**
+   * ── And it stays small ──
+   *
+   * "Last time: slight left low-back discomfort." A note is information a
+   * member weighs, and an app that escalates one sentence into a bordered
+   * warning across every future leg day has stopped helping them adapt. The
+   * border, the icon and the guidance are kept for the flagged case only,
+   * which is the one where a smaller nudge is not the useful thing.
+   */
+  check("the ordinary recall is one line", /if \(!seekCare\) \{[\s\S]{0,600}<button/.test(surface));
+  check("with the guidance behind a tap", /\{open && \(/.test(surface));
+  check("and no border on it", !/if \(!seekCare\) \{[\s\S]{0,400}rounded-xl border/.test(surface));
+  check("the flagged one keeps its weight", /AlertTriangle/.test(surface));
 }
 
 console.log("\nAnd it says why the five seconds are worth it\n");

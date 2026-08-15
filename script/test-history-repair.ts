@@ -25,6 +25,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { alreadyImported } from "../shared/models/training.js";
 
 let passed = 0;
 let failed = 0;
@@ -100,6 +101,61 @@ console.log("\nA day that was missed can be filled in\n");
   check("and born finished", /finishedAt: new Date\(\)/.test(body));
 }
 
+console.log("\nThe three cases, pinned\n");
+
+{
+  const w = (workoutType: string | null, reviewedAt: unknown = null) => ({
+    id: workoutType ?? "none",
+    workoutType,
+    reviewedAt,
+  });
+
+  /** 1. Nothing like it that day — the historical activity is simply written. */
+  check("no matching import means write it",
+    alreadyImported([w("walking"), w("running")], "full_body") === null);
+  check("and an empty day certainly does", alreadyImported([], "full_body") === null);
+  check("as does a movement we cannot place", alreadyImported([w("strength")], null) === null);
+
+  /**
+   * 2. A generic Strength import the same day is the same hour. Refuse, hand it
+   * over, and let the member put the focus on the record that already has the
+   * duration and the heart rate.
+   */
+  check("a generic strength import matches a full-body session",
+    alreadyImported([w("walking"), w("strength")], "full_body")?.workoutType === "strength");
+  check("a run matches endurance work",
+    alreadyImported([w("running")], "endurance")?.workoutType === "running");
+  /** Different kinds of work on one day are different sessions. */
+  check("but a run does not match a lifting session",
+    alreadyImported([w("running")], "full_body") === null);
+  check("nor a walk anything demanding",
+    alreadyImported([w("walking")], "full_body") === null);
+
+  /**
+   * One the member has already answered about is a record they have looked at
+   * and accepted. Offering to enrich it again is the queue behaviour Confirm
+   * Activity exists to avoid.
+   */
+  check("an already-reviewed import is not offered again",
+    alreadyImported([w("strength", new Date())], "full_body") === null);
+  check("but an unreviewed one beside it still is",
+    alreadyImported([w("strength", new Date()), w("strength")], "full_body")?.reviewedAt === null);
+
+  /**
+   * 3. Two genuinely separate workouts on one day both survive — 14 Aug on the
+   * account this was written from has exactly that, fourteen minutes at 15:20
+   * and sixty-four at 17:36. Nothing here merges them; the check refuses *once*
+   * and `force` is how the member says it was separate.
+   */
+  const twoStrength = [w("strength"), { id: "b", workoutType: "strength", reviewedAt: null }];
+  check("the first is what gets offered", alreadyImported(twoStrength, "full_body")?.id === "strength");
+  check("and nothing collapses the pair", twoStrength.length === 2);
+
+  const routes2 = code("server/training/routes.ts");
+  check("the route uses that rule rather than its own", /alreadyImported\(/.test(routes2));
+  check("and the member can overrule it", /force: z\.boolean\(\)\.optional\(\)/.test(routes2));
+}
+
 console.log("\nAnd never charges the same hour twice\n");
 
 {
@@ -114,7 +170,8 @@ console.log("\nAnd never charges the same hour twice\n");
   check("the imported side of the day is checked", /from\(healthWorkouts\)/.test(body));
   check("on the same day", /eq\(healthWorkouts\.onDate, onDate\)/.test(body));
   check("and only what has not been answered", /isNull\(healthWorkouts\.reviewedAt\)/.test(body));
-  check("matched through the one mapper", /externalActivityCategory\(w\.workoutType\) === category/.test(body));
+  /** Through the shared rule, which is where all three cases are pinned above. */
+  check("matched through the one rule", /alreadyImported\(/.test(body));
 
   /** A refusal that hands over what the caller needs to do the right thing. */
   check("it refuses rather than writing", /status\(409\)/.test(body));

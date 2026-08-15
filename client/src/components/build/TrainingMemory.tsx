@@ -19,6 +19,7 @@
  * didn't seem to connect" is a claim Sakred did not have the right to make.
  */
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -27,7 +28,18 @@ import {
   restoreLine,
   type Observation,
 } from "@shared/models/trainingMemory";
-import { cn } from "@/lib/utils";
+
+/**
+ * The member's own today, so a shape match can be aged out.
+ *
+ * Local rather than UTC: whether a note from "last week" still speaks is a
+ * question about their week, and a member training at 9pm on the west coast is
+ * already tomorrow in UTC.
+ */
+function localToday(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 export const MEMORY_KEY = ["/api/training/memory"] as const;
 
@@ -43,6 +55,24 @@ export function useTrainingMemory() {
   });
 }
 
+/**
+ * ── The size of it is the argument ────────────────────────────────────────
+ *
+ * One line, quoting them:
+ *
+ *     Last time: slight left low-back discomfort.
+ *
+ * Not a bordered warning across every future leg day. A note is information a
+ * member weighs, and an app that escalates one sentence into a standing
+ * caution has stopped helping them adapt and started telling them what they
+ * are allowed to do. The guidance line — warm it, start lighter — is available
+ * behind a tap rather than asserted every time, because most days they already
+ * know.
+ *
+ * The exception is the only one worth making. Where the sentence tripped the
+ * red-flag screen it keeps the border, the icon and the guidance, because that
+ * is the one case where the useful thing is not a smaller nudge.
+ */
 function Card({
   headline,
   quote,
@@ -56,22 +86,37 @@ function Card({
   seekCare: boolean;
   testid: string;
 }) {
+  const [open, setOpen] = useState(false);
+
+  if (!seekCare) {
+    return (
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full text-left tap-clean py-0.5"
+        data-testid={testid}
+      >
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          <span className="text-foreground/70">Last time:</span>{" "}
+          {/* Their sentence where they wrote one, the short form where they
+              only picked a word. Never a paraphrase of the sentence. */}
+          {quote ?? headline.replace(/^Last time(?: on [^:]+)?:\s*/, "")}
+        </p>
+        {open && (
+          <p className="text-[11px] text-muted-foreground/80 leading-relaxed mt-1">{guidance}</p>
+        )}
+      </button>
+    );
+  }
+
   return (
     <div
-      className={cn(
-        "rounded-xl border px-3 py-2.5 space-y-1.5",
-        seekCare ? "border-[hsl(var(--gold))]/40 bg-[hsl(var(--gold))]/[0.04]" : "border-border/50",
-      )}
+      className="rounded-xl border border-[hsl(var(--gold))]/40 bg-[hsl(var(--gold))]/[0.04] px-3 py-2.5 space-y-1.5"
       data-testid={testid}
     >
       <p className="text-xs text-foreground/90 leading-relaxed flex items-start gap-1.5">
-        {seekCare && (
-          <AlertTriangle className="h-3.5 w-3.5 text-[hsl(var(--gold))] shrink-0 mt-0.5" />
-        )}
+        <AlertTriangle className="h-3.5 w-3.5 text-[hsl(var(--gold))] shrink-0 mt-0.5" />
         <span>{headline}</span>
       </p>
-      {/* Quoted, and visibly so. The member should be able to see that this is
-          their sentence and not the app's account of it. */}
       {quote && (
         <p className="text-xs text-muted-foreground italic leading-relaxed border-l border-border/60 pl-2">
           “{quote}”
@@ -95,7 +140,7 @@ export function MovementMemory({
   movement: { id: string; name: string; pattern?: string | null; category?: string | null };
 }) {
   const { data } = useTrainingMemory();
-  const found = recallFor(data?.observations ?? [], movement);
+  const found = recallFor(data?.observations ?? [], movement, localToday());
   if (!found) return null;
 
   const line = recallLine(found, movement.name);

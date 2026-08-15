@@ -58,6 +58,26 @@ export type Observation = {
 export const MEMORY_WINDOW_DAYS = 45;
 
 /**
+ * And how far back a note about a *different* movement still speaks.
+ *
+ * Much shorter, because a shape match is an inference. "You noted this on a
+ * single-leg RDL, and today is a B-stance RDL" is worth saying the week after;
+ * saying it for six weeks turns one sentence into a standing warning across
+ * every leg day, which is the opposite of the point. The app is meant to adapt
+ * to what is true now, not to obey what was true in July.
+ *
+ * The exact movement keeps the full window: coming back to the same lift is
+ * precisely when somebody wants to be reminded what happened last time on it.
+ */
+export const MEMORY_ALIKE_DAYS = 14;
+
+/** Whole days between two YYYY-MM-DD strings. Positive when `a` is earlier. */
+function daysBetween(a: string, b: string): number {
+  const ms = Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`);
+  return Math.round(ms / 86_400_000);
+}
+
+/**
  * ── The boundary ──────────────────────────────────────────────────────────
  *
  * Sakred personalizes around soreness, stiffness, poor connection and training
@@ -124,6 +144,8 @@ export function isNotable(o: Observation): boolean {
 export function recallFor(
   observations: readonly Observation[],
   movement: { id: string; pattern?: string | null; category?: string | null },
+  /** Today, so a shape match can be held to a shorter memory than an exact one. */
+  today?: string,
 ): Observation | null {
   const notable = observations.filter(isNotable);
   const exact = notable.filter((o) => o.exerciseId === movement.id);
@@ -132,7 +154,9 @@ export function recallFor(
       o.exerciseId !== movement.id &&
       !!movement.pattern &&
       o.pattern === movement.pattern &&
-      o.category === movement.category,
+      o.category === movement.category &&
+      // A shape match is an inference, and it fades. See MEMORY_ALIKE_DAYS.
+      (!today || daysBetween(o.onDate, today) <= MEMORY_ALIKE_DAYS),
   );
   // Newest of the exact matches, else newest of the ones like it.
   const pick = (rows: Observation[]) =>
@@ -151,8 +175,17 @@ export function recallFor(
 export function recallForCategory(
   observations: readonly Observation[],
   category: string,
+  today?: string,
 ): Observation | null {
-  const rows = observations.filter((o) => isNotable(o) && o.category === category);
+  const rows = observations.filter(
+    (o) =>
+      isNotable(o) &&
+      o.category === category &&
+      // Held to the same short clock as a shape match, and for the same reason:
+      // a recommendation is a category, so this is an inference about a kind of
+      // work rather than a fact about a movement.
+      (!today || daysBetween(o.onDate, today) <= MEMORY_ALIKE_DAYS),
+  );
   return rows.length ? rows.reduce((a, b) => (b.onDate > a.onDate ? b : a)) : null;
 }
 
@@ -198,8 +231,8 @@ export function recallLine(o: Observation, movementName: string): Recall {
   return {
     headline:
       when === "this"
-        ? `Last time, you noted ${whereItWas(o)}.`
-        : `Last time you did ${when}, you noted ${whereItWas(o)}.`,
+        ? `Last time: ${whereItWas(o)}.`
+        : `Last time on ${when}: ${whereItWas(o)}.`,
     quote: o.note?.trim() || null,
     /**
      * Two registers, and the line between them is the product's ethics.
