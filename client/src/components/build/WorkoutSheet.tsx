@@ -43,7 +43,7 @@ import {
   type ReactNode,
 } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Plus, Check, MoreHorizontal, Users, Send } from "lucide-react";
+import { ChevronDown, Plus, Check, MoreHorizontal, Users, Send, MessageSquare, ChevronRight } from "lucide-react";
 import { isPracticeCategory } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -59,6 +59,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MovementPicker, type Movement } from "./MovementPicker";
 import { NewMovement } from "./NewMovement";
+import { ObservationForm, observationSummary, type Observation } from "./Observation";
+import { MovementMemory, MEMORY_KEY } from "./TrainingMemory";
 import { cn } from "@/lib/utils";
 
 // ─── Who can open it ────────────────────────────────────────────────────────
@@ -172,11 +174,23 @@ function Sheet() {
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  /**
+   * Which movement they are leaving a note on, `"session"` for the whole thing,
+   * and `null` for none. A separate screen rather than a field on the row: what
+   * gets written here is a sentence, and a sentence does not belong beside two
+   * number boxes and a tick.
+   */
+  const [noting, setNoting] = useState<string | null>(null);
+  /** Finish opens the response loop rather than committing straight away. */
+  const [reviewing, setReviewing] = useState(false);
   const [shareWithCoach, setShareWithCoach] = useState(true);
   const [finished, setFinished] = useState(false);
   const [shared, setShared] = useState(false);
 
   const logged = session.logged ?? [];
+  const observations = session.observations ?? [];
+  const observationFor = (exerciseId: string | null) =>
+    observations.find((o) => o.exerciseId === exerciseId) ?? null;
 
   /**
    * The session, grouped.
@@ -282,6 +296,16 @@ function Sheet() {
     },
   });
 
+  const observe = useMutation({
+    mutationFn: async (o: Observation) =>
+      apiRequest("POST", `/api/training/sessions/${session.id}/observations`, o),
+    onSuccess: () => {
+      setNoting(null);
+      refreshSession();
+    },
+    onError: failed,
+  });
+
   const finish = useMutation({
     mutationFn: async () =>
       apiRequest("POST", `/api/training/sessions/${session.id}/finish`, { shareWithCoach }),
@@ -289,6 +313,8 @@ function Sheet() {
       qc.invalidateQueries({ queryKey: ["/api/training/sessions"] });
       qc.invalidateQueries({ queryKey: ["/api/training/today"] });
       qc.invalidateQueries({ queryKey: ["/api/terrain/today"] });
+      // What was just said becomes what gets remembered.
+      qc.invalidateQueries({ queryKey: MEMORY_KEY });
       setFinished(true);
     },
     onError: failed,
@@ -394,6 +420,140 @@ function Sheet() {
     );
   }
 
+  // ── Leaving a note ───────────────────────────────────────────────────────
+
+  if (noting !== null) {
+    const target = noting === "session" ? null : groups.find((g) => g.movement.id === noting);
+    return (
+      <Layer>
+        <ObservationForm
+          title={noting === "session" ? "The session" : (target as Group)?.movement.name ?? "This movement"}
+          unilateral={noting !== "session" && !!(target as Group)?.movement.unilateral}
+          existing={observationFor(noting === "session" ? null : noting)}
+          saving={observe.isPending}
+          onCancel={() => setNoting(null)}
+          onSave={(o) =>
+            observe.mutate({ exerciseId: noting === "session" ? null : noting, ...o })
+          }
+        />
+      </Layer>
+    );
+  }
+
+  // ── How did that land? ───────────────────────────────────────────────────
+
+  if (reviewing) {
+    return (
+      <Layer>
+        <div className="shrink-0 px-4 pt-3 pb-2 border-b border-border/40">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground/70">
+            How did that land?
+          </p>
+          <p className="font-display text-xl mt-0.5">
+            {session.title?.trim() || "Your session"}
+          </p>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto scroll-touch px-4 py-4 space-y-5">
+          {/*
+            ── Why this screen exists at all ──
+
+            The number a member can give you afterwards — 80 × 8 — is the half
+            the app already had. The half it never had is what their body did
+            with it, and there is exactly one moment somebody will tell you:
+            the minute they finish, before they have put the phone away.
+
+            It is optional and it is fast. The point is not to grade fourteen
+            exercises every workout; it is that the one evening something felt
+            wrong, there is somewhere obvious to say so.
+          */}
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Anything feel off? What you say here shapes your next warm-up and what
+            Sakred suggests — see below.
+          </p>
+
+          <div className="space-y-1">
+            {groups.map((g) => {
+              const o = observationFor(g.movement.id);
+              return (
+                <button
+                  key={g.movement.id}
+                  onClick={() => setNoting(g.movement.id)}
+                  className="w-full flex items-center justify-between gap-3 py-2.5 text-left tap-clean"
+                  data-testid={`review-${g.movement.id}`}
+                >
+                  <span className="text-sm truncate">{g.movement.name}</span>
+                  <span className="text-xs text-muted-foreground shrink-0 inline-flex items-center gap-1">
+                    {o ? observationSummary(o) : "Add feedback"}
+                    <ChevronRight className="h-3 w-3" />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            onClick={() => setNoting("session")}
+            className="w-full flex items-center justify-between gap-3 py-2.5 text-left tap-clean border-t border-border/40"
+            data-testid="review-session-note"
+          >
+            <span className="text-sm text-muted-foreground">Overall session note</span>
+            <span className="text-xs text-muted-foreground shrink-0 inline-flex items-center gap-1">
+              {observationFor(null) ? observationSummary(observationFor(null)!) : "Add"}
+              <Plus className="h-3 w-3" />
+            </span>
+          </button>
+
+          {/*
+            The boundary, stated where somebody is about to describe a symptom.
+            Sakred can adapt training around what a member reports; it cannot
+            tell them what is wrong with them, and the difference matters most
+            in exactly the cases where it would be most tempting to try.
+          */}
+          <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
+            Sakred adjusts your training around what you notice. It doesn't diagnose —
+            sharp, spreading or worsening pain is worth a professional's eyes.
+          </p>
+        </div>
+
+        <div className="shrink-0 px-4 py-3 pb-safe border-t border-border/40 flex gap-2">
+          {/* The fast path, and it records something rather than nothing: "the
+              session landed fine" is a real answer and is what makes the one
+              evening it does not land readable. */}
+          <Button
+            variant="ghost"
+            className="flex-1 text-muted-foreground"
+            disabled={observe.isPending || finish.isPending}
+            onClick={async () => {
+              try {
+                await observe.mutateAsync({
+                  exerciseId: null,
+                  note: null,
+                  quality: "good",
+                  side: null,
+                });
+              } catch {
+                return;
+              }
+              finish.mutate();
+            }}
+            data-testid="review-all-good"
+          >
+            No — felt good
+          </Button>
+          <Button
+            className="flex-1 bg-gold border-gold-border text-white"
+            disabled={finish.isPending}
+            onClick={() => finish.mutate()}
+            data-testid="review-finish"
+          >
+            {finish.isPending ? "Saving…" : "Finish"}
+          </Button>
+        </div>
+      </Layer>
+    );
+  }
+
   // ── Adding a movement ────────────────────────────────────────────────────
 
   if (creating !== null) {
@@ -455,14 +615,15 @@ function Sheet() {
             startedAt={session.startedAt}
             className="flex-1 text-center text-sm tabular-nums text-muted-foreground"
           />
+          {/* Opens the response loop rather than committing. See `reviewing`. */}
           <Button
             size="sm"
             className="bg-gold border-gold-border text-white"
-            onClick={() => finish.mutate()}
+            onClick={() => setReviewing(true)}
             disabled={total === 0 || finish.isPending}
             data-testid="finish-workout"
           >
-            {finish.isPending ? "Saving…" : "Finish"}
+            Finish
           </Button>
         </div>
 
@@ -500,17 +661,40 @@ function Sheet() {
                     <span className="text-[10px] text-muted-foreground shrink-0">per side</span>
                   )}
                 </div>
+                <div className="flex items-center shrink-0">
+                {/*
+                  During the workout, not only at the end. "The glute didn't
+                  connect on that set" is a thing somebody knows at the moment
+                  it happens and has usually stopped thinking about by the time
+                  they are putting the bar away.
+                */}
+                <button
+                  onClick={() => setNoting(m.id)}
+                  className="h-7 w-7 grid place-items-center tap-clean"
+                  aria-label={`Note on ${m.name}`}
+                  data-testid={`note-movement-${m.id}`}
+                >
+                  <MessageSquare
+                    className={cn(
+                      "h-3.5 w-3.5",
+                      observationFor(m.id)
+                        ? "text-[hsl(var(--gold))]"
+                        : "text-muted-foreground/50",
+                    )}
+                  />
+                </button>
                 <button
                   onClick={() => {
                     setMenuFor(menuFor === m.id ? null : m.id);
                     setConfirmRemove(null);
                   }}
-                  className="h-7 w-7 -mr-1.5 grid place-items-center text-muted-foreground/60 tap-clean shrink-0"
+                  className="h-7 w-7 -mr-1.5 grid place-items-center text-muted-foreground/60 tap-clean"
                   aria-label={`Options for ${m.name}`}
                   data-testid={`movement-menu-${m.id}`}
                 >
                   <MoreHorizontal className="h-4 w-4" />
                 </button>
+                </div>
               </div>
 
               {/*
@@ -538,6 +722,15 @@ function Sheet() {
                     : `Remove ${m.name}`}
                 </button>
               )}
+
+              {/*
+                Before the first set of it, which is the only moment it could
+                change anything. `pattern` is not carried on a logged set, so a
+                movement matched only by shape needs the catalogue — that is a
+                gap, and the exact-movement match, which is the common case,
+                works without it.
+              */}
+              <MovementMemory movement={{ id: m.id, name: m.name, category: m.category }} />
 
               {/* What is already on the server, stated rather than editable. */}
               {g.sets.map((s, i) => (

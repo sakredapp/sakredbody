@@ -32,6 +32,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { seedOpenWorkout } from "@/hooks/use-open-workout";
 import { type RunningSession } from "@/lib/startSession";
 import { useWorkoutSheet } from "@/components/build/WorkoutSheet";
+import { RestoreMemory } from "@/components/build/TrainingMemory";
 import { TodayRead } from "@/components/TodayRead";
 import { RhythmSection } from "@/components/RhythmCards";
 import { Panel, SectionHeading } from "@/components/portal/Panel";
@@ -409,6 +410,17 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
           <p className="text-[11px] text-muted-foreground mt-3">Averaged over the last 7 days.</p>
         )}
       </Panel>
+
+      {/*
+        ── What their last session left them with ──
+
+        The other half of an answer Build already gives. A member who reported a
+        tight left low back after hinging does not need Restore repeating the
+        training advice back at them; they need to be told that today might be
+        better spent giving that area something than asking more of it. One
+        observation, one reader, two useful readings — see `trainingMemory`.
+      */}
+      <RestoreMemory />
 
       {/* ── Restoring is something you do, not only something you skip ── */}
       <Panel title="Movement that restores" data-testid="restore-movement">

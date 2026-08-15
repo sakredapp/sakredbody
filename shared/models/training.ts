@@ -1110,6 +1110,131 @@ export const workoutSets = pgTable(
   ],
 );
 
+// ─── 5. WHAT THE BODY SAID ─────────────────────────────────────────────────
+
+/**
+ * What the member noticed, kept exactly as they said it.
+ *
+ * ── Why a table and not another `note` column ─────────────────────────────
+ *
+ * There were already three. `workout_sets.note`, `workout_sessions.note` and
+ * `member_workout_exercises.note` all existed and all had the same two
+ * problems: nothing in the app wrote to them, and nothing read them. A member
+ * could not have left a note if they had wanted to, and if they had it would
+ * have gone nowhere.
+ *
+ * The reason to make a fourth place rather than use one of the three is that
+ * none of them can hold the thing that matters. "Slight low-back discomfort on
+ * the left-leg RDL — the glute didn't feel like it was firing" is *about* a
+ * movement, in a session, on a side, and none of those columns records a side
+ * or attaches to a movement-within-a-session. A note on set 3 of 4 is not
+ * where that observation lives; it is a fact about the exercise that day.
+ *
+ * ── The raw sentence is the record ────────────────────────────────────────
+ *
+ * `note` is what the person typed and is never rewritten, summarised or
+ * replaced. Everything beside it is context or the member's own structuring of
+ * their own answer — `quality` and `side` are chosen from a short list by the
+ * member, not inferred from their words by anything.
+ *
+ * There is deliberately no column here for model-extracted tags. When
+ * extraction is worth adding it gets its own columns and its own provenance,
+ * so that an interpretation can never be mistaken for, or written over, the
+ * thing it is an interpretation of. A column with no writer is structure
+ * invented to satisfy a rule.
+ *
+ * ── What it is not ────────────────────────────────────────────────────────
+ *
+ * Not a symptom log and not a medical record. It records how training felt, in
+ * the member's words, so that the next warm-up, the next exercise choice and
+ * the next Restore suggestion can take account of it. Sakred does not diagnose
+ * from it — see the red-flag rules where this is read.
+ */
+export const OBSERVATION_QUALITIES = [
+  "good",
+  "tight",
+  "weak",
+  "discomfort",
+  "unstable",
+  "other",
+] as const;
+
+export type ObservationQuality = (typeof OBSERVATION_QUALITIES)[number];
+
+/** Left, right, both — or nothing said, which is the common case. */
+export const OBSERVATION_SIDES = ["left", "right", "both"] as const;
+export type ObservationSide = (typeof OBSERVATION_SIDES)[number];
+
+export const trainingObservations = pgTable(
+  "training_observations",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull(),
+
+    /** Always a session. An observation with no training behind it is a mood. */
+    sessionId: uuid("session_id").notNull(),
+
+    /**
+     * Which movement it is about, or null for the session as a whole.
+     *
+     * Text rather than uuid because that is what `exercises.id` is — slugs,
+     * readable in a URL, and stable across a catalogue reseed.
+     */
+    exerciseId: text("exercise_id"),
+
+    /**
+     * The member's own day, denormalised from the session.
+     *
+     * So "what did they say about hinging lately" is a range scan rather than a
+     * join through sessions on every read — this is asked on the way into a
+     * warm-up, which is a request path.
+     */
+    onDate: date("on_date").notNull(),
+
+    /** What they actually said. Never rewritten. */
+    note: text("note"),
+
+    /**
+     * One word from a short list, chosen by them.
+     *
+     * Nullable, because a sentence on its own is a complete observation and
+     * forcing a category on somebody who wanted to write "shoulder felt odd
+     * coming out of the hole" would lose more than it structures.
+     */
+    quality: text("quality"),
+    /** Nullable, and usually null. Only a per-side movement makes it a question. */
+    side: text("side"),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (t) => [
+    // The read this exists for: what has this member said lately, newest first.
+    index("idx_training_observations_user").on(t.userId, t.onDate),
+    // And: what have they said about *this* movement.
+    index("idx_training_observations_exercise").on(t.userId, t.exerciseId),
+    index("idx_training_observations_session").on(t.sessionId),
+  ],
+);
+
+export type TrainingObservation = typeof trainingObservations.$inferSelect;
+
+export const observationSchema = z
+  .object({
+    exerciseId: z.string().max(80).nullable().optional(),
+    note: z.string().trim().max(1000).nullable().optional(),
+    quality: z.enum(OBSERVATION_QUALITIES).nullable().optional(),
+    side: z.enum(OBSERVATION_SIDES).nullable().optional(),
+  })
+  /**
+   * An observation with neither a word nor a sentence records nothing. Letting
+   * one through would fill the table with rows that can only ever say "this
+   * member tapped an exercise", and the reader would have to filter them out
+   * every time it asked what somebody had noticed.
+   */
+  .refine((v) => (v.note?.trim().length ?? 0) > 0 || !!v.quality, {
+    message: "Say something, or pick how it felt.",
+  });
+
 // ─── Derived numbers ───────────────────────────────────────────────────────
 
 /**

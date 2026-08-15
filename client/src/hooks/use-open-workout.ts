@@ -82,6 +82,17 @@ export type OpenWorkout = RunningSession & {
    */
   logged?: LoggedSet[];
   unit?: "kg" | "lb";
+  /**
+   * What the member has said about it so far — one per movement at most, plus
+   * one for the session as a whole. Optional for the same reason as `logged`.
+   */
+  observations?: {
+    id: string;
+    exerciseId: string | null;
+    note: string | null;
+    quality: string | null;
+    side: string | null;
+  }[];
 };
 
 export const OPEN_WORKOUT_KEY = ["/api/training/sessions/open"] as const;

@@ -33,6 +33,8 @@ import { buildGate, actionFor, REPORT_INVITE, type BuildAction } from "@shared/m
 import { EXERCISE_CATEGORIES } from "@shared/models/training";
 import { ChevronRight, Plus } from "lucide-react";
 import { LogPractice } from "@/components/build/LogPractice";
+import { useTrainingMemory } from "@/components/build/TrainingMemory";
+import { MEMORY_DISCLOSURE, recallForCategory, recallLine } from "@shared/models/trainingMemory";
 
 const CATEGORY_LABEL = new Map(EXERCISE_CATEGORIES.map((c) => [c.id as string, c.label as string]));
 
@@ -214,6 +216,17 @@ export function TodaysBuild({
         )}
 
         {/*
+          ── What they told Sakred last time ──
+
+          Above the check-in invitation and below the options, because it is
+          about the thing they are choosing rather than about today's readings.
+          Only where the movement being recommended is one they have said
+          something about — a card that appeared every day saying nothing would
+          make the one that matters invisible.
+        */}
+        {primary && <SuggestionMemory category={primary.category} label={primary.label} />}
+
+        {/*
           The one thing no sensor can supply.
 
           Offered when the reading is standing on measurements alone, which is
@@ -329,5 +342,59 @@ export function RecentBuild() {
         />
       )}
     </>
+  );
+}
+
+
+/**
+ * Why leaving a note is worth the five seconds.
+ *
+ * Stated once, on the screen where training is chosen, rather than as a
+ * tooltip beside every note field. Somebody who does not know that what they
+ * type changes anything will not type anything — and the feature is worth
+ * exactly what people put into it.
+ *
+ * Only after they have actually left one, so it reads as an explanation of
+ * something happening rather than as an ask.
+ */
+export function MemoryDisclosure() {
+  const { data } = useTrainingMemory();
+  if (!data?.observations?.length) return null;
+
+  return (
+    <p className="text-[11px] text-muted-foreground leading-relaxed" data-testid="memory-disclosure">
+      <span className="text-foreground/80">{MEMORY_DISCLOSURE.title}.</span>{" "}
+      {MEMORY_DISCLOSURE.body}
+    </p>
+  );
+}
+
+/**
+ * What was said about work like this, before they commit to more of it.
+ *
+ * The suggestion names a category rather than a movement — "Chest", "Ground
+ * movement" — so the match is by category, which is the resolution the
+ * recommendation itself has. Matching more precisely than the thing being
+ * recommended would be inventing precision.
+ */
+function SuggestionMemory({ category, label }: { category: string; label: string }) {
+  const { data } = useTrainingMemory();
+  const found = recallForCategory(data?.observations ?? [], category);
+  if (!found) return null;
+
+  const line = recallLine(found, label);
+  return (
+    <div
+      className="rounded-xl border border-border/50 px-3 py-2.5 space-y-1.5"
+      data-testid="build-memory"
+    >
+      <p className="text-xs leading-relaxed">{line.headline}</p>
+      {line.quote && (
+        <p className="text-xs text-muted-foreground italic leading-relaxed border-l border-border/60 pl-2">
+          “{line.quote}”
+        </p>
+      )}
+      <p className="text-[11px] text-muted-foreground leading-relaxed">{line.guidance}</p>
+    </div>
   );
 }

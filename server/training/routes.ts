@@ -62,6 +62,8 @@ import {
   communityMessages,
   healthWorkouts,
   externalActivityCategory,
+  trainingObservations,
+  observationSchema,
 } from "../../shared/schema.js";
 // Through the barrel, as wins/routes.ts already does. It is the single place
 // that answers "which rooms can they see", and reaching past index.js for it
@@ -76,6 +78,7 @@ import {
   type SetRow,
 } from "./strength.js";
 import { memberToday } from "../coaching/enrollment.js";
+import { trainingMemory } from "./memory.js";
 import { addDaysToString } from "../../shared/utils/dates.js";
 import { track, trackError } from "../telemetry/index.js";
 
@@ -898,6 +901,91 @@ export function registerTrainingRoutes(app: Express) {
     },
   );
 
+  /**
+   * What the body said, in the member's own words.
+   *
+   * ── Why the raw sentence is the payload ──────────────────────────────────
+   *
+   * "Slight low-back discomfort on the left-leg RDL — the glute didn't feel
+   * like it was firing" is worth more than any category it could be reduced
+   * to, and it is stored exactly as typed. `quality` and `side` are the
+   * member's own structuring of their own answer, picked from a short list;
+   * nothing here reads their sentence and decides what it meant.
+   *
+   * The date comes from the session rather than from the clock, so an
+   * observation left on a workout logged after midnight sits on the day the
+   * training happened.
+   */
+  /**
+   * What they have said lately, for the screens that are about to ask them to
+   * load something.
+   *
+   * Deliberately the whole window rather than a per-movement lookup. The list
+   * is small — notable observations only, forty-five days — and the alternative
+   * is one request per movement on a screen with eight of them, on a phone, in
+   * a gym. Matching a note to a movement is arithmetic on data the client
+   * already has.
+   */
+  app.get("/api/training/memory", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      const notes = await trainingMemory(userId, await memberToday(userId));
+      res.json({ observations: notes });
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
+  app.post("/api/training/sessions/:id/observations", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      const id = param(req, "id");
+      const input = observationSchema.parse(req.body ?? {});
+
+      // Ownership in the predicate, and the session supplies the day.
+      const [owned] = await db
+        .select({ id: workoutSessions.id, onDate: workoutSessions.onDate })
+        .from(workoutSessions)
+        .where(and(eq(workoutSessions.id, id), eq(workoutSessions.userId, userId)));
+      if (!owned) return res.status(404).json({ message: "No such session" });
+
+      /**
+       * One observation per movement per session, replaced rather than stacked.
+       *
+       * A member correcting what they just wrote is correcting it, not adding a
+       * second opinion — and a list of four notes about the same exercise on
+       * the same evening is a reader's problem forever afterwards.
+       */
+      await db
+        .delete(trainingObservations)
+        .where(
+          and(
+            eq(trainingObservations.sessionId, id),
+            input.exerciseId
+              ? eq(trainingObservations.exerciseId, input.exerciseId)
+              : isNull(trainingObservations.exerciseId),
+          ),
+        );
+
+      const [row] = await db
+        .insert(trainingObservations)
+        .values({
+          userId,
+          sessionId: id,
+          exerciseId: input.exerciseId ?? null,
+          onDate: owned.onDate,
+          note: input.note?.trim() || null,
+          quality: input.quality ?? null,
+          side: input.side ?? null,
+        })
+        .returning();
+
+      res.status(201).json(row);
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
   app.post("/api/training/sessions/:id/finish", isAuthenticated, async (req, res) => {
     try {
       const userId = req.session!.userId!;
@@ -1063,12 +1151,31 @@ export function registerTrainingRoutes(app: Express) {
         .where(eq(workoutSets.sessionId, open.id))
         .orderBy(asc(workoutSets.setIndex));
 
+      /**
+       * And whatever has been said about it.
+       *
+       * With the session rather than behind a second request: the note icon on
+       * a movement is either filled or it is not, and a screen that has to wait
+       * on a second round trip to know which draws it wrong first.
+       */
+      const observations = await db
+        .select({
+          id: trainingObservations.id,
+          exerciseId: trainingObservations.exerciseId,
+          note: trainingObservations.note,
+          quality: trainingObservations.quality,
+          side: trainingObservations.side,
+        })
+        .from(trainingObservations)
+        .where(eq(trainingObservations.sessionId, open.id));
+
       res.json({
         session: {
           ...open,
           sets: logged.length,
           unit,
           logged: logged.map((s) => ({ ...s, weight: out(s.weightKg, unit) })),
+          observations,
         },
       });
     } catch (err) {

@@ -38,7 +38,7 @@ import { SectionHeading, Panel, StatTile } from "@/components/portal/Panel";
 import { HabitPanel } from "@/components/habits/HabitPanel";
 import { TodayRead } from "@/components/TodayRead";
 import { MemberBuild } from "@/components/build/MemberBuild";
-import { TodaysBuild, RecentBuild } from "@/components/build/BuildToday";
+import { TodaysBuild, RecentBuild, MemoryDisclosure } from "@/components/build/BuildToday";
 import { Elapsed } from "@/components/build/Elapsed";
 import { WorkoutInProgress } from "@/components/build/WorkoutInProgress";
 import { WhyToday } from "@/components/build/WhyToday";
@@ -422,6 +422,11 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
             from a readiness level with no knowledge of what Terrain
             concluded. `TodaysBuild` above renders the same suggestions
             through the gate instead. */}
+        {/* Why leaving a note is worth five seconds — shown only once they have
+            actually left one, so it explains something happening rather than
+            asking for something. */}
+        <MemoryDisclosure />
+
         <p className="text-[11px] text-muted-foreground text-center max-w-sm mx-auto">
           When your coach plans a session for today, it appears at the top of this screen with
           its targets already worked out.
