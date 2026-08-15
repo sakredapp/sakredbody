@@ -25,12 +25,14 @@
  * a Home screen reading "Keep today adjustable".
  */
 
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToday } from "@/components/TodayRead";
 import { Panel } from "@/components/portal/Panel";
 import { buildGate, actionFor, REPORT_INVITE, type BuildAction } from "@shared/models/buildToday";
 import { EXERCISE_CATEGORIES } from "@shared/models/training";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
+import { LogPractice } from "@/components/build/LogPractice";
 
 const CATEGORY_LABEL = new Map(EXERCISE_CATEGORIES.map((c) => [c.id as string, c.label as string]));
 
@@ -254,33 +256,78 @@ export function TodaysBuild({
  * session the member definitely did.
  */
 export function RecentBuild() {
+  const qc = useQueryClient();
   const terrain = useQuery<TerrainReading>({ queryKey: ["/api/terrain/today"] });
   const events = terrain.data?.movementEvents ?? [];
+  const [adding, setAdding] = useState(false);
 
   const demanding = events.filter((e) =>
     (e.orientations ?? [e.orientation]).some((o) => o === "yang" || o === "both"),
   );
 
-  // Nothing yet is a real answer on somebody's first week, and an empty
-  // bordered box announcing it is not.
-  if (!demanding.length) return null;
-
   return (
-    <Panel title="Recent Build">
-      <div className="space-y-1.5" data-testid="recent-build">
-        {demanding.slice(0, 8).map((e, i) => (
-          <div
-            key={e.id ?? `${e.onDate}-${i}`}
-            className="flex items-baseline justify-between gap-3 py-1"
-            data-testid="recent-build-row"
-          >
-            <span className="text-sm truncate">{eventLabel(e)}</span>
-            <span className="text-xs text-muted-foreground tabular-nums shrink-0">
-              {whenShort(e.onDate)}
-            </span>
+    <>
+      {/*
+        Nothing yet is a real answer on somebody's first week, so the list is
+        omitted rather than shown empty — but the way to correct history is not,
+        because a member with no history is exactly who might have a fortnight
+        of training the app never saw.
+      */}
+      {demanding.length > 0 ? (
+        <Panel title="Recent Build">
+          <div className="space-y-1.5" data-testid="recent-build">
+            {demanding.slice(0, 8).map((e, i) => (
+              <div
+                key={e.id ?? `${e.onDate}-${i}`}
+                className="flex items-baseline justify-between gap-3 py-1"
+                data-testid="recent-build-row"
+              >
+                <span className="text-sm truncate">{eventLabel(e)}</span>
+                <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                  {whenShort(e.onDate)}
+                </span>
+              </div>
+            ))}
+
+            {/*
+              ── The way to correct it ──
+
+              A member could see a day was missing and do nothing about it. The
+              phone was on the bench, the session was at somebody else's gym,
+              the app was closed. A history you cannot correct is one you stop
+              trusting, and every reading built on it inherits the gap.
+
+              Deliberately quiet and at the bottom: this is a repair, not a
+              second way to log training.
+            */}
+            <button
+              onClick={() => setAdding(true)}
+              className="pt-2 text-xs text-muted-foreground tap-clean inline-flex items-center gap-1"
+              data-testid="add-past-activity"
+            >
+              <Plus className="h-3 w-3" />
+              Add something Sakred missed
+            </button>
           </div>
-        ))}
-      </div>
-    </Panel>
+        </Panel>
+      ) : (
+        <button
+          onClick={() => setAdding(true)}
+          className="w-full text-xs text-muted-foreground tap-clean inline-flex items-center justify-center gap-1 py-1"
+          data-testid="add-past-activity"
+        >
+          <Plus className="h-3 w-3" />
+          Add something Sakred missed
+        </button>
+      )}
+
+      {adding && (
+        <LogPractice
+          past
+          onClose={() => setAdding(false)}
+          onLogged={() => qc.invalidateQueries({ queryKey: ["/api/terrain/today"] })}
+        />
+      )}
+    </>
   );
 }

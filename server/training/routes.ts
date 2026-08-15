@@ -60,6 +60,8 @@ import {
   coachingMessages,
   channels,
   communityMessages,
+  healthWorkouts,
+  externalActivityCategory,
 } from "../../shared/schema.js";
 // Through the barrel, as wins/routes.ts already does. It is the single place
 // that answers "which rooms can they see", and reaching past index.js for it
@@ -74,6 +76,7 @@ import {
   type SetRow,
 } from "./strength.js";
 import { memberToday } from "../coaching/enrollment.js";
+import { addDaysToString } from "../../shared/utils/dates.js";
 import { track, trackError } from "../telemetry/index.js";
 
 function param(req: Request, name: string): string {
@@ -691,10 +694,90 @@ export function registerTrainingRoutes(app: Express) {
           distanceM: z.number().min(0).max(1_000_000).optional(),
           rpe: z.number().int().min(1).max(10).optional(),
           shareWithCoach: z.boolean().optional(),
+          note: z.string().trim().max(1000).optional(),
+          /**
+           * A day other than today.
+           *
+           * The member's history is only as good as their ability to correct
+           * it, and there was no way to. A workout their watch never saw — the
+           * phone was on the bench, the session was at a friend's gym, the app
+           * was closed — simply did not exist, and the member could see that it
+           * did not and do nothing about it.
+           *
+           * Bounded on both sides. The future is not history, and sixty days is
+           * as far back as a person can honestly place a session by memory.
+           */
+          onDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+          /**
+           * Yes, record it anyway — I have seen what you found.
+           *
+           * Only ever sent in answer to the 409 below, never by default. See
+           * the duplicate check.
+           */
+          force: z.boolean().optional(),
         })
         .parse(req.body ?? {});
 
-      const onDate = await memberToday(userId);
+      const today = await memberToday(userId);
+      const onDate = input.onDate ?? today;
+
+      if (onDate > today) {
+        return res.status(400).json({ message: "That day hasn't happened yet." });
+      }
+      if (onDate < addDaysToString(today, -60)) {
+        return res.status(400).json({ message: "That's further back than Sakred keeps." });
+      }
+
+      /**
+       * The same workout, already imported.
+       *
+       * A member adding "Back, 60 minutes, Friday" whose watch already recorded
+       * a generic Strength Training that afternoon would be charging their body
+       * twice for one session — and the imported row is the better one to keep,
+       * because it carries the real duration, the heart rate and the source.
+       * What it lacks is the only thing the member was trying to add: which
+       * muscles, and what to call it.
+       *
+       * So this refuses and hands back the candidate, and the client offers to
+       * put the detail on it instead. `force` is how somebody says no, that was
+       * a different session — which is a real answer and stays available.
+       */
+      if (!input.force) {
+        const [movement] = await db
+          .select({ category: exercises.category })
+          .from(exercises)
+          .where(eq(exercises.id, input.exerciseId));
+        const category = movement?.category ?? null;
+
+        const sameDay = await db
+          .select({
+            id: healthWorkouts.id,
+            workoutType: healthWorkouts.workoutType,
+            durationSeconds: healthWorkouts.durationSeconds,
+            sourceApp: healthWorkouts.sourceApp,
+            onDate: healthWorkouts.onDate,
+          })
+          .from(healthWorkouts)
+          .where(
+            and(
+              eq(healthWorkouts.userId, userId),
+              eq(healthWorkouts.onDate, onDate),
+              isNull(healthWorkouts.reviewedAt),
+            ),
+          )
+          .orderBy(desc(healthWorkouts.startAt));
+
+        const match = sameDay.find(
+          (w) => category != null && externalActivityCategory(w.workoutType) === category,
+        );
+        if (match) {
+          return res.status(409).json({
+            error: "already_imported",
+            message: "Your phone already recorded something like this that day.",
+            workout: match,
+          });
+        }
+      }
 
       const sessionId = await transactionally<string>(async (tx) => {
         const [session] = await tx
@@ -704,6 +787,7 @@ export function registerTrainingRoutes(app: Express) {
             onDate,
             title: input.title,
             durationMinutes: input.durationMinutes,
+            ...(input.note ? { note: input.note } : {}),
             // Born finished. It is a record of something already done, and it
             // must never occupy the one open-workout slot.
             finishedAt: new Date(),

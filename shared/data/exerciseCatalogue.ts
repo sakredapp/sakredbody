@@ -53,6 +53,12 @@ const DEFAULTS: Record<string, Partial<Row>> = {
   shoulders: { pattern: "push", equipment: "barbell", tracking: "reps", load: true },
   arms: { pattern: "pull", equipment: "barbell", tracking: "reps", load: true },
   legs: { pattern: "squat", equipment: "barbell", tracking: "reps", load: true },
+  /*
+    A whole session, which is what an imported `strength` workout maps to as
+    well — so a member recording "Tuesday was a full-body day" and a watch
+    reporting Strength Training land on the same category and weigh the same.
+  */
+  full_body: { pattern: "squat", equipment: "other", tracking: "duration", load: false },
   glutes: { pattern: "hinge", equipment: "barbell", tracking: "reps", load: true },
   calves: { pattern: "push", equipment: "machine", tracking: "reps", load: true },
   core: { pattern: "core", equipment: "bodyweight", tracking: "reps", load: false },
@@ -122,6 +128,20 @@ const CATALOGUE: Record<string, Partial<Row>[]> = {
     N("Push-Up", { equipment: "bodyweight", load: false, bw: 0.64, aliases: ["pushup", "press up"] }),
     N("Weighted Push-Up", { equipment: "bodyweight", bw: 0.64 }),
     N("Dip — Chest Emphasis", { equipment: "bodyweight", bw: 1, aliases: ["chest dip"] }),
+    /*
+      "I trained back for an hour."
+
+      A whole session is a thing people did, and until now the catalogue had no
+      word for one — every entry was a single movement. That is fine while you
+      are logging as you go and useless the next morning, when what you want to
+      record is that Tuesday evening was legs. It is also the vocabulary
+      Confirm Activity already asks in (`WORKOUT_FOCUSES`), so the two now
+      agree rather than each having their own list.
+
+      Tracked in time and carrying its category's real load, so a session
+      recorded this way weighs the same in terrain as one logged set by set.
+    */
+    N("Chest Session", { tracking: "duration", load: false, aliases: ["chest day"] }),
   ],
   back: [
     N("Conventional Deadlift", { pattern: "hinge", orm: true, aliases: ["deadlift", "dl"] }),
@@ -151,6 +171,7 @@ const CATALOGUE: Record<string, Partial<Row>[]> = {
     N("Chin-Up", { equipment: "bodyweight", load: false, bw: 1, aliases: ["chinup"] }),
     N("Assisted Pull-Up", { equipment: "machine", bw: 1 }),
     N("Weighted Pull-Up", { equipment: "bodyweight", bw: 1 }),
+    N("Back Session", { tracking: "duration", load: false, aliases: ["back day"] }),
   ],
   shoulders: [
     N("Barbell Overhead Press", { orm: true, aliases: ["ohp", "overhead press", "military press"] }),
@@ -173,6 +194,7 @@ const CATALOGUE: Record<string, Partial<Row>[]> = {
     N("Cable Rear-Delt Fly", { equipment: "cable", pattern: "pull" }),
     N("Face Pull", { equipment: "cable", pattern: "pull" }),
     N("Upright Row", { pattern: "pull" }),
+    N("Shoulder Session", { tracking: "duration", load: false, aliases: ["shoulder day"] }),
   ],
   arms: [
     N("Barbell Curl", { aliases: ["bb curl", "curl"] }),
@@ -206,6 +228,7 @@ const CATALOGUE: Record<string, Partial<Row>[]> = {
     N("Single-Arm Cable Extension", { equipment: "cable", pattern: "push", uni: true }),
     N("Machine Triceps Extension", { equipment: "machine", pattern: "push" }),
     N("Dip — Triceps Emphasis", { equipment: "bodyweight", pattern: "push", bw: 1, aliases: ["dip"] }),
+    N("Arm Session", { tracking: "duration", load: false, aliases: ["arm day"] }),
   ],
   legs: [
     N("Back Squat", { orm: true, aliases: ["squat", "bb squat"] }),
@@ -254,6 +277,7 @@ const CATALOGUE: Record<string, Partial<Row>[]> = {
     N("Lying Leg Curl", { equipment: "machine", pattern: "hinge" }),
     N("Standing Leg Curl", { equipment: "machine", pattern: "hinge", uni: true }),
     N("Nordic Hamstring Curl", { equipment: "bodyweight", pattern: "hinge", load: false, bw: 0.6 }),
+    N("Leg Session", { tracking: "duration", load: false, aliases: ["leg day"] }),
   ],
   glutes: [
     N("Barbell Hip Thrust", { orm: true, aliases: ["hip thrust"] }),
@@ -263,6 +287,7 @@ const CATALOGUE: Record<string, Partial<Row>[]> = {
     N("Machine Glute Kickback", { equipment: "machine", uni: true }),
     N("Hip Abduction Machine", { equipment: "machine", aliases: ["abduction"] }),
     N("Hip Adduction Machine", { equipment: "machine", aliases: ["adduction"] }),
+    N("Glute Session", { tracking: "duration", load: false, aliases: ["glute day"] }),
   ],
   calves: [
     N("Standing Calf Raise", { equipment: "machine", aliases: ["calf raise"] }),
@@ -294,6 +319,10 @@ const CATALOGUE: Record<string, Partial<Row>[]> = {
     N("Cable Wood Chop", { equipment: "cable", load: true, uni: true }),
     N("Cable Lift", { equipment: "cable", load: true, uni: true }),
     N("Russian Twist", { equipment: "other" }),
+    N("Core Session", { tracking: "duration", load: false, aliases: ["core day"] }),
+  ],
+  full_body: [
+    N("Full Body Session", { aliases: ["full body day", "strength session", "workout"] }),
   ],
   carry: [
     N("Farmer's Carry", { equipment: "dumbbell", aliases: ["farmers walk"] }),

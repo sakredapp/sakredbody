@@ -247,11 +247,32 @@ export async function movementEvents(userId: string, since: string): Promise<Mov
     events.push(e);
   }
 
+  /**
+   * One workout, one entry — even when two devices recorded it.
+   *
+   * A member who lifts with Sakred open is very likely also wearing a watch
+   * writing the same hour into Apple Health. `recentMovement` has always
+   * collapsed that pair, so load counted it once; this list did not, so the
+   * member's own history showed it twice under two different names. On 11 Aug
+   * one account had a Sakred session at 19:59 and an Apple Health `strength`
+   * import at 19:50 — the same workout, rendered as "Full body · 11 Aug" and
+   * "Strength · 11 Aug", one above the other.
+   *
+   * The rule is deliberately narrow: an *imported* event is dropped only when a
+   * *Sakred* event on the same day already covers that category. Two imported
+   * strength workouts on one day stay two — that is a member who trained twice,
+   * and the same account has exactly that on 14 Aug. Only the double-recording
+   * case collapses, and the survivor is the one with the sets in it.
+   */
+  const loggedCategories = new Set<string>();
+  for (const e of events) for (const c of e.categories) loggedCategories.add(`${e.onDate}|${c}`);
+
   for (const row of imported) {
     // Same rule as the reduction: an activity we cannot place is dropped rather
     // than guessed at, because an invented category feeds invented load.
     const category = externalActivityCategory(row.workoutType);
     if (!category) continue;
+    if (loggedCategories.has(`${row.onDate}|${category}`)) continue;
     events.push({
       id: row.id,
       occurredAt: row.startAt ?? null,
