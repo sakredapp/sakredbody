@@ -505,3 +505,54 @@ export const healthSyncSchema = z.object({
   osVersion: z.string().max(60).optional().nullable(),
 });
 export type HealthSyncInput = z.infer<typeof healthSyncSchema>;
+
+
+/**
+ * Is this an import where the member knows something the sensor does not?
+ *
+ * ── Restraint is the whole feature ────────────────────────────────────────
+ *
+ * A watch reports dozens of passive walks a week. Asking about each of them
+ * turns a good idea into a chore queue, and the member learns to dismiss the
+ * card without reading it — at which point the one prompt that mattered gets
+ * dismissed too.
+ *
+ * So the test is not "could a member add something", which is true of
+ * everything. It is "does the source classification leave out something that
+ * changes what Sakred can say tomorrow". For a generic strength import that is
+ * the whole muscle-group question: Sakred cannot infer legs from a watch, and
+ * with the answer it can honestly say chest has had more room than back.
+ *
+ * A run is already understood. Easy-versus-intervals might refine a
+ * recommendation one day, and when it does this list is where that decision
+ * gets made — deliberately, rather than by an eager default.
+ */
+const ASKS_FOR_DETAIL: ReadonlySet<string> = new Set([
+  "strength",
+  "strengthtraining",
+  "traditionalstrengthtraining",
+  "functionalstrengthtraining",
+  "crosstraining",
+  "hiit",
+  "highintensityintervaltraining",
+  "mixedcardio",
+  "mixedmetaboliccardiotraining",
+  "other",
+]);
+
+/** Understood well enough already. Never prompted about. */
+const UNDERSTOOD: ReadonlySet<string> = new Set([
+  "walking", "running", "cycling", "biking", "swimming", "hiking",
+  "yoga", "pilates", "mobility", "stretching", "meditation", "breathwork",
+  "rowing", "elliptical", "stairs", "dance",
+]);
+
+export function needsConfirmation(workoutType: string | null | undefined): boolean {
+  const t = (workoutType ?? "").trim().toLowerCase().replace(/[\s_-]/g, "");
+  if (!t) return true; // Unknown type — the ambiguous case worth asking about.
+  if (UNDERSTOOD.has(t)) return false;
+  if (ASKS_FOR_DETAIL.has(t)) return true;
+  // Anything the mapper cannot place is ambiguous by definition, and ambiguity
+  // is exactly where a member's answer is worth having.
+  return true;
+}

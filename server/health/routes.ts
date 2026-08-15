@@ -42,6 +42,9 @@ import { db } from "../db.js";
 import { storage } from "../storage.js";
 import { isAuthenticated } from "../auth/index.js";
 import { zodMessage } from "../../shared/utils/zodMessage.js";
+import { needsConfirmation } from "../../shared/models/health.js";
+import { externalActivityCategory } from "../../shared/models/training.js";
+import { memberToday } from "../coaching/enrollment.js";
 import {
   healthConnections,
   healthDays,
@@ -402,6 +405,68 @@ export function registerHealthRoutes(app: Express) {
    * reads either of these columns — it goes through the activity's category and
    * CATEGORY_LOAD, exactly as it does for a session logged in Sakred.
    */
+  /**
+   * The one imported session worth asking about, if there is one.
+   *
+   * ── One card, one day ─────────────────────────────────────────────────────
+   *
+   * Never a queue. A member with five unreviewed strength imports sees one, and
+   * handling it does not immediately produce the next — otherwise the card
+   * becomes whack-a-mole and they learn to dismiss it unread, which costs the
+   * one prompt that mattered.
+   *
+   * The daily gate is derived from `reviewed_at` rather than stored anywhere:
+   * if anything was reviewed today, nothing new surfaces today. No extra state
+   * to keep, and it self-heals — a member who reviews nothing simply gets asked
+   * again tomorrow. Older events stay editable from history; this is the
+   * prompt, not the only way in.
+   */
+  app.get("/api/health/workouts/confirm", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId!;
+      const today = await memberToday(userId);
+
+      const recent = await db
+        .select({
+          id: healthWorkouts.id,
+          workoutType: healthWorkouts.workoutType,
+          onDate: healthWorkouts.onDate,
+          startAt: healthWorkouts.startAt,
+          durationSeconds: healthWorkouts.durationSeconds,
+          sourceApp: healthWorkouts.sourceApp,
+          reviewedAt: healthWorkouts.reviewedAt,
+        })
+        .from(healthWorkouts)
+        .where(eq(healthWorkouts.userId, userId))
+        .orderBy(desc(healthWorkouts.startAt))
+        .limit(60);
+
+      // Already answered something today — say nothing more until tomorrow.
+      const answeredToday = recent.some(
+        (w) => w.reviewedAt && w.reviewedAt.toISOString().slice(0, 10) === today,
+      );
+      if (answeredToday) return res.json({ workout: null });
+
+      const candidate = recent.find((w) => !w.reviewedAt && needsConfirmation(w.workoutType));
+      if (!candidate) return res.json({ workout: null });
+
+      res.json({
+        workout: {
+          id: candidate.id,
+          workoutType: candidate.workoutType,
+          onDate: candidate.onDate,
+          durationSeconds: candidate.durationSeconds,
+          sourceApp: candidate.sourceApp,
+          /** Sakred's own reading, stated separately from what the member says. */
+          category: externalActivityCategory(candidate.workoutType),
+        },
+      });
+    } catch (err) {
+      console.error("[health] confirm candidate failed", err);
+      res.status(500).json({ message: "Could not load that." });
+    }
+  });
+
   app.patch("/api/health/workouts/:id", isAuthenticated, async (req, res) => {
     const parsed = workoutFeedbackSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: zodMessage(parsed.error) });
