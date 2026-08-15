@@ -30,6 +30,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Panel } from "@/components/portal/Panel";
 import { WorkoutInProgress } from "@/components/build/WorkoutInProgress";
 import { startSession as beginSession, type RunningSession } from "@/lib/startSession";
+import { seedOpenWorkout } from "@/hooks/use-open-workout";
 import { MovementPicker, type Movement } from "./MovementPicker";
 import { LogPractice } from "./LogPractice";
 import { RecentSessions } from "./RecentSessions";
@@ -99,6 +100,11 @@ export function MemberBuild({ onStarted }: { onStarted: (sessionId: string, titl
       setCollision(result.conflict);
       return null;
     }
+    // The new session goes into the shared cache before anybody renders
+    // against it, so the resume strip, the timer and Build all start from the
+    // same fact — and so a `/open` read already in flight cannot come back and
+    // say nothing is running. See `seedOpenWorkout`.
+    await seedOpenWorkout(qc, result.started);
     return result.started;
   };
 

@@ -44,6 +44,13 @@ import { Elapsed } from "@/components/build/Elapsed";
 import { WorkoutInProgress } from "@/components/build/WorkoutInProgress";
 import { WhyToday } from "@/components/build/WhyToday";
 import { startSession, type RunningSession } from "@/lib/startSession";
+import {
+  isMissingSession,
+  reconcileOpenWorkout,
+  seedOpenWorkout,
+  useOpenWorkout,
+  type OpenWorkout,
+} from "@/hooks/use-open-workout";
 import type { BuildAction } from "@shared/models/buildToday";
 import type { MemberSection } from "@/components/MemberNav";
 import { Dumbbell, Check, Plus, Trophy, Loader2 } from "lucide-react";
@@ -168,24 +175,7 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
    * A session ends when somebody presses Finish. Nothing else ends it, and
    * certainly not looking at your step count mid-workout.
    */
-  const openSession = useQuery<{
-    session: {
-      id: string;
-      title: string | null;
-      habitId: string | null;
-      startedAt: string;
-      sets: number;
-    } | null;
-  }>({
-    queryKey: ["/api/training/sessions/open"],
-    queryFn: async () => {
-      const r = await fetch("/api/training/sessions/open", { credentials: "include" });
-      if (!r.ok) throw new Error("no");
-      return r.json();
-    },
-    // Cheap, and the answer changes when the member acts on another device.
-    staleTime: 15_000,
-  });
+  const openSession = useOpenWorkout();
 
   /**
    * Recover whatever is actually running, from the server rather than memory.
@@ -201,20 +191,78 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
    * on a session that was still open on the server with sets already in it.
    * Nothing was lost and there was no way to add to it.
    */
+  /**
+   * ── And it mirrors in both directions ────────────────────────────────────
+   *
+   * This effect used to only ever *set*: `if (!open) return`. So the server
+   * could say a session had ended and the screen would keep showing it, which
+   * is how a workout deleted at 16:38 was still being written to at 16:40. A
+   * one-way mirror is not a mirror.
+   *
+   * The race that made the one-way version tempting is handled where it
+   * belongs — `seedOpenWorkout` writes a newly created session into this same
+   * cache and cancels any `/open` read already in flight, so "the server says
+   * nothing is open" can be believed the moment it is said.
+   */
   useEffect(() => {
-    const open = openSession.data?.session;
-    if (!open) return;
-    if (open.habitId) {
-      if (!sessionId) setSessionId(open.id);
-    } else if (!freeSession) {
-      setFreeSession({ id: open.id, title: open.title ?? "Your session" });
+    if (!openSession.isSuccess) return;
+    const open = openSession.data.session;
+
+    if (!open) {
+      if (sessionId) setSessionId(null);
+      if (freeSession) setFreeSession(null);
+      return;
     }
-  }, [openSession.data, freeSession, sessionId]);
+
+    if (open.habitId) {
+      if (sessionId !== open.id) setSessionId(open.id);
+      if (freeSession) setFreeSession(null);
+    } else {
+      if (sessionId) setSessionId(null);
+      if (freeSession?.id !== open.id) {
+        setFreeSession({ id: open.id, title: open.title ?? "Your session" });
+      }
+    }
+  }, [openSession.isSuccess, openSession.data, freeSession, sessionId]);
 
   /** Finishing is the only thing that clears it, on the server and here. */
   const clearSession = () => {
     setFreeSession(null);
     qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
+  };
+
+  /**
+   * The session a surface was writing to does not exist any more.
+   *
+   * The screen comes down either way. Where the server has a *different*
+   * workout open — started on another device, or the one this member forgot
+   * about — it is offered through the same card a start-collision uses, with a
+   * Resume button on it. Nothing is adopted silently and nothing is created:
+   * a member who tapped "log 35 × 13" is owed the truth, not a new session
+   * with their set quietly moved into it.
+   */
+  const sessionGone = (replacement: OpenWorkout | null) => {
+    setFreeSession(null);
+    setSessionId(null);
+    setEntries({});
+    setCollision(replacement);
+    toast({
+      title: replacement
+        ? "That workout had already ended."
+        : "That workout is no longer open.",
+      description: replacement
+        ? "A different one is running — resume it below."
+        : "It was finished or discarded. Start a new one when you're ready.",
+    });
+  };
+
+  /** Shared by every write scoped to a session id — see `FreeSession`. */
+  const writeFailed = async (e: Error) => {
+    if (!isMissingSession(e)) {
+      toast({ title: e.message, variant: "destructive" });
+      return;
+    }
+    sessionGone(await reconcileOpenWorkout(qc));
   };
 
   const today = useQuery<TodayBuild>({
@@ -230,17 +278,19 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
     // `apiRequest` resolves to the Response, not the body — it throws on a
     // non-2xx and hands back the raw response, so the JSON has to be read here.
     mutationFn: (habitId: string) => startSession({ habitId }),
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       // A refusal is a true answer, not a failure — the member has a workout
       // open and needs the way back into it rather than an error.
       if ("conflict" in result) {
         setCollision(result.conflict);
         return;
       }
+      // Written into the cache rather than invalidated: the running time
+      // appears immediately, and — the reason it matters — a `/open` read
+      // issued a moment before this session existed can no longer land on top
+      // of it and report that nothing is running.
+      await seedOpenWorkout(qc, result.started);
       setSessionId(result.started.id);
-      // So the running time appears immediately rather than on the next
-      // refetch — `startedAt` only arrives with the open-session answer.
-      qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
     },
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
@@ -259,13 +309,13 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
    */
   const startFocus = useMutation({
     mutationFn: (title: string) => startSession({ title }),
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       if ("conflict" in result) {
         setCollision(result.conflict);
         return;
       }
+      await seedOpenWorkout(qc, result.started);
       setFreeSession({ id: result.started.id, title: result.started.title ?? "Your session" });
-      qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
     },
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
@@ -273,7 +323,7 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
   const logSet = useMutation({
     mutationFn: async (body: Record<string, unknown>) =>
       apiRequest("POST", `/api/training/sessions/${sessionId}/sets`, body),
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: writeFailed,
   });
 
   const finish = useMutation({
@@ -301,7 +351,7 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
       setEntries({});
       toast({ title: "Session logged." });
     },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: writeFailed,
   });
 
   if (today.isLoading) {
@@ -377,13 +427,11 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
             startedAt={openSession.data?.session?.startedAt}
             unit={unit}
             onDone={clearSession}
+            onGone={sessionGone}
           />
         ) : (
           <>
-            <MemberBuild onStarted={(id, t) => {
-              setFreeSession({ id, title: t });
-              qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
-            }} />
+            <MemberBuild onStarted={(id, t) => setFreeSession({ id, title: t })} />
 
             {/* `TodayRead side="build"` stood here and was the contradiction
                 vector: its headline comes from `readLine`, which is generated
@@ -759,12 +807,10 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
           startedAt={openSession.data?.session?.startedAt}
           unit={unit}
           onDone={clearSession}
+          onGone={sessionGone}
         />
       ) : (
-        <MemberBuild onStarted={(id, t) => {
-              setFreeSession({ id, title: t });
-              qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
-            }} />
+        <MemberBuild onStarted={(id, t) => setFreeSession({ id, title: t })} />
       )}
 
       <p className="text-xs text-muted-foreground text-center">

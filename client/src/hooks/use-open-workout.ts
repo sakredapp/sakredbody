@@ -15,9 +15,33 @@
  * from where the member happens to be standing, which is the whole point — a
  * workout is running because a row has no `finished_at`, not because a
  * particular component is mounted.
+ *
+ * ── And the client is not allowed a second opinion ───────────────────────
+ *
+ * This module is also where an id stops being a fact the client remembers and
+ * becomes a fact it *checks*. On 15 Aug a session was started at 16:37:32,
+ * deleted by a discard the client never learned about at 16:38:00, and then
+ * written to at 16:40:47 — `404 {"message":"No such session"}` — while the
+ * screen went on showing a workout, a movement, and a set waiting to be
+ * logged. Nothing on the server was wrong. The client was holding an id the
+ * server had already forgotten.
+ *
+ * Two rules follow, and both live here so no surface can implement them
+ * differently:
+ *
+ *   `seed`        a session that has just been created is written into the
+ *                 cache rather than only into a component, and any `/open`
+ *                 read already in flight is cancelled so a stale answer cannot
+ *                 land on top of it.
+ *
+ *   `reconcile`   a write that comes back 404 does not toast and continue. It
+ *                 re-asks the server what is open and hands back the truth —
+ *                 another session to resume, or nothing at all. A caller may
+ *                 adopt what it gets. No caller may invent one.
  */
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type QueryClient } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/apiFetch";
 import type { RunningSession } from "@/lib/startSession";
 
 export type OpenWorkout = RunningSession & {
@@ -27,14 +51,18 @@ export type OpenWorkout = RunningSession & {
 
 export const OPEN_WORKOUT_KEY = ["/api/training/sessions/open"] as const;
 
+type OpenAnswer = { session: OpenWorkout | null };
+
+async function fetchOpen({ signal }: { signal?: AbortSignal } = {}): Promise<OpenAnswer> {
+  const r = await apiFetch("/api/training/sessions/open", { signal });
+  if (!r.ok) throw new Error("open");
+  return r.json();
+}
+
 export function useOpenWorkout() {
-  return useQuery<{ session: OpenWorkout | null }>({
+  return useQuery<OpenAnswer>({
     queryKey: OPEN_WORKOUT_KEY,
-    queryFn: async () => {
-      const r = await fetch("/api/training/sessions/open", { credentials: "include" });
-      if (!r.ok) throw new Error("open");
-      return r.json();
-    },
+    queryFn: ({ signal }) => fetchOpen({ signal }),
     /**
      * Cheap, and the answer changes when the member acts on another device —
      * or when a session started on Build is finished from the banner.
@@ -42,3 +70,56 @@ export function useOpenWorkout() {
     staleTime: 15_000,
   });
 }
+
+/**
+ * A session that has just been created is already the truth.
+ *
+ * Writing it into the cache rather than invalidating closes the one race that
+ * would otherwise make the reconciliation rule below unsafe: a `/open` request
+ * issued a moment *before* the session was created resolves a moment *after*
+ * it, says "nothing is open", and a client that trusts the cache would throw
+ * away a workout that had just started. The logs show exactly that ordering —
+ * `POST /sessions` at 16:37:32, `GET /sessions/open` at 16:37:33.
+ *
+ * So anything in flight is cancelled first. Its answer was true when it was
+ * asked and is not true now.
+ */
+export async function seedOpenWorkout(
+  qc: QueryClient,
+  session: RunningSession & { sets?: number },
+): Promise<void> {
+  await qc.cancelQueries({ queryKey: OPEN_WORKOUT_KEY });
+  qc.setQueryData<OpenAnswer>(OPEN_WORKOUT_KEY, {
+    session: { ...session, sets: session.sets ?? 0 },
+  });
+}
+
+/**
+ * Ask the server what is actually open, and believe it.
+ *
+ * Bypasses the cache deliberately — this is called at the moment the client has
+ * been proven wrong, which is the one moment a cached answer is worth nothing.
+ */
+export async function reconcileOpenWorkout(qc: QueryClient): Promise<OpenWorkout | null> {
+  await qc.cancelQueries({ queryKey: OPEN_WORKOUT_KEY });
+  try {
+    const answer = await fetchOpen();
+    qc.setQueryData<OpenAnswer>(OPEN_WORKOUT_KEY, answer);
+    return answer.session;
+  } catch {
+    /**
+     * The network failed, which is not evidence that the session is gone. The
+     * cache is left alone and the caller is told nothing was learned — dropping
+     * a live workout because a reconnect was mid-flight would be the same class
+     * of bug in the opposite direction.
+     */
+    return null;
+  }
+}
+
+/**
+ * Re-exported so call sites have one import for the whole rule, while the
+ * predicate itself stays in a module with no dependencies — see
+ * `lib/missingSession`, and the tests that exercise it directly.
+ */
+export { isMissingSession } from "@/lib/missingSession";

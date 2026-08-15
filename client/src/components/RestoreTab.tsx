@@ -29,6 +29,8 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Moon, Wind, HeartPulse } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { seedOpenWorkout } from "@/hooks/use-open-workout";
+import { type RunningSession } from "@/lib/startSession";
 import { FreeSession } from "@/components/build/FreeSession";
 import { TodayRead } from "@/components/TodayRead";
 import { RhythmSection } from "@/components/RhythmCards";
@@ -248,11 +250,13 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
   const start = useMutation({
     mutationFn: async (label: string) => {
       const res = await apiRequest("POST", "/api/training/sessions", { title: label });
-      return (await res.json()) as { id: string; title: string | null };
+      return (await res.json()) as RunningSession;
     },
-    onSuccess: (row, label) => {
+    onSuccess: async (row, label) => {
+      // Seeded, not invalidated — same reason as everywhere else a session is
+      // created. See `seedOpenWorkout`.
+      await seedOpenWorkout(qc, row);
       setSession({ id: row.id, title: row.title ?? label });
-      qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
     },
   });
 
@@ -426,6 +430,10 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
             qc.invalidateQueries({ queryKey: ["/api/terrain/today"] });
             qc.invalidateQueries({ queryKey: ["/api/today"] });
           }}
+          /* Restore holds the session in its own state, so "it is gone" simply
+             means letting go of it. There is no second surface here to offer a
+             different workout on — Build owns that conversation. */
+          onGone={() => setSession(null)}
         />
       ) : (
         <Panel title="Movement that restores" data-testid="restore-movement">

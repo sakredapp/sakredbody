@@ -13,12 +13,17 @@
  * identically — the only difference is who decided what to do.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Plus, Check, X, Send, ChevronUp, ChevronDown, Users } from "lucide-react";
 import { isPracticeCategory } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import {
+  isMissingSession,
+  reconcileOpenWorkout,
+  type OpenWorkout,
+} from "@/hooks/use-open-workout";
 import { Elapsed } from "@/components/build/Elapsed";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,6 +105,7 @@ export function FreeSession({
   title,
   unit,
   onDone,
+  onGone,
 }: {
   sessionId: string;
   title: string;
@@ -110,6 +116,14 @@ export function FreeSession({
   startedAt?: string;
   unit: "kg" | "lb";
   onDone: () => void;
+  /**
+   * This session does not exist any more, and here is what does.
+   *
+   * Called with whatever the server says is open — usually nothing. The parent
+   * owns what happens next, because the screen this component is sitting on has
+   * to come down and only the parent can take it down.
+   */
+  onGone: (replacement: OpenWorkout | null) => void;
 }) {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -141,10 +155,35 @@ export function FreeSession({
   const [finished, setFinished] = useState(false);
   const [shared, setShared] = useState(false);
 
+  /**
+   * The session went away underneath us.
+   *
+   * Every write on this screen is scoped to one id, so a 404 from any of them
+   * is the same fact: that id is not a session any more. What it must never be
+   * is a red toast the member reads and then carries on typing into, which is
+   * what shipped — a workout deleted at 16:38:00 was still being written to at
+   * 16:40:47, three taps and two error toasts later.
+   *
+   * So the failure is treated as information. Re-ask the server, hand the
+   * answer up, and let the screen come down. Nothing is created to replace it:
+   * putting the member's set into a session they did not start would turn a
+   * visible error into a silent lie.
+   */
+  const gone = async () => {
+    const replacement = await reconcileOpenWorkout(qc);
+    onGone(replacement);
+  };
+
+  /** Every write here is scoped to `sessionId`, so all of them share this. */
+  const failed = (e: Error) => {
+    if (isMissingSession(e)) return void gone();
+    toast({ title: e.message, variant: "destructive" });
+  };
+
   const logSet = useMutation({
     mutationFn: async (body: Record<string, unknown>) =>
       apiRequest("POST", `/api/training/sessions/${sessionId}/sets`, body),
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: failed,
   });
 
   const createMovement = useMutation({
@@ -174,8 +213,33 @@ export function FreeSession({
       toast({ title: "Discarded." });
       onDone();
     },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    /**
+     * A discard that 404s has still got what it asked for.
+     *
+     * This is the exact shape of the production failure: two DELETEs went out a
+     * second apart, the first returned 200 and the second 404. React Query
+     * gives a `useMutation` observer one current mutation, so the second call
+     * orphaned the first one's `onSuccess` — the session was deleted and the
+     * only callback that ran was the error one. The screen stayed up, pointing
+     * at a row that no longer existed.
+     *
+     * Both halves are fixed: the latch below stops the second call, and a 404
+     * here is treated as the outcome rather than the failure, because the
+     * session being absent is precisely what Discard means.
+     */
+    onError: (e: Error) => {
+      if (isMissingSession(e)) return void gone();
+      toast({ title: e.message, variant: "destructive" });
+    },
   });
+  /**
+   * One discard, however fast the taps.
+   *
+   * `discard.isPending` is React state and is not true within the same tick as
+   * the call that starts it, so two taps close together both read it as false.
+   * A ref is set synchronously and is the only guard that actually holds.
+   */
+  const discardSent = useRef(false);
   const discarding = discard.isPending;
 
   const finish = useMutation({
@@ -196,7 +260,7 @@ export function FreeSession({
       // people" is a natural next thought.
       setFinished(true);
     },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: failed,
   });
 
   const shareToRoom = useMutation({
@@ -256,7 +320,20 @@ export function FreeSession({
     }
     if (b.movement.takesLoad && r.weight) body.weight = Number(r.weight);
 
-    await logSet.mutateAsync(body);
+    /**
+     * A set is marked logged only once the server has it.
+     *
+     * `mutateAsync` rejects on failure, and this used to let that rejection out
+     * of an onClick handler — an unhandled promise rejection, and a row that
+     * looked committed on a screen where nothing had been written. The catch is
+     * silent because `onError` has already said what happened, or has already
+     * taken the screen down.
+     */
+    try {
+      await logSet.mutateAsync(body);
+    } catch {
+      return;
+    }
     patch(bi, ri, { logged: true });
     // A logged set almost always means another is coming; adding the next row
     // saves a tap on every set of every workout. A practice is the exception —
@@ -331,11 +408,12 @@ export function FreeSession({
               */}
               <button
                 onClick={() => {
-                  if (discarding) return;
+                  if (discarding || discardSent.current) return;
                   if (!confirmDiscard) {
                     setConfirmDiscard(true);
                     return;
                   }
+                  discardSent.current = true;
                   discard.mutate();
                 }}
                 disabled={discarding}
