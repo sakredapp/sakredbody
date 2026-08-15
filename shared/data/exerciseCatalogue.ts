@@ -229,6 +229,25 @@ const CATALOGUE: Record<string, Partial<Row>[]> = {
     N("Step-Up", { equipment: "dumbbell", uni: true }),
     N("Romanian Deadlift", { pattern: "hinge", orm: true, aliases: ["rdl"] }),
     N("Dumbbell Romanian Deadlift", { equipment: "dumbbell", pattern: "hinge" }),
+    /*
+      The loaded single-leg hinge, which the catalogue did not have.
+
+      Searching "rdl" returned Landmine RDL, Romanian Deadlift, and
+      **Single-Leg RDL Reach** — a bodyweight balance drill tracked in seconds.
+      A member doing 35 lb × 13 per side was offered a movement that takes no
+      load and counts no reps, so the only way to log the work was to invent a
+      movement, which produced a `full_body`, `equipment: other`, bilateral row
+      that will never graph against anything.
+
+      Unilateral, because that is the whole point of it, and it is what makes
+      the "per side" label appear on the set row.
+    */
+    N("Single-Leg Romanian Deadlift", {
+      equipment: "dumbbell",
+      pattern: "hinge",
+      uni: true,
+      aliases: ["single leg rdl", "sl rdl", "single-leg rdl", "one leg rdl", "b stance rdl"],
+    }),
     N("Stiff-Leg Deadlift", { pattern: "hinge" }),
     N("Good Morning", { pattern: "hinge" }),
     N("Seated Leg Curl", { equipment: "machine", pattern: "hinge" }),

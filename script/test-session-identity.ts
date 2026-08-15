@@ -117,41 +117,43 @@ console.log("\nThe mirror clears as well as sets\n");
 
   check("the rehydration effect exists", start > -1);
   /**
-   * This was `if (!open) return;` — the single line that let the screen keep a
-   * session the server had already forgotten.
-   *
-   * Read as the branch itself rather than as "somewhere after the words
-   * `if (!open)`". A window measured in characters runs straight past a `return`
-   * into the code below it and finds the setters there, which is an assertion
-   * that passes on the bug it was written to catch.
+   * This was `if (!open) return;` — the one line that let a screen keep a
+   * session the server had already forgotten. It is now an unconditional
+   * assignment rather than a branch that can be given an early exit, which is
+   * the shape that cannot regress the same way: there is no path through it
+   * that leaves the old id in place.
    */
-  const nothingOpen = (() => {
-    const at = effect.indexOf("if (!open) {");
-    return at === -1 ? "" : effect.slice(at, effect.indexOf("\n    }", at));
-  })();
-
-  check("nothing open is a branch, not a bail-out", nothingOpen.length > 0);
-  check("it clears the prescribed id", /setSessionId\(null\)/.test(nothingOpen));
-  check("and the ad-hoc one", /setFreeSession\(null\)/.test(nothingOpen));
+  check("the prescribed id follows the server", /const mine = open\?\.habitId \? open\.id : null/.test(effect));
+  check("and is assigned, not merely set when present", /if \(sessionId !== mine\) setSessionId\(mine\)/.test(effect));
+  check("nothing open resolves to nothing held", /: null/.test(effect));
   check("it does not bail out on an empty answer", !/if \(!open\) return/.test(effect));
   /** A cleared cache is not an answer. Only a successful read is. */
   check("and only acts on a real answer", /openSession\.isSuccess/.test(effect));
-  /** A different id on the server wins over whatever is on screen. */
-  check("a different session is adopted", /freeSession\?\.id !== open\.id/.test(effect));
+
+  /**
+   * The layer mirrors the other kind, from the same query, and comes down when
+   * the server says nothing is running.
+   */
+  const sheetSrc = code("client/src/components/build/WorkoutSheet.tsx");
+  check("the layer reads the same query", /useOpenWorkout\(\)/.test(sheetSrc));
+  check("and closes itself when nothing is open", /if \(!session && expanded\) collapse\(\)/.test(sheetSrc));
+  check("and renders nothing without one", /if \(!expanded \|\| !session/.test(sheetSrc));
 }
 
 console.log("\nA 404 takes the screen down, and never invents a session\n");
 
 {
-  const free = code("client/src/components/build/FreeSession.tsx");
+  const sheet = code("client/src/components/build/WorkoutSheet.tsx");
   const tab = code("client/src/components/BuildTab.tsx");
 
   /** One handler, so no write can be the one that forgot. */
-  check("the session screen has one failure path", /const failed = \(e: Error\)/.test(free));
-  check("logging a set uses it", /apiRequest\("POST", `\/api\/training\/sessions\/\$\{sessionId\}\/sets`[\s\S]{0,120}onError: failed/.test(free));
-  check("finishing uses it", /finish`[\s\S]{0,600}onError: failed/.test(free));
-  check("it re-asks the server", /reconcileOpenWorkout\(qc\)/.test(free));
-  check("and hands the answer up", /onGone\(replacement\)/.test(free));
+  check("the workout layer has one failure path", /const failed = \(e: Error\)/.test(sheet));
+  check("logging a set uses it", /sets`, body\),[\s\S]{0,120}onError: failed/.test(sheet));
+  check("finishing uses it", /finish`, \{ shareWithCoach \}\)[\s\S]{0,600}onError: failed/.test(sheet));
+  check("removing a movement uses it", /exercises\/\$\{exerciseId\}`\)[\s\S]{0,600}onError: failed/.test(sheet));
+  check("it re-asks the server", /reconcileOpenWorkout\(qc\)/.test(sheet));
+  /** And the layer comes down rather than staying up over a dead id. */
+  check("and the layer comes down", /const gone = async \(\) => \{[\s\S]{0,300}collapse\(\)/.test(sheet));
 
   /** The prescribed path writes to a session id too, and had the same hole. */
   check("the prescribed path reconciles as well", /reconcileOpenWorkout\(qc\)/.test(tab));
@@ -165,47 +167,52 @@ console.log("\nA 404 takes the screen down, and never invents a session\n");
   /** A negative assertion over an empty string is not an assertion. */
   check("there is a recovery path to read", recovery.length > 100, `${recovery.length} chars`);
   check("recovery starts nothing", !/startSession\(|startFocus\.mutate|start\.mutate/.test(recovery));
-  check("it clears both kinds of session", /setFreeSession\(null\)[\s\S]{0,120}setSessionId\(null\)/.test(recovery));
+  check("it clears the session", /setSessionId\(null\)/.test(recovery));
   check("a replacement is offered, not assumed", /setCollision\(replacement\)/.test(recovery));
+  /** And the layer's own recovery invents nothing either. */
+  const layerGone = sheet.slice(sheet.indexOf("const gone = async"), sheet.indexOf("const failed ="));
+  check("there is a layer recovery path to read", layerGone.length > 80, `${layerGone.length} chars`);
+  check("the layer starts nothing either", !/startSession|beginSession|POST", "\/api\/training\/sessions"/.test(layerGone));
   /** And says which of the two happened, because they are different facts. */
   check("it says so either way", /replacement\s*\?[\s\S]{0,200}no longer open/.test(recovery));
 
-  /** Every surface that mounts the session screen has to answer for this. */
+  /**
+   * And there is exactly one surface that writes sets to an ad-hoc session.
+   * Two would be two places to forget this in.
+   */
   for (const path of [
     "client/src/components/BuildTab.tsx",
     "client/src/components/RestoreTab.tsx",
+    "client/src/components/build/MemberBuild.tsx",
   ]) {
-    const src = code(path);
-    const mounts = (src.match(/<FreeSession/g) ?? []).length;
-    const handled = (src.match(/onGone=/g) ?? []).length;
-    check(`${path.split("/").pop()} handles it on every mount`, mounts > 0 && mounts === handled,
-      `${mounts} mounted, ${handled} handled`);
+    check(`${path.split("/").pop()} does not log sets itself`,
+      !/sessions\/\$\{[^}]+\}\/sets/.test(code(path).replace(/\$\{sessionId\}\/sets/g, "PRESCRIBED")));
   }
 }
 
 console.log("\nOne discard, however fast the taps\n");
 
 {
-  const free = code("client/src/components/build/FreeSession.tsx");
+  const sheet = code("client/src/components/build/WorkoutSheet.tsx");
 
   /**
    * `discard.isPending` is React state and is not true in the same tick as the
    * call that starts it, so two taps close together both read it as false.
    * That is what put two DELETEs on the wire a second apart.
    */
-  check("a ref latches the first one", /discardSent = useRef\(false\)/.test(free));
-  check("and the handler checks it", /discardSent\.current\) return/.test(free));
-  check("and sets it before firing", /discardSent\.current = true;\s*discard\.mutate\(\)/.test(free));
+  check("a ref latches the first one", /discardSent = useRef\(false\)/.test(sheet));
+  check("and the handler checks it", /discardSent\.current\) return/.test(sheet));
+  check("and sets it before firing", /discardSent\.current = true;\s*discard\.mutate\(\)/.test(sheet));
   /** Discarding something already absent has got what it asked for. */
   check("a 404 on discard is the outcome, not the failure",
-    /onError: \(e: Error\) => \{\s*if \(isMissingSession\(e\)\) return void gone\(\)/.test(free));
+    /onError: \(e: Error\) => \{\s*if \(isMissingSession\(e\)\) return void gone\(\)/.test(sheet));
 
   /**
-   * A set is marked logged only once the server has it. `mutateAsync` rejects,
-   * and letting that out of an onClick handler is an unhandled rejection under
-   * a row that looks committed.
+   * The boxes clear only once the server has the set. `mutateAsync` rejects,
+   * and letting that out of a click handler is an unhandled rejection under a
+   * row that looks like it emptied because it saved.
    */
-  check("a failed set is not marked logged", /catch \{\s*return;\s*\}\s*patch\(bi, ri, \{ logged: true \}\)/.test(free));
+  check("a failed set does not clear the row", /catch \{\s*return;\s*\}\s*[\s\S]{0,200}patch\(g\.movement\.id/.test(sheet));
 }
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);

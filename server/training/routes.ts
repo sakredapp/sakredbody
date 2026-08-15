@@ -766,6 +766,54 @@ export function registerTrainingRoutes(app: Express) {
     }
   });
 
+  /**
+   * Take one movement back out of an open session.
+   *
+   * ── Why a route and not four calls to `DELETE /sets/:id` ─────────────────
+   *
+   * Removing a movement removes everything logged under it, and doing that one
+   * set at a time is three round trips that can half-succeed: a member on a gym
+   * wifi ends up with a movement they asked to remove still holding its second
+   * and third sets. One statement, or none of it.
+   *
+   * The member is told the count before this is called — see the confirmation
+   * in the workout screen — because this destroys work that was really done.
+   * A movement with nothing under it deletes nothing and is simply dropped from
+   * the screen.
+   */
+  app.delete(
+    "/api/training/sessions/:id/exercises/:exerciseId",
+    isAuthenticated,
+    async (req, res) => {
+      try {
+        const userId = req.session!.userId!;
+        const id = param(req, "id");
+
+        // Ownership in the predicate. An id from somebody else's session is a
+        // refusal rather than a deletion of their sets.
+        const [owned] = await db
+          .select({ id: workoutSessions.id })
+          .from(workoutSessions)
+          .where(and(eq(workoutSessions.id, id), eq(workoutSessions.userId, userId)));
+        if (!owned) return res.status(404).json({ message: "No such session" });
+
+        const removed = await db
+          .delete(workoutSets)
+          .where(
+            and(
+              eq(workoutSets.sessionId, id),
+              eq(workoutSets.exerciseId, param(req, "exerciseId")),
+            ),
+          )
+          .returning({ id: workoutSets.id });
+
+        res.json({ removed: removed.length });
+      } catch (err) {
+        fail(res, err);
+      }
+    },
+  );
+
   app.post("/api/training/sessions/:id/finish", isAuthenticated, async (req, res) => {
     try {
       const userId = req.session!.userId!;
@@ -895,12 +943,50 @@ export function registerTrainingRoutes(app: Express) {
 
       if (!open) return res.json({ session: null });
 
-      const [{ sets }] = await db
-        .select({ sets: sql<number>`count(*)::int` })
+      /**
+       * What is in it, not just how much.
+       *
+       * The workout screen used to hold its list of movements in component
+       * state, so the sets were safe on the server and the *session* was not:
+       * force-quit mid-workout, reopen, and Build offered an empty session with
+       * a timer running on it. Everything logged was still there and there was
+       * no way to see it, which reads as data loss whether or not it is.
+       *
+       * So the open session carries its own contents. The exercise columns come
+       * along because the screen has to know how to render a row — a hold takes
+       * seconds, a class takes minutes, and a foam roll takes no weight at all
+       * — and re-deriving that from a catalogue fetch would mean the screen
+       * could render before it knew what it was rendering.
+       */
+      const unit = await unitFor(userId);
+      const logged = await db
+        .select({
+          id: workoutSets.id,
+          exerciseId: workoutSets.exerciseId,
+          name: exercises.name,
+          category: exercises.category,
+          trackingType: exercises.trackingType,
+          takesLoad: exercises.takesLoad,
+          unilateral: exercises.unilateral,
+          setIndex: workoutSets.setIndex,
+          reps: workoutSets.reps,
+          durationSeconds: workoutSets.durationSeconds,
+          distanceM: workoutSets.distanceM,
+          weightKg: workoutSets.weightKg,
+        })
         .from(workoutSets)
-        .where(eq(workoutSets.sessionId, open.id));
+        .innerJoin(exercises, eq(workoutSets.exerciseId, exercises.id))
+        .where(eq(workoutSets.sessionId, open.id))
+        .orderBy(asc(workoutSets.setIndex));
 
-      res.json({ session: { ...open, sets: Number(sets) || 0 } });
+      res.json({
+        session: {
+          ...open,
+          sets: logged.length,
+          unit,
+          logged: logged.map((s) => ({ ...s, weight: out(s.weightKg, unit) })),
+        },
+      });
     } catch (err) {
       fail(res, err);
     }

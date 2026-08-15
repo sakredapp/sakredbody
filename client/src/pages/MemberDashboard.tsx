@@ -59,6 +59,7 @@ import { PortalBackdrop } from "@/components/portal/PortalBackdrop";
 import { PillarHome } from "@/components/PillarHome";
 import { BuildTab } from "@/components/BuildTab";
 import { ActiveWorkoutBar } from "@/components/build/ActiveWorkoutBar";
+import { WorkoutSheet, WorkoutSheetProvider } from "@/components/build/WorkoutSheet";
 import { RestoreTab } from "@/components/RestoreTab";
 import { SettingsTab } from "@/components/SettingsTab";
 import { useHealthAutoSync } from "@/hooks/use-health";
@@ -403,6 +404,7 @@ export default function MemberDashboard() {
   const minDateStr = minDate.toISOString().split("T")[0];
 
   return (
+    <WorkoutSheetProvider>
     <div className="min-h-screen bg-background relative isolate">
       {/* The star chart the marketing site uses, held far back. Fixed, so it
           behaves like the room the content is in rather than scrolling with
@@ -1111,10 +1113,22 @@ export default function MemberDashboard() {
       */}
       <div className="fixed inset-x-0 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-40 px-4 pointer-events-none">
         <div className="mx-auto max-w-md pointer-events-auto">
-          <ActiveWorkoutBar hidden={section === "build"} onResume={() => setSection("build")} />
+          {/*
+            Shown on every screen now, Build included. It used to hide there
+            because Build was where the workout lived; the workout is a layer
+            over the whole app, so the strip is the way back into it from
+            everywhere — and Build is no longer a special case.
+          */}
+          <ActiveWorkoutBar onOpenBuild={() => setSection("build")} />
         </div>
       </div>
       <MemberBottomNav section={section} onChange={setSection} />
+
+      {/*
+        Above the header and the nav both, so expanding it makes the app the
+        workout rather than putting the workout inside the app.
+      */}
+      <WorkoutSheet />
 
       <Dialog open={showBookingDialog} onOpenChange={setShowBookingDialog}>
         <DialogContent className="max-w-md" data-testid="dialog-booking">
@@ -1162,5 +1176,6 @@ export default function MemberDashboard() {
         </DialogContent>
       </Dialog>
     </div>
+    </WorkoutSheetProvider>
   );
 }

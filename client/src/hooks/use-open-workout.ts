@@ -44,9 +44,44 @@ import { useQuery, type QueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/apiFetch";
 import type { RunningSession } from "@/lib/startSession";
 
+/**
+ * One set already in the open session, with enough of its movement attached to
+ * draw the row it belongs to.
+ *
+ * The exercise columns travel with the set on purpose: the workout screen has
+ * to know whether a row takes weight and whether it counts reps or seconds
+ * before it can render anything, and deriving that from a separate catalogue
+ * fetch would mean the screen could paint before it knew what it was painting.
+ */
+export type LoggedSet = {
+  id: string;
+  exerciseId: string;
+  name: string;
+  category: string;
+  trackingType: "reps" | "duration" | "distance";
+  takesLoad: boolean;
+  unilateral: boolean;
+  setIndex: number;
+  reps: number | null;
+  durationSeconds: number | null;
+  distanceM: number | null;
+  weight: number | null;
+};
+
 export type OpenWorkout = RunningSession & {
   /** How much has been logged, so the banner can say more than "a workout". */
   sets: number;
+  /**
+   * What is in it.
+   *
+   * Optional, and the workout screen must render without it — a bundled native
+   * client and a deployed server are never updated in the same instant, so
+   * every field added here is absent for some members for some hours. Build 23
+   * shipped dereferencing a new field unconditionally and took down the whole
+   * section. See `TodaysBuild`.
+   */
+  logged?: LoggedSet[];
+  unit?: "kg" | "lb";
 };
 
 export const OPEN_WORKOUT_KEY = ["/api/training/sessions/open"] as const;

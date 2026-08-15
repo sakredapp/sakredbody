@@ -38,11 +38,11 @@ import { SectionHeading, Panel, StatTile } from "@/components/portal/Panel";
 import { HabitPanel } from "@/components/habits/HabitPanel";
 import { TodayRead } from "@/components/TodayRead";
 import { MemberBuild } from "@/components/build/MemberBuild";
-import { FreeSession } from "@/components/build/FreeSession";
 import { TodaysBuild, RecentBuild } from "@/components/build/BuildToday";
 import { Elapsed } from "@/components/build/Elapsed";
 import { WorkoutInProgress } from "@/components/build/WorkoutInProgress";
 import { WhyToday } from "@/components/build/WhyToday";
+import { useWorkoutSheet } from "@/components/build/WorkoutSheet";
 import { startSession, type RunningSession } from "@/lib/startSession";
 import {
   isMissingSession,
@@ -143,10 +143,17 @@ function targetLabel(l: PrescribedLift): string {
 export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
   const { toast } = useToast();
   const qc = useQueryClient();
+  /**
+   * Where an ad-hoc workout goes.
+   *
+   * This screen used to render one inline, two-thirds of the way down, under a
+   * recommendation and a history list. It is a layer over the whole app now —
+   * see `WorkoutSheet` — so Build's job is to start one and get out of the way.
+   * The prescribed path below is unchanged: that screen is the prescription.
+   */
+  const workout = useWorkoutSheet();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [entries, setEntries] = useState<Record<string, Entry[]>>({});
-  /** An ad-hoc or template-started session, which has no prescription behind it. */
-  const [freeSession, setFreeSession] = useState<{ id: string; title: string } | null>(null);
   /**
    * A workout that was already running when they tried to start another.
    *
@@ -207,29 +214,14 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
   useEffect(() => {
     if (!openSession.isSuccess) return;
     const open = openSession.data.session;
-
-    if (!open) {
-      if (sessionId) setSessionId(null);
-      if (freeSession) setFreeSession(null);
-      return;
-    }
-
-    if (open.habitId) {
-      if (sessionId !== open.id) setSessionId(open.id);
-      if (freeSession) setFreeSession(null);
-    } else {
-      if (sessionId) setSessionId(null);
-      if (freeSession?.id !== open.id) {
-        setFreeSession({ id: open.id, title: open.title ?? "Your session" });
-      }
-    }
-  }, [openSession.isSuccess, openSession.data, freeSession, sessionId]);
-
-  /** Finishing is the only thing that clears it, on the server and here. */
-  const clearSession = () => {
-    setFreeSession(null);
-    qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
-  };
+    /**
+     * Only the prescribed id lives here now. An ad-hoc session belongs to the
+     * workout layer, which reads the same query — so there is one mirror per
+     * kind of session rather than two components holding the same id.
+     */
+    const mine = open?.habitId ? open.id : null;
+    if (sessionId !== mine) setSessionId(mine);
+  }, [openSession.isSuccess, openSession.data, sessionId]);
 
   /**
    * The session a surface was writing to does not exist any more.
@@ -242,7 +234,6 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
    * with their set quietly moved into it.
    */
   const sessionGone = (replacement: OpenWorkout | null) => {
-    setFreeSession(null);
     setSessionId(null);
     setEntries({});
     setCollision(replacement);
@@ -256,7 +247,7 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
     });
   };
 
-  /** Shared by every write scoped to a session id — see `FreeSession`. */
+  /** Shared by every write scoped to a session id — see `WorkoutSheet`. */
   const writeFailed = async (e: Error) => {
     if (!isMissingSession(e)) {
       toast({ title: e.message, variant: "destructive" });
@@ -315,7 +306,9 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
         return;
       }
       await seedOpenWorkout(qc, result.started);
-      setFreeSession({ id: result.started.id, title: result.started.title ?? "Your session" });
+      // And the layer comes up. Nothing is handed to it — it reads the session
+      // from the cache this just seeded.
+      workout.open();
     },
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
@@ -420,30 +413,19 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
             prescribed sessions appear sits underneath the things they can
             actually do, in the size of a footnote, because that is its
             importance on a day it does not apply. */}
-        {freeSession ? (
-          <FreeSession
-            sessionId={freeSession.id}
-            title={freeSession.title}
-            startedAt={openSession.data?.session?.startedAt}
-            unit={unit}
-            onDone={clearSession}
-            onGone={sessionGone}
-          />
-        ) : (
-          <>
-            <MemberBuild onStarted={(id, t) => setFreeSession({ id, title: t })} />
+        {/* Starting one raises the workout layer over the whole app. Build
+            does not render a session inline any more — see `WorkoutSheet`. */}
+        <MemberBuild onStarted={workout.open} />
 
-            {/* `TodayRead side="build"` stood here and was the contradiction
-                vector: its headline comes from `readLine`, which is generated
-                from a readiness level with no knowledge of what Terrain
-                concluded. `TodaysBuild` above renders the same suggestions
-                through the gate instead. */}
-            <p className="text-[11px] text-muted-foreground text-center max-w-sm mx-auto">
-              When your coach plans a session for today, it appears at the top of this screen with
-              its targets already worked out.
-            </p>
-          </>
-        )}
+        {/* `TodayRead side="build"` stood here and was the contradiction
+            vector: its headline comes from `readLine`, which is generated
+            from a readiness level with no knowledge of what Terrain
+            concluded. `TodaysBuild` above renders the same suggestions
+            through the gate instead. */}
+        <p className="text-[11px] text-muted-foreground text-center max-w-sm mx-auto">
+          When your coach plans a session for today, it appears at the top of this screen with
+          its targets already worked out.
+        </p>
       </div>
     );
   }
@@ -569,11 +551,7 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
                       // Adopt whatever is actually running — the same branch the
                       // rehydration effect uses, because it is the same truth.
                       if (collision.habitId) setSessionId(collision.id);
-                      else
-                        setFreeSession({
-                          id: collision.id,
-                          title: collision.title ?? "Your session",
-                        });
+                      else workout.open();
                       setCollision(null);
                       qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
                     }}
@@ -800,18 +778,7 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
 
           Squats in the morning and a Pilates class in the evening is an
           ordinary Tuesday, not an edge case. */}
-      {freeSession ? (
-        <FreeSession
-          sessionId={freeSession.id}
-          title={freeSession.title}
-          startedAt={openSession.data?.session?.startedAt}
-          unit={unit}
-          onDone={clearSession}
-          onGone={sessionGone}
-        />
-      ) : (
-        <MemberBuild onStarted={(id, t) => setFreeSession({ id, title: t })} />
-      )}
+      <MemberBuild onStarted={workout.open} />
 
       <p className="text-xs text-muted-foreground text-center">
         Weights are in {unit}.{" "}

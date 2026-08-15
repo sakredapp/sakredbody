@@ -31,7 +31,7 @@ import { Moon, Wind, HeartPulse } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { seedOpenWorkout } from "@/hooks/use-open-workout";
 import { type RunningSession } from "@/lib/startSession";
-import { FreeSession } from "@/components/build/FreeSession";
+import { useWorkoutSheet } from "@/components/build/WorkoutSheet";
 import { TodayRead } from "@/components/TodayRead";
 import { RhythmSection } from "@/components/RhythmCards";
 import { Panel, SectionHeading } from "@/components/portal/Panel";
@@ -237,12 +237,12 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
   /**
    * A restorative session, started here and logged by the Build engine.
    *
-   * Held in component state rather than read from `/api/training/sessions/open`
-   * because that endpoint is what Build resumes from — a sauna started on this
-   * screen and a workout started on that one are the same row, and whichever
-   * screen the member is looking at should be the one showing it.
+   * It used to be rendered inline on this screen, which meant a sauna and a
+   * squat session — the same row in `workout_sessions` — were two different
+   * looking things depending on which tab you happened to start them from. The
+   * workout layer takes both now, so this screen's job is the way in.
    */
-  const [session, setSession] = useState<{ id: string; title: string } | null>(null);
+  const workout = useWorkoutSheet();
 
   const prefs = useQuery<{ weightUnit?: "kg" | "lb" }>({ queryKey: ["/api/auth/user"] });
   const unit = prefs.data?.weightUnit === "kg" ? "kg" : "lb";
@@ -252,11 +252,11 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
       const res = await apiRequest("POST", "/api/training/sessions", { title: label });
       return (await res.json()) as RunningSession;
     },
-    onSuccess: async (row, label) => {
+    onSuccess: async (row) => {
       // Seeded, not invalidated — same reason as everywhere else a session is
       // created. See `seedOpenWorkout`.
       await seedOpenWorkout(qc, row);
-      setSession({ id: row.id, title: row.title ?? label });
+      workout.open();
     },
   });
 
@@ -411,32 +411,7 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
       </Panel>
 
       {/* ── Restoring is something you do, not only something you skip ── */}
-      {session ? (
-        /*
-          The same engine Build uses, on this screen.
-          
-          Not a second implementation and not a redirect. `workout_sessions`
-          and `workout_sets` already treat a sauna and a set of squats
-          identically — the catalogue's own load numbers are what decide which
-          side of the ledger something lands on — so the only thing Restore
-          needed was a way in.
-        */
-        <FreeSession
-          sessionId={session.id}
-          title={session.title}
-          unit={unit}
-          onDone={() => {
-            setSession(null);
-            qc.invalidateQueries({ queryKey: ["/api/terrain/today"] });
-            qc.invalidateQueries({ queryKey: ["/api/today"] });
-          }}
-          /* Restore holds the session in its own state, so "it is gone" simply
-             means letting go of it. There is no second surface here to offer a
-             different workout on — Build owns that conversation. */
-          onGone={() => setSession(null)}
-        />
-      ) : (
-        <Panel title="Movement that restores" data-testid="restore-movement">
+      <Panel title="Movement that restores" data-testid="restore-movement">
           <p className="text-sm text-muted-foreground mb-3">
             Rest is not the only way to give capacity back. These are logged the
             same as anything else, and they count on the other side of the ledger.
@@ -460,11 +435,10 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
               </button>
             ))}
           </div>
-          <p className="text-[11px] text-muted-foreground mt-3">
-            Tap one to start logging it.
-          </p>
-        </Panel>
-      )}
+        <p className="text-[11px] text-muted-foreground mt-3">
+          Tap one to start logging it.
+        </p>
+      </Panel>
 
       {/*
         An idea, for somebody who has already decided to move.

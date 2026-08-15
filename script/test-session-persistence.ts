@@ -69,10 +69,16 @@ console.log("\nNavigating away is not cancelling\n");
 
 {
   const tab = code("client/src/components/BuildTab.tsx");
+  const sheet = code("client/src/components/build/WorkoutSheet.tsx");
 
-  /** Both shapes rehydrate from the one open-session answer. */
-  check("a prescribed session is recovered", /if \(open\.habitId\)[\s\S]{0,120}setSessionId\(open\.id\)/.test(tab));
-  check("an ad-hoc session still is too", /setFreeSession\(\{ id: open\.id/.test(tab));
+  /**
+   * Both shapes rehydrate from the one open-session answer — a prescribed
+   * session into this screen, an ad-hoc one into the workout layer, which
+   * reads the same query. One mirror per kind, never two holding one id.
+   */
+  check("a prescribed session is recovered", /open\?\.habitId \? open\.id : null/.test(tab));
+  check("and the layer recovers the ad-hoc one", /const session = data\?\.session/.test(sheet));
+  check("from the same query", /useOpenWorkout\(\)/.test(sheet));
 
   /**
    * And finishing has to invalidate that answer, or the effect immediately
@@ -224,12 +230,25 @@ console.log("\nEvery screen knows a workout is running\n");
   check("and derives nothing from navigation", !/section|route|location/i.test(bar));
 
   check("it shows how long", /<Elapsed/.test(bar));
-  check("and offers the way back", /onResume/.test(bar));
+  /**
+   * It used to take an `onResume` and hide on Build, because Build was where
+   * the workout lived. The workout is a layer over the whole app now, so the
+   * strip raises it — and there is no screen it has to hide on.
+   */
+  check("and offers the way back", /onClick=\{session\.habitId \? onOpenBuild : open\}/.test(bar));
+  check("which raises the layer", /useWorkoutSheet\(\)/.test(bar));
   /** "0 sets" on a workout somebody just started reads as a reproach. */
   check("it counts sets only once there are some", /sets > 0/.test(bar));
 
   check("it is mounted app-wide", /<ActiveWorkoutBar/.test(dash));
-  check("and hides on the surface already showing it", /hidden=\{section === "build"\}/.test(dash));
+  check("and so is the layer", /<WorkoutSheet \/>/.test(dash));
+  /**
+   * A prescribed session is the one exception: Build renders it with every
+   * target and resolved weight on it, and the blank-logger layer would replace
+   * all of that with an empty list.
+   */
+  check("a prescribed session goes to its own screen", /onOpenBuild=\{\(\) => setSection\("build"\)\}/.test(dash));
+  check("and the layer stands aside for it", /session\.habitId\) return null/.test(code("client/src/components/build/WorkoutSheet.tsx")));
 }
 
 console.log("\nOnly Finish or a confirmed Discard ends it\n");
@@ -256,9 +275,9 @@ console.log("\nOnly Finish or a confirmed Discard ends it\n");
   check("the sets go too", /delete\(workoutSets\)/.test(body));
   check("and it does not become history", !/finishedAt/.test(body));
 
-  const free = code("client/src/components/build/FreeSession.tsx");
-  check("the client asks first", /confirmDiscard/.test(free));
-  check("and says what will happen", /Discard — tap again/.test(free));
+  const sheet = code("client/src/components/build/WorkoutSheet.tsx");
+  check("the client asks first", /confirmDiscard/.test(sheet));
+  check("and says what will happen", /Discard — tap again/.test(sheet));
 }
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);

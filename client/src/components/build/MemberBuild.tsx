@@ -32,6 +32,7 @@ import { WorkoutInProgress } from "@/components/build/WorkoutInProgress";
 import { startSession as beginSession, type RunningSession } from "@/lib/startSession";
 import { seedOpenWorkout } from "@/hooks/use-open-workout";
 import { MovementPicker, type Movement } from "./MovementPicker";
+import { NewMovement, type NewMovementInput } from "./NewMovement";
 import { LogPractice } from "./LogPractice";
 import { RecentSessions } from "./RecentSessions";
 import { TodaysMovement } from "@/components/portal/TodaysMovement";
@@ -68,7 +69,17 @@ type Draft = {
   takesLoad: boolean;
 };
 
-export function MemberBuild({ onStarted }: { onStarted: (sessionId: string, title: string) => void }) {
+export function MemberBuild({
+  /**
+   * A workout is now open. Nothing is passed back with it: the layer that
+   * shows it reads the session from `/api/training/sessions/open`, which is
+   * the same place every other surface reads it from. Handing an id and a
+   * title across would be a second copy to fall out of step with the first.
+   */
+  onStarted,
+}: {
+  onStarted: () => void;
+}) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [building, setBuilding] = useState<SavedWorkout | "new" | null>(null);
@@ -135,7 +146,7 @@ export function MemberBuild({ onStarted }: { onStarted: (sessionId: string, titl
         <WorkoutInProgress
           session={collision}
           onResume={() => {
-            onStarted(collision.id, collision.title ?? "Your session");
+            onStarted();
             setCollision(null);
           }}
         />
@@ -158,7 +169,7 @@ export function MemberBuild({ onStarted }: { onStarted: (sessionId: string, titl
               size="sm"
               onClick={async () => {
                 const s = await begin("");
-                if (s) onStarted(s.id, "Today's session");
+                if (s) onStarted();
               }}
               disabled={startSession.isPending}
               data-testid="build-start-empty"
@@ -212,7 +223,7 @@ export function MemberBuild({ onStarted }: { onStarted: (sessionId: string, titl
                     className="shrink-0"
                     onClick={async () => {
                       const s = await begin(w.name);
-                      if (s) onStarted(s.id, w.name);
+                      if (s) onStarted();
                     }}
                     data-testid={`start-workout-${w.id}`}
                   >
@@ -290,17 +301,23 @@ function WorkoutBuilder({
     })) ?? [],
   );
 
+  /**
+   * The same four questions the workout screen asks.
+   *
+   * This used to send the name and a hardcoded `full_body`, which is how a
+   * loaded single-leg hinge became a bilateral full-body movement that will
+   * never graph against anything. See `NewMovement` for the argument.
+   */
+  const [creating, setCreating] = useState<string | null>(null);
   const createMovement = useMutation({
-    mutationFn: async (movementName: string) => {
-      const res = await apiRequest("POST", "/api/training/exercises", {
-        name: movementName,
-        category: "full_body",
-      });
+    mutationFn: async (input: NewMovementInput) => {
+      const res = await apiRequest("POST", "/api/training/exercises", input);
       return (await res.json()) as Movement;
     },
     onSuccess: (m) => {
       qc.invalidateQueries({ queryKey: ["/api/training/exercises"] });
       add(m);
+      setCreating(null);
       toast({ title: `Added ${m.name}` });
     },
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
@@ -356,13 +373,22 @@ function WorkoutBuilder({
           </DialogTitle>
         </DialogHeader>
 
-        {picking ? (
+        {creating !== null ? (
+          <div className="flex-1 min-h-0 flex flex-col">
+            <NewMovement
+              name={creating}
+              saving={createMovement.isPending}
+              onCancel={() => setCreating(null)}
+              onCreate={(m) => createMovement.mutate(m)}
+            />
+          </div>
+        ) : picking ? (
           <div className="flex-1 min-h-0 flex flex-col">
             <MovementPicker
               only="movements"
               picked={picked}
               onPick={add}
-              onCreate={(n) => n && createMovement.mutate(n)}
+              onCreate={(n) => setCreating(n)}
               onClose={() => setPicking(false)}
             />
           </div>
@@ -453,7 +479,7 @@ function WorkoutBuilder({
           </div>
         )}
 
-        {!picking && (
+        {!picking && creating === null && (
           <div className="shrink-0 flex gap-2 pt-1">
             <Button variant="ghost" onClick={onClose} className="flex-1 text-muted-foreground">
               Cancel

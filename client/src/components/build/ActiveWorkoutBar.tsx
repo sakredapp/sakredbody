@@ -11,9 +11,26 @@
  * the system knows is happening is most of what makes this feel like training
  * software.
  *
- * So the strip is driven by `useOpenWorkout`, which is the same query Build
- * reads. Not by navigation state, not by a context provider tracking where
- * somebody has been. A workout is running because a row has no `finished_at`.
+ * So the strip is driven by `useOpenWorkout`, which is the same query the
+ * workout screen reads. Not by navigation state, not by a context provider
+ * tracking where somebody has been. A workout is running because a row has no
+ * `finished_at`.
+ *
+ * ── It has no "hidden" case any more ──────────────────────────────────────
+ *
+ * It used to hide on Build, because Build was where the workout lived. The
+ * workout is now a layer over the whole app, so there is no screen that is
+ * already showing it — collapsed is collapsed everywhere — and this is the way
+ * back in from all of them.
+ *
+ * ── Except one, and it is a real distinction ──────────────────────────────
+ *
+ * A session carrying a `habit_id` is a coach's prescription being worked
+ * through, and that screen is not a blank logger: every lift arrives with its
+ * target sets, target reps and a weight already resolved from this member's
+ * own history. Opening the ad-hoc workout layer over it would replace all of
+ * that with an empty list. So a prescribed session sends the member to Build,
+ * where its own screen is, and the layer takes the sessions nobody wrote.
  *
  * ── Restraint is the design ───────────────────────────────────────────────
  *
@@ -25,26 +42,27 @@
 
 import { Elapsed } from "@/components/build/Elapsed";
 import { useOpenWorkout } from "@/hooks/use-open-workout";
+import { useWorkoutSheet } from "@/components/build/WorkoutSheet";
 import { ChevronRight } from "lucide-react";
 
 export function ActiveWorkoutBar({
-  /** True on the surface that already shows the workout — no point pointing at itself. */
-  hidden,
-  onResume,
+  /** Where a coach-prescribed session lives. See the note above. */
+  onOpenBuild,
 }: {
-  hidden?: boolean;
-  onResume: () => void;
+  onOpenBuild: () => void;
 }) {
   const { data } = useOpenWorkout();
+  const { expanded, open } = useWorkoutSheet();
   const session = data?.session;
 
-  if (hidden || !session) return null;
+  // Nothing to point at, or it is already in front of them.
+  if (!session || expanded) return null;
 
   const sets = session.sets;
 
   return (
     <button
-      onClick={onResume}
+      onClick={session.habitId ? onOpenBuild : open}
       className="w-full text-left rounded-xl border border-[hsl(var(--gold))]/25 bg-card/80 backdrop-blur px-3 py-2 flex items-center gap-3 tap-clean"
       data-testid="active-workout-bar"
     >
