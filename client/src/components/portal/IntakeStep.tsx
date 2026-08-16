@@ -38,6 +38,7 @@ import { explainY } from "@shared/utils/almanac";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { formatLocalDateString } from "@shared/utils/dates";
 
 export type IntakeValues = {
   firstName: string;
@@ -98,10 +99,7 @@ export function IntakeStep({
   // Today, as the picker's ceiling. A birth date in the future is not a
   // validation edge case, it is a typo, and the picker should not offer it.
   const today = useMemo(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-      d.getDate(),
-    ).padStart(2, "0")}`;
+    return formatLocalDateString();
   }, []);
 
   const canSubmit = firstName.trim().length > 0 && Boolean(birthDate) && !saving;

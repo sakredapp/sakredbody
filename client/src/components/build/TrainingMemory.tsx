@@ -28,6 +28,7 @@ import {
   restoreLine,
   type Observation,
 } from "@shared/models/trainingMemory";
+import { formatLocalDateString } from "@shared/utils/dates";
 
 /**
  * The member's own today, so a shape match can be aged out.
@@ -36,10 +37,7 @@ import {
  * question about their week, and a member training at 9pm on the west coast is
  * already tomorrow in UTC.
  */
-function localToday(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
+const localToday = formatLocalDateString;
 
 export const MEMORY_KEY = ["/api/training/memory"] as const;
 

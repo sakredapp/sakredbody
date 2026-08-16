@@ -41,6 +41,7 @@ import { WORKOUT_FOCUSES } from "@shared/models/health";
 import { activityLabel } from "@shared/models/training";
 import { MovementPicker, type Movement } from "./MovementPicker";
 import { cn } from "@/lib/utils";
+import { formatLocalDateString, addDaysToString } from "@shared/utils/dates";
 
 /** The lengths classes and sessions actually come in. */
 const COMMON_MINUTES = [15, 20, 30, 45, 60, 75, 90];
@@ -53,9 +54,7 @@ const FOCUS_LABEL: Record<string, string> = {
 
 /** A local YYYY-MM-DD, N days back. Never UTC — the member's day is theirs. */
 function dayBack(n: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return addDaysToString(formatLocalDateString(), -n);
 }
 
 function dayLabel(iso: string): string {

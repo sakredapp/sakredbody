@@ -14,6 +14,7 @@
  */
 
 import type { HealthMetric } from "@shared/schema";
+import { formatLocalDateString } from "@shared/utils/dates";
 
 export type MetricGroup = "Movement" | "Sleep" | "Heart" | "Body" | "Vitals" | "Practice";
 
@@ -494,10 +495,16 @@ export function isStillCounting(
   return METRIC_DISPLAY[metric]?.cumulative === true && onDate === today;
 }
 
-/** The member's own date, as the browser sees it. */
+/**
+ * The member's own date, as the browser sees it.
+ *
+ * Kept as a name because half the health surfaces read well with it, but it is
+ * no longer an implementation: there were five copies of these four lines in
+ * the client, and the one that mattered was the one somebody wrote from memory
+ * as `toISOString().slice(0, 10)`. One conversion, one place to be wrong.
+ */
 export function localToday(): string {
-  const n = new Date();
-  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+  return formatLocalDateString();
 }
 
 /** Below this a line is two dots and a slope, which says nothing. */

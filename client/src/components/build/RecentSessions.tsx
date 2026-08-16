@@ -47,7 +47,7 @@ import type { HealthWorkout } from "@shared/schema";
 import { useHealthSummary } from "@/hooks/use-health";
 import { Panel } from "@/components/portal/Panel";
 import { cn } from "@/lib/utils";
-import { localToday, localDaysAgo } from "@/lib/localDate";
+import { formatLocalDateString, addDaysToString } from "@shared/utils/dates";
 
 type Session = {
   id: string;
@@ -119,8 +119,8 @@ export function RecentSessions({ days = 7 }: { days?: number }) {
   // 20:00 in Toronto it is already tomorrow, so the session somebody had just
   // finished came back labelled "Yesterday". The comment here claimed the fix
   // while the line underneath it did the opposite.
-  const today = localToday();
-  const cutoff = localDaysAgo(days);
+  const today = formatLocalDateString();
+  const cutoff = addDaysToString(today, -days);
 
   // An unfinished session is one somebody is in the middle of, or abandoned.
   // Either way it is not history yet, and showing it as a completed day is a

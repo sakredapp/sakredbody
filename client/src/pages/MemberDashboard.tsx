@@ -77,6 +77,7 @@ import { useHasCoach } from "@/hooks/use-coaching";
 import { useUnreadCoachMessages } from "@/hooks/use-notifications";
 import { scheduleMorningNotice } from "@/lib/morningNotice";
 import { updateWidget } from "@/lib/widget";
+import { formatLocalDateString, addDaysToString } from "@shared/utils/dates";
 
 // Icon mapping (UI-only, can't live in shared/)
 const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -373,12 +374,14 @@ export default function MemberDashboard() {
     return <LoginGate />;
   }
 
-  const computeEndDate = (start: string, days: number) => {
-    if (!start) return "";
-    const d = new Date(start);
-    d.setDate(d.getDate() + days);
-    return d.toISOString().split("T")[0];
-  };
+  /**
+   * `new Date("2026-09-01")` parses as UTC midnight, `setDate` then moves the
+   * *local* calendar, and `toISOString` reads it back as UTC — three different
+   * frames in four lines. West of UTC that returned a retreat end date one day
+   * late, on a booking the member submits. String arithmetic has no frames.
+   */
+  const computeEndDate = (start: string, days: number) =>
+    start ? addDaysToString(start, days) : "";
 
   const handleSubmitBooking = () => {
     if (retreatType === "private" && !tierPrivateAvailable(housingTier)) {
@@ -399,9 +402,8 @@ export default function MemberDashboard() {
   };
 
   const initials = [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join("") || "M";
-  const minDate = new Date();
-  minDate.setDate(minDate.getDate() + 14);
-  const minDateStr = minDate.toISOString().split("T")[0];
+  /** Two weeks out, counted from the member's today rather than UTC's. */
+  const minDateStr = addDaysToString(formatLocalDateString(), 14);
 
   return (
     <WorkoutSheetProvider>

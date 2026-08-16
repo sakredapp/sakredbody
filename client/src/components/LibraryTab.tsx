@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Lock, BookOpen, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SectionHeading } from "@/components/portal/Panel";
+import { formatLocalDateString } from "@shared/utils/dates";
 
 function readingLabel(entry: ShelfEntry) {
   if (entry.progress?.completedAt) return "Finished";
@@ -248,7 +249,10 @@ function Reader({ ebookId, onBack }: { ebookId: string; onBack: () => void }) {
                                 // The hook reports success and failure itself.
                                 enroll.mutate({
                                   routineId: pairedRoutine.id,
-                                  startDate: new Date().toISOString().split("T")[0],
+                                  // The member's day, not UTC's. Enrolling at
+                                  // 9pm in Toronto wrote tomorrow's date, so
+                                  // day 1 of the protocol quietly wasn't today.
+                                  startDate: formatLocalDateString(),
                                   intensity: "lite",
                                 })
                               }

@@ -35,6 +35,7 @@ import { ChevronRight, Plus } from "lucide-react";
 import { LogPractice } from "@/components/build/LogPractice";
 import { useTrainingMemory } from "@/components/build/TrainingMemory";
 import { MEMORY_DISCLOSURE, recallForCategory, recallLine } from "@shared/models/trainingMemory";
+import { formatLocalDateString } from "@shared/utils/dates";
 
 const CATEGORY_LABEL = new Map(EXERCISE_CATEGORIES.map((c) => [c.id as string, c.label as string]));
 
@@ -380,8 +381,7 @@ export function MemoryDisclosure() {
 function SuggestionMemory({ category, label }: { category: string; label: string }) {
   const { data } = useTrainingMemory();
   /** Local, so a note "from last week" is judged against the member's week. */
-  const d = new Date();
-  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const today = formatLocalDateString();
   const found = recallForCategory(data?.observations ?? [], category, today);
   if (!found) return null;
 

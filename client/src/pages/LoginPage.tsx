@@ -10,6 +10,7 @@ import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/links";
 import { apiFetch, setAuthToken } from "@/lib/apiFetch";
 import { ConstellationSky } from "@/components/portal/ConstellationSky";
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
+import { formatLocalDateString } from "@shared/utils/dates";
 
 /** The app has no website to return to, and no store badges to offer. */
 const isNative = Capacitor.isNativePlatform();
@@ -91,7 +92,9 @@ export default function LoginPage() {
   const maxBirthDate = (() => {
     const d = new Date();
     d.setFullYear(d.getFullYear() - 18);
-    return d.toISOString().slice(0, 10);
+    // The calendar fields were just computed locally; format them the same way
+    // rather than converting to UTC and moving the boundary by an evening.
+    return formatLocalDateString(d);
   })();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
