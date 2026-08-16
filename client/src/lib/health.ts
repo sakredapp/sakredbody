@@ -15,12 +15,14 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 import { withTimeout, BridgeTimeout } from "./bridgeTimeout";
 import { apiRequest } from "./queryClient";
 import {
-  METRIC_PLANS,
-  READ_TYPES,
+  exerciseMinutesFromWorkouts,
   foldSleep,
   localDate,
+  plansFor,
+  readTypesFor,
   toCanonical,
   type CanonicalSample,
+  type HealthPlatform,
 } from "./healthMetrics";
 
 /** Mirrors the server's constants; the server is authoritative and sends them. */
@@ -36,7 +38,11 @@ const PAGE = 1_000;
  */
 const READ_TIMEOUT_MS = 45_000;
 
-export type HealthPlatform = "healthkit" | "healthconnect";
+/**
+ * Re-exported rather than declared. The metric plans have to say which store
+ * each of them exists in, so the union has to live where the plans live.
+ */
+export type { HealthPlatform };
 
 export function healthPlatform(): HealthPlatform | null {
   if (!Capacitor.isNativePlatform()) return null;
@@ -289,7 +295,11 @@ export async function requestHealthAccess(): Promise<{
   // looked like from the outside.
   const status = await withTimeout(
     p.requestAuthorization({
-      read: READ_TYPES as never[],
+      // This platform's types, not both platforms'. See `readTypesFor`: the
+      // Android plugin rejects the whole call on the first identifier its enum
+      // does not know, so asking Health Connect for an Apple-only metric was
+      // enough to make Connect a button that could never work.
+      read: readTypesFor(healthPlatform()) as never[],
       write: [],
       // Health Connect caps reads at ~30 days without this, which would make an
       // Android member's first sync three months shorter than an iPhone's.
@@ -454,7 +464,7 @@ export async function syncHealth(): Promise<SyncResult> {
   const skipped: string[] = [];
   const granted: string[] = [];
 
-  for (const plan of METRIC_PLANS) {
+  for (const plan of plansFor(healthPlatform())) {
     try {
       // Wrapped like every other crossing. A read that never answers hangs
       // the whole sync — the same failure as the probe, one screen further in,
@@ -550,6 +560,29 @@ export async function syncHealth(): Promise<SyncResult> {
     }
   } catch (err) {
     skipped.push(`workouts: ${errText(err)}`);
+  }
+
+  /**
+   * Exercise minutes on Android, derived rather than read.
+   *
+   * Health Connect has no exercise-time record; it has sessions with a start
+   * and an end, which is the same fact recorded differently. Dropping the
+   * metric on Android would have been the cheap fix and would have left an
+   * Android member's terrain reading permanently missing a number an iPhone
+   * member has — so it is computed from the sessions that were just read.
+   *
+   * After the workout read, so a failed session query produces no minutes
+   * rather than a confident zero.
+   */
+  if (healthPlatform() === "healthconnect") {
+    for (const day of exerciseMinutesFromWorkouts(workouts)) {
+      samples.push({
+        onDate: day.onDate,
+        metric: "exerciseMinutes",
+        value: day.minutes,
+        unit: "minute",
+      });
+    }
   }
 
   if (!samples.length && !workouts.length) {

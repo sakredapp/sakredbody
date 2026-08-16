@@ -23,6 +23,9 @@ import type { HealthMetric } from "@shared/schema";
  * is implied by a helper's default, someone adds a metric and gets a day's
  * total body temperature.
  */
+/** The two stores. Named here so the plans can say which of them they exist in. */
+export type HealthPlatform = "healthkit" | "healthconnect";
+
 export type MetricPlan = {
   /** The plugin's HealthDataType. */
   dataType: string;
@@ -32,6 +35,16 @@ export type MetricPlan = {
   accepts: string[];
   /** Converts an accepted unit's value into our canonical unit. */
   convert?: (value: number, unit: string) => number;
+  /**
+   * Where this metric exists. Omitted means both, which is nearly everything.
+   *
+   * Not decoration. `requestAuthorization` sends the whole list in one call and
+   * the Android plugin rejects the *entire* call on the first identifier it
+   * does not recognise — so one metric that only Apple has took Health Connect
+   * down at first contact, and the member saw "Unsupported data type:
+   * exerciseTime" under a Connect button that could never work.
+   */
+  platforms?: HealthPlatform[];
 };
 
 export const METRIC_PLANS: MetricPlan[] = [
@@ -39,7 +52,19 @@ export const METRIC_PLANS: MetricPlan[] = [
   { dataType: "steps", metric: "steps", aggregation: "sum", accepts: ["count"] },
   { dataType: "distance", metric: "distanceMeters", aggregation: "sum", accepts: ["meter"] },
   { dataType: "flightsClimbed", metric: "flightsClimbed", aggregation: "sum", accepts: ["count"] },
-  { dataType: "exerciseTime", metric: "exerciseMinutes", aggregation: "sum", accepts: ["minute"] },
+  {
+    dataType: "exerciseTime",
+    metric: "exerciseMinutes",
+    aggregation: "sum",
+    accepts: ["minute"],
+    /**
+     * Apple's own tally of exercise minutes. Health Connect has no equivalent
+     * record — it models training as `ExerciseSessionRecord`, which carries a
+     * start and an end — so the minutes are derived from the sessions
+     * themselves on Android. See `exerciseMinutesFromWorkouts`.
+     */
+    platforms: ["healthkit"],
+  },
   { dataType: "calories", metric: "activeCalories", aggregation: "sum", accepts: ["kilocalorie"] },
   { dataType: "totalCalories", metric: "totalCalories", aggregation: "sum", accepts: ["kilocalorie"] },
 
@@ -112,12 +137,66 @@ export const METRIC_PLANS: MetricPlan[] = [
   },
 ];
 
-/** Every plugin data type we ask permission for, plus sleep and workouts. */
-export const READ_TYPES: string[] = [
-  ...METRIC_PLANS.map((p) => p.dataType),
-  "sleep",
-  "workouts",
-];
+/** The metrics this platform actually has. */
+export function plansFor(platform: HealthPlatform | null): MetricPlan[] {
+  if (!platform) return METRIC_PLANS;
+  return METRIC_PLANS.filter((p) => !p.platforms || p.platforms.includes(platform));
+}
+
+/**
+ * Every data type we ask permission for on this platform, plus sleep and
+ * workouts.
+ *
+ * ── Why this is per-platform and not one list ─────────────────────────────
+ *
+ * `requestAuthorization` sends the whole array in a single call, and the
+ * Android plugin parses it before it does anything else: the first identifier
+ * its enum does not recognise throws, and the call is rejected. Not that
+ * metric — the call. So Health Connect never opened its permission sheet, and
+ * the Settings screen showed "Unsupported data type: exerciseTime" in red
+ * under a Connect button that could not work no matter how many times it was
+ * pressed.
+ *
+ * One optional metric that only Apple has was enough to take the whole
+ * integration down on Android. Asking each platform for what it has is the
+ * fix; `script/test-health.ts` reads the plugin's own Kotlin enum and fails if
+ * we ever ask Android for something it does not define, so the next divergence
+ * is a failing test rather than a red line on a member's phone.
+ */
+export function readTypesFor(platform: HealthPlatform | null): string[] {
+  return [...plansFor(platform).map((p) => p.dataType), "sleep", "workouts"];
+}
+
+/** Both platforms' types, for anything that has no platform in hand. */
+export const READ_TYPES: string[] = readTypesFor(null);
+
+/**
+ * Exercise minutes, derived from the sessions rather than read as a metric.
+ *
+ * Health Connect records training as `ExerciseSessionRecord` — a start, an end
+ * and a type — and the minutes Apple reports separately are, on Android,
+ * simply how long those sessions lasted. Summed per member-local day, which is
+ * the same day the workout rows are filed under, so the two cannot disagree
+ * about which day a late-evening session belongs to.
+ *
+ * Rounded down to whole minutes and zero-length sessions dropped: a session
+ * recorded with no duration is a session somebody's watch started and
+ * abandoned, and counting it as a minute of exercise would be inventing one.
+ */
+export function exerciseMinutesFromWorkouts(
+  workouts: readonly { onDate: string; durationSeconds?: number | null }[],
+): { onDate: string; minutes: number }[] {
+  const byDay = new Map<string, number>();
+  for (const w of workouts) {
+    const seconds = w.durationSeconds ?? 0;
+    if (seconds <= 0) continue;
+    byDay.set(w.onDate, (byDay.get(w.onDate) ?? 0) + seconds);
+  }
+  return Array.from(byDay.entries())
+    .map(([onDate, seconds]) => ({ onDate, minutes: Math.floor(seconds / 60) }))
+    .filter((d) => d.minutes > 0)
+    .sort((a, b) => a.onDate.localeCompare(b.onDate));
+}
 
 /**
  * The member's local calendar date for an instant.

@@ -8,12 +8,14 @@
  * permission surface rather than the plumbing.
  */
 
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import { withTimeout, BridgeTimeout } from "../client/src/lib/bridgeTimeout.js";
 import { HEALTH_UNITS, HEALTH_RANGES, healthMetricEnum } from "../shared/models/health.js";
 import {
   METRIC_PLANS,
   READ_TYPES,
+  readTypesFor,
+  exerciseMinutesFromWorkouts,
   CANONICAL_UNITS,
   localDate,
   toCanonical,
@@ -1686,6 +1688,80 @@ console.log("\nA native call that never answers becomes an error\n");
     "the probe reports a timeout distinctly from an error",
     /timedOut/.test(HEALTH_SRC),
   );
+}
+
+/**
+ * ── We only ask Health Connect for records Health Connect has ─────────────
+ *
+ * `requestAuthorization` sends every requested type in one call, and the
+ * Android plugin parses the whole array before doing anything: the first
+ * identifier its enum does not define throws, and the *call* is rejected. So
+ * `exerciseTime` — Apple's own tally of exercise minutes, which Health Connect
+ * has no record for — took the entire integration down at first contact. The
+ * member saw "Unsupported data type: exerciseTime" in red under a Connect
+ * button that could not work however many times it was pressed.
+ *
+ * This reads the plugin's own Kotlin enum, so the next time we add a metric
+ * that only one store has, it fails here instead of on somebody's phone.
+ */
+{
+  const ENUM_PATH =
+    "node_modules/@capgo/capacitor-health/android/src/main/java/app/capgo/plugin/health/HealthDataType.kt";
+
+  if (!existsSync(ENUM_PATH)) {
+    check("the Android plugin's type enum is readable", false, "install dependencies first");
+  } else {
+    const kt = readFileSync(ENUM_PATH, "utf8");
+    const android = new Set(
+      [...kt.matchAll(/^\s+[A-Z_0-9]+\("(\w+)"/gm)].map((m) => m[1]),
+    );
+    check("the enum parsed", android.size > 15, `${android.size} types`);
+
+    /** Sleep and workouts are their own permission, not entries in the enum. */
+    const asked = readTypesFor("healthconnect").filter(
+      (t) => t !== "sleep" && t !== "workouts",
+    );
+    const unsupported = asked.filter((t) => !android.has(t));
+    check("every type we ask Health Connect for exists in its enum",
+      unsupported.length === 0, unsupported.join(", "));
+
+    /** And the check is worth having only if it would have caught the bug. */
+    const everything = readTypesFor(null).filter((t) => t !== "sleep" && t !== "workouts");
+    check("the unfiltered list would still have failed it",
+      everything.some((t) => !android.has(t)),
+      "nothing is platform-specific any more — this guard has stopped proving anything");
+
+    /**
+     * Dropping the metric on Android would have been the cheap fix and would
+     * have left an Android member's terrain permanently short a number an
+     * iPhone member has. Health Connect models training as sessions with a
+     * start and an end, so the minutes are the sessions.
+     */
+    const minutes = exerciseMinutesFromWorkouts([
+      { onDate: "2026-08-16", durationSeconds: 1800 },
+      { onDate: "2026-08-16", durationSeconds: 900 },
+      { onDate: "2026-08-15", durationSeconds: 3600 },
+      // A session a watch started and abandoned is not a minute of exercise.
+      { onDate: "2026-08-14", durationSeconds: 0 },
+      { onDate: "2026-08-13", durationSeconds: null },
+    ]);
+    check("two sessions on one day are one day's minutes",
+      minutes.find((d) => d.onDate === "2026-08-16")?.minutes === 45,
+      JSON.stringify(minutes));
+    check("and a separate day stays separate",
+      minutes.find((d) => d.onDate === "2026-08-15")?.minutes === 60);
+    check("a zero-length session contributes nothing",
+      !minutes.some((d) => d.onDate === "2026-08-14"));
+    check("and neither does one with no duration at all",
+      !minutes.some((d) => d.onDate === "2026-08-13"));
+    check("the days come back in order",
+      minutes.map((d) => d.onDate).join(",") === "2026-08-15,2026-08-16");
+
+    check("iOS still reads Apple's own tally",
+      readTypesFor("healthkit").includes("exerciseTime"));
+    check("and Android does not ask for it",
+      !readTypesFor("healthconnect").includes("exerciseTime"));
+  }
 }
 
 
