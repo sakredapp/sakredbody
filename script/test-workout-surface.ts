@@ -52,6 +52,8 @@ const code = (p: string) =>
 const sheet = code("client/src/components/build/WorkoutSheet.tsx");
 const routes = code("server/training/routes.ts");
 const composition = code("server/training/composition.ts");
+const migration = readFileSync(
+  new URL("../supabase/2026-08-16-session-exercises.sql", import.meta.url), "utf8");
 
 console.log("\nThe workout is a layer, not a card\n");
 
@@ -301,6 +303,69 @@ console.log("\nA set is finished work, and still the member's to correct\n");
     new URL("../supabase/2026-08-16-session-exercises.sql", import.meta.url), "utf8");
   check("and the database refuses a pair that disagrees",
     /check \(\(set_style = 'warmup'\) = is_warmup\)/.test(migration));
+}
+
+console.log("\nThe seven things that must survive a reload or a second tap\n");
+
+{
+  /**
+   * ── Why these are listed rather than assumed ──────────────────────────────
+   *
+   * Every one of them is a mutation added this week, and every one has the same
+   * two failure modes: it does not survive the app being closed, or it happens
+   * twice when a finger lands twice on a gym network. The composition entity
+   * makes the first class of bug impossible by construction for most of them —
+   * which is worth stating explicitly, because "the row exists" is the whole
+   * argument and it should be visible.
+   */
+
+  // 1. A movement added and never loaded survives being closed.
+  check("adding a movement writes to the database, not to component state",
+    /apiRequest\("POST", `\/api\/training\/sessions\/\$\{session\.id\}\/exercises`/.test(sheet));
+  check("and the server writes it before any set exists",
+    /await ensureSessionExercise\(sessionId, input\.exerciseId/.test(routes));
+  check("a second tap cannot send a second request",
+    /if \(addMovement\.isPending\) return;/.test(sheet));
+  check("and the database would refuse it anyway",
+    /uq_session_exercises_session_exercise/.test(migration) &&
+    /onConflictDoNothing/.test(composition));
+
+  // 2 & 3. A corrected set, and its metadata, come back after a reload.
+  check("a correction is a server write", /app\.patch\("\/api\/training\/sets\/:id"/.test(routes));
+  check("and the screen refetches rather than patching its own copy",
+    /onSuccess: \(\) => \{\s*setEditing\(null\);\s*refreshSession\(\);/.test(sheet));
+  for (const col of ["isWarmup", "setStyle", "toFailure", "rpe"]) {
+    check(`the open session returns ${col}, so it survives a reload`,
+      new RegExp(`${col}: workoutSets\\.${col}`).test(routes));
+  }
+
+  // 4. Superset grouping survives a cold reopen.
+  check("a superset is stored on the composition row",
+    /supersetGroup: sessionExercises\.supersetGroup/.test(composition));
+  check("and comes back with the open session",
+    /exercises: composition/.test(routes));
+
+  // 5. `Use last` fills the boxes and logs nothing.
+  {
+    const fn = sheet.slice(sheet.indexOf("const useLast ="));
+    const body = fn.slice(0, fn.indexOf("\n  };") + 5);
+    check("there is a useLast to read", body.length > 100, `${body.length} chars`);
+    check("it writes to the draft only", /patch\(g\.movement\.id/.test(body));
+    check("and never logs a set", !/mutate|apiRequest|logSet/.test(body));
+  }
+
+  // 6. Removing a movement leaves nothing behind.
+  check("removal takes the sets", /delete\(workoutSets\)/.test(composition));
+  check("and the composition row with them", /delete\(sessionExercises\)/.test(composition));
+  check("destructive, so it is confirmed with a count",
+    /its \$\{g\.sets\.length\} logged/.test(sheet));
+
+  // 7. Last time is never this time.
+  check("prior performance excludes the session being performed",
+    /excludeSessionId \? sql`AND s\.id <> \$\{excludeSessionId\}`/.test(composition));
+  check("and every unfinished session", /s\.finished_at IS NOT NULL/.test(composition));
+  check("the open route passes its own id as the exclusion",
+    /priorPerformanceFor\(userId, ids, open\.id, unit\)/.test(routes));
 }
 
 console.log("\nA movement can be taken back out\n");

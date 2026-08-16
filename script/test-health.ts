@@ -1765,5 +1765,87 @@ console.log("\nA native call that never answers becomes an error\n");
 }
 
 
+/**
+ * ── The Android lifecycle, end to end ─────────────────────────────────────
+ *
+ * connect → permission request → sync → duration derivation → disconnect.
+ *
+ * Every one of these crossed a bridge that could fail, and the failure that
+ * actually shipped was in the first step: one Apple-only identifier in the
+ * permission array and the *whole call* was rejected, so nothing downstream
+ * ever ran. These hold the shape of each step and, more importantly, that a
+ * failure in one of them does not take the others with it.
+ */
+console.log("\nThe Android health lifecycle survives a part of it failing\n");
+
+{
+  const src = stripComments(readFileSync("client/src/lib/health.ts", "utf8"));
+  const hook = stripComments(readFileSync("client/src/hooks/use-health.ts", "utf8"));
+
+  // ── Connect: availability is resolved, not assumed from the platform ──
+  check("availability is probed rather than inferred",
+    /const \[available, setAvailable\]/.test(hook) && /healthAvailability\(\)/.test(hook));
+  check("an Android shell with no provider is a distinct reason",
+    /setReason/.test(hook));
+
+  // ── Permission: this platform's types only ──
+  check("the request asks for this platform's types",
+    /read: readTypesFor\(healthPlatform\(\)\)/.test(src));
+  check("and never writes", /write: \[\]/.test(src));
+  check("history access is asked for, so Android is not capped at 30 days",
+    /requestHistoryAccess: true/.test(src));
+
+  // ── Sync: one metric failing must not end the sync ──
+  const loop = src.slice(src.indexOf("for (const plan of plansFor"));
+  const body = loop.slice(0, loop.indexOf("\n  }") + 4);
+  check("there is a read loop to check", body.length > 200, `${body.length} chars`);
+  check("each metric is read inside its own try", /try \{/.test(body));
+  check("and a failure is recorded rather than thrown",
+    /catch \(err\) \{\s*skipped\.push/.test(body));
+  check("so an unsupported or unavailable type skips only itself",
+    !/throw/.test(body));
+
+  /** Sleep and workouts are separately guarded, for the same reason. */
+  check("the sleep read has its own catch", /skipped\.push\(`sleep/.test(src));
+  check("and the workout read too", /skipped\.push\(`workouts/.test(src));
+
+  /**
+   * And what the member is told. A sync that skipped four metrics and posted
+   * two is not a failure, and reporting it as one would send somebody to
+   * support about a phone that is working.
+   */
+  check("what was skipped comes back to the caller", /skipped,?\s*\}/.test(src) || /skipped\b/.test(src));
+
+  // ── Derivation: after the workouts, so a failed read yields no minutes ──
+  const deriveAt = src.indexOf("exerciseMinutesFromWorkouts(workouts)");
+  const workoutAt = src.indexOf("queryWorkouts");
+  check("minutes are derived after the sessions are read",
+    deriveAt > workoutAt && workoutAt > 0);
+  check("and only on Health Connect",
+    /healthPlatform\(\) === "healthconnect"/.test(src));
+  /**
+   * A failed workout query leaves `workouts` empty, and an empty list must
+   * produce no rows rather than a confident zero — a zero would be Sakred
+   * asserting the member did not train.
+   */
+  check("no sessions means no minutes, not zero minutes",
+    exerciseMinutesFromWorkouts([]).length === 0);
+
+  // ── Disconnect: the worker stops before the rows go ──
+  const dc = hook.slice(hook.indexOf("const disconnect = useMutation"));
+  const dcBody = dc.slice(0, dc.indexOf("});") + 3);
+  check("there is a disconnect to check", dcBody.length > 80);
+  check("background sync is stopped first",
+    dcBody.indexOf("disableBackgroundSync") < dcBody.indexOf("/api/health/connection"));
+  check("then the stored measurements are deleted",
+    /apiRequest\("DELETE", "\/api\/health\/connection"\)/.test(dcBody));
+  check("and the screens are told", /onSuccess: invalidate/.test(dcBody));
+  /** Destructive, and the member is asked in words that say what goes. */
+  const card = readFileSync("client/src/components/portal/HealthCard.tsx", "utf8");
+  check("disconnect confirms before deleting", /delete every health measurement/i.test(card));
+  check("and says it cannot be undone", /cannot be undone/i.test(card));
+  check("with a pending state while it runs", /disconnect\.isPending/.test(card));
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

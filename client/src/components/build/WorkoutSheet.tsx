@@ -704,7 +704,18 @@ function Sheet() {
 
   // ── Editing ──────────────────────────────────────────────────────────────
 
+  /**
+   * Adding is guarded twice, and both are load-bearing.
+   *
+   * `groups` cannot have updated yet when a second tap lands a moment after the
+   * first, so the membership test alone would let two POSTs through for the
+   * same movement. The database refuses the duplicate — one row per movement
+   * per session, held by a unique index — but a member should not be relying on
+   * a constraint to make a double tap harmless, and the second request would
+   * still cost them a refetch on a gym network.
+   */
   const add = (m: Movement) => {
+    if (addMovement.isPending) return;
     if (groups.some((g) => g.movement.id === m.id)) return setPicking(false);
     addMovement.mutate(m);
   };
