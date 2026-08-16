@@ -5,7 +5,11 @@
  *   GET    /api/training/exercises              — the catalogue, searchable
  *   GET    /api/training/today                  — today's prescribed lifts
  *   POST   /api/training/sessions               — begin one
+ *   POST   /api/training/sessions/:id/exercises — put a movement in it
+ *   PATCH  /api/training/sessions/:id/exercises/:exerciseId — superset it
+ *   DELETE /api/training/sessions/:id/exercises/:exerciseId — take it out
  *   POST   /api/training/sessions/:id/sets      — record a set
+ *   PATCH  /api/training/sets/:id               — correct one
  *   DELETE /api/training/sets/:id               — undo one
  *   POST   /api/training/sessions/:id/finish    — done
  *   GET    /api/training/sessions               — history
@@ -41,6 +45,7 @@ import {
   bodyMeasurements,
   workoutSessions,
   workoutSets,
+  sessionExercises,
   habits,
   routineHabits,
   users,
@@ -48,6 +53,9 @@ import {
   prescribeExerciseSchema,
   prescribeExercisePatchSchema,
   logSetSchema,
+  updateSetSchema,
+  addSessionExerciseSchema,
+  reconcileSetStyle,
   bodyMeasurementSchema,
   weightUnitEnum,
   lbToKg,
@@ -78,6 +86,15 @@ import {
   REFERENCE_WINDOW_DAYS,
   type SetRow,
 } from "./strength.js";
+import {
+  compositionFor,
+  ensureSessionExercise,
+  ownsSession,
+  pairSessionExercise,
+  priorPerformanceFor,
+  recentConcernsFor,
+  removeSessionExercise,
+} from "./composition.js";
 import { memberToday } from "../coaching/enrollment.js";
 import { trainingMemory } from "./memory.js";
 import { addDaysToString } from "../../shared/utils/dates.js";
@@ -607,6 +624,21 @@ export function registerTrainingRoutes(app: Express) {
         .from(workoutSets)
         .where(eq(workoutSets.sessionId, sessionId));
 
+      /**
+       * The movement is in the workout, said explicitly, before the set is
+       * written.
+       *
+       * Every path that logs a set reaches this line — the prescribed screen,
+       * the free session, and any client old enough not to know the
+       * composition route exists. So a set can never be the only evidence that
+       * a movement was trained, which is the condition this whole table was
+       * added to end. It is idempotent, and the usual case is that the row is
+       * already there.
+       */
+      await ensureSessionExercise(sessionId, input.exerciseId, input.habitExerciseId ?? null);
+
+      const style = reconcileSetStyle(input);
+
       const [row] = await db
         .insert(workoutSets)
         .values({
@@ -618,7 +650,9 @@ export function registerTrainingRoutes(app: Express) {
           durationSeconds: input.durationSeconds ?? null,
           distanceM: input.distanceM ?? null,
           weightKg: inKg(input.weight ?? 0, input.unit ?? unit),
-          isWarmup: input.isWarmup,
+          isWarmup: style.isWarmup,
+          setStyle: style.setStyle,
+          toFailure: input.toFailure ?? false,
           rpe: input.rpe ?? null,
           note: input.note ?? null,
         })
@@ -801,6 +835,16 @@ export function registerTrainingRoutes(app: Express) {
           })
           .returning();
 
+        // Composition inside the same transaction as the set, so a practice is
+        // never a session whose only account of what was done is a set row.
+        // Written by hand rather than through `ensureSessionExercise` because
+        // that helper takes the pool and this must take the transaction.
+        await tx.insert(sessionExercises).values({
+          sessionId: session.id,
+          exerciseId: input.exerciseId,
+          position: 0,
+        });
+
         await tx.insert(workoutSets).values({
           sessionId: session.id,
           exerciseId: input.exerciseId,
@@ -888,22 +932,179 @@ export function registerTrainingRoutes(app: Express) {
           .where(and(eq(workoutSessions.id, id), eq(workoutSessions.userId, userId)));
         if (!owned) return res.status(404).json({ message: "No such session" });
 
-        const removed = await db
-          .delete(workoutSets)
-          .where(
-            and(
-              eq(workoutSets.sessionId, id),
-              eq(workoutSets.exerciseId, param(req, "exerciseId")),
-            ),
-          )
-          .returning({ id: workoutSets.id });
+        // Both halves: the work logged under it, and the statement that it was
+        // in the workout at all. Deleting only the sets used to leave a
+        // movement that reappeared on the next reload with nothing in it.
+        const { removed } = await removeSessionExercise(id, param(req, "exerciseId"));
 
-        res.json({ removed: removed.length });
+        res.json({ removed });
       } catch (err) {
         fail(res, err);
       }
     },
   );
+
+  /**
+   * Put a movement into the workout, now, before anything is done with it.
+   *
+   * ── The one-minute gap this closes ────────────────────────────────────────
+   *
+   * Choosing a movement used to write nothing anywhere. It went into a React
+   * `useState` and stayed there until the first set was logged, which is
+   * usually a minute later and sometimes never — so a member who picked their
+   * next exercise, put the phone in their pocket and walked to the rack came
+   * back to a workout that had forgotten what they were about to do. Nothing
+   * was lost from the database, because nothing had ever been offered to it.
+   *
+   * The response carries what the screen needs to draw the movement it just
+   * added, including what was done last time. That is deliberate: the moment
+   * somebody selects incline press is exactly the moment "210 × 2 · 200 × 4"
+   * is worth reading, and a second request for it is a second chance to render
+   * the row without it.
+   */
+  app.post("/api/training/sessions/:id/exercises", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      const sessionId = param(req, "id");
+      const input = addSessionExerciseSchema.parse(req.body ?? {});
+
+      if (!(await ownsSession(userId, sessionId))) {
+        return res.status(404).json({ message: "No such session" });
+      }
+
+      const [exercise] = await db
+        .select({ id: exercises.id })
+        .from(exercises)
+        .where(eq(exercises.id, input.exerciseId));
+      if (!exercise) return res.status(400).json({ message: "No such exercise" });
+
+      await ensureSessionExercise(sessionId, input.exerciseId, input.habitExerciseId ?? null);
+      if (input.supersetWith) {
+        await pairSessionExercise(sessionId, input.exerciseId, input.supersetWith);
+      }
+
+      const unit = await unitFor(userId);
+      const [composition, previous] = await Promise.all([
+        compositionFor(sessionId),
+        priorPerformanceFor(userId, [input.exerciseId], sessionId, unit),
+      ]);
+
+      res.status(201).json({
+        exercises: composition,
+        previous,
+        added: composition.find((m) => m.exerciseId === input.exerciseId) ?? null,
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: zodMessage(err) });
+      }
+      fail(res, err);
+    }
+  });
+
+  /**
+   * Pair a movement with another one, or set it loose again.
+   *
+   * A superset is a relationship between exercises, so this is the only place
+   * one can be declared — there is deliberately no "superset" set type. See
+   * `SET_STYLES` for why that distinction is load-bearing rather than
+   * pedantic.
+   */
+  app.patch("/api/training/sessions/:id/exercises/:exerciseId", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      const sessionId = param(req, "id");
+      const input = z
+        .object({ supersetWith: z.string().min(1).nullable() })
+        .parse(req.body ?? {});
+
+      if (!(await ownsSession(userId, sessionId))) {
+        return res.status(404).json({ message: "No such session" });
+      }
+
+      await pairSessionExercise(sessionId, param(req, "exerciseId"), input.supersetWith);
+      res.json({ exercises: await compositionFor(sessionId) });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: zodMessage(err) });
+      }
+      fail(res, err);
+    }
+  });
+
+  /**
+   * Correct a set that is already down.
+   *
+   * ── Why a completed set has to stay editable ─────────────────────────────
+   *
+   * A logged set was a statement the screen rendered and nothing could change:
+   * the only way to fix 205 typed as 250 was to delete the row and log it
+   * again, which loses its place in the order. That is a strange thing for a
+   * training log to insist on — the number is wrong, the member knows it is
+   * wrong, and the app's answer was that history is immutable. History is
+   * immutable against *Sakred* rewriting it. It is not immutable against the
+   * person who did the work.
+   *
+   * A patch, so a member correcting a weight sends a weight. Absent means
+   * unchanged and null means cleared, and the two are different — see
+   * `updateSetSchema`.
+   */
+  app.patch("/api/training/sets/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      const setId = param(req, "id");
+      const input = updateSetSchema.parse(req.body ?? {});
+      const unit = await unitFor(userId);
+
+      // Ownership through the session, in the predicate rather than in a
+      // second query — the same rule DELETE /sets/:id follows.
+      const [existing] = await db
+        .select({ id: workoutSets.id, isWarmup: workoutSets.isWarmup, setStyle: workoutSets.setStyle })
+        .from(workoutSets)
+        .innerJoin(workoutSessions, eq(workoutSets.sessionId, workoutSessions.id))
+        .where(and(eq(workoutSets.id, setId), eq(workoutSessions.userId, userId)));
+      if (!existing) return res.status(404).json({ message: "Not found" });
+
+      const patch: Record<string, unknown> = {};
+      if ("reps" in input) patch.reps = input.reps ?? null;
+      if ("durationSeconds" in input) patch.durationSeconds = input.durationSeconds ?? null;
+      if ("distanceM" in input) patch.distanceM = input.distanceM ?? null;
+      if (input.weight !== undefined) patch.weightKg = inKg(input.weight, input.unit ?? unit);
+      if ("rpe" in input) patch.rpe = input.rpe ?? null;
+      if ("note" in input) patch.note = input.note ?? null;
+      if (input.toFailure !== undefined) patch.toFailure = input.toFailure;
+
+      /**
+       * The two warm-up columns move together or not at all. Sending neither
+       * leaves both alone; sending either sends both, so the CHECK that holds
+       * them equal never sees a half-written pair.
+       */
+      if (input.setStyle !== undefined) {
+        const style = reconcileSetStyle({ setStyle: input.setStyle });
+        patch.setStyle = style.setStyle;
+        patch.isWarmup = style.isWarmup;
+      } else if (input.isWarmup !== undefined && input.isWarmup !== existing.isWarmup) {
+        // An older client that only knows the flag. Turning it on makes the set
+        // a warm-up; turning it off returns it to a working set, which is the
+        // only style it can have had while the flag was set.
+        patch.setStyle = input.isWarmup ? "warmup" : "normal";
+        patch.isWarmup = input.isWarmup;
+      }
+
+      const [row] = await db
+        .update(workoutSets)
+        .set(patch)
+        .where(eq(workoutSets.id, setId))
+        .returning();
+
+      res.json({ ...row, weight: out(row.weightKg, unit), unit });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: zodMessage(err) });
+      }
+      fail(res, err);
+    }
+  });
 
   /**
    * What the body said, in the member's own words.
@@ -1149,6 +1350,10 @@ export function registerTrainingRoutes(app: Express) {
           durationSeconds: workoutSets.durationSeconds,
           distanceM: workoutSets.distanceM,
           weightKg: workoutSets.weightKg,
+          isWarmup: workoutSets.isWarmup,
+          setStyle: workoutSets.setStyle,
+          toFailure: workoutSets.toFailure,
+          rpe: workoutSets.rpe,
         })
         .from(workoutSets)
         .innerJoin(exercises, eq(workoutSets.exerciseId, exercises.id))
@@ -1173,6 +1378,32 @@ export function registerTrainingRoutes(app: Express) {
         .from(trainingObservations)
         .where(eq(trainingObservations.sessionId, open.id));
 
+      /**
+       * And what the workout is *made of*, which the sets cannot say.
+       *
+       * A movement chosen and not yet performed has no set, so for as long as
+       * composition was inferred from `logged` it existed only in the phone's
+       * memory. This is the list, in the member's own order, and it is the one
+       * the screen renders — `logged` now only says what has been done under
+       * each entry.
+       */
+      const composition = await compositionFor(open.id);
+
+      /**
+       * Beside each movement, the last time it was trained.
+       *
+       * Fetched here rather than by the screen because it is the same question
+       * for every movement in the session and the screen has seven of them.
+       * `GET /exercises/:id/history` has existed for months and answers a
+       * different question — a series over time, not "what did I put on the
+       * bar last Tuesday" — which is why it had no caller.
+       */
+      const ids = composition.map((m) => m.exerciseId);
+      const [previous, concerns] = await Promise.all([
+        priorPerformanceFor(userId, ids, open.id, unit),
+        recentConcernsFor(userId, ids),
+      ]);
+
       res.json({
         session: {
           ...open,
@@ -1180,6 +1411,9 @@ export function registerTrainingRoutes(app: Express) {
           unit,
           logged: logged.map((s) => ({ ...s, weight: out(s.weightKg, unit) })),
           observations,
+          exercises: composition,
+          previous,
+          concerns,
         },
       });
     } catch (err) {

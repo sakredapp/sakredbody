@@ -345,7 +345,14 @@ console.log("\nWritten where it happens, read where it matters\n");
   check("joined to the catalogue for shape", /leftJoin\(exercises/.test(memory));
 
   /** Read where a decision is made, and nowhere else. */
-  check("above the movement, before the sets", /<MovementMemory[\s\S]{0,200}g\.sets\.map/.test(sheet));
+  /**
+   * By position rather than by a character window: what happened last time and
+   * the reference sentence now sit between the two, and a fixed-distance regex
+   * would report a layout change as a missing feature.
+   */
+  check("above the movement, before the sets",
+    sheet.includes("<MovementMemory") &&
+      sheet.indexOf("<MovementMemory") < sheet.indexOf("g.sets.map"));
   check("on the recommendation", /<SuggestionMemory/.test(code("client/src/components/build/BuildToday.tsx")));
   check("and on Restore", /<RestoreMemory \/>/.test(code("client/src/components/RestoreTab.tsx")));
   /** Not as a feed. Nothing renders a list of past complaints. */

@@ -66,6 +66,49 @@ export type LoggedSet = {
   durationSeconds: number | null;
   distanceM: number | null;
   weight: number | null;
+  /**
+   * How the set was performed. All optional for the usual reason — a phone
+   * running the build before these columns existed gets `undefined`, and every
+   * reader has to treat that as "a normal working set" rather than as a bug.
+   */
+  rpe?: number | null;
+  isWarmup?: boolean;
+  setStyle?: string;
+  toFailure?: boolean;
+};
+
+/**
+ * A movement in the session, whether or not anything has been done with it.
+ *
+ * This is the list the screen renders. It used to be derived from `logged`,
+ * which cannot see a movement chosen a minute ago — and that minute is where
+ * every "my exercise disappeared" report came from.
+ */
+export type SessionMovement = {
+  id: string;
+  exerciseId: string;
+  name: string;
+  category: string;
+  trackingType: "reps" | "duration" | "distance";
+  takesLoad: boolean;
+  unilateral: boolean;
+  position: number;
+  supersetGroup: string | null;
+  habitExerciseId: string | null;
+};
+
+/** What was done the last time this movement was trained. */
+export type PriorPerformance = {
+  exerciseId: string;
+  onDate: string;
+  sets: {
+    reps: number | null;
+    durationSeconds: number | null;
+    distanceM: number | null;
+    weight: number | null;
+    rpe: number | null;
+    isWarmup: boolean;
+  }[];
 };
 
 export type OpenWorkout = RunningSession & {
@@ -93,6 +136,20 @@ export type OpenWorkout = RunningSession & {
     quality: string | null;
     side: string | null;
   }[];
+  /**
+   * The composition — what the workout is made of, in the member's order.
+   *
+   * Optional like everything else here, and the screen falls back to deriving
+   * the list from `logged` when it is absent. That fallback is the old
+   * behaviour, bug and all; it exists only so a client running against a server
+   * that predates `session_exercises` shows a workout rather than an empty
+   * layer.
+   */
+  exercises?: SessionMovement[];
+  /** Keyed by exercise id. Absent for a movement never trained before. */
+  previous?: Record<string, PriorPerformance>;
+  /** The most recent thing said about each movement, if anything was. */
+  concerns?: Record<string, { quality: string | null; side: string | null; onDate: string }>;
 };
 
 export const OPEN_WORKOUT_KEY = ["/api/training/sessions/open"] as const;

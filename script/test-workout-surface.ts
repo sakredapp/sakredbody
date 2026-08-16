@@ -24,6 +24,13 @@
 
 import { readFileSync } from "node:fs";
 import { catalogueRows } from "../shared/data/exerciseCatalogue.js";
+import {
+  priorSummary,
+  referenceNote,
+  reconcileSetStyle,
+  topWorkingSet,
+  type PriorPerformance,
+} from "../shared/models/training.js";
 
 let passed = 0;
 let failed = 0;
@@ -44,6 +51,7 @@ const code = (p: string) =>
 
 const sheet = code("client/src/components/build/WorkoutSheet.tsx");
 const routes = code("server/training/routes.ts");
+const composition = code("server/training/composition.ts");
 
 console.log("\nThe workout is a layer, not a card\n");
 
@@ -127,11 +135,172 @@ console.log("\nWhat is in the session comes from the server\n");
    * which is exactly how the old screen lost its movement list on a restart.
    */
   check("the movement list is derived", /const groups = useMemo<Group\[\]>/.test(sheet));
-  check("from the logged sets", /for \(const s of logged\)/.test(sheet));
-  /** The only local state is what has not been written down yet. */
-  check("plus what has not been logged yet", /const \[extras, setExtras\]/.test(sheet));
-  check("and a movement stops being extra once it is on the server",
-    /const onServer = new Set\(logged\.map/.test(sheet));
+
+  /**
+   * ── And the list itself is now the server's ──
+   *
+   * These two assertions used to require `const [extras, setExtras]` and the
+   * effect that emptied it. They were pinning the bug: `extras` was a React
+   * state array holding movements chosen and not yet logged, which is exactly
+   * the window in which a locked phone lost one. The contract is now that a
+   * movement is written down when it is chosen, so there is nothing local left
+   * to reconcile.
+   */
+  check("composition comes down with the session", /session\.exercises\?\.length/.test(sheet));
+  check("and there is no client-side list of movements any more",
+    !/const \[extras, setExtras\]/.test(sheet));
+  check("choosing a movement is a write", /apiRequest\("POST", `\/api\/training\/sessions\/\$\{session\.id\}\/exercises`/.test(sheet));
+  check("the server writes it before the first set exists",
+    /ensureSessionExercise\(sessionId, input\.exerciseId/.test(routes));
+  /** Derivation from sets survives only as the fallback for an older server. */
+  check("and deriving from sets is the fallback, not the rule",
+    /for \(const s of logged\)/.test(sheet) &&
+      sheet.indexOf("session.exercises?.length") < sheet.indexOf("for (const s of logged)"));
+}
+
+console.log("\nWhat happened last time is on the screen\n");
+
+{
+  /**
+   * The endpoint existed and nothing called it — `GET /exercises/:id/history`
+   * returns an estimated-1RM series, which answers a question about months.
+   * Somebody at a bench is asking about last Tuesday, and nothing answered
+   * that at all.
+   */
+  check("the open session carries previous performance", /priorPerformanceFor\(userId, ids/.test(routes));
+  check("excluding the session being performed",
+    /excludeSessionId \? sql`AND s\.id <> \$\{excludeSessionId\}`/.test(composition));
+  check("and only finished ones count", /s\.finished_at IS NOT NULL/.test(composition));
+
+  check("the screen shows it", /data-testid=\{`last-time-\$\{m\.id\}`\}/.test(sheet));
+  check("with the date it was done", /Last time · \{priorDate\(prior\.onDate\)\}/.test(sheet));
+  check("and the sets as performed", /priorSummary\(prior, unit as WeightUnit, m\.trackingType\)/.test(sheet));
+  check("with a way to reuse the numbers", /data-testid=\{`use-last-\$\{m\.id\}`\}/.test(sheet));
+
+  /**
+   * The reference sentence is conditional on the warm-up in every branch. A
+   * progression that demands more weight every week regardless of what the
+   * body reported is wrong on precisely the weeks it matters.
+   */
+  const model = code("shared/models/training.ts");
+  const note = model.slice(model.indexOf("export function referenceNote"));
+  const body = note.slice(0, note.indexOf("\n}"));
+  check("there is a reference to read", body.length > 100);
+  check("it never instructs an increase", !/add \d|increase by|go up/i.test(body));
+  check("progression is offered, not demanded", /There may be room to progress if the warm-up agrees/.test(body));
+  check("a reported concern makes it gentler", /Start lighter and use the warm-up/.test(body));
+  check("and it never says why anything hurt",
+    !/because|due to|caused|injur|strain/i.test(body));
+}
+
+console.log("\nAnd the sentences it actually produces\n");
+
+{
+  const set = (weight: number, reps: number, rpe: number | null = null, isWarmup = false) => ({
+    reps,
+    durationSeconds: null,
+    distanceM: null,
+    weight,
+    rpe,
+    isWarmup,
+  });
+
+  /** The session from the brief, warm-up included. */
+  const chest: PriorPerformance = {
+    exerciseId: "incline-machine-chest-press",
+    onDate: "2026-08-09",
+    sets: [set(140, 10, null, true), set(210, 2), set(200, 4), set(200, 5)],
+  };
+
+  /** The unit once, at the end. Six repetitions of "lb" on one line is noise. */
+  check("the summary is the working sets, in order",
+    priorSummary(chest, "lb") === "210 × 2 · 200 × 4 · 200 × 5 lb",
+    priorSummary(chest, "lb"));
+  /** The ramp is recorded and does not belong on the line about the work. */
+  check("the warm-up is not in it", !priorSummary(chest, "lb").includes("140"));
+  check("the top working set is the heaviest", topWorkingSet(chest)?.weight === 210);
+
+  /** A movement with only warm-ups is still something to report. */
+  const rampOnly: PriorPerformance = {
+    exerciseId: "x", onDate: "2026-08-09", sets: [set(95, 10, null, true)],
+  };
+  check("a session of nothing but warm-ups still says what happened",
+    priorSummary(rampOnly, "lb") === "95 × 10 lb", priorSummary(rampOnly, "lb"));
+
+  const easy = referenceNote(chest, "lb") ?? "";
+  check("an unremarkable session offers room", /may be room to progress/.test(easy), easy);
+  check("and states the reference in the member's unit", /210 lb × 2/.test(easy), easy);
+
+  const hard = referenceNote(
+    { ...chest, sets: [set(210, 2, 9.5)] }, "lb",
+  ) ?? "";
+  check("a session that was already near the top asks to be matched",
+    /Matching it is a good session/.test(hard), hard);
+  check("and does not ask for more", !/room to progress/.test(hard), hard);
+
+  /**
+   * The boundary, executed rather than described: a reported concern changes
+   * what is suggested and says nothing about the body.
+   */
+  const guarded = referenceNote(chest, "lb", { quality: "discomfort" }) ?? "";
+  check("a reported discomfort overrides the reference",
+    /Start lighter/.test(guarded), guarded);
+  check("it does not name a body part or a cause",
+    !/back|shoulder|knee|hip|because|injur/i.test(guarded), guarded);
+  check("and 'it felt good' is not a reason to hold back",
+    /may be room to progress/.test(referenceNote(chest, "lb", { quality: "good" }) ?? ""));
+
+  /** Nothing to say when there is nothing to say. */
+  check("a movement never trained says nothing", referenceNote(null, "lb") === null);
+  check("and neither does a bodyweight-only history",
+    referenceNote({ ...chest, sets: [set(0, 12)] }, "lb") === null);
+
+  /** The two spellings of warm-up, which a database CHECK holds equal. */
+  check("a style decides the flag", reconcileSetStyle({ setStyle: "warmup" }).isWarmup === true);
+  check("a drop set is not a warm-up", reconcileSetStyle({ setStyle: "dropset" }).isWarmup === false);
+  check("an old client sending only the flag still agrees",
+    reconcileSetStyle({ isWarmup: true }).setStyle === "warmup");
+  check("and its working sets are normal",
+    reconcileSetStyle({ isWarmup: false }).setStyle === "normal");
+  check("saying nothing at all is a working set",
+    reconcileSetStyle({}).setStyle === "normal" && reconcileSetStyle({}).isWarmup === false);
+}
+
+console.log("\nA set is finished work, and still the member's to correct\n");
+
+{
+  check("tapping a logged set opens it", /setEditing\(\{ id: s\.id, draft: draftOf\(s, m\) \}\)/.test(sheet));
+  check("the server accepts a correction", /app\.patch\("\/api\/training\/sets\/:id"/.test(routes));
+  /** Ownership through the session, in the predicate. */
+  check("owned by the member who did it", /innerJoin\(workoutSessions[\s\S]{0,200}eq\(workoutSessions\.userId, userId\)/.test(routes));
+
+  /**
+   * The permanent empty row is gone. It made a movement with three sets under
+   * it look unfinished forever.
+   */
+  check("the entry row is asked for once sets exist", /data-testid=\{`add-set-\$\{m\.id\}`\}/.test(sheet));
+  check("and moving on is offered beside it", /data-testid=\{`next-exercise-\$\{m\.id\}`\}/.test(sheet));
+  check("but a movement with nothing under it opens straight into the row",
+    /entering\[m\.id\] \?\? g\.sets\.length === 0/.test(sheet));
+
+  /** Superset is a relationship between movements, never a kind of set. */
+  const model = code("shared/models/training.ts");
+  check("the set styles do not include superset",
+    /SET_STYLES = \["normal", "warmup", "dropset", "backoff"\]/.test(model));
+  check("supersets live on the composition row", /supersetGroup: uuid\("superset_group"\)/.test(model));
+  check("and are offered as a partner, not a type", /Superset with…/.test(sheet));
+  check("with a way back out", /data-testid=\{`unpair-\$\{m\.id\}`\}/.test(sheet));
+
+  /**
+   * Two spellings of "warm-up" that a database CHECK holds equal. Both are kept
+   * because every derived number already reads `is_warmup`.
+   */
+  check("the two warm-up columns are reconciled in one place",
+    /export function reconcileSetStyle/.test(model));
+  const migration = readFileSync(
+    new URL("../supabase/2026-08-16-session-exercises.sql", import.meta.url), "utf8");
+  check("and the database refuses a pair that disagrees",
+    /check \(\(set_style = 'warmup'\) = is_warmup\)/.test(migration));
 }
 
 console.log("\nA movement can be taken back out\n");
@@ -150,9 +319,19 @@ console.log("\nA movement can be taken back out\n");
    * One statement, not one per set. Three round trips that can half-succeed
    * leave a movement somebody asked to remove still holding its later sets.
    */
-  check("it removes every set at once", /delete\(workoutSets\)[\s\S]{0,300}eq\(workoutSets\.exerciseId/.test(body));
-  check("scoped to this session", /eq\(workoutSets\.sessionId, id\)/.test(body));
-  check("and says how much went", /removed: removed\.length/.test(body));
+  check("the removal itself is one call", /removeSessionExercise\(id, param\(req, "exerciseId"\)\)/.test(body));
+  check("and says how much went", /res\.json\(\{ removed \}\)/.test(body));
+
+  /**
+   * The statements moved into `composition.ts` when composition stopped being
+   * inferred from the sets. Both halves have to go: deleting only the sets left
+   * the movement itself in `session_exercises`, so it came back empty on the
+   * next reload — a movement somebody removed, returning.
+   */
+  check("one statement removes every set", /delete\(workoutSets\)[\s\S]{0,300}eq\(workoutSets\.exerciseId/.test(composition));
+  check("scoped to this session", /eq\(workoutSets\.sessionId, sessionId\)/.test(composition));
+  check("and the movement goes with them",
+    /delete\(sessionExercises\)[\s\S]{0,300}eq\(sessionExercises\.exerciseId/.test(composition));
 
   /** The member is told what they are about to lose, in the sentence. */
   check("the client offers it", /data-testid=\{`remove-movement-/.test(sheet));

@@ -27,10 +27,26 @@
  * The list of movements used to live in `useState` beside the sets. The sets
  * were safe — each one is committed as it is logged — but the *list* was not,
  * so a force-quit mid-workout gave you back a running clock over an empty
- * session with no sign of the eleven sets underneath it. Now `logged` comes
- * down with the open session and the groups are derived from it, so the only
- * local state is what has not been written down yet: movements added but not
- * yet logged, and the numbers currently in the boxes.
+ * session with no sign of the eleven sets underneath it. So `logged` started
+ * coming down with the open session and the groups were derived from it.
+ *
+ * That fixed half of it. The half it could not fix is the minute between
+ * choosing a movement and finishing its first set, because in that minute
+ * there are no sets to derive anything from — the movement lived in `extras`,
+ * a `useState` array, and a locked phone took it. `session_exercises` is the
+ * other half: a movement is written down the moment it is chosen, so this
+ * screen now renders the server's list rather than a list it maintains.
+ *
+ * The only local state left is what genuinely has not been offered to the
+ * server yet — the numbers currently in the boxes, and which rows are open.
+ *
+ * ── What happened last time is part of the workout ────────────────────────
+ *
+ * Beside each movement is the last session it appeared in. Not a chart, not a
+ * trend: the sets, as performed, on the date they were performed. The
+ * reference sentence underneath is conditional on the warm-up by design — see
+ * `referenceNote` in the shared model for why nothing here tells anybody to
+ * add five pounds.
  */
 
 import {
@@ -54,7 +70,15 @@ import {
   Send,
   MessageSquare,
 } from "lucide-react";
-import { isPracticeCategory } from "@shared/schema";
+import {
+  isPracticeCategory,
+  priorSummary,
+  referenceNote,
+  SET_STYLES,
+  SET_STYLE_LABEL,
+  type SetStyle,
+  type WeightUnit,
+} from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -63,6 +87,8 @@ import {
   useOpenWorkout,
   OPEN_WORKOUT_KEY,
   type LoggedSet,
+  type PriorPerformance,
+  type SessionMovement,
 } from "@/hooks/use-open-workout";
 import { Elapsed } from "@/components/build/Elapsed";
 import { Button } from "@/components/ui/button";
@@ -136,7 +162,27 @@ function movementOf(s: LoggedSet): Movement {
   };
 }
 
-type Group = { movement: Movement; sets: LoggedSet[] };
+/** A composition row, as the `Movement` the picker and the rows already speak. */
+function movementFrom(m: SessionMovement): Movement {
+  return {
+    id: m.exerciseId,
+    name: m.name,
+    category: m.category,
+    equipment: "other",
+    trackingType: m.trackingType,
+    takesLoad: m.takesLoad,
+    unilateral: m.unilateral,
+    aliases: null,
+    ownerUserId: null,
+  };
+}
+
+type Group = {
+  movement: Movement;
+  sets: LoggedSet[];
+  /** Null when the server is older than `session_exercises`. */
+  supersetGroup: string | null;
+};
 
 /** "80 lb × 8", "45 min", "0:45" — whichever of those this set actually is. */
 function setLine(s: LoggedSet, unit: string): string {
@@ -154,8 +200,213 @@ function setLine(s: LoggedSet, unit: string): string {
   return parts.join(" × ") || "logged";
 }
 
-type Draft = { weight: string; reps: string; seconds: string };
-const blank = (): Draft => ({ weight: "", reps: "", seconds: "" });
+/**
+ * What a set was, beyond its numbers — and nothing at all when it was ordinary.
+ *
+ * A working set taken at an unremarkable effort says nothing here on purpose.
+ * The point of RPE and set style is that the unusual ones stand out, and a row
+ * that always carries three annotations is a row where none of them register.
+ */
+function setAside(s: LoggedSet): string | null {
+  const parts: string[] = [];
+  if (s.setStyle && s.setStyle !== "normal") parts.push(SET_STYLE_LABEL[s.setStyle as SetStyle] ?? s.setStyle);
+  if (s.rpe != null) parts.push(`RPE ${s.rpe}`);
+  if (s.toFailure) parts.push("to failure");
+  return parts.length ? parts.join(" · ") : null;
+}
+
+/** "Aug 9", in the reader's own locale. Never a bare ISO string. */
+function priorDate(onDate: string): string {
+  return new Date(`${onDate}T12:00:00`).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+type Draft = {
+  weight: string;
+  reps: string;
+  seconds: string;
+  rpe: string;
+  style: SetStyle;
+  toFailure: boolean;
+};
+const blank = (): Draft => ({
+  weight: "",
+  reps: "",
+  seconds: "",
+  rpe: "",
+  style: "normal",
+  toFailure: false,
+});
+
+/** A set already on the server, back in the boxes it came out of. */
+function draftOf(s: LoggedSet, m: Movement): Draft {
+  const seconds =
+    s.durationSeconds == null
+      ? ""
+      : String(isPracticeCategory(m.category) ? Math.round(s.durationSeconds / 60) : s.durationSeconds);
+  return {
+    weight: s.weight != null && s.weight > 0 ? String(s.weight) : "",
+    reps: s.reps != null ? String(s.reps) : "",
+    seconds,
+    rpe: s.rpe != null ? String(s.rpe) : "",
+    style: (SET_STYLES as readonly string[]).includes(s.setStyle ?? "")
+      ? (s.setStyle as SetStyle)
+      : s.isWarmup
+        ? "warmup"
+        : "normal",
+    toFailure: !!s.toFailure,
+  };
+}
+
+/**
+ * The boxes: a weight, a count, and the control that commits them.
+ *
+ * One component for both entering a set and correcting one, so the two cannot
+ * come to disagree about which unit a Reformer class is measured in.
+ */
+function SetRow({
+  m,
+  unit,
+  index,
+  d,
+  onChange,
+  onCommit,
+  pending,
+  label,
+  testId,
+}: {
+  m: Movement;
+  unit: string;
+  index: number;
+  d: Draft;
+  onChange: (p: Partial<Draft>) => void;
+  onCommit: () => void;
+  pending: boolean;
+  label: string;
+  testId: string;
+}) {
+  const duration = m.trackingType === "duration";
+  const asMinutes = duration && isPracticeCategory(m.category);
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-[11px] text-muted-foreground w-4 shrink-0">{index}</span>
+
+      {m.takesLoad && (
+        <Input
+          type="number"
+          inputMode="decimal"
+          placeholder={unit}
+          value={d.weight}
+          onChange={(e) => onChange({ weight: e.target.value })}
+          className="h-10"
+          aria-label={`Weight, set ${index}`}
+        />
+      )}
+
+      {duration ? (
+        <Input
+          type="number"
+          inputMode="numeric"
+          placeholder={asMinutes ? "mins" : "secs"}
+          value={d.seconds}
+          onChange={(e) => onChange({ seconds: e.target.value })}
+          className="h-10"
+          aria-label={asMinutes ? "Minutes" : "Seconds"}
+        />
+      ) : (
+        <Input
+          type="number"
+          inputMode="numeric"
+          placeholder="reps"
+          value={d.reps}
+          onChange={(e) => onChange({ reps: e.target.value })}
+          className="h-10"
+          aria-label="Reps"
+        />
+      )}
+
+      <Button
+        size="sm"
+        onClick={onCommit}
+        disabled={pending}
+        className="shrink-0 h-10 w-10 p-0"
+        aria-label={label}
+        data-testid={testId}
+      >
+        <Check className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * How the set went, beside the numbers rather than instead of them.
+ *
+ * Only while a row is open. A resting movement shows its sets and two words;
+ * turning every logged row into a panel of effort controls is how a training
+ * log becomes a cockpit, and the member came here to lift.
+ */
+function SetMeta({
+  d,
+  onChange,
+  testId,
+}: {
+  d: Draft;
+  onChange: (p: Partial<Draft>) => void;
+  testId: string;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5" data-testid={testId}>
+      {SET_STYLES.map((s) => (
+        <button
+          key={s}
+          onClick={() => onChange({ style: s })}
+          aria-pressed={d.style === s}
+          className={cn(
+            "text-[11px] tap-clean transition-colors",
+            d.style === s ? "text-[hsl(var(--gold))]" : "text-muted-foreground/60",
+          )}
+          data-testid={`${testId}-style-${s}`}
+        >
+          {SET_STYLE_LABEL[s]}
+        </button>
+      ))}
+
+      <label className="inline-flex items-center gap-1 text-[11px] text-muted-foreground/60">
+        RPE
+        {/*
+          The shared Input, not a bare one. Its type scale is what keeps iOS
+          from zooming the viewport on focus, and a hand-rolled box here would
+          be one more control to find in that audit.
+        */}
+        <Input
+          type="number"
+          inputMode="numeric"
+          value={d.rpe}
+          onChange={(e) => onChange({ rpe: e.target.value })}
+          className="h-7 w-12 px-1.5 text-center"
+          aria-label="RPE, 1 to 10"
+          data-testid={`${testId}-rpe`}
+        />
+      </label>
+
+      <button
+        onClick={() => onChange({ toFailure: !d.toFailure })}
+        aria-pressed={d.toFailure}
+        className={cn(
+          "text-[11px] tap-clean transition-colors",
+          d.toFailure ? "text-[hsl(var(--gold))]" : "text-muted-foreground/60",
+        )}
+        data-testid={`${testId}-failure`}
+      >
+        To failure
+      </button>
+    </div>
+  );
+}
 
 // ─── The layer ──────────────────────────────────────────────────────────────
 
@@ -198,12 +449,21 @@ function Sheet() {
   const session = data!.session!;
   const unit = session.unit ?? "lb";
 
-  /**
-   * Movements added but with nothing under them yet — the only part of the
-   * list the server cannot know about, because nothing has been written.
-   */
-  const [extras, setExtras] = useState<Movement[]>([]);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  /**
+   * Which movements have their entry row open.
+   *
+   * A row waiting under every movement forever is what made a finished
+   * exercise look unfinished: three sets logged and a fourth pair of empty
+   * boxes below them, every time, saying "you are not done here". So the row
+   * is open when there is nothing logged yet — the case where it is the only
+   * thing to do — and asked for afterwards.
+   */
+  const [entering, setEntering] = useState<Record<string, boolean>>({});
+  /** The set currently being corrected, if any, and the numbers in its boxes. */
+  const [editing, setEditing] = useState<{ id: string; draft: Draft } | null>(null);
+  /** Which movement is choosing a superset partner. */
+  const [pairing, setPairing] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
   const [creating, setCreating] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
@@ -224,38 +484,62 @@ function Sheet() {
 
   const logged = session.logged ?? [];
   const observations = session.observations ?? [];
+  const previous = session.previous ?? {};
+  const concerns = session.concerns ?? {};
   const observationFor = (exerciseId: string | null) =>
     observations.find((o) => o.exerciseId === exerciseId) ?? null;
 
   /**
-   * The session, grouped.
+   * The session, as the server has it.
    *
-   * Derived rather than stored, so there is no second copy of the sets to fall
-   * out of step with the first. Order is the order they were trained in — the
-   * first appearance of each movement in `setIndex` order — followed by
-   * whatever has been added since and not yet logged.
+   * `session.exercises` is the composition — every movement that is in this
+   * workout, in the order the member arranged, whether or not anything has been
+   * logged under it. The sets are then attached to their movement.
+   *
+   * The fallback derives the list from the sets, which is what this screen did
+   * before `session_exercises` existed. It is kept for one narrow case: a
+   * client running against a server that predates the table. It carries the old
+   * bug with it — a movement with no sets is invisible — and that is preferable
+   * to an empty layer over a live workout.
    */
   const groups = useMemo<Group[]>(() => {
+    const setsFor = (id: string) => logged.filter((s) => s.exerciseId === id);
+
+    if (session.exercises?.length) {
+      return session.exercises.map((m) => ({
+        movement: movementFrom(m),
+        sets: setsFor(m.exerciseId),
+        supersetGroup: m.supersetGroup,
+      }));
+    }
+
     const byId = new Map<string, Group>();
     for (const s of logged) {
       const g = byId.get(s.exerciseId);
       if (g) g.sets.push(s);
-      else byId.set(s.exerciseId, { movement: movementOf(s), sets: [s] });
+      else byId.set(s.exerciseId, { movement: movementOf(s), sets: [s], supersetGroup: null });
     }
-    for (const m of extras) if (!byId.has(m.id)) byId.set(m.id, { movement: m, sets: [] });
     return Array.from(byId.values());
-  }, [logged, extras]);
+  }, [logged, session.exercises]);
 
   /**
-   * A movement stops being "extra" the moment it has a set on the server.
-   *
-   * Without this it would be held in both places, and removing it would take
-   * the logged half away and leave the empty half on screen.
+   * A movement with nothing under it yet opens its entry row without being
+   * asked. That is the only state in which the row is the obvious next action;
+   * once a set exists, `+ Add set` says so instead.
    */
   useEffect(() => {
-    const onServer = new Set(logged.map((s) => s.exerciseId));
-    setExtras((prev) => (prev.some((m) => onServer.has(m.id)) ? prev.filter((m) => !onServer.has(m.id)) : prev));
-  }, [logged]);
+    setEntering((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const g of groups) {
+        if (g.sets.length === 0 && next[g.movement.id] === undefined) {
+          next[g.movement.id] = true;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [groups]);
 
   // ── Writes ───────────────────────────────────────────────────────────────
 
@@ -285,11 +569,64 @@ function Sheet() {
     onError: failed,
   });
 
+  /**
+   * Choosing a movement is a write, now, rather than a note to self.
+   *
+   * This used to be `setExtras(prev => [...prev, m])` — a React state update
+   * and nothing else. The movement existed only in this tab's memory until its
+   * first set was logged, which is why one could be chosen at the rack and be
+   * gone by the time the phone came back out of a pocket. Nothing was lost from
+   * the database; nothing had ever been offered to it.
+   */
+  const addMovement = useMutation({
+    mutationFn: async (m: Movement) =>
+      apiRequest("POST", `/api/training/sessions/${session.id}/exercises`, { exerciseId: m.id }),
+    onSuccess: (_r, m) => {
+      setPicking(false);
+      setEntering((prev) => ({ ...prev, [m.id]: true }));
+      refreshSession();
+    },
+    onError: failed,
+  });
+
+  const setSuperset = useMutation({
+    mutationFn: async (v: { exerciseId: string; supersetWith: string | null }) =>
+      apiRequest(
+        "PATCH",
+        `/api/training/sessions/${session.id}/exercises/${v.exerciseId}`,
+        { supersetWith: v.supersetWith },
+      ),
+    onSuccess: () => {
+      setPairing(null);
+      setMenuFor(null);
+      refreshSession();
+    },
+    onError: failed,
+  });
+
+  const editSet = useMutation({
+    mutationFn: async (v: { id: string; body: Record<string, unknown> }) =>
+      apiRequest("PATCH", `/api/training/sets/${v.id}`, v.body),
+    onSuccess: () => {
+      setEditing(null);
+      refreshSession();
+    },
+    onError: failed,
+  });
+
+  const dropSet = useMutation({
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/training/sets/${id}`),
+    onSuccess: () => {
+      setEditing(null);
+      refreshSession();
+    },
+    onError: failed,
+  });
+
   const removeMovement = useMutation({
     mutationFn: async (exerciseId: string) =>
       apiRequest("DELETE", `/api/training/sessions/${session.id}/exercises/${exerciseId}`),
     onSuccess: (_r, exerciseId) => {
-      setExtras((prev) => prev.filter((m) => m.id !== exerciseId));
       setDrafts((prev) => {
         const next = { ...prev };
         delete next[exerciseId];
@@ -368,36 +705,50 @@ function Sheet() {
   // ── Editing ──────────────────────────────────────────────────────────────
 
   const add = (m: Movement) => {
-    setExtras((prev) =>
-      prev.some((x) => x.id === m.id) || logged.some((s) => s.exerciseId === m.id)
-        ? prev
-        : [...prev, m],
-    );
-    setPicking(false);
+    if (groups.some((g) => g.movement.id === m.id)) return setPicking(false);
+    addMovement.mutate(m);
   };
 
   const draftFor = (id: string) => drafts[id] ?? blank();
   const patch = (id: string, p: Partial<Draft>) =>
     setDrafts((prev) => ({ ...prev, [id]: { ...draftFor(id), ...p } }));
 
-  const commit = async (g: Group) => {
-    const d = draftFor(g.movement.id);
-    const body: Record<string, unknown> = { exerciseId: g.movement.id };
-
-    if (g.movement.trackingType === "duration") {
+  /**
+   * The numbers and the shape of one set, from a draft, in the request body.
+   *
+   * Shared by logging a new set and correcting an old one, so the two cannot
+   * disagree about what "45" means for a Reformer class.
+   */
+  const measures = (m: Movement, d: Draft): Record<string, unknown> | null => {
+    const body: Record<string, unknown> = {};
+    if (m.trackingType === "duration") {
       // A hold is seconds and a class is minutes. "3000 secs" of Reformer is
       // the kind of unit that gets typed wrong once and lives in the history.
       const entered = Number(d.seconds);
-      if (!entered) return toast({ title: "How long?", variant: "destructive" });
-      body.durationSeconds = isPracticeCategory(g.movement.category)
-        ? Math.round(entered * 60)
-        : entered;
+      if (!entered) {
+        toast({ title: "How long?", variant: "destructive" });
+        return null;
+      }
+      body.durationSeconds = isPracticeCategory(m.category) ? Math.round(entered * 60) : entered;
     } else {
       const reps = Number(d.reps);
-      if (!reps) return toast({ title: "How many reps?", variant: "destructive" });
+      if (!reps) {
+        toast({ title: "How many reps?", variant: "destructive" });
+        return null;
+      }
       body.reps = reps;
     }
-    if (g.movement.takesLoad && d.weight) body.weight = Number(d.weight);
+    if (m.takesLoad) body.weight = d.weight ? Number(d.weight) : 0;
+    body.setStyle = d.style;
+    body.toFailure = d.toFailure;
+    body.rpe = d.rpe ? Number(d.rpe) : null;
+    return body;
+  };
+
+  const commit = async (g: Group) => {
+    const d = draftFor(g.movement.id);
+    const body = measures(g.movement, d);
+    if (!body) return;
 
     /**
      * The row clears only once the server has it. `mutateAsync` rejects on
@@ -405,13 +756,38 @@ function Sheet() {
      * rejection under a box that looks like it emptied because it saved.
      */
     try {
-      await logSet.mutateAsync(body);
+      await logSet.mutateAsync({ ...body, exerciseId: g.movement.id });
     } catch {
       return;
     }
     // The weight carries to the next set, because the next set is usually the
-    // same weight. Reps do not — that is the number that changes.
-    patch(g.movement.id, { reps: "", seconds: "" });
+    // same weight. Reps do not — that is the number that changes. RPE does not
+    // either: it is a reading of the set that just happened.
+    patch(g.movement.id, { reps: "", seconds: "", rpe: "", toFailure: false });
+    // And the row closes, so a movement with sets under it stops looking like
+    // a movement waiting to be started.
+    setEntering((prev) => ({ ...prev, [g.movement.id]: false }));
+  };
+
+  /** Fill the boxes with what was done last time, at the same point in the set. */
+  const useLast = (g: Group, prior: PriorPerformance) => {
+    const working = prior.sets.filter((s) => !s.isWarmup);
+    const from = (working.length ? working : prior.sets)[g.sets.length] ??
+      (working.length ? working : prior.sets).slice(-1)[0];
+    if (!from) return;
+    patch(g.movement.id, {
+      weight: from.weight != null && from.weight > 0 ? String(from.weight) : "",
+      reps: from.reps != null ? String(from.reps) : "",
+      seconds:
+        from.durationSeconds != null
+          ? String(
+              isPracticeCategory(g.movement.category)
+                ? Math.round(from.durationSeconds / 60)
+                : from.durationSeconds,
+            )
+          : "",
+    });
+    setEntering((prev) => ({ ...prev, [g.movement.id]: true }));
   };
 
   const total = logged.length;
@@ -627,9 +1003,21 @@ function Sheet() {
         */}
         <div className="shrink-0 px-4 pt-3 pb-2 flex items-center justify-between gap-3 border-b border-border/40">
           <p className="font-display text-lg">Add a movement</p>
-          <Button variant="ghost" size="sm" onClick={() => setPicking(false)}>
-            Done
-          </Button>
+          {/*
+            The picker stays up until the server has it. Choosing a movement is
+            a write now, and a picker that closed on the tap would be claiming
+            success before anything had been asked.
+          */}
+          <div className="flex items-center gap-3">
+            {addMovement.isPending && (
+              <span className="text-[11px] text-muted-foreground" data-testid="adding-movement">
+                Adding…
+              </span>
+            )}
+            <Button variant="ghost" size="sm" onClick={() => setPicking(false)}>
+              Done
+            </Button>
+          </div>
         </div>
         <div className="flex-1 min-h-0 px-4 py-3 flex flex-col">
           <MovementPicker
@@ -696,8 +1084,13 @@ function Sheet() {
         {groups.map((g) => {
           const m = g.movement;
           const d = draftFor(m.id);
-          const duration = m.trackingType === "duration";
-          const asMinutes = duration && isPracticeCategory(m.category);
+          const prior = previous[m.id] ?? null;
+          const reference = referenceNote(prior, unit as WeightUnit, concerns[m.id] ?? null);
+          const open = entering[m.id] ?? g.sets.length === 0;
+          /** Who else is in this superset, if it is one. */
+          const partners = g.supersetGroup
+            ? groups.filter((x) => x.supersetGroup === g.supersetGroup && x.movement.id !== m.id)
+            : [];
 
           return (
             <div key={m.id} className="space-y-2" data-testid={`workout-movement-${m.id}`}>
@@ -706,6 +1099,20 @@ function Sheet() {
                   <p className="text-base truncate">{m.name}</p>
                   {m.unilateral && (
                     <span className="text-[10px] text-muted-foreground shrink-0">per side</span>
+                  )}
+                  {/*
+                    A superset is stated on the movement, because that is what
+                    it is a property of. Naming the partner rather than drawing
+                    a bracket: on a phone, in a list that scrolls, a bracket
+                    connects two things that are rarely both on screen.
+                  */}
+                  {partners.length > 0 && (
+                    <span
+                      className="text-[10px] text-[hsl(var(--gold))] shrink-0 truncate"
+                      data-testid={`superset-${m.id}`}
+                    >
+                      superset · {partners.map((p) => p.movement.name).join(", ")}
+                    </span>
                   )}
                 </div>
                 <div className="flex items-center shrink-0">
@@ -750,24 +1157,84 @@ function Sheet() {
                 what they are about to lose; "and its 3 logged sets" does.
               */}
               {menuFor === m.id && (
-                <button
-                  onClick={() => {
-                    if (g.sets.length === 0 || confirmRemove === m.id) {
-                      removeMovement.mutate(m.id);
-                      return;
-                    }
-                    setConfirmRemove(m.id);
-                  }}
-                  disabled={removeMovement.isPending}
-                  className="text-xs text-muted-foreground tap-clean"
-                  data-testid={`remove-movement-${m.id}`}
-                >
-                  {confirmRemove === m.id
-                    ? `Remove ${m.name} and its ${g.sets.length} logged ${
-                        g.sets.length === 1 ? "set" : "sets"
-                      }? — tap again`
-                    : `Remove ${m.name}`}
-                </button>
+                <div className="space-y-2">
+                  {/*
+                    ── Pairing, offered as the relationship it is ──
+
+                    "Superset with…" names another movement in the session.
+                    There is deliberately no superset *set type*: a superset is
+                    a fact about two exercises, and modelling it as a kind of
+                    repetition would have left every volume and 1RM reader
+                    asking what a superset set weighs. See `SET_STYLES`.
+                  */}
+                  {pairing === m.id ? (
+                    <div className="flex flex-wrap gap-2">
+                      {groups
+                        .filter((x) => x.movement.id !== m.id)
+                        .map((x) => (
+                          <button
+                            key={x.movement.id}
+                            onClick={() =>
+                              setSuperset.mutate({
+                                exerciseId: m.id,
+                                supersetWith: x.movement.id,
+                              })
+                            }
+                            disabled={setSuperset.isPending}
+                            className="text-[11px] rounded-full border border-border/60 px-2.5 py-1 tap-clean"
+                            data-testid={`pair-with-${x.movement.id}`}
+                          >
+                            {x.movement.name}
+                          </button>
+                        ))}
+                      <button
+                        onClick={() => setPairing(null)}
+                        className="text-[11px] text-muted-foreground px-1 tap-clean"
+                        data-testid={`pair-cancel-${m.id}`}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : partners.length > 0 ? (
+                    <button
+                      onClick={() => setSuperset.mutate({ exerciseId: m.id, supersetWith: null })}
+                      disabled={setSuperset.isPending}
+                      className="block text-xs text-muted-foreground tap-clean"
+                      data-testid={`unpair-${m.id}`}
+                    >
+                      Perform separately
+                    </button>
+                  ) : (
+                    groups.length > 1 && (
+                      <button
+                        onClick={() => setPairing(m.id)}
+                        className="block text-xs text-muted-foreground tap-clean"
+                        data-testid={`pair-${m.id}`}
+                      >
+                        Superset with…
+                      </button>
+                    )
+                  )}
+
+                  <button
+                    onClick={() => {
+                      if (g.sets.length === 0 || confirmRemove === m.id) {
+                        removeMovement.mutate(m.id);
+                        return;
+                      }
+                      setConfirmRemove(m.id);
+                    }}
+                    disabled={removeMovement.isPending}
+                    className="block text-xs text-muted-foreground tap-clean"
+                    data-testid={`remove-movement-${m.id}`}
+                  >
+                    {confirmRemove === m.id
+                      ? `Remove ${m.name} and its ${g.sets.length} logged ${
+                          g.sets.length === 1 ? "set" : "sets"
+                        }? — tap again`
+                      : `Remove ${m.name}`}
+                  </button>
+                </div>
               )}
 
               {/*
@@ -779,71 +1246,182 @@ function Sheet() {
               */}
               <MovementMemory movement={{ id: m.id, name: m.name, category: m.category }} />
 
-              {/* What is already on the server, stated rather than editable. */}
-              {g.sets.map((s, i) => (
+              {/*
+                ── What happened last time ──
+
+                The numbers, on the date they were done, at the top of the
+                movement they are about. This is the whole of item one: the
+                data has been on the server since the first workout and the
+                only endpoint that read it returned a 1RM series, which is an
+                answer to a question about months. Somebody standing at a bench
+                is asking about last Tuesday.
+              */}
+              {prior && (
                 <div
-                  key={s.id}
-                  className="flex items-center gap-3 text-sm"
-                  data-testid={`logged-set-${s.id}`}
+                  className="flex items-start justify-between gap-3"
+                  data-testid={`last-time-${m.id}`}
                 >
-                  <span className="text-[11px] text-muted-foreground w-4 shrink-0">{i + 1}</span>
-                  <span className="flex-1">{setLine(s, unit)}</span>
-                  <Check className="h-3.5 w-3.5 text-[hsl(var(--gold))] shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground/70">
+                      Last time · {priorDate(prior.onDate)}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {priorSummary(prior, unit as WeightUnit, m.trackingType)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => useLast(g, prior)}
+                    className="shrink-0 text-[11px] text-[hsl(var(--gold))] tap-clean"
+                    data-testid={`use-last-${m.id}`}
+                  >
+                    Use last
+                  </button>
                 </div>
-              ))}
+              )}
 
-              {/* And one row waiting, always — a set you have to ask for is a
-                  tap between you and the thing you came here to do. */}
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] text-muted-foreground w-4 shrink-0">
-                  {g.sets.length + 1}
-                </span>
-
-                {m.takesLoad && (
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    placeholder={unit}
-                    value={d.weight}
-                    onChange={(e) => patch(m.id, { weight: e.target.value })}
-                    className="h-10"
-                    aria-label={`Weight, set ${g.sets.length + 1}`}
-                  />
-                )}
-
-                {duration ? (
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    placeholder={asMinutes ? "mins" : "secs"}
-                    value={d.seconds}
-                    onChange={(e) => patch(m.id, { seconds: e.target.value })}
-                    className="h-10"
-                    aria-label={asMinutes ? "Minutes" : "Seconds"}
-                  />
-                ) : (
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    placeholder="reps"
-                    value={d.reps}
-                    onChange={(e) => patch(m.id, { reps: e.target.value })}
-                    className="h-10"
-                    aria-label="Reps"
-                  />
-                )}
-
-                <Button
-                  size="sm"
-                  onClick={() => commit(g)}
-                  disabled={logSet.isPending}
-                  className="shrink-0 h-10 w-10 p-0"
-                  aria-label="Log this set"
-                  data-testid={`log-set-${m.id}`}
+              {/*
+                And what that makes reasonable today — conditional on the
+                warm-up, always. See `referenceNote`: a number that goes up
+                every week regardless of what the body reported is wrong on
+                precisely the weeks it matters.
+              */}
+              {reference && (
+                <p
+                  className="text-[11px] text-muted-foreground/80 leading-relaxed"
+                  data-testid={`reference-${m.id}`}
                 >
-                  <Check className="h-4 w-4" />
-                </Button>
-              </div>
+                  {reference}
+                </p>
+              )}
+
+              {/*
+                What is down already — and tapping one opens it.
+
+                A logged set used to be a statement nothing could change, so
+                fixing 205 typed as 250 meant deleting the row and losing its
+                place. History is immutable against Sakred rewriting it. It is
+                not immutable against the person who did the work.
+              */}
+              {g.sets.map((s, i) => {
+                const aside = setAside(s);
+                if (editing?.id === s.id) {
+                  return (
+                    <div key={s.id} className="space-y-1.5" data-testid={`editing-set-${s.id}`}>
+                      <SetRow
+                        m={m}
+                        unit={unit}
+                        index={i + 1}
+                        d={editing.draft}
+                        onChange={(p) =>
+                          setEditing((e) => (e ? { ...e, draft: { ...e.draft, ...p } } : e))
+                        }
+                        pending={editSet.isPending}
+                        onCommit={() => {
+                          const body = measures(m, editing.draft);
+                          if (body) editSet.mutate({ id: s.id, body });
+                        }}
+                        label="Save this set"
+                        testId={`save-set-${s.id}`}
+                      />
+                      <div className="flex items-center justify-between gap-3 pl-6">
+                        <SetMeta
+                          d={editing.draft}
+                          onChange={(p) =>
+                            setEditing((e) => (e ? { ...e, draft: { ...e.draft, ...p } } : e))
+                          }
+                          testId={`edit-meta-${s.id}`}
+                        />
+                        <div className="flex items-center gap-3 shrink-0">
+                          <button
+                            onClick={() => setEditing(null)}
+                            className="text-[11px] text-muted-foreground tap-clean"
+                            data-testid={`cancel-edit-${s.id}`}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() => dropSet.mutate(s.id)}
+                            disabled={dropSet.isPending}
+                            className="text-[11px] text-muted-foreground/70 tap-clean"
+                            data-testid={`delete-set-${s.id}`}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => setEditing({ id: s.id, draft: draftOf(s, m) })}
+                    className="w-full flex items-center gap-3 text-sm text-left tap-clean"
+                    data-testid={`logged-set-${s.id}`}
+                    aria-label={`Edit set ${i + 1} of ${m.name}`}
+                  >
+                    <span className="text-[11px] text-muted-foreground w-4 shrink-0">{i + 1}</span>
+                    <span className="flex-1 min-w-0 truncate">
+                      {setLine(s, unit)}
+                      {aside && (
+                        <span className="text-muted-foreground text-xs"> · {aside}</span>
+                      )}
+                    </span>
+                    <Check className="h-3.5 w-3.5 text-[hsl(var(--gold))] shrink-0" />
+                  </button>
+                );
+              })}
+
+              {/*
+                ── The row you are filling in, and only then ──
+
+                A blank pair of boxes under every movement forever is what made
+                a finished exercise look unfinished: three sets logged, and a
+                fourth empty row underneath saying "you are not done here". It
+                opens on a movement with nothing under it — where it is the
+                only thing to do — and is asked for after that.
+              */}
+              {open ? (
+                <div className="space-y-1.5">
+                  <SetRow
+                    m={m}
+                    unit={unit}
+                    index={g.sets.length + 1}
+                    d={d}
+                    onChange={(p) => patch(m.id, p)}
+                    pending={logSet.isPending}
+                    onCommit={() => commit(g)}
+                    label="Log this set"
+                    testId={`log-set-${m.id}`}
+                  />
+                  <div className="pl-6">
+                    <SetMeta
+                      d={d}
+                      onChange={(p) => patch(m.id, p)}
+                      testId={`meta-${m.id}`}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-4 pl-6">
+                  <button
+                    onClick={() => setEntering((prev) => ({ ...prev, [m.id]: true }))}
+                    className="text-xs text-[hsl(var(--gold))] tap-clean inline-flex items-center gap-1"
+                    data-testid={`add-set-${m.id}`}
+                  >
+                    <Plus className="h-3 w-3" />
+                    Add set
+                  </button>
+                  <button
+                    onClick={() => setPicking(true)}
+                    className="text-xs text-muted-foreground tap-clean inline-flex items-center gap-1"
+                    data-testid={`next-exercise-${m.id}`}
+                  >
+                    Next exercise
+                    <ChevronRight className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}
