@@ -39,6 +39,22 @@ npm run build:client >/dev/null
 echo "› syncing native project"
 npx cap sync android >/dev/null
 
+# `cap sync` regenerates the plugin paths, and when node_modules is reached
+# through a symlink — a second worktree, a workspace, a hoisted install — it
+# resolves the real location and writes a path that walks out of the checkout
+# to get there. It builds here and nowhere else. Android 52 was assembled from
+# exactly that and left the rewrite in `git status` afterwards.
+#
+# Normalise the path portion only, never the whole file: a plugin added or
+# removed since the last commit is a legitimate change sync just made, and
+# reverting it would silently ship a build missing a plugin.
+echo "› normalising generated native paths"
+node script/normalise-native-paths.mjs
+
+# And refuse to go further if anything still escapes. A release artifact that
+# depends on this machine's neighbouring directory must not be uploadable.
+node script/normalise-native-paths.mjs --check
+
 echo "› assembling signed bundle"
 (cd android && ./gradlew bundleRelease --no-daemon -q)
 

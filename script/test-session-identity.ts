@@ -169,7 +169,16 @@ console.log("\nA 404 takes the screen down, and never invents a session\n");
   check("there is a recovery path to read", recovery.length > 100, `${recovery.length} chars`);
   check("recovery starts nothing", !/startSession\(|startFocus\.mutate|start\.mutate/.test(recovery));
   check("it clears the session", /setSessionId\(null\)/.test(recovery));
-  check("a replacement is offered, not assumed", /setCollision\(replacement\)/.test(recovery));
+  check("a replacement is offered, not assumed",
+    /setCollision\(replacement \? \{ session: replacement \} : null\)/.test(recovery));
+  /**
+   * And offered with no retry attached, which is what withholds "Discard &
+   * start this workout" here. A session that vanished under somebody logging a
+   * set is not a refused start: there is no workout waiting to begin, and a
+   * button offering to start one would name something that does not exist.
+   */
+  check("and with nothing to retry, so only Resume is offered",
+    !/retry/.test(recovery));
   /** And the layer's own recovery invents nothing either. */
   const layerGone = sheet.slice(sheet.indexOf("const gone = async"), sheet.indexOf("const failed ="));
   check("there is a layer recovery path to read", layerGone.length > 80, `${layerGone.length} chars`);

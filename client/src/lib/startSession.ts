@@ -21,6 +21,12 @@ export type RunningSession = {
   title: string | null;
   habitId: string | null;
   startedAt: string;
+  /**
+   * How much is logged in it. Optional, because a bundled client meets a server
+   * that predates it and vice versa — and because the recovery card has to
+   * render either way, just without the count.
+   */
+  sets?: number;
 };
 
 export type StartResult =

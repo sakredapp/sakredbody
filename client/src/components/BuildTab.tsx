@@ -43,6 +43,21 @@ import { Elapsed } from "@/components/build/Elapsed";
 import { WorkoutInProgress } from "@/components/build/WorkoutInProgress";
 import { WhyToday } from "@/components/build/WhyToday";
 import { useWorkoutSheet } from "@/components/build/WorkoutSheet";
+
+/**
+ * A start that was refused, and the attempt that was refused — held together
+ * so the way out of the refusal can finish what the member actually asked for.
+ */
+type Collision = {
+  session: RunningSession;
+  /**
+   * What to do once the blocking session is gone. Absent when nothing was
+   * being started — a session that vanished under a member who was logging a
+   * set is a different event, and offering to "discard and start this workout"
+   * there would name a workout that does not exist.
+   */
+  retry?: () => void;
+};
 import { startSession, type RunningSession } from "@/lib/startSession";
 import {
   isMissingSession,
@@ -160,7 +175,7 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
    * Held so the collision can be shown where they tapped, and cleared the
    * moment they resume it — see `WorkoutInProgress`.
    */
-  const [collision, setCollision] = useState<RunningSession | null>(null);
+  const [collision, setCollision] = useState<Collision | null>(null);
   /**
    * A recommendation the member tapped but has not started yet.
    *
@@ -236,7 +251,7 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
   const sessionGone = (replacement: OpenWorkout | null) => {
     setSessionId(null);
     setEntries({});
-    setCollision(replacement);
+    setCollision(replacement ? { session: replacement } : null);
     toast({
       title: replacement
         ? "That workout had already ended."
@@ -269,11 +284,16 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
     // `apiRequest` resolves to the Response, not the body — it throws on a
     // non-2xx and hands back the raw response, so the JSON has to be read here.
     mutationFn: (habitId: string) => startSession({ habitId }),
-    onSuccess: async (result) => {
+    onSuccess: async (result, habitId) => {
       // A refusal is a true answer, not a failure — the member has a workout
       // open and needs the way back into it rather than an error.
+      //
+      // The attempt is kept with it. Discarding the old session is only half
+      // an answer: what the member asked for was to start *this* workout, and
+      // making them tap Start again afterwards is the same dead end one step
+      // further along.
       if ("conflict" in result) {
-        setCollision(result.conflict);
+        setCollision({ session: result.conflict, retry: () => start.mutate(habitId) });
         return;
       }
       // Written into the cache rather than invalidated: the running time
@@ -300,15 +320,40 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
    */
   const startFocus = useMutation({
     mutationFn: (title: string) => startSession({ title }),
-    onSuccess: async (result) => {
+    onSuccess: async (result, title) => {
       if ("conflict" in result) {
-        setCollision(result.conflict);
+        setCollision({ session: result.conflict, retry: () => startFocus.mutate(title) });
         return;
       }
       await seedOpenWorkout(qc, result.started);
       // And the layer comes up. Nothing is handed to it — it reads the session
       // from the cache this just seeded.
       workout.open();
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  /**
+   * Throw away the session that is in the way, then start the one they asked
+   * for.
+   *
+   * Confirmed on the card before this runs — see `WorkoutInProgress`. Never
+   * automatic and never on a timer: a session with no sets can still carry
+   * exercise composition, which is a record of what somebody had chosen to do,
+   * and nothing should delete that without being asked.
+   *
+   * The retry is inside `onSuccess`, so a failed delete leaves the member
+   * exactly where they were rather than starting a second workout beside one
+   * that is still open.
+   */
+  const discardBlocking = useMutation({
+    mutationFn: async (c: Collision) =>
+      apiRequest("DELETE", `/api/training/sessions/${c.session.id}`),
+    onSuccess: async (_r, c) => {
+      setCollision(null);
+      await qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
+      qc.invalidateQueries({ queryKey: ["/api/training/sessions"] });
+      c.retry?.();
     },
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
@@ -551,15 +596,19 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
               {collision && (
                 <div className="mt-4">
                   <WorkoutInProgress
-                    session={collision}
+                    session={collision.session}
                     onResume={() => {
                       // Adopt whatever is actually running — the same branch the
                       // rehydration effect uses, because it is the same truth.
-                      if (collision.habitId) setSessionId(collision.id);
+                      if (collision.session.habitId) setSessionId(collision.session.id);
                       else workout.open();
                       setCollision(null);
                       qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
                     }}
+                    onDiscard={
+                      collision.retry ? () => discardBlocking.mutate(collision) : undefined
+                    }
+                    discarding={discardBlocking.isPending}
                   />
                 </div>
               )}

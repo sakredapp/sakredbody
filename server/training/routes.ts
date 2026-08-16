@@ -578,10 +578,25 @@ export function registerTrainingRoutes(app: Express) {
         .limit(1);
 
       if (running) {
+        /**
+         * How much is in it, with the refusal.
+         *
+         * Without this the member is offered a choice between resuming and
+         * discarding with no way to tell which is the right one. A session left
+         * open overnight with nothing logged is a mistap; the same session with
+         * eleven sets in it is a workout, and the difference has to be on the
+         * card. It cost one count query on a path that runs when somebody is
+         * already blocked.
+         */
+        const [{ n }] = await db
+          .select({ n: sql<number>`count(*)::int` })
+          .from(workoutSets)
+          .where(eq(workoutSets.sessionId, running.id));
+
         return res.status(409).json({
           error: "open_session_exists",
           message: "You already have a workout in progress.",
-          session: running,
+          session: { ...running, sets: n },
         });
       }
 

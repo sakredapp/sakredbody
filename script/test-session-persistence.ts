@@ -107,7 +107,13 @@ console.log("\nOne open workout, refused rather than merged\n");
    * And it hands back what the caller needs to resume. A 409 that only says no
    * leaves the UI unable to offer the one useful action.
    */
-  check("and the session to resume", /session: running/.test(body));
+  check("and the session to resume", /session: \{ \.\.\.running, sets: n \}/.test(body));
+  /**
+   * With how much is in it. A member offered "resume or discard" cannot choose
+   * without knowing whether the blocking session holds eleven sets or nothing
+   * at all — and that difference is the whole decision.
+   */
+  check("and how much is in it", /count\(\*\)::int/.test(body));
   check("including when it began", /startedAt: workoutSessions\.createdAt/.test(body));
 
   /**
@@ -204,9 +210,43 @@ console.log("\nA refusal is answered, not toasted\n");
   const card = code("client/src/components/build/WorkoutInProgress.tsx");
   check("the card names what is running", /session\.title/.test(card));
   check("shows how long it has been", /<Elapsed/.test(card));
-  check("and offers the way back in", /Resume workout/.test(card));
-  /** Ending somebody's training does not belong on a collision card. */
-  check("it cannot finish the workout", !/finish|discard/i.test(card.replace(/Finish or discard it before beginning another\./, "")));
+  check("and offers the way back in", /data-testid="button-resume-workout"/.test(card));
+  check("it says how much is in it", /sets === 1 \? "set" : "sets"/.test(card));
+  check("and how old it is, coarsely, once it is stale", /function coarseAge/.test(card));
+  check("saying which day it is from", /from yesterday/.test(card));
+
+  /**
+   * ── Discard belongs here after all ──
+   *
+   * This used to assert the opposite: that ending a workout could not happen
+   * on a collision card, because it ends somebody's training and they may have
+   * hit the card by accident. That holds for a workout in progress. It did not
+   * hold for the case the card exists to handle — a "Tissue work" session sat
+   * open in production for a day and ten hours with nothing in it, refusing
+   * every attempt its owner made to start anything, and the only way out was
+   * to resume a workout they did not want in order to discard it from inside.
+   */
+  check("there is a way out that is not resuming", /data-testid="button-discard-and-start"/.test(card));
+  check("it is never one tap", /if \(!confirming\) return setConfirming\(true\)/.test(card));
+  check("and the confirmation names what goes", /Discard \$\{name\}/.test(card));
+  /** Finishing would claim training happened. Only discard is offered. */
+  check("it still cannot finish the workout", !/\bfinish\b/i.test(card.replace(/finish what the member/gi, "")));
+
+  /**
+   * And it finishes what was asked. Discarding the blocker is half an answer —
+   * the member wanted to start a workout, and making them tap Start again is
+   * the same dead end one step further along.
+   */
+  for (const path of [
+    "client/src/components/BuildTab.tsx",
+    "client/src/components/build/MemberBuild.tsx",
+  ]) {
+    const src = code(path);
+    check(`${path.split("/").pop()} retries the start it was refused`,
+      /retry(\?)?\.?\(\)/.test(src) && /discardBlocking/.test(src));
+    check(`${path.split("/").pop()} retries only after the delete succeeds`,
+      /onSuccess: async \(_r, c\)/.test(src));
+  }
 
   for (const [name, path] of [
     ["the prescribed start", "client/src/components/BuildTab.tsx"],

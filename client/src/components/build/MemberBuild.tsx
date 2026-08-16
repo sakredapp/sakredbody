@@ -92,7 +92,28 @@ export function MemberBuild({
    *
    * Held rather than toasted, so the card can offer the way back into it.
    */
-  const [collision, setCollision] = useState<RunningSession | null>(null);
+  /** The refused start, held with the attempt so the way out can finish it. */
+  const [collision, setCollision] = useState<
+    { session: RunningSession; retry: () => void } | null
+  >(null);
+
+  /**
+   * Throw away the session that is in the way, then retry the one they asked
+   * for. Confirmed on the card first — see `WorkoutInProgress`, and the note
+   * there about zero-set sessions that still carry composition.
+   */
+  const discardBlocking = useMutation({
+    mutationFn: async (c: { session: RunningSession }) =>
+      apiRequest("DELETE", `/api/training/sessions/${c.session.id}`),
+    onSuccess: async (_r, c) => {
+      const retry = collision?.retry;
+      setCollision(null);
+      await qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
+      qc.invalidateQueries({ queryKey: ["/api/training/sessions"] });
+      retry?.();
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
 
   const startSession = useMutation({
     mutationFn: (title: string) => beginSession({ title: title || null }),
@@ -108,7 +129,7 @@ export function MemberBuild({
   const begin = async (title: string): Promise<{ id: string } | null> => {
     const result = await startSession.mutateAsync(title);
     if ("conflict" in result) {
-      setCollision(result.conflict);
+      setCollision({ session: result.conflict, retry: () => void begin(title) });
       return null;
     }
     // The new session goes into the shared cache before anybody renders
@@ -144,11 +165,13 @@ export function MemberBuild({
 
       {collision && (
         <WorkoutInProgress
-          session={collision}
+          session={collision.session}
           onResume={() => {
             onStarted();
             setCollision(null);
           }}
+          onDiscard={() => discardBlocking.mutate(collision)}
+          discarding={discardBlocking.isPending}
         />
       )}
       <Panel title="Your own training">
