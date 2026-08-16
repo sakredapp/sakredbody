@@ -279,6 +279,51 @@ show("contenteditable:", editables);
    * Island — the first line of every confirmation the app gives, behind a
    * cutout, on the phones most members hold.
    */
+  /**
+   * ── And no surface hands a date question to the platform ──
+   *
+   * `<input type="date">` is four different controls. On iOS it is a compact
+   * pill with an intrinsic width that ignores `width: 100%`; on a Samsung it
+   * opens a full-height dialog with the month grid collapsed to a sliver, SET
+   * and CANCEL stranded at the bottom, and today already selected — which is
+   * how a member's date of birth became this morning.
+   *
+   * Sakred draws both replacements: `BirthFields` for a day out of a century,
+   * `DatePicker` for a day that is near. Admin tables are exempt — they are a
+   * desktop surface for one person, and a native picker there costs nobody.
+   */
+  const nativeDates: string[] = [];
+  for (const rel of files(SRC)) {
+    if (rel.includes("/admin/")) continue;
+    const src = source(rel);
+    for (const m of src.matchAll(/type="(date|time)"/g)) {
+      nativeDates.push(`${rel}:${src.slice(0, m.index).split("\n").length} (${m[1]})`);
+    }
+  }
+  check("no member-facing surface uses a native date or time control",
+    nativeDates.length === 0, nativeDates.join(", "));
+
+  /**
+   * And neither replacement turns a calendar date into a moment. `Date.UTC` for
+   * "how many days has this month" is arithmetic with UTC at both ends; a
+   * `toISOString().slice(0, 10)` anywhere here would be the bug that labelled a
+   * finished workout "Yesterday".
+   */
+  for (const f of ["components/portal/DatePicker.tsx", "components/portal/BirthFields.tsx"]) {
+    const src = source(join(SRC, f));
+    check(`${f} exists to check`, src.length > 500);
+    check(`${f} never slices a UTC instant into a day`,
+      !/toISOString\(\)\s*\.\s*(slice|split)/.test(src));
+  }
+
+  const picker = source(join(SRC, "components/portal/DatePicker.tsx"));
+  check("its bounds are string comparisons, which is why they sort",
+    /day < min/.test(picker) && /day > max/.test(picker));
+  check("a month with nothing choosable in it cannot be paged into blindly",
+    /disabled=\{!canGoBack\}/.test(picker) && /disabled=\{!canGoForward\}/.test(picker));
+  check("and there is a way out that is not choosing a date",
+    /-close`\}/.test(picker));
+
   const toast = readFileSync(join(ROOT, SRC, "components/ui/toast.tsx"), "utf8");
   check("the toast clears the notch", /safe-area-inset-top/.test(toast));
   check("and adds to the gap rather than replacing it", /\+1rem\)\]/.test(toast));

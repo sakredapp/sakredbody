@@ -39,6 +39,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { SakredDate } from "@/components/portal/DatePicker";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
@@ -901,11 +902,12 @@ export function RoutinesTab() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Start Date</label>
-                <Input
-                  type="date"
+                <SakredDate
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  onChange={setStartDate}
                   min={formatLocalDate()}
+                  placeholder="Choose a start date"
+                  testId="plan-start-date"
                 />
               </div>
               <div className="space-y-2">

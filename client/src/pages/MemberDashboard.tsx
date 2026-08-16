@@ -15,6 +15,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { SakredDate } from "@/components/portal/DatePicker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { ArrowRight, BarChart3, Building2, Calendar, Check, ChevronRight, Clock, Compass, DollarSign, Dumbbell, Heart, HelpCircle, Home, Hotel, ListChecks, LogOut, Map, MapPin, MoreHorizontal, Settings, ShieldCheck, Sparkles, Star, User, UserPlus, Users, UtensilsCrossed } from "lucide-react";
@@ -911,12 +912,12 @@ export default function MemberDashboard() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Preferred Start Date</label>
-                    <Input
-                      type="date"
+                    <SakredDate
                       value={preferredStartDate}
-                      onChange={(e) => setPreferredStartDate(e.target.value)}
+                      onChange={setPreferredStartDate}
                       min={minDateStr}
-                      data-testid="input-start-date"
+                      placeholder="Choose a start date"
+                      testId="input-start-date"
                     />
                     <p className="text-xs text-muted-foreground">At least 2 weeks out from today</p>
                   </div>

@@ -36,6 +36,7 @@ import { apiFetch } from "@/lib/apiFetch";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SakredDate } from "@/components/portal/DatePicker";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { WORKOUT_FOCUSES } from "@shared/models/health";
 import { activityLabel } from "@shared/models/training";
@@ -369,15 +370,18 @@ export function LogPractice({
                     );
                   })}
                 </div>
-                <Input
-                  type="date"
+                {/* Our own grid, not the platform's. See `DatePicker`: the
+                    native dialog on a Samsung is a full-height sheet with the
+                    month collapsed to a sliver, and this is a question about
+                    last Tuesday. */}
+                <SakredDate
                   value={onDate}
+                  onChange={setOnDate}
                   max={dayBack(0)}
                   min={dayBack(60)}
-                  onChange={(e) => e.target.value && setOnDate(e.target.value)}
-                  className="h-9 w-44"
-                  aria-label="Date"
-                  data-testid="past-date"
+                  placeholder="When was it?"
+                  className="w-44"
+                  testId="past-date"
                 />
               </div>
             )}

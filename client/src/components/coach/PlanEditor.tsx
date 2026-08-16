@@ -21,6 +21,7 @@ import { Plus, X, AlertTriangle, Info, Search } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { SakredDate } from "@/components/portal/DatePicker";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -552,12 +553,12 @@ export function PlanEditor({
         />
         <label className="flex items-center gap-2 text-xs text-muted-foreground">
           Through
-          <Input
-            type="date"
+          <SakredDate
             value={endsOn}
-            onChange={(e) => setEndsOn(e.target.value)}
-            className="h-8 w-40 text-base md:text-sm"
-            data-testid="plan-ends-on"
+            onChange={setEndsOn}
+            placeholder="No end date"
+            className="w-40"
+            testId="plan-ends-on"
           />
         </label>
       </div>
