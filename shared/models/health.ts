@@ -36,6 +36,7 @@
 
 import { sql } from "drizzle-orm";
 import { WORKOUT_RESPONSES, WORKOUT_PLACEMENTS } from "./training.js";
+import { todayInZone } from "../utils/dates.js";
 import {
   pgTable,
   text,
@@ -505,6 +506,36 @@ export const healthSyncSchema = z.object({
   osVersion: z.string().max(60).optional().nullable(),
 });
 export type HealthSyncInput = z.infer<typeof healthSyncSchema>;
+
+/**
+ * Has this member already answered a card today?
+ *
+ * ── Why this is a function and not two lines in the route ─────────────────
+ *
+ * Because it was two lines in the route, and it was wrong for eight months in
+ * a way nothing could see. It compared `reviewedAt.toISOString().slice(0, 10)`
+ * — a UTC calendar date — against the member's local one. In Toronto those
+ * agree for twenty hours a day and disagree for four, and the four are the
+ * evening: precisely when somebody sits down and reviews the session they just
+ * finished.
+ *
+ * What that produced was not an error. The write succeeded, the card refreshed,
+ * and the *next* unreviewed import silently took its place — so the member saw
+ * a card that appeared to have ignored them, pressed Save a second time, and
+ * gave a session they had never described the previous session's name. Two rows
+ * on 15 Aug 2026, six seconds apart, identically labelled.
+ *
+ * An instant is not a day. Turning one into the other requires knowing where
+ * the member is standing, and this is the only place that conversion is
+ * allowed to happen.
+ */
+export function answeredToday<T extends { reviewedAt: Date | null }>(
+  recent: readonly T[],
+  timeZone: string | null | undefined,
+  today: string,
+): boolean {
+  return recent.some((w) => w.reviewedAt != null && todayInZone(timeZone, w.reviewedAt) === today);
+}
 
 
 /**

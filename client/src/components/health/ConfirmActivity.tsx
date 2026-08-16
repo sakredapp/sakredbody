@@ -22,7 +22,7 @@
  * Nothing is mandatory. Confirm on its own is a complete answer.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -87,32 +87,80 @@ function when(onDate: string, seconds: number | null): string {
   return `${day} · ${Math.round(seconds / 60)} min`;
 }
 
+export const CONFIRM_KEY = ["/api/health/workouts/confirm"] as const;
+
+/**
+ * The query lives out here and the answering lives inside, keyed by workout id.
+ *
+ * That `key` is the whole reason for the split. Everything the member types —
+ * which chips are lit, what they named it, whether the detail form is even open
+ * — is state about *one* session. When the card becomes a different session,
+ * React must throw that state away rather than hand it to the next workout.
+ *
+ * It did not, once. A member answered one strength session, the card was
+ * replaced by another, and their selections came along for the ride looking
+ * exactly like the screen they had just filled in. They pressed Save again, and
+ * a session they had never described acquired the previous one's name. A key is
+ * the cheapest possible guarantee that cannot happen again.
+ */
 export function ConfirmActivity() {
+  const { data } = useQuery<{ workout: Candidate | null }>({
+    queryKey: CONFIRM_KEY,
+    staleTime: 60_000,
+  });
+  const w = data?.workout;
+  if (!w) return null;
+  return <Answer key={w.id} w={w} />;
+}
+
+function Answer({ w }: { w: Candidate }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [orientation, setOrientation] = useState<string | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
   const [label, setLabel] = useState("");
-
-  const { data } = useQuery<{ workout: Candidate | null }>({
-    queryKey: ["/api/health/workouts/confirm"],
-    staleTime: 60_000,
-  });
-  const w = data?.workout;
+  const [done, setDone] = useState(false);
 
   const save = useMutation({
     mutationFn: async (body: Record<string, unknown>) =>
-      apiRequest("PATCH", `/api/health/workouts/${w!.id}`, body),
-    onSuccess: () => {
-      // The card goes, and movement history picks up the annotation.
-      qc.invalidateQueries({ queryKey: ["/api/health/workouts/confirm"] });
-      qc.invalidateQueries({ queryKey: ["/api/terrain/today"] });
-    },
+      apiRequest("PATCH", `/api/health/workouts/${w.id}`, body),
+    /**
+     * Say so, *then* stand down.
+     *
+     * Invalidating here would be correct and invisible: the refetch removes the
+     * card within a frame or two, so the member sees a form vanish and has no
+     * way to tell that from a crash. The acknowledgement is held for a beat
+     * first, and only then does the card go — the disappearance becomes the
+     * end of a sentence rather than the whole of it.
+     */
+    onSuccess: () => setDone(true),
   });
 
-  if (!w) return null;
+  useEffect(() => {
+    if (!done) return;
+    const t = setTimeout(() => {
+      qc.invalidateQueries({ queryKey: CONFIRM_KEY });
+      qc.invalidateQueries({ queryKey: ["/api/terrain/today"] });
+    }, 1400);
+    return () => clearTimeout(t);
+  }, [done, qc]);
 
   const name = activityLabel(w.workoutType ?? "") || w.workoutType || "A session";
+
+  /** The whole card becomes the receipt. Nothing else is left to press. */
+  if (done) {
+    return (
+      <div
+        className="rounded-2xl border border-[hsl(var(--gold))]/40 bg-[hsl(var(--gold))]/[0.04] p-4"
+        data-testid="confirm-activity-saved"
+      >
+        <p className="text-sm">Activity updated</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {name} · {when(w.onDate, w.durationSeconds)}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -146,7 +194,7 @@ export function ConfirmActivity() {
             onClick={() => save.mutate({ reviewed: true })}
             data-testid="button-confirm-activity"
           >
-            Confirm
+            {save.isPending ? "Confirming…" : "Confirm"}
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setOpen(true)} data-testid="button-add-detail">
             Add detail
@@ -210,6 +258,20 @@ export function ConfirmActivity() {
             {save.isPending ? "Saving…" : "Save"}
           </Button>
         </div>
+      )}
+
+      {/*
+        A failure says so and changes nothing else.
+
+        The chips stay lit and the name stays typed, because the member's answer
+        is still the best thing on the screen and asking them to reconstruct it
+        is a second failure on top of the first. The button has already returned
+        to Save; this is the sentence that tells them why.
+      */}
+      {save.isError && (
+        <p className="text-xs text-[hsl(var(--destructive))]" data-testid="confirm-activity-error">
+          Couldn't save. Try again.
+        </p>
       )}
     </div>
   );

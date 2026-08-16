@@ -47,6 +47,7 @@ import type { HealthWorkout } from "@shared/schema";
 import { useHealthSummary } from "@/hooks/use-health";
 import { Panel } from "@/components/portal/Panel";
 import { cn } from "@/lib/utils";
+import { localToday, localDaysAgo } from "@/lib/localDate";
 
 type Session = {
   id: string;
@@ -113,11 +114,13 @@ export function RecentSessions({ days = 7 }: { days?: number }) {
 
   if (isLoading || !data) return null;
 
-  // The member's own date, which is what `onDate` is written against — using
-  // the device's today would put a late-evening session in the wrong bucket
-  // for anybody whose timezone differs from the one they logged it in.
-  const today = new Date().toISOString().slice(0, 10);
-  const cutoff = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  // The member's own date, which is what `onDate` is written against. This read
+  // `toISOString()`, which is the UTC date and not anybody's calendar: after
+  // 20:00 in Toronto it is already tomorrow, so the session somebody had just
+  // finished came back labelled "Yesterday". The comment here claimed the fix
+  // while the line underneath it did the opposite.
+  const today = localToday();
+  const cutoff = localDaysAgo(days);
 
   // An unfinished session is one somebody is in the middle of, or abandoned.
   // Either way it is not history yet, and showing it as a completed day is a

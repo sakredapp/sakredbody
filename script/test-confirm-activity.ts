@@ -18,7 +18,12 @@
  */
 
 import { readFileSync } from "node:fs";
-import { needsConfirmation, WORKOUT_FOCUSES, workoutFeedbackSchema } from "../shared/models/health.js";
+import {
+  needsConfirmation,
+  answeredToday,
+  WORKOUT_FOCUSES,
+  workoutFeedbackSchema,
+} from "../shared/models/health.js";
 
 let passed = 0;
 let failed = 0;
@@ -74,7 +79,17 @@ console.log("\nOne card, never a queue\n");
    * immediately produce the next, or the member is playing whack-a-mole.
    */
   check("nothing more once something is answered today", /answeredToday/.test(body));
-  check("derived from reviewed_at", /reviewedAt && w\.reviewedAt\.toISOString/.test(body));
+  /**
+   * Still derived from `reviewed_at` rather than stored — no extra state to
+   * keep, and a member who reviews nothing is simply asked again tomorrow.
+   *
+   * This assertion used to require `reviewedAt.toISOString()`, which is to say
+   * it required the defect: it pinned the UTC read that mis-fired every Toronto
+   * evening. A test can hold a bug in place as firmly as it holds a rule, and
+   * the only difference is whether anyone stated which one it was.
+   */
+  check("derived from reviewed_at", /reviewedAt: healthWorkouts\.reviewedAt/.test(body));
+  check("and read in the member's zone, not the server's", /todayInZone/.test(code("shared/models/health.ts")));
 
   check("Sakred's own reading is sent separately", /externalActivityCategory/.test(body));
 }
@@ -166,6 +181,113 @@ console.log("\nThe card keeps the three truths apart\n");
   check("and the card is on it", /<ConfirmActivity \/>/.test(home));
   /** Below the reading, because it is about yesterday and Home opens on today. */
   check("under the terrain reading", /<TerrainToday[\s\S]{0,600}<ConfirmActivity \/>/.test(home));
+}
+
+/**
+ * ── The 15 Aug regression, kept as a fixture ──────────────────────────────
+ *
+ * A member in Toronto answered a card at 22:05 local. The write succeeded. The
+ * gate then read the write's instant as a UTC date — already tomorrow — decided
+ * nothing had been answered today, and put the next unreviewed import on screen
+ * wearing the last one's answers.
+ *
+ * Everything below is that evening, at the boundary and either side of it.
+ */
+console.log("\nOne card a day, in the member's day\n");
+
+{
+  const at = (iso: string) => ({ reviewedAt: new Date(iso) });
+  const TORONTO = "America/Toronto";
+
+  /** 22:05 on the 15th in Toronto is 02:05 on the 16th in UTC. The bug, exactly. */
+  check("an evening review counts as today",
+    answeredToday([at("2026-08-16T02:05:57Z")], TORONTO, "2026-08-15"));
+  check("and does not count as the UTC tomorrow",
+    !answeredToday([at("2026-08-16T02:05:57Z")], TORONTO, "2026-08-16"));
+
+  /** The six seconds that produced the second write must be inside the same day. */
+  check("the second tap six seconds later is the same day",
+    answeredToday([at("2026-08-16T02:06:03Z")], TORONTO, "2026-08-15"));
+
+  /** Midnight either side, in local terms. */
+  check("one minute before local midnight still counts",
+    answeredToday([at("2026-08-16T03:59:00Z")], TORONTO, "2026-08-15"));
+  check("one minute after it does not",
+    !answeredToday([at("2026-08-16T04:01:00Z")], TORONTO, "2026-08-15"));
+
+  /** Morning, where UTC and local agree and the old code looked fine. */
+  check("a morning review counts too",
+    answeredToday([at("2026-08-15T13:30:00Z")], TORONTO, "2026-08-15"));
+
+  /** Zones ahead of UTC break the other way; both directions are one rule. */
+  check("Sydney, where local is already tomorrow",
+    answeredToday([at("2026-08-15T14:00:00Z")], "Australia/Sydney", "2026-08-16"));
+  check("and Los Angeles, further behind",
+    answeredToday([at("2026-08-16T05:00:00Z")], "America/Los_Angeles", "2026-08-15"));
+
+  /** Yesterday's review never gates today. */
+  check("a review from yesterday does not silence today",
+    !answeredToday([at("2026-08-15T02:05:00Z")], TORONTO, "2026-08-15"));
+
+  check("nothing reviewed means nothing answered",
+    !answeredToday([{ reviewedAt: null }, { reviewedAt: null }], TORONTO, "2026-08-15"));
+  check("an empty history likewise", !answeredToday([], TORONTO, "2026-08-15"));
+
+  /** One answered among many is still an answer. */
+  check("one answer among unreviewed rows is enough",
+    answeredToday(
+      [{ reviewedAt: null }, at("2026-08-16T02:05:57Z"), { reviewedAt: null }],
+      TORONTO,
+      "2026-08-15",
+    ));
+
+  /** A member with no zone set still gets a consistent answer rather than a crash. */
+  check("a missing zone falls back rather than throwing",
+    typeof answeredToday([at("2026-08-16T02:05:57Z")], null, "2026-08-15") === "boolean");
+  check("as does a nonsense one",
+    typeof answeredToday([at("2026-08-16T02:05:57Z")], "Mars/Olympus", "2026-08-15") === "boolean");
+
+  /** And the route asks the shared rule rather than keeping its own copy. */
+  const routes = code("server/health/routes.ts");
+  check("the route uses the shared gate", /answeredToday\(recent, zone, today\)/.test(routes));
+  check("it reads the member's own zone", /select\(\{ timezone: users\.timezone \}\)/.test(routes));
+  check("and no longer slices a UTC instant",
+    !/reviewedAt\.toISOString\(\)\.slice/.test(routes));
+}
+
+/**
+ * ── A save must be legible ────────────────────────────────────────────────
+ *
+ * The same evening proved the other half: a successful write and a failed one
+ * looked identical, because neither said anything. Nothing below tests the
+ * network — it tests that each of the four states has somewhere to appear.
+ */
+console.log("\nEvery save says what happened\n");
+
+{
+  const card = code("client/src/components/health/ConfirmActivity.tsx");
+
+  /** The key is the fix for answers travelling to the wrong workout. */
+  check("the answering form is keyed by workout", /<Answer key=\{w\.id\} w=\{w\} \/>/.test(card));
+  check("so the query and the form are separate components",
+    /function Answer\(\{ w \}/.test(card));
+
+  check("success is stated, not merely implied", /Activity updated/.test(card));
+  check("and has somewhere to be found", /data-testid="confirm-activity-saved"/.test(card));
+  /** Held for a beat, so the card's exit reads as a consequence. */
+  check("the card stands down after the acknowledgement",
+    /onSuccess: \(\) => setDone\(true\)/.test(card));
+  check("and only then invalidates", /setTimeout\([\s\S]{0,200}invalidateQueries/.test(card));
+
+  check("a failure is visible", /Couldn't save\. Try again\./.test(card));
+  check("with a hook for the harness", /data-testid="confirm-activity-error"/.test(card));
+  /** The answer they already gave stays on screen; nothing is cleared on error. */
+  check("nothing is reset when it fails",
+    !/isError[\s\S]{0,200}set(Focus|Orientation|Label)\(/.test(card));
+
+  check("working is stated on both buttons", /Saving…/.test(card) && /Confirming…/.test(card));
+  check("and both refuse a second tap while in flight",
+    (card.match(/disabled=\{save\.isPending\}/g) ?? []).length === 2);
 }
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);
