@@ -82,16 +82,32 @@ export function BirthDateField({
   value,
   onChange,
   testId = "birth-date",
+  maxYear,
+  className,
 }: {
   value: string;
   onChange: (v: string) => void;
   testId?: string;
+  /**
+   * The latest year offered. Sign-up passes the year somebody turning
+   * eighteen today was born, so the control cannot invite a date the server
+   * will refuse.
+   *
+   * A year rather than a full date, and deliberately: the exact cutoff is an
+   * age rule, the server owns it, and it already returns a clear refusal. A
+   * client that tried to reproduce the rule to the day would be a second
+   * implementation of it, and the two would disagree the first time one
+   * changed.
+   */
+  maxYear?: number;
+  /** For surfaces with their own field treatment — the sign-up glass, mainly. */
+  className?: string;
 }) {
   const parts = parse(value);
-  const thisYear = new Date().getFullYear();
+  const ceiling = maxYear ?? new Date().getFullYear();
   const years = useMemo(
-    () => Array.from({ length: 120 }, (_, i) => thisYear - i),
-    [thisYear],
+    () => Array.from({ length: 120 }, (_, i) => ceiling - i),
+    [ceiling],
   );
 
   /**
@@ -116,7 +132,7 @@ export function BirthDateField({
       <select
         value={parts.day ?? ""}
         onChange={(e) => set({ day: e.target.value ? Number(e.target.value) : null })}
-        className={cn(FIELD)}
+        className={cn(FIELD, className)}
         aria-label="Day of birth"
         data-testid={`${testId}-day`}
       >
@@ -129,7 +145,7 @@ export function BirthDateField({
       <select
         value={parts.month ?? ""}
         onChange={(e) => set({ month: e.target.value ? Number(e.target.value) : null })}
-        className={cn(FIELD)}
+        className={cn(FIELD, className)}
         aria-label="Month of birth"
         data-testid={`${testId}-month`}
       >
@@ -142,7 +158,7 @@ export function BirthDateField({
       <select
         value={parts.year ?? ""}
         onChange={(e) => set({ year: e.target.value ? Number(e.target.value) : null })}
-        className={cn(FIELD)}
+        className={cn(FIELD, className)}
         aria-label="Year of birth"
         data-testid={`${testId}-year`}
       >

@@ -4,6 +4,7 @@ import { Capacitor } from "@capacitor/core";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BirthDateField } from "@/components/portal/BirthFields";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Download, Loader2, Smartphone, type LucideIcon } from "lucide-react";
 import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/links";
@@ -385,16 +386,23 @@ export default function LoginPage() {
                     >
                       Date of birth
                     </label>
-                    <Input
-                      id="dateOfBirth"
-                      type="date"
+                    {/*
+                      Three lists, not a native date input. On a Samsung this
+                      opened a full-height dialog with the month grid collapsed
+                      to a sliver, and it opened on today — one tap on SET and
+                      somebody's date of birth is this morning. That is the
+                      first form a new Android member meets.
+
+                      The year ceiling still comes from the eighteen-years rule
+                      so the control cannot invite a date the server will
+                      refuse; the server remains the one that enforces it.
+                    */}
+                    <BirthDateField
                       value={dateOfBirth}
-                      onChange={(e) => setDateOfBirth(e.target.value)}
-                      required
-                      // The server enforces this; max is only so the picker
-                      // doesn't invite a date it will then refuse.
-                      max={maxBirthDate}
-                      className="bg-white/10 border-white/20 text-white placeholder:text-white/40 [color-scheme:dark]"
+                      onChange={setDateOfBirth}
+                      maxYear={Number(maxBirthDate.slice(0, 4))}
+                      testId="signup-birth-date"
+                      className="bg-white/10 border-white/20 text-white"
                     />
                     <p className="text-xs text-white/40">
                       Sakred Body is for adults. We check your age and don't keep the date.
