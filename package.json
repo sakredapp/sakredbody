@@ -10,6 +10,8 @@
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
     "db:push": "drizzle-kit push",
+    "db:baseline": "tsx script/baseline.ts",
+    "db:verify-from-zero": "tsx script/verify-from-zero.ts",
     "db:rls": "echo 'Run supabase/rls-policies.sql in the Supabase SQL Editor'",
     "vercel-build": "vite build",
     "cap:sync": "npm run build:client && cap sync",

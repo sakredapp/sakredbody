@@ -1,0 +1,44 @@
+-- ─── Sakred Body — schema baseline ────────────────────────────────────────
+--
+-- The state of `public` as of 16 Aug 2026, and the point every environment
+-- starts from.
+--
+-- ── Why this file exists ──────────────────────────────────────────────────
+--
+-- It did not, and the absence was invisible until an audit went looking for a
+-- QA environment. Production had 93 tables; the 32 tracked migrations could
+-- create 32 of them. `users`, `workout_sessions`, `workout_sets`, `exercises`,
+-- `habits` and `retreats` had no creating statement anywhere in the repository.
+-- They were built by `drizzle-kit push`, which diffs against a live database
+-- and applies — leaving the truth in production and the history nowhere.
+--
+-- So: the database could not be rebuilt from the repository. Not for a test
+-- environment, and not after losing it.
+--
+-- ── The cutoff rule ───────────────────────────────────────────────────────
+--
+-- This baseline is the CURRENT schema, not a historical one. Everything in
+-- `supabase_migrations.schema_migrations` dated on or before 20260815212610 is
+-- PRE-BASELINE HISTORY: already contained here, and never replayed on top.
+-- Replaying them would fail on tables this file has already created.
+--
+--     new environment  =  this baseline
+--                      +  migrations AFTER the cutoff, in order
+--                      +  the QA seed, if it is a QA environment
+--
+-- A migration added from now on is post-baseline and does replay. When this
+-- file is next regenerated, move the cutoff with it and say so here.
+--
+-- ── How it is built ───────────────────────────────────────────────────────
+--
+--   01  tables, constraints and indexes for everything `shared/schema.ts`
+--       defines — emitted by `drizzle-kit generate`, which reads the schema
+--       files and writes SQL without touching a database. Regenerate with
+--       `npm run db:baseline`.
+--   02  four tables that exist in production and in migrations but were never
+--       added to the Drizzle schema, so `generate` cannot see them. Introspected.
+--   03  row-level security: enablement and every policy. Drizzle does not
+--       model these at all, which is the other half of why push left no history.
+--
+-- Schema only. No rows, no member data, no PII.
+

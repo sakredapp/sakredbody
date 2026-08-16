@@ -21,3 +21,5 @@ plugins/**/build/
 .sim-build/
 
 script/.interaction-inventory.json
+.baseline-out/
+.baseline-src/
