@@ -54,6 +54,39 @@ check("the helper functions the policies need are present",
 check("the cutoff rule is written down, not remembered",
   /PRE-BASELINE HISTORY/.test(sql) && sql.includes(BASELINE_CUTOFF));
 
+/**
+ * ── Parity, which is the check that would have caught all of this ─────────
+ *
+ * The baseline and `shared/schema.ts` must describe the same set of tables.
+ * They disagreed by four: coaching_plans, coaching_plan_items,
+ * coaching_checkin_requests and notifications were defined in Drizzle, used by
+ * the server and applied to production — but their modules were never
+ * re-exported from schema.ts, the one file drizzle-kit reads. So `generate`
+ * could not emit them and `push` regarded them as tables nobody had asked for,
+ * which is one confirmation prompt away from dropping live coaching data.
+ *
+ * The allowlist below is for tables that genuinely cannot be modelled in
+ * Drizzle. It is empty, and adding to it should require an argument.
+ */
+const NON_DRIZZLE_TABLES: readonly string[] = [];
+
+{
+  const drizzlePart = join(ROOT, "supabase/baseline/01-drizzle-schema.sql");
+  const drizzleTables = new Set(
+    [...readFileSync(drizzlePart, "utf8").matchAll(/^CREATE TABLE "([a-z_]+)"/gm)].map((m) => m[1]),
+  );
+  const baselineTables = new Set(
+    [...sql.matchAll(/CREATE TABLE (?:IF NOT EXISTS )?(?:public\.)?"?([a-z_]+)"?/g)].map((m) => m[1]),
+  );
+  const missing = [...baselineTables].filter(
+    (t) => !drizzleTables.has(t) && !NON_DRIZZLE_TABLES.includes(t),
+  );
+  check("every baseline table is in the Drizzle schema", missing.length === 0, missing.join(", "));
+  check("and the allowlist is still empty", NON_DRIZZLE_TABLES.length === 0,
+    NON_DRIZZLE_TABLES.join(", "));
+  check("Drizzle emits all 93", drizzleTables.size === 93, `${drizzleTables.size}`);
+}
+
 if (!process.env.DATABASE_URL) {
   console.log(
     "\n  · No DATABASE_URL. Offline checks only — the reconstruction itself needs\n" +

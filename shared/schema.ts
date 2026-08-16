@@ -26,6 +26,17 @@ export * from "./models/rhythmTracking.js";
 export * from "./models/suggestions.js";
 export * from "./models/apothecary.js";
 export * from "./models/profilePhotos.js";
+/*
+ * These three were defined, used by the server, applied to production by
+ * migration — and never re-exported here. `shared/schema.ts` is the file
+ * drizzle-kit reads, so to Drizzle their four tables did not exist:
+ * `generate` could not emit them, and `push` regarded coaching_plans,
+ * coaching_plan_items, coaching_checkin_requests and notifications as tables
+ * nobody had asked for. A schema file is a manifest as much as a definition.
+ */
+export * from "./models/coachingPlans.js";
+export * from "./models/checkinRequests.js";
+export * from "./models/notifications.js";
 
 /**
  * The intake form behind ApplicationModal, on the Mastermind page.

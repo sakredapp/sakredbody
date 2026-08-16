@@ -1207,6 +1207,76 @@ CREATE TABLE "profile_photos" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "coaching_plan_items" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"plan_id" uuid NOT NULL,
+	"routine_habit_id" uuid NOT NULL,
+	"intent" text DEFAULT 'add' NOT NULL,
+	"target" double precision,
+	"schedule_kind" text,
+	"schedule_days" smallint[],
+	"schedule_count" integer,
+	"recommended_time" text,
+	"member_reason" text,
+	"coach_note" text,
+	"order_index" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "coaching_plans" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"member_user_id" varchar NOT NULL,
+	"coach_user_id" varchar NOT NULL,
+	"relationship_id" uuid,
+	"title" text NOT NULL,
+	"focus" text,
+	"member_visible_note" text,
+	"internal_note" text,
+	"status" text DEFAULT 'draft' NOT NULL,
+	"starts_on" date,
+	"ends_on" date,
+	"created_by_user_id" varchar NOT NULL,
+	"activated_by_user_id" varchar,
+	"ended_by_user_id" varchar,
+	"activated_at" timestamp with time zone,
+	"ended_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "coaching_checkin_requests" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"member_user_id" varchar NOT NULL,
+	"coach_user_id" varchar NOT NULL,
+	"relationship_id" uuid,
+	"requested_by_user_id" varchar NOT NULL,
+	"kind" text DEFAULT 'quick' NOT NULL,
+	"status" text DEFAULT 'open' NOT NULL,
+	"coach_prompt" text,
+	"requested_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"due_on" date,
+	"completed_at" timestamp with time zone,
+	"cancelled_at" timestamp with time zone,
+	"cancelled_by_user_id" varchar,
+	"checkin_id" uuid,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "notifications" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"user_id" varchar NOT NULL,
+	"type" text NOT NULL,
+	"actor_user_id" varchar,
+	"resource_type" text NOT NULL,
+	"resource_id" uuid,
+	"title" text NOT NULL,
+	"body" text,
+	"dedupe_key" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"read_at" timestamp with time zone
+);
+--> statement-breakpoint
 ALTER TABLE "coaching_messages" ADD CONSTRAINT "coaching_messages_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "habit_products" ADD CONSTRAINT "habit_products_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "product_links" ADD CONSTRAINT "product_links_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -1392,4 +1462,13 @@ CREATE UNIQUE INDEX "uq_suggestion_dismissal_forever" ON "suggestion_dismissals"
 CREATE INDEX "idx_suggestion_dismissals_user" ON "suggestion_dismissals" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "idx_support_products_support" ON "support_products" USING btree ("support_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "uq_support_products" ON "support_products" USING btree ("support_id","product_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "uq_profile_photos_token" ON "profile_photos" USING btree ("token");
+CREATE UNIQUE INDEX "uq_profile_photos_token" ON "profile_photos" USING btree ("token");--> statement-breakpoint
+CREATE UNIQUE INDEX "uq_coaching_plan_item" ON "coaching_plan_items" USING btree ("plan_id","routine_habit_id");--> statement-breakpoint
+CREATE INDEX "idx_coaching_plan_item_plan" ON "coaching_plan_items" USING btree ("plan_id","order_index");--> statement-breakpoint
+CREATE INDEX "idx_coaching_plan_member" ON "coaching_plans" USING btree ("member_user_id","status","created_at");--> statement-breakpoint
+CREATE INDEX "idx_coaching_plan_coach" ON "coaching_plans" USING btree ("coach_user_id","status");--> statement-breakpoint
+CREATE UNIQUE INDEX "uq_coaching_checkin_open" ON "coaching_checkin_requests" USING btree ("member_user_id","coach_user_id") WHERE status = 'open';--> statement-breakpoint
+CREATE INDEX "idx_coaching_checkin_member" ON "coaching_checkin_requests" USING btree ("member_user_id","status");--> statement-breakpoint
+CREATE INDEX "idx_coaching_checkin_coach" ON "coaching_checkin_requests" USING btree ("coach_user_id","status","requested_at");--> statement-breakpoint
+CREATE UNIQUE INDEX "uq_notification_dedupe" ON "notifications" USING btree ("dedupe_key");--> statement-breakpoint
+CREATE INDEX "idx_notifications_user" ON "notifications" USING btree ("user_id","created_at");
