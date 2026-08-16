@@ -97,6 +97,10 @@ import {
 } from "./composition.js";
 import { memberToday } from "../coaching/enrollment.js";
 import { trainingMemory } from "./memory.js";
+import {
+  readTrainingResponse,
+  RESPONSE_WINDOW_DAYS,
+} from "../../shared/models/trainingResponse.js";
 import { addDaysToString } from "../../shared/utils/dates.js";
 import { track, trackError } from "../telemetry/index.js";
 
@@ -1134,8 +1138,45 @@ export function registerTrainingRoutes(app: Express) {
   app.get("/api/training/memory", isAuthenticated, async (req, res) => {
     try {
       const userId = req.session!.userId!;
-      const notes = await trainingMemory(userId, await memberToday(userId));
-      res.json({ observations: notes });
+      const today = await memberToday(userId);
+
+      /**
+       * Both halves of training response, from one request.
+       *
+       * The notes are what the member said; `response` is what they did — sets
+       * at the top end, sets taken to failure, and how long ago. Restore reads
+       * them together, and a second endpoint would be a second thing to keep in
+       * step with the first. The interpretation is not here: `restoreLine` and
+       * `loadGuidance` are in the shared model, testable without a database,
+       * and Build and Restore call different ones over the same data rather
+       * than each deriving their own.
+       *
+       * Nothing about this feeds Terrain. Terrain Now stays the canonical
+       * reading of state; this is context for one screen.
+       */
+      const [notes, sets] = await Promise.all([
+        trainingMemory(userId, today),
+        db
+          .select({
+            onDate: workoutSessions.onDate,
+            rpe: workoutSets.rpe,
+            toFailure: workoutSets.toFailure,
+            isWarmup: workoutSets.isWarmup,
+          })
+          .from(workoutSets)
+          .innerJoin(workoutSessions, eq(workoutSets.sessionId, workoutSessions.id))
+          .where(
+            and(
+              eq(workoutSessions.userId, userId),
+              gte(workoutSessions.onDate, addDaysToString(today, -RESPONSE_WINDOW_DAYS)),
+            ),
+          ),
+      ]);
+
+      res.json({
+        observations: notes,
+        response: readTrainingResponse(sets, today),
+      });
     } catch (err) {
       fail(res, err);
     }

@@ -28,6 +28,7 @@ import {
   restoreLine,
   type Observation,
 } from "@shared/models/trainingMemory";
+import { loadGuidance, type TrainingResponse } from "@shared/models/trainingResponse";
 import { formatLocalDateString } from "@shared/utils/dates";
 
 /**
@@ -42,7 +43,7 @@ const localToday = formatLocalDateString;
 export const MEMORY_KEY = ["/api/training/memory"] as const;
 
 export function useTrainingMemory() {
-  return useQuery<{ observations: Observation[] }>({
+  return useQuery<{ observations: Observation[]; response?: TrainingResponse }>({
     queryKey: MEMORY_KEY,
     /**
      * It changes when a session is finished, which invalidates it. Between
@@ -163,17 +164,56 @@ export function MovementMemory({
 export function RestoreMemory() {
   const { data } = useTrainingMemory();
   const notes = data?.observations ?? [];
-  if (!notes.length) return null;
+  /**
+   * Optional, like every field added to a payload a bundled client reads: an
+   * app built before the server sent this gets `undefined` and behaves exactly
+   * as it did.
+   */
+  const load = data?.response ?? null;
 
-  // Newest, which is the ordering the server already returns.
-  const line = restoreLine(notes[0]);
+  /**
+   * ── One card, both halves ────────────────────────────────────────────────
+   *
+   * What the member said and what they actually did are different evidence and
+   * they answer the same question, so they are read together rather than
+   * stacked as two panels. Restore is a screen somebody opens looking for one
+   * useful thing to do; giving them two boxes about training load is how a
+   * quiet screen becomes a dashboard.
+   *
+   * The note wins when there is one. A sentence a member wrote about their own
+   * body is more specific than a count of hard sets, and the load only sharpens
+   * what the note already says — see `restoreLine`.
+   */
+  if (notes.length) {
+    // Newest, which is the ordering the server already returns.
+    const line = restoreLine(notes[0], load);
+    return (
+      <Card
+        headline={line.headline}
+        quote={line.quote}
+        guidance={line.guidance}
+        seekCare={line.seekCare}
+        testid="restore-memory"
+      />
+    );
+  }
+
+  /**
+   * Nothing was said, but something was done. Most days this is null too —
+   * `loadGuidance` only speaks for a session inside two days that went to
+   * failure or sat at the top end, because a screen that produces a sentence
+   * about training load every single day teaches people to stop reading it.
+   */
+  const fromLoad = load ? loadGuidance(load) : null;
+  if (!fromLoad) return null;
+
   return (
     <Card
-      headline={line.headline}
-      quote={line.quote}
-      guidance={line.guidance}
-      seekCare={line.seekCare}
-      testid="restore-memory"
+      headline={fromLoad.headline}
+      quote={null}
+      guidance={fromLoad.guidance}
+      seekCare={false}
+      testid="restore-load"
     />
   );
 }

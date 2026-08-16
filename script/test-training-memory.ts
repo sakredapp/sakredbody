@@ -23,7 +23,7 @@
  * Run: tsx script/test-training-memory.ts
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import {
   MEMORY_ALIKE_DAYS,
   MEMORY_DISCLOSURE,
@@ -36,6 +36,10 @@ import {
   restoreLine,
   type Observation,
 } from "../shared/models/trainingMemory.js";
+import {
+  readTrainingResponse,
+  loadGuidance,
+} from "../shared/models/trainingResponse.js";
 
 let passed = 0;
 let failed = 0;
@@ -373,6 +377,116 @@ console.log("\nWritten where it happens, read where it matters\n");
   check("with the guidance behind a tap", /\{open && \(/.test(surface));
   check("and no border on it", !/if \(!seekCare\) \{[\s\S]{0,400}rounded-xl border/.test(surface));
   check("the flagged one keeps its weight", /AlertTriangle/.test(surface));
+}
+
+console.log("\nRestore reads what was done, not only what was said\n");
+
+{
+  const set = (onDate: string, rpe: number | null, toFailure = false, isWarmup = false) =>
+    ({ onDate, rpe, toFailure, isWarmup });
+  const TODAY = "2026-08-16";
+
+  /** A ramp is not a demand, however honest the member is about the first rep. */
+  check("warm-ups never count as hard work",
+    readTrainingResponse([set("2026-08-16", 9, false, true)], TODAY).hardSets === 0);
+
+  const hard = readTrainingResponse(
+    [
+      set("2026-08-15", 9),
+      set("2026-08-15", 8),
+      set("2026-08-15", 8.5),
+      set("2026-08-15", 9),
+      set("2026-08-15", 6),
+      set("2026-08-10", 10),
+    ],
+    TODAY,
+  );
+  check("four sets at the top end are counted", hard.hardSets === 4, String(hard.hardSets));
+  check("a submaximal set is not", hard.hardSets !== 5);
+  check("and one outside the window is not either", hard.lastHardOn === "2026-08-15");
+  check("yesterday is one day ago", hard.daysSinceHard === 1);
+
+  /** Failure is a different event from an RPE of 10 and is counted apart. */
+  const failed_ = readTrainingResponse([set("2026-08-16", null, true)], TODAY);
+  check("a set to failure counts without an RPE", failed_.hardSets === 1);
+  check("and is counted separately", failed_.failureSets === 1);
+  check("an RPE 10 is not automatically failure",
+    readTrainingResponse([set("2026-08-16", 10)], TODAY).failureSets === 0);
+
+  // ── What it will and will not say ──
+
+  check("nothing trained means nothing said",
+    loadGuidance(readTrainingResponse([], TODAY)) === null);
+  check("one heavy set is not news",
+    loadGuidance(readTrainingResponse([set("2026-08-16", 9)], TODAY)) === null);
+  /** Monday is not a reason to change Thursday. */
+  check("a hard session four days ago has stopped mattering",
+    loadGuidance(readTrainingResponse([
+      set("2026-08-12", 9), set("2026-08-12", 9), set("2026-08-12", 9), set("2026-08-12", 9),
+    ], TODAY)) === null);
+
+  const said = loadGuidance(hard);
+  check("four hard sets yesterday are worth saying", !!said);
+  check("and it says when", /yesterday/.test(said?.headline ?? ""), said?.headline);
+  check("failure is named as itself",
+    /to failure/.test(loadGuidance(failed_)?.headline ?? ""));
+  check("the guidance is about training, never about a body",
+    !/(injur|strain|inflam|because|damage)/i.test(
+      `${said?.headline} ${said?.guidance}`));
+
+  // ── The two halves, read together ──
+
+  const note: Observation = {
+    exerciseId: "single-leg-rdl",
+    note: "Left low back felt tight coming out of the hinge.",
+    quality: "tight",
+    side: "left",
+    onDate: "2026-08-15",
+    exerciseName: "Single-Leg RDL",
+    pattern: "hinge",
+    category: "strength",
+  };
+
+  check("a note on its own gives the ordinary line",
+    /may be more useful today/.test(restoreLine(note, null).guidance));
+  check("the same note after a hard session is firmer",
+    /came after a session at the top end/.test(restoreLine(note, hard).guidance));
+  check("and still never says why anything hurt",
+    !/(injur|strain|because|damage|cause)/i.test(restoreLine(note, hard).guidance));
+
+  /**
+   * The load must not soften what a red flag says. When a sentence needs
+   * professional eyes, how hard the session was makes no difference to what
+   * Sakred is willing to claim.
+   */
+  const flagged: Observation = { ...note, note: "Sharp pain shooting down the leg, getting worse." };
+  check("a red flag is unaffected by the load",
+    restoreLine(flagged, hard).guidance === restoreLine(flagged, null).guidance);
+  check("and still asks for qualified eyes", restoreLine(flagged, hard).seekCare);
+
+  // ── The boundary ──
+
+  /**
+   * Terrain Now is the canonical reading of state. This is context for one
+   * screen, and the moment it starts feeding the terrain engine it has become
+   * a second one.
+   */
+  const model = code("shared/models/trainingResponse.ts");
+  check("the response model does not import terrain", !/terrain/i.test(
+    model.split("\n").filter((l) => l.startsWith("import")).join(" ")));
+  /**
+   * Both halves of the terrain path, named explicitly. `existsSync` guards
+   * against the check quietly passing if either file is ever moved — a
+   * boundary test that stops reading the thing it guards is worse than none.
+   */
+  for (const f of ["server/terrain/routes.ts", "server/terrain/read.ts"]) {
+    check(`${f} is there to check`,
+      existsSync(new URL(`../${f}`, import.meta.url)));
+    check(`and does not read training response`,
+      !/readTrainingResponse|loadGuidance|trainingResponse/.test(code(f)));
+  }
+  check("Restore renders one card, not two",
+    (code("client/src/components/build/TrainingMemory.tsx").match(/testid="restore-/g) ?? []).length === 2);
 }
 
 console.log("\nAnd it says why the five seconds are worth it\n");

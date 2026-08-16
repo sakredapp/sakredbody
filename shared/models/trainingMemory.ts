@@ -31,6 +31,8 @@
  *                               are exactly the ones where guessing is worst
  */
 
+import type { TrainingResponse } from "./trainingResponse.js";
+
 /** The words that make a note worth recalling. "Felt good" is not one. */
 const NOTABLE = new Set(["tight", "weak", "discomfort", "unstable"]);
 
@@ -257,14 +259,36 @@ export function recallLine(o: Observation, movementName: string): Recall {
  * the answer — that today might be better spent giving that area something
  * than asking more of it.
  */
-export function restoreLine(o: Observation): Recall {
+export function restoreLine(o: Observation, load?: TrainingResponse | null): Recall {
   const seekCare = needsProfessionalEyes(o.note);
+
+  /**
+   * ── What the sets add to the sentence ────────────────────────────────────
+   *
+   * A member who reported a tight left low back after hinging has told Restore
+   * one thing. Whether they also took four sets to the top end that day tells
+   * it another, and the two together are a better answer than either alone —
+   * "that area, after a hard session" is a reason to do less today that
+   * neither half establishes on its own.
+   *
+   * It is still only a training adjustment. A note plus a load count cannot
+   * become an opinion about what is wrong with somebody, and nothing below
+   * names a cause, a structure or a diagnosis. The flagged case is untouched
+   * by any of it: when a sentence needs professional eyes, the load makes no
+   * difference to what Sakred is willing to say.
+   */
+  const wasHard =
+    !seekCare && !!load && load.daysSinceHard != null && load.daysSinceHard <= 2 &&
+    (load.failureSets > 0 || load.hardSets >= 4);
+
   return {
     headline: `Your last session left ${whereItWas(o)}.`,
     quote: o.note?.trim() || null,
     guidance: seekCare
       ? "Gentle movement and rest are reasonable today. What you described is worth someone qualified looking at."
-      : "Mobility and easy work around that area may be more useful today than adding load to it.",
+      : wasHard
+        ? "That came after a session at the top end. Mobility and easy work around that area will be worth more today than asking anything of it."
+        : "Mobility and easy work around that area may be more useful today than adding load to it.",
     seekCare,
   };
 }
