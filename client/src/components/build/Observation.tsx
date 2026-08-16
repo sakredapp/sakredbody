@@ -153,7 +153,7 @@ export function ObservationForm({
             placeholder="Slight low-back discomfort on the left leg. Glute didn't feel like it was firing."
             maxLength={1000}
             rows={4}
-            className="w-full rounded-lg border border-border/60 bg-transparent px-3 py-2 text-sm leading-relaxed resize-none"
+            className="w-full rounded-lg border border-border/60 bg-transparent px-3 py-2 text-base md:text-sm leading-relaxed resize-none"
             data-testid="observation-note"
           />
         </div>

@@ -415,7 +415,7 @@ export function LogPractice({
                     setCustom(e.target.value);
                     setMinutes(null);
                   }}
-                  className="h-8 w-20 text-xs"
+                  className="h-8 w-20 text-base md:text-xs"
                   aria-label="Minutes"
                 />
               </div>

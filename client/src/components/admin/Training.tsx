@@ -481,7 +481,7 @@ function Prescription({ habitId }: { habitId: string }) {
                 <Input
                   defaultValue={p.note ?? ""}
                   placeholder="Top set heavy, back-offs at RPE 7"
-                  className="h-8 text-sm"
+                  className="h-8 text-base md:text-sm"
                   onBlur={(e) =>
                     e.target.value !== (p.note ?? "") &&
                     save.mutate({ id: p.id, body: { note: e.target.value || null } })

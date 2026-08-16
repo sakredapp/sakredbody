@@ -152,7 +152,7 @@ export function CheckinRequests({ memberId, memberName }: { memberId: string; me
               onChange={(e) => setPrompt(e.target.value.slice(0, 500))}
               rows={2}
               placeholder="Give me a quick read before tomorrow's session."
-              className="w-full rounded-md border border-border/40 bg-transparent p-2 text-sm"
+              className="w-full rounded-md border border-border/40 bg-transparent p-2 text-base md:text-sm"
               data-testid="checkin-request-prompt"
             />
           </div>
@@ -163,7 +163,7 @@ export function CheckinRequests({ memberId, memberName }: { memberId: string; me
               type="date"
               value={due}
               onChange={(e) => setDue(e.target.value)}
-              className="rounded-md border border-border/40 bg-transparent p-2 text-sm"
+              className="rounded-md border border-border/40 bg-transparent p-2 text-base md:text-sm"
               data-testid="checkin-request-due"
             />
           </div>

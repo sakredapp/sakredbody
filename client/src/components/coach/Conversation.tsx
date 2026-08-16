@@ -355,7 +355,7 @@ function Composer({
           }}
           rows={1}
           placeholder={`Message ${side.otherName}…`}
-          className="flex-1 resize-none bg-transparent border border-border/40 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-border max-h-40"
+          className="flex-1 resize-none bg-transparent border border-border/40 rounded-lg px-3 py-2 text-base md:text-sm focus:outline-none focus:border-border max-h-40"
           data-testid="composer-input"
         />
 

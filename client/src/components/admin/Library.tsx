@@ -683,7 +683,7 @@ function Sections({ ebookId }: { ebookId: string }) {
                     e.target.value !== s.title &&
                     save.mutate({ id: s.id, body: { title: e.target.value } })
                   }
-                  className="h-8 text-sm"
+                  className="h-8 text-base md:text-sm"
                 />
                 {s.isFree && <Badge variant="secondary" className="text-[10px] shrink-0">Free</Badge>}
                 <Button
@@ -709,7 +709,7 @@ function Sections({ ebookId }: { ebookId: string }) {
                   <Textarea
                     defaultValue={s.content ?? ""}
                     rows={12}
-                    className="font-mono text-xs"
+                    className="font-mono text-base md:text-xs"
                     placeholder="<p>The section text. HTML is allowed here — this is admin content, rendered directly by the reader.</p>"
                     onBlur={(e) =>
                       e.target.value !== (s.content ?? "") &&

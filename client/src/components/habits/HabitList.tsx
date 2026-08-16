@@ -186,7 +186,7 @@ function HabitRow({
                 }
               }}
               placeholder={h.target ? String(h.target) : h.unit ?? ""}
-              className="h-7 w-20 text-right text-sm"
+              className="h-7 w-20 text-right text-base md:text-sm"
               data-testid={`habit-input-${h.trackedHabitId}`}
             />
           ) : (

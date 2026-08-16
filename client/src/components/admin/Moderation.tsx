@@ -165,7 +165,7 @@ export function ModerationAdmin() {
                       value={notes[r.id] ?? ""}
                       onChange={(e) => setNotes({ ...notes, [r.id]: e.target.value })}
                       placeholder="Note for the record (optional)"
-                      className="h-9 text-sm"
+                      className="h-9 text-base md:text-sm"
                     />
                     <div className="flex gap-2 flex-wrap">
                       <Button

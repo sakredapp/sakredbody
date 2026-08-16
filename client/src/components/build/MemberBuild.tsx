@@ -431,7 +431,7 @@ function WorkoutBuilder({
                               ),
                             )
                           }
-                          className="w-11 bg-transparent border border-border/50 rounded px-1.5 py-0.5 text-[11px] text-center"
+                          className="w-11 bg-transparent border border-border/50 rounded px-1.5 py-0.5 text-base md:text-[11px] text-center"
                           aria-label="Sets"
                         />
                         <span className="text-[11px] text-muted-foreground">
@@ -451,7 +451,7 @@ function WorkoutBuilder({
                                 ),
                               )
                             }
-                            className="w-11 bg-transparent border border-border/50 rounded px-1.5 py-0.5 text-[11px] text-center"
+                            className="w-11 bg-transparent border border-border/50 rounded px-1.5 py-0.5 text-base md:text-[11px] text-center"
                             aria-label="Reps"
                           />
                         )}

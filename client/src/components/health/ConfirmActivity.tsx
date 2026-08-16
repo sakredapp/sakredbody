@@ -235,7 +235,7 @@ function Answer({ w }: { w: Candidate }) {
               onChange={(e) => setLabel(e.target.value)}
               placeholder="Back day"
               maxLength={60}
-              className="w-full rounded-lg border border-border/60 bg-transparent px-3 py-2"
+              className="w-full rounded-lg border border-border/60 bg-transparent px-3 py-2 text-base md:text-sm"
               data-testid="input-activity-label"
             />
           </div>

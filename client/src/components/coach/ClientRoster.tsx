@@ -191,7 +191,7 @@ export function ClientRoster({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search your clients"
-            className="pl-9 h-9 text-sm"
+            className="pl-9 h-9 text-base md:text-sm"
             data-testid="client-search"
           />
         </div>
