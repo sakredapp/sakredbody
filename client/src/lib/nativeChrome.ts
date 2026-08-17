@@ -40,6 +40,9 @@
  */
 
 import type { ResolvedAppearance } from "./appearance";
+import { hslTripletToHex } from "./themeInk";
+
+export { hslTripletToHex };
 
 /**
  * Which icon contrast an appearance needs.
@@ -55,47 +58,13 @@ export function statusBarStyleFor(resolved: ResolvedAppearance): "DARK" | "LIGHT
 }
 
 /**
- * `40 26% 92%` — the way a CSS custom property holds a colour — as `#f0ece5`.
+ * The ground the web layer is currently painting, as hex.
  *
- * The triplet form is what the stylesheet stores, because every consumer wraps
- * it in `hsl()` with its own alpha. Nothing outside CSS can use it in that
- * shape: the native plugin wants hex, and so does `<meta name="theme-color">`
- * on the browsers that are fussiest about it.
- *
- * Returns null rather than a guess when the value isn't a triplet. A wrong
- * colour on the status bar is worse than the previous one left in place.
+ * The conversion itself lives in `themeInk.ts` alongside the canvas-side
+ * accessor, because they are the same operation — reading a token out of CSS
+ * into a form something that isn't CSS can use — and having two copies is how
+ * they drift.
  */
-export function hslTripletToHex(triplet: string): string | null {
-  const parts = triplet.trim().replace(/%/g, "").split(/[\s,/]+/).filter(Boolean);
-  if (parts.length < 3) return null;
-
-  const h = Number(parts[0]);
-  const s = Number(parts[1]) / 100;
-  const l = Number(parts[2]) / 100;
-  if (!Number.isFinite(h) || !Number.isFinite(s) || !Number.isFinite(l)) return null;
-
-  const c = (1 - Math.abs(2 * l - 1)) * s;
-  const hp = (((h % 360) + 360) % 360) / 60;
-  const x = c * (1 - Math.abs((hp % 2) - 1));
-  const m = l - c / 2;
-
-  const [r, g, b] =
-    hp < 1 ? [c, x, 0] :
-    hp < 2 ? [x, c, 0] :
-    hp < 3 ? [0, c, x] :
-    hp < 4 ? [0, x, c] :
-    hp < 5 ? [x, 0, c] :
-             [c, 0, x];
-
-  const byte = (v: number) =>
-    Math.max(0, Math.min(255, Math.round((v + m) * 255)))
-      .toString(16)
-      .padStart(2, "0");
-
-  return `#${byte(r)}${byte(g)}${byte(b)}`;
-}
-
-/** The ground the web layer is currently painting, as hex. */
 export function currentInkHex(): string | null {
   if (typeof document === "undefined" || typeof getComputedStyle !== "function") return null;
   const triplet = getComputedStyle(document.documentElement).getPropertyValue("--ink");
