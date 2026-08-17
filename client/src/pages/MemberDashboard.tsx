@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { SakredDate } from "@/components/portal/DatePicker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { ArrowRight, BarChart3, Building2, Calendar, Check, ChevronRight, Clock, Compass, DollarSign, Dumbbell, Heart, HelpCircle, Home, Hotel, ListChecks, LogOut, Map, MapPin, MoreHorizontal, Settings, ShieldCheck, Sparkles, Star, User, UserPlus, Users, UtensilsCrossed } from "lucide-react";
+import { ArrowRight, BarChart3, Building2, Calendar, Check, ChevronRight, Clock, Compass, DollarSign, Dumbbell, Heart, HelpCircle, Home, Hotel, ListChecks, LogOut, Map, MapPin, MoreHorizontal, Settings, Sparkles, Star, User, UserPlus, Users, UtensilsCrossed } from "lucide-react";
 import type { Retreat, BookingRequest, Partner, PartnerService } from "@shared/schema";
 import {
   SERVICE_CATEGORIES,
@@ -55,7 +55,6 @@ import {
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 import { useInkSurface } from "@/hooks/use-ink-surface";
 import { PORTAL_COLUMN } from "@/lib/layout";
-import { useAccess } from "@/hooks/use-access";
 import { PortalBackdrop } from "@/components/portal/PortalBackdrop";
 import { PillarHome } from "@/components/PillarHome";
 import { BuildTab } from "@/components/BuildTab";
@@ -178,7 +177,6 @@ export default function MemberDashboard() {
   useInkSurface();
 
   const { user, isLoading: authLoading, isAuthenticated, logout } = useAuth();
-  const access = useAccess();
   const { toast } = useToast();
 
   // The server schedules by calendar date and runs in UTC; it needs to know
@@ -447,45 +445,26 @@ export default function MemberDashboard() {
               dashboard: Nick coaches and also trains, and the second is not
               forfeit for taking on the first.
             */}
-            {access.atLeast("coach") && (
-              <Link
-                href="/coach"
-                /*
-                  Labelled at every width, unlike Admin below.
-                  It was `hidden sm:inline`, and `sm` is 640px — so on the 393px
-                  phone this is the door to somebody's whole working day, it
-                  rendered as a bare 14px glyph beside an equally bare glyph for
-                  Admin. Two unlabelled gold circles, one of which is the back
-                  office. The word costs about fifty pixels in a row that on a
-                  phone holds only the logo, these pills, help and the avatar —
-                  the desktop nav is `hidden md:flex` and absent here — so the
-                  space it was saving was never contested.
-                */
-                className="tap inline-flex items-center gap-1.5 px-3 rounded-full border border-gold/35 text-gold text-xs uppercase tracking-widest hover:border-gold/70 transition-colors"
-                data-testid="link-coach"
-              >
-                <Users className="w-3.5 h-3.5" />
-                <span>Coach</span>
-              </Link>
-            )}
-            {access.isStaff && (
-              <Link
-                href="/admin"
-                /*
-                  Compact on a phone, and that is the right call for this one:
-                  the back office is not a surface anybody runs their day from,
-                  and an admin who needs it knows where it is. The label returns
-                  at 640px. What it must not be is an *unnamed* control, so the
-                  glyph carries the name for assistive tech at every width.
-                */
-                className="tap inline-flex items-center gap-1.5 px-3 rounded-full border border-gold/35 text-gold text-xs uppercase tracking-widest hover:border-gold/70 transition-colors"
-                aria-label="Admin"
-                data-testid="link-admin"
-              >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Admin</span>
-              </Link>
-            )}
+            {/*
+              Coach and Admin used to be two gold pills here.
+
+              They are gone, and the reason is not tidiness. A pill in the
+              header is a bespoke control that exists once, for one role, and
+              has to be built again for the next one — which is exactly what
+              happened: Admin sat here from before roles existed, Coach was
+              added beside it, and a third would have made a row of one-offs
+              where a menu belongs.
+
+              Both now live in `ROLE_DESTINATIONS` and render under My Roles in
+              the More sheet on a phone, and at the end of the section row on a
+              desktop. One list, one architecture, and a new role is an entry in
+              it rather than another pill in here.
+
+              This also settles what a coach's own app looks like: Nick opens
+              the same Sakred Body everyone opens, and his second job is a
+              destination he goes to, not a badge he wears in the header of his
+              own dashboard.
+            */}
             {/* Help, before the avatar. Someone stuck is looking along the top
                 bar for a way to ask, and "ask a person" should not be buried
                 two taps into a menu labelled with your own face. */}
