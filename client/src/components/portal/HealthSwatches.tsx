@@ -31,7 +31,7 @@
 import { useState } from "react";
 import { ChevronRight, TrendingDown, TrendingUp } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
-import { useHealthSummary, useHealthSync } from "@/hooks/use-health";
+import { useHealthSync, useHealthView } from "@/hooks/use-health";
 import { METRIC_DISPLAY, planTiles, trendOf, dayLabel, localToday } from "@/lib/healthDisplay";
 import type { DaySeries, Tile } from "@/lib/healthDisplay";
 import type { HealthMetric } from "@shared/models/health";
@@ -284,12 +284,11 @@ export function HealthSwatches({ onOpenStats }: { onOpenStats?: () => void }) {
    * home screen wants the figure explained, not to be moved to another screen.
    */
   const [openMetric, setOpenMetric] = useState<HealthMetric | null>(null);
-  const { data } = useHealthSummary(30);
-  const { available, reason, platform, connect } = useHealthSync();
+  const { connect } = useHealthSync();
+  const { view, reason, platform, days: rawDays } = useHealthView(30);
   const isNative = Capacitor.isNativePlatform();
 
-  const days = (data?.days ?? []) as DaySeries[];
-  const connected = data?.connected ?? false;
+  const days = rawDays as DaySeries[];
   const storeName = platform === "healthconnect" ? "Health Connect" : "Apple Health";
 
   const tiles = planTiles(days, MAX_TILES);
@@ -297,13 +296,27 @@ export function HealthSwatches({ onOpenStats }: { onOpenStats?: () => void }) {
   // The most recent day anything arrived for — what the header names.
   const freshest = tiles.map((t) => t.onDate).filter(Boolean).sort().pop() ?? null;
 
+  /*
+    ── The order of these branches is the fix ──────────────────────────────
+
+    Every one of them used to begin `!connected &&`, where `connected` was read
+    out of the summary payload — so on a cold launch, before that query had
+    answered, a connected member fell through to the Connect prompt at the
+    bottom. On Home. As the first thing they saw. Meanwhile Settings, reading
+    the same undefined value a moment later, said Connected.
+
+    Now the branches are a single resolved state, and `unknown` is a state the
+    machine can actually be in rather than a value that had to pretend to be
+    "no". Nothing here can offer to connect a phone that is already connected.
+  */
+
+  // Still deciding. Render nothing rather than flashing an explanation that
+  // resolves a beat later into its own contradiction.
+  if (view.kind === "unknown") return null;
+
   // A browser cannot read health data, so a prompt there would be an
   // instruction the member cannot follow.
-  if (!connected && !isNative) return null;
-
-  // Still probing. Render nothing rather than flashing an error that resolves
-  // a beat later.
-  if (!connected && available === null) return null;
+  if (view.kind !== "ready" && !isNative) return null;
 
   // ── Unavailable, said out loud ──────────────────────────────────────────
   //
@@ -316,7 +329,7 @@ export function HealthSwatches({ onOpenStats }: { onOpenStats?: () => void }) {
   // `reason` has been carried up from the plugin since the beginning and was
   // never rendered anywhere. On Android it is the actionable case: Health
   // Connect is genuinely absent on some devices and is installable.
-  if (!connected && available === false) {
+  if (view.kind === "unavailable") {
     return (
       <div
         className="rounded-xl border border-border/40 bg-white/[0.03] p-4"
@@ -328,7 +341,7 @@ export function HealthSwatches({ onOpenStats }: { onOpenStats?: () => void }) {
     );
   }
 
-  if (!connected) {
+  if (view.kind === "disconnected") {
     return (
       <button
         onClick={() => connect.mutate()}
@@ -346,7 +359,30 @@ export function HealthSwatches({ onOpenStats }: { onOpenStats?: () => void }) {
     );
   }
 
-  if (!tiles.length) {
+  // Linked, and the read is still outstanding. The member is not asked to do
+  // anything, because there is nothing for them to do.
+  if (view.kind === "hydrating") {
+    return (
+      <div
+        className="rounded-xl border border-border/40 bg-white/[0.03] p-4"
+        data-testid="health-hydrating"
+      >
+        <p className="text-xs text-muted-foreground">Loading your health data…</p>
+      </div>
+    );
+  }
+
+  if (view.kind === "error") {
+    return (
+      <div className="rounded-xl border border-border/40 bg-white/[0.03] p-4">
+        <p className="text-xs text-muted-foreground">
+          We couldn't reach your health data just now. It's still on your phone.
+        </p>
+      </div>
+    );
+  }
+
+  if (view.kind === "empty" || !tiles.length) {
     return (
       <div className="rounded-xl border border-border/40 bg-white/[0.03] p-4">
         <p className="text-xs text-muted-foreground">

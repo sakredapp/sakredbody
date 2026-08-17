@@ -30,7 +30,8 @@ import { Check } from "lucide-react";
 import { StarMark } from "./StarMark";
 import { Capacitor } from "@capacitor/core";
 import { useAuth } from "@/hooks/use-auth";
-import { useHealthSummary, useHealthSync } from "@/hooks/use-health";
+import { useHealthStatus, useHealthSync } from "@/hooks/use-health";
+import { resolveConnection } from "@/lib/healthState";
 import { track } from "@/lib/track";
 import { IntakeStep, type IntakeValues } from "./IntakeStep";
 import { PhotoStep } from "./PhotoStep";
@@ -141,7 +142,8 @@ type Step = "intake" | "photo" | "health" | "notifications" | "widget";
 
 export function Onboarding() {
   const { available, platform, connect } = useHealthSync();
-  const { data, isLoading } = useHealthSummary(30);
+  const status = useHealthStatus();
+  const isLoading = status.isLoading;
   const isNative = Capacitor.isNativePlatform();
   const { user } = useAuth();
   const userId = user?.id ?? null;
@@ -150,7 +152,17 @@ export function Onboarding() {
   const [depth, setDepth] = useState<NoticeDepth>(getNoticeDepth());
   const [notifyBusy, setNotifyBusy] = useState(false);
 
-  const connected = data?.connected ?? false;
+  /*
+    The connection question, asked of the endpoint whose job it is.
+
+    This mattered more here than anywhere: reading it off the summary meant an
+    unfinished query looked like a member with no phone linked, and onboarding
+    would offer to connect Apple Health to someone who connected it weeks ago
+    — the one screen where being wrong wastes a step the member cannot skip
+    back to. `unknown` is treated as "do not ask", which is the safe direction:
+    the worst case is a connected member is not re-asked.
+  */
+  const connected = resolveConnection(status) !== "disconnected";
   const isIos = Capacitor.getPlatform() === "ios";
   const storeName = platform === "healthconnect" ? "Health Connect" : "Apple Health";
 

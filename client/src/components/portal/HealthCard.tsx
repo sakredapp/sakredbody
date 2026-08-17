@@ -1,12 +1,20 @@
 /**
  * The Health card — connect a phone, and see everything it sent.
  *
- * Shown on Stats. Three genuinely different states, so it does not try to be
- * one component with a flag:
+ * Shown on Stats. The states are genuinely different, so it does not try to be
+ * one component with a flag — and they come from `resolveHealthView`, not from
+ * booleans assembled here:
  *
- *   web           — health only reads on the phone; say so and stop
- *   not connected — one button, and an honest sentence about what we read
- *   connected     — every metric that has data, grouped
+ *   unknown       — still asking. Neutral, and never a Connect button
+ *   unavailable   — health only reads on the phone; say so and stop
+ *   disconnected  — one button, and an honest sentence about what we read
+ *   hydrating     — linked, and the first read has not landed yet
+ *   empty         — linked, we looked, and there is genuinely nothing
+ *   ready         — every metric that has data, grouped
+ *   error         — we could not find out, and say which way round that is
+ *
+ * The distinction between `unknown` and `disconnected` is the one this card
+ * used to be unable to make, and it is the whole bug: see healthState.ts.
  *
  * "Every metric that has data" rather than a fixed four. The sync collects
  * twenty-two, and hard-coding a handful in the component meant the other
@@ -18,7 +26,7 @@
  */
 
 import { RefreshCw, Link2Off, TrendingDown, TrendingUp } from "lucide-react";
-import { useHealthSummary, useHealthSync } from "@/hooks/use-health";
+import { useHealthSync, useHealthView } from "@/hooks/use-health";
 import {
   METRIC_DISPLAY,
   groupsWithData,
@@ -132,20 +140,31 @@ function MetricTile({ days, metric }: { days: DaySeries[]; metric: keyof typeof 
 }
 
 export function HealthCard() {
-  const { available, reason, platform, connect, sync, disconnect } = useHealthSync();
-  const { data, isLoading } = useHealthSummary(30);
+  const { connect, sync, disconnect } = useHealthSync();
+  const { view, reason, platform, summary, days: rawDays, connections } = useHealthView(30);
   const { toast } = useToast();
 
   const storeName = platform === "healthconnect" ? "Health Connect" : "Apple Health";
-  const days = (data?.days ?? []) as DaySeries[];
-  const connected = data?.connected ?? false;
+  const days = rawDays as DaySeries[];
   const groups = groupsWithData(days);
 
-  // `available === null` means the probe has not resolved. Rendering the
-  // "phone only" message during that beat would flash the wrong explanation at
-  // every member who is in fact on a phone.
-  const showConnect = available === true && !connected;
-  const webOnly = available === false && !connected;
+  /*
+    Every branch below comes from one resolved state rather than from booleans
+    combined at the point of use.
+
+    What used to be here was `const connected = data?.connected ?? false` —
+    read from the summary, so an unfinished query and a member with no phone
+    linked produced the same value, and this card offered "Connect Apple
+    Health" to someone whose Settings screen said Connected on the same
+    launch. There is no expression that recovers the difference once it has
+    been collapsed, which is why the fix is a state machine and not a longer
+    condition. See client/src/lib/healthState.ts.
+  */
+  const showConnect = view.kind === "disconnected";
+  const webOnly = view.kind === "unavailable";
+  // Data outranks everything: once there is something to draw it stays drawn,
+  // through a refresh, a failed status read, or a sync that never returns.
+  const showData = view.kind === "ready";
 
   const runSync = async () => {
     const res = await sync.mutateAsync();
@@ -179,12 +198,12 @@ export function HealthCard() {
             Your body's own record
           </h3>
           <p className="text-xs text-muted-foreground mt-1">
-            {connected
+            {showData || view.kind === "hydrating" || view.kind === "empty"
               ? `From ${storeName}. Updates on its own.`
               : `Activity, sleep and heart data from ${storeName}.`}
           </p>
         </div>
-        {connected && (
+        {showData && (
           <Button
             variant="ghost"
             size="sm"
@@ -218,7 +237,35 @@ export function HealthCard() {
         </div>
       )}
 
-      {connected && (
+      {/*
+        Linked, and nothing to draw yet. Distinct from "no data" because
+        nobody has finished looking — a member with a full Health app must
+        never be told they have none merely because the read is outstanding.
+      */}
+      {view.kind === "hydrating" && (
+        <p className="text-sm text-muted-foreground">Loading your health data…</p>
+      )}
+
+      {view.kind === "empty" && (
+        <p className="text-sm text-muted-foreground">
+          Connected, but nothing has come through yet. If you only just allowed access, give it a
+          minute — or check which categories you shared in {storeName}.
+        </p>
+      )}
+
+      {view.kind === "error" && (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            We couldn't check your {storeName} connection just now. Nothing has changed on your
+            phone — this is us, not you.
+          </p>
+          <Button variant="outline" size="sm" onClick={() => summary.refetch()}>
+            Try again
+          </Button>
+        </div>
+      )}
+
+      {showData && (
         <>
           {groups.map(({ group, metrics }) => (
             <div key={group} className="space-y-2">
@@ -231,21 +278,21 @@ export function HealthCard() {
             </div>
           ))}
 
-          <HealthWorkouts workouts={data?.workouts ?? []} editable />
+          <HealthWorkouts workouts={summary.data?.workouts ?? []} editable />
 
-          {isLoading && <p className="text-xs text-muted-foreground">Loading…</p>}
-
-          {!isLoading && groups.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              Connected, but nothing has come through yet. If you only just allowed access, give it
-              a minute — or check which categories you shared in {storeName}.
-            </p>
+          {/*
+            A caption, never a curtain. The numbers above stay on screen while
+            this is true — a member who had sleep and HRV yesterday must not
+            briefly look like someone with no wearable while we check.
+          */}
+          {view.kind === "ready" && view.refreshing && (
+            <p className="text-xs text-muted-foreground">Updating…</p>
           )}
 
           <div className="flex items-center justify-between gap-3 pt-1">
             <p className="text-[11px] text-muted-foreground">
-              {data?.connections[0]?.lastSyncAt
-                ? `Last synced ${new Date(data.connections[0].lastSyncAt).toLocaleString()}`
+              {connections[0]?.lastSyncAt
+                ? `Last synced ${new Date(connections[0].lastSyncAt).toLocaleString()}`
                 : "Not synced yet"}
             </p>
             <Button

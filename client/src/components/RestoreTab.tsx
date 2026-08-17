@@ -38,7 +38,7 @@ import { RhythmSection } from "@/components/RhythmCards";
 import { Panel, SectionHeading } from "@/components/portal/Panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { useHealthSummary } from "@/hooks/use-health";
+import { useHealthConnection, useHealthSummary } from "@/hooks/use-health";
 import { EXERCISE_CATEGORIES, CATEGORY_LOAD, activityLabel } from "@shared/models/training";
 import { HabitPanel } from "@/components/habits/HabitPanel";
 import { TerrainCheckin } from "@/components/habits/TerrainCheckin";
@@ -282,8 +282,17 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
    *     loading      we do not know yet — say nothing
    *     !connected   genuinely nothing linked — offer the CTA
    *     connected    linked; may still have no readings this week
+   *
+   * It now asks `/api/health/status` rather than reading `connected` off the
+   * summary. Same three states, but the third was unreachable before: the
+   * summary answers both questions in one payload, so "still loading" arrived
+   * here as `connected === false` and this screen offered the CTA anyway —
+   * the exact wrong the comment above was written to prevent, reintroduced by
+   * the source it trusted.
    */
-  const connected = health.data?.connected === true;
+  const connection = useHealthConnection();
+  const connected = connection === "connected";
+  const stillAsking = connection === "unknown";
   const noReadings = sleep === null && hrv === null && rhr === null;
 
   return (
@@ -350,8 +359,9 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">
-            {/* Only suggest connecting to somebody who has not. */}
-            {connected
+            {/* Only suggest connecting to somebody who has not — and only
+                once we know, which `stillAsking` is what makes possible. */}
+            {connected || stillAsking
               ? "Nothing to read yet. Log a session and this starts filling in."
               : "Nothing to read yet. Connect health data or log a session."}
           </p>
@@ -365,7 +375,12 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
         onAction={noReadings ? undefined : () => onOpen("coaching")}
         data-testid="restore-recovery"
       >
-        {health.isLoading ? (
+        {/*
+          A skeleton while either question is open. Falling through to the
+          "Connect health data" branch during that beat is what made a
+          connected member's Restore screen ask them to connect.
+        */}
+        {health.isLoading || stillAsking ? (
           <Skeleton className="h-14 w-full" />
         ) : !connected ? (
           <div className="space-y-3">

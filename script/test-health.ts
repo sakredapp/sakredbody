@@ -1410,12 +1410,33 @@ for (const name of ["onboarding.shown", "onboarding.answered"]) {
 const SWATCH_UNAVAIL = stripComments(SWATCH_SRC);
 check(
   "the home screen says so when health is unavailable",
-  /available === false/.test(SWATCH_UNAVAIL) && /reason/.test(SWATCH_UNAVAIL),
+  /view\.kind === "unavailable"/.test(SWATCH_UNAVAIL) && /reason/.test(SWATCH_UNAVAIL),
   "returning null for an unavailable store is indistinguishable from the feature not existing"
 );
+/*
+  These two used to read `available === false` and `available === null` — the
+  probe's own tri-state, checked at the point of render. The states they name
+  are unchanged; what moved is where they are decided. Both now come out of
+  `resolveHealthView`, which is what let the third state on this screen —
+  connected, but the summary has not answered — stop resolving to "offer
+  Connect".
+*/
 check(
   "a still-resolving probe renders nothing rather than an error",
-  /available === null/.test(SWATCH_UNAVAIL)
+  /view\.kind === "unknown"\) return null/.test(SWATCH_UNAVAIL)
+);
+/*
+  The one that mattered. This screen is Home, the first thing a member sees,
+  and every branch here used to begin `!connected &&` where `connected` came
+  from the summary payload — so before that query answered, a connected member
+  fell through to the Connect prompt on launch. Nothing on this screen may
+  offer that except a confirmed disconnection.
+*/
+check(
+  "and Home offers Connect only on a confirmed disconnection",
+  /view\.kind === "disconnected"/.test(SWATCH_UNAVAIL) &&
+    !/data\?\.connected/.test(SWATCH_UNAVAIL),
+  "the summary payload is not the connection"
 );
 check(
   "leaving early is remembered, and separately from finishing",
@@ -1800,8 +1821,12 @@ console.log("\nThe Android health lifecycle survives a part of it failing\n");
   const body = loop.slice(0, loop.indexOf("\n  }") + 4);
   check("there is a read loop to check", body.length > 200, `${body.length} chars`);
   check("each metric is read inside its own try", /try \{/.test(body));
+  // The catch now also times the failed read for the launch trace, so this
+  // matches the push anywhere in the handler rather than as its first
+  // statement. What is being defended is unchanged: the failure is recorded
+  // and the loop continues to the next metric.
   check("and a failure is recorded rather than thrown",
-    /catch \(err\) \{\s*skipped\.push/.test(body));
+    /catch \(err\) \{[\s\S]*?skipped\.push/.test(body));
   check("so an unsupported or unavailable type skips only itself",
     !/throw/.test(body));
 

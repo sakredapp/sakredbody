@@ -25,9 +25,26 @@ import { cn } from "@/lib/utils";
 const TREND_FLOOR = 0.03;
 
 export function MemberHealth({ userId }: { userId: string }) {
-  const { data, isLoading } = useMemberHealth(userId, 30);
+  const { data, isLoading, error } = useMemberHealth(userId, 30);
 
   if (isLoading) return <p className="text-xs text-muted-foreground">Loading health…</p>;
+
+  /*
+    A failed read is not a member without a phone.
+
+    The loading case was already handled above, so this is the narrower half
+    of the same mistake the member-facing screens made: with no data and no
+    spinner, "no phone connected" was the only thing left to say, and it is a
+    statement about the member rather than about the request. A coach acts on
+    it — asks a client to reconnect something that was never disconnected.
+  */
+  if (error) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Couldn't load their health data. This says nothing about their connection.
+      </p>
+    );
+  }
 
   if (!data?.connected) {
     return (

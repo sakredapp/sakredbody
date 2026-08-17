@@ -14,6 +14,7 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { withTimeout, BridgeTimeout } from "./bridgeTimeout";
 import { apiRequest } from "./queryClient";
+import { markHealth, noteHealth, noteHealthFamily } from "./healthTrace";
 import {
   exerciseMinutesFromWorkouts,
   foldSleep,
@@ -465,6 +466,7 @@ export async function syncHealth(): Promise<SyncResult> {
   const granted: string[] = [];
 
   for (const plan of plansFor(healthPlatform())) {
+    const startedAt = readClock();
     try {
       // Wrapped like every other crossing. A read that never answers hangs
       // the whole sync — the same failure as the probe, one screen further in,
@@ -480,6 +482,19 @@ export async function syncHealth(): Promise<SyncResult> {
         `Health.queryAggregated(${plan.dataType})`,
         READ_TIMEOUT_MS,
       );
+      /*
+        Timed per family, because the two explanations for a slow sync call
+        for opposite fixes: one family taking fifty seconds is a query to
+        narrow, twenty-two families taking two seconds each is a loop to
+        parallelise. Only a per-family duration tells them apart, and the
+        bucket count says whether the window is wider than it needs to be.
+
+        Duration and count only. Never a value.
+      */
+      noteHealthFamily(plan.metric, {
+        ms: readClock() - startedAt,
+        buckets: res.samples?.length ?? 0,
+      });
       let kept = 0;
       for (const bucket of res.samples ?? []) {
         const row = toCanonical(plan, {
@@ -499,6 +514,7 @@ export async function syncHealth(): Promise<SyncResult> {
       }
       if (kept) granted.push(plan.metric);
     } catch (err) {
+      noteHealthFamily(plan.metric, { ms: readClock() - startedAt, error: errText(err) });
       skipped.push(`${plan.metric}: ${errText(err)}`);
     }
   }
@@ -506,6 +522,7 @@ export async function syncHealth(): Promise<SyncResult> {
   // Sleep is read as samples rather than aggregated, because the stage
   // breakdown only exists on the samples — and deep and REM minutes are the
   // part a coach actually reads.
+  const sleepStartedAt = readClock();
   try {
     const res = await withTimeout(
       p.readSamples({
@@ -519,9 +536,16 @@ export async function syncHealth(): Promise<SyncResult> {
       READ_TIMEOUT_MS,
     );
     const folded = foldSleep(res.samples ?? []);
+    // The only read here with a limit that a long window can actually reach.
+    // Whether 2,000 is a ceiling being hit is a question the count answers.
+    noteHealthFamily("sleep", {
+      ms: readClock() - sleepStartedAt,
+      buckets: res.samples?.length ?? 0,
+    });
     samples.push(...folded);
     if (folded.length) granted.push("sleepMinutes");
   } catch (err) {
+    noteHealthFamily("sleep", { ms: readClock() - sleepStartedAt, error: errText(err) });
     skipped.push(`sleep: ${errText(err)}`);
   }
 
@@ -536,12 +560,17 @@ export async function syncHealth(): Promise<SyncResult> {
     distanceMeters?: number | null;
     sourceApp?: string | null;
   }[] = [];
+  const workoutsStartedAt = readClock();
   try {
     const res = await withTimeout(
       p.queryWorkouts({ startDate, endDate, limit: 300 }),
       "Health.queryWorkouts()",
       READ_TIMEOUT_MS,
     );
+    noteHealthFamily("workouts", {
+      ms: readClock() - workoutsStartedAt,
+      buckets: res.workouts?.length ?? 0,
+    });
     for (const w of res.workouts ?? []) {
       // No platform id means no idempotency key, and re-syncing would add the
       // same session again every time. Skipping is the lesser wrong.
@@ -559,6 +588,7 @@ export async function syncHealth(): Promise<SyncResult> {
       });
     }
   } catch (err) {
+    noteHealthFamily("workouts", { ms: readClock() - workoutsStartedAt, error: errText(err) });
     skipped.push(`workouts: ${errText(err)}`);
   }
 
@@ -596,11 +626,17 @@ export async function syncHealth(): Promise<SyncResult> {
     };
   }
 
+  // Everything above was the phone. Everything below is our own network.
+  // Splitting the trace here is what makes "Health Connect is slow" and "the
+  // upload is slow" two different findings rather than one guess.
+  markHealth("native_read_resolved");
+
   let accepted = 0;
   let workoutsWritten = 0;
   let rejected = 0;
   const reasons: string[] = [];
 
+  markHealth("write_started");
   try {
     // Paged, and the watermark only advances on the LAST page. A run that
     // dies halfway then re-reads from the old mark next time; advancing per
@@ -624,10 +660,28 @@ export async function syncHealth(): Promise<SyncResult> {
       for (const r of body.reasons ?? []) if (!reasons.includes(r)) reasons.push(r);
     }
   } catch (err) {
+    markHealth("write_resolved");
     return { ...empty, skipped, message: errText(err) };
   }
+  markHealth("write_resolved");
+  noteHealth("samples_posted", samples.length);
+  noteHealth("workouts_posted", workouts.length);
 
   return { ok: true, accepted, workouts: workoutsWritten, rejected, reasons, skipped };
+}
+
+/**
+ * Monotonic, for measuring a span rather than naming a moment.
+ *
+ * A phone can adjust its wall clock mid-sync, and a member can cross a
+ * timezone during one. Either would make a stage report a negative duration
+ * with `Date.now()`, which is the sort of number that gets a real finding
+ * dismissed as a bug in the instrument.
+ */
+function readClock(): number {
+  return typeof performance !== "undefined" && typeof performance.now === "function"
+    ? performance.now()
+    : Date.now();
 }
 
 function errText(err: unknown): string {

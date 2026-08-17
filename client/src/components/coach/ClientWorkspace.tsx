@@ -641,6 +641,11 @@ function Plan({ memberId, memberName }: { memberId: string; memberName: string }
       <Section title="Health context" kind="health">
         {trends.isLoading ? (
           <Skeleton className="h-16 w-full" />
+        ) : trends.error ? (
+          // Not the same as a client with no phone linked, and a coach would
+          // act differently on each — one is a conversation to have, the other
+          // is nothing to do with them. Say which one this is.
+          <Empty>Couldn't load their health data. This says nothing about their connection.</Empty>
         ) : !trends.data?.connected ? (
           <Empty>
             No connected health data. Member-entered habits and check-ins still appear.

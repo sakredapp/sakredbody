@@ -127,6 +127,12 @@ export const EVENT_NAMES = [
   // behaviour: when a device reports the feature unavailable, this is the only
   // evidence anyone has, and without it the answer is guesswork.
   "health.probe",
+  // How long the first health screen took, stage by stage. Durations and
+  // counts only, never a measurement. The launch it describes takes about a
+  // minute on a real phone — and so does every candidate explanation for it,
+  // which is why elapsed time per stage is the only thing that separates
+  // them. See client/src/lib/healthTrace.ts.
+  "health.startup",
 
   // Administration. Who changed whose access, and when — the one category
   // where the audit trail matters more than the aggregate.
