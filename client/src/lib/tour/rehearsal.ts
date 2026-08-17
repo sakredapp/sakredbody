@@ -302,9 +302,48 @@ function numberOrNull(v: unknown): number | null {
 
 // ── The boundary ─────────────────────────────────────────────────────────
 
+/**
+ * Background writes that are real, safe, and nothing to do with the rehearsal.
+ *
+ * ── Why deferred rather than refused ──────────────────────────────────────
+ *
+ * The barrier is up for about a minute while the member practises logging a
+ * set. Things carry on underneath it: health sync pushes what the phone
+ * actually measured, a notification token registers. Those are real member
+ * data, not invented — refusing them would drop them on the floor and fill the
+ * error paths with 403s that mean nothing to anybody reading a log later.
+ *
+ * So they are held and replayed when the barrier comes down. During the
+ * interval nothing reaches the network, which is the guarantee; afterwards the
+ * genuine writes land, a minute late, which for a background sync is no
+ * difference at all.
+ *
+ * ── Why this is a list and not a rule ─────────────────────────────────────
+ *
+ * Because deferral is permission. A route matched here goes out eventually,
+ * and if an unknown route were deferred by default then a workout mutation
+ * added next year would be queued during the rehearsal and posted the moment
+ * it ended — which is the contamination this whole file exists to prevent,
+ * arriving sixty seconds later than it otherwise would.
+ *
+ * Refusal stays the default. This is the enumerated exception, it is short,
+ * and nothing that touches training or a member's body record belongs in it.
+ */
+const DEFERRED_WRITES: RegExp[] = [
+  // Real measurements from the device. The member's own data, already
+  // collected; the rehearsal has no business discarding it.
+  /^\/api\/health\/(?!workouts\/confirm)/,
+  // Push token registration and read receipts. No body record involved.
+  /^\/api\/notifications\//,
+];
+
+type Deferred = { input: RequestInfo | URL; init?: RequestInit };
+
 let store: RehearsalStore | null = null;
 let original: typeof globalThis.fetch | null = null;
+let installed: typeof globalThis.fetch | null = null;
 let refused: RefusedWrite[] = [];
+let deferred: Deferred[] = [];
 
 export function isRehearsing(): boolean {
   return store !== null;
@@ -351,16 +390,27 @@ export function beginRehearsal(startedAt: string, fetchImpl?: typeof globalThis.
   if (store) return;
   store = createStore(startedAt);
   refused = [];
+  deferred = [];
 
-  const base = fetchImpl ?? globalThis.fetch;
-  original = base.bind(globalThis) as typeof globalThis.fetch;
+  /*
+    Held as the reference we were given, not as a bound copy of it.
 
-  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    `base.bind(globalThis)` returns a *new* function, so restoring it on the
+    way out would leave a wrapper in place of whatever was there before —
+    forever, and one layer thicker after every rehearsal. Natively that
+    "whatever" is `installNativeApiFetch`'s patch, which every raw
+    `fetch("/api/…")` in the app depends on; quietly replacing it with a bound
+    proxy of itself is the kind of thing that works until it doesn't.
+  */
+  original = fetchImpl ?? globalThis.fetch;
+
+  const wrapper = async (input: RequestInfo | URL, init?: RequestInit) => {
     const active = store;
-    if (!active || !original) return (original ?? base)(input as RequestInfo, init);
+    const base = original;
+    if (!base) throw new Error("rehearsal boundary lost its original fetch");
+    if (!active) return base.call(globalThis, input as RequestInfo, init);
 
-    const method =
-      init?.method ?? (input instanceof Request ? input.method : "GET");
+    const method = init?.method ?? (input instanceof Request ? input.method : "GET");
     const path = pathOf(input);
 
     let body: unknown;
@@ -373,8 +423,14 @@ export function beginRehearsal(startedAt: string, fetchImpl?: typeof globalThis.
     }
 
     const verdict = routeRehearsal(method, path, body, active);
-    if (verdict.kind === "passthrough") return original(input as RequestInfo, init);
+    if (verdict.kind === "passthrough") return base.call(globalThis, input as RequestInfo, init);
     if (verdict.kind === "serve") return json(verdict.status, verdict.body);
+
+    if (DEFERRED_WRITES.some((r) => r.test(path))) {
+      deferred.push({ input, init });
+      // 202: accepted, not yet acted on. Which is exactly true.
+      return json(202, { deferred: true, rehearsal: true });
+    }
 
     refused.push({ method: method.toUpperCase(), path });
     /*
@@ -385,16 +441,61 @@ export function beginRehearsal(startedAt: string, fetchImpl?: typeof globalThis.
     */
     return json(403, { error: verdict.reason, rehearsal: true });
   };
+
+  installed = wrapper as typeof globalThis.fetch;
+  globalThis.fetch = installed;
 }
 
 /**
  * End it, and let go of everything.
  *
- * The store is dropped rather than cleared, so there is no object left holding
- * invented sets, and nothing to submit later even by mistake.
+ * ── Called from more places than it is started from ───────────────────────
+ *
+ * Deliberately. The rehearsal begins in one place and can end in six: the
+ * member closes the sheet, pauses the walkthrough, backs out with the Android
+ * gesture, navigates away, the component unmounts, or something throws. Every
+ * one of those has to bring the barrier down, so this is idempotent, safe to
+ * call when nothing is running, and safe to call twice — an effect cleanup and
+ * an explicit close will both fire, and the second must not restore a
+ * `null` over somebody else's fetch.
+ *
+ * The store is dropped rather than cleared, so nothing is left holding invented
+ * sets and there is nothing to submit later even by mistake.
  */
 export function endRehearsal(): void {
-  if (original) globalThis.fetch = original;
+  if (!store && !installed) return;
+
+  /*
+    Only unwind what we put there.
+
+    If something else has patched `fetch` on top of ours since — a debug tool,
+    a future interceptor — then blindly assigning `original` would silently
+    remove theirs. Leaving ours in place is worse, so the store is dropped
+    either way: the wrapper checks `store` on every call and passes everything
+    through once it is null, so an un-restorable barrier degrades to a
+    transparent one rather than to a stuck one.
+  */
+  if (installed && globalThis.fetch === installed && original) {
+    globalThis.fetch = original;
+  }
+
+  const held = deferred;
+  installed = null;
   original = null;
   store = null;
+  deferred = [];
+
+  /*
+    Replay what was held back. After the reset above, so these go out through
+    the restored fetch rather than back into the barrier — which would queue
+    them again, forever.
+  */
+  for (const { input, init } of held) {
+    void Promise.resolve(globalThis.fetch(input as RequestInfo, init)).catch(() => undefined);
+  }
+}
+
+/** How many real background writes are waiting for the barrier to come down. */
+export function deferredWrites(): number {
+  return deferred.length;
 }

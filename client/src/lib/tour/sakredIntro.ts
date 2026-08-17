@@ -132,6 +132,7 @@ export const SAKRED_INTRO: GuidedTour = {
       objective: "Learn Build",
       section: "build",
       anchor: "build-start-session",
+      rehearsal: "begin",
       title: "Starting a session",
       body:
         "This opens your workout.\n\nOpen one now and I'll show you how logging " +
@@ -197,6 +198,7 @@ export const SAKRED_INTRO: GuidedTour = {
       id: "close-workout",
       objective: "Learn Build",
       anchor: "workout-close",
+      rehearsal: "end",
       title: "That's a session",
       body:
         "Close this one. Nothing from the rehearsal is kept — no sets, no history, " +

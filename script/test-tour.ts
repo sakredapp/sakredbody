@@ -46,6 +46,7 @@ import {
 } from "../client/src/lib/tour/sakredIntro.js";
 import { isProgress, progressKey } from "../client/src/lib/tour/progress.js";
 import { AUTO_START_ENABLED, REQUIRED_TOUR_VERSION, owesRequiredTour } from "../client/src/lib/tour/rollout.js";
+import { TOUR_ANCHORS } from "../client/src/lib/tour/types.js";
 import type { GuidedTour, TourAnchor, TourProgress, TourWorld } from "../client/src/lib/tour/types.js";
 
 let passed = 0;
@@ -533,6 +534,35 @@ const named = new Set<TourAnchor>(
 
 const missing = [...named].filter((a) => !placed.has(a) && !PENDING.has(a));
 check("every anchor a step names exists on a real control", missing.length === 0, missing.join(", "));
+
+/*
+  The arithmetic, asserted rather than reported.
+
+  The previous version of this file had the enum as a type, which cannot be
+  counted at runtime — so the denominator lived in prose, and prose is how a
+  status report says "13 of 15" while listing fifteen items. Two unplaced
+  targets fit comfortably inside a slip like that.
+
+  Now every anchor in `TOUR_ANCHORS` is in exactly one of three buckets and the
+  buckets have to account for all of it. An anchor added to the enum and
+  forgotten fails here rather than being quietly absent from a count.
+*/
+const unaccounted = TOUR_ANCHORS.filter((a) => !placed.has(a) && !PENDING.has(a));
+check(
+  "every anchor in the enum is either placed or explicitly pending",
+  unaccounted.length === 0,
+  unaccounted.join(", "),
+);
+const placedFromEnum = TOUR_ANCHORS.filter((a) => placed.has(a));
+check(
+  "placed + pending accounts for the whole enum",
+  placedFromEnum.length + PENDING.size === TOUR_ANCHORS.length,
+  `${placedFromEnum.length} placed + ${PENDING.size} pending ≠ ${TOUR_ANCHORS.length} total`,
+);
+check(
+  "and no anchor is claimed both placed and pending",
+  ![...PENDING].some((a) => placed.has(a)),
+);
 
 const staleP = [...PENDING].filter((a) => placed.has(a));
 check("and nothing lingers on the pending list once it is wired", staleP.length === 0, staleP.join(", "));

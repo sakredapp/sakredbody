@@ -27,35 +27,47 @@
 /**
  * Canonical target names.
  *
- * A union rather than a string so a typo is a type error, and so the full set
- * of things the walkthrough is allowed to point at is legible in one place.
+ * ── Why an array and not a union ──────────────────────────────────────────
+ *
+ * It was a union, which gave the type safety and nothing else — and a type
+ * does not exist at runtime, so no test could count it. The denominator was
+ * therefore prose, and prose is how a report ends up saying "13 of 15" while
+ * listing fifteen things. Two unimplemented targets can hide behind an
+ * arithmetic slip in exactly that way.
+ *
+ * As a `const` array it is the same type (derived below, so a typo is still a
+ * type error) *and* a value the suite can enumerate. Total, placed and pending
+ * are now measured rather than asserted, and they have to add up.
  */
-export type TourAnchor =
-  | "nav-home"
-  | "nav-restore"
-  | "nav-build"
-  | "nav-community"
-  | "nav-body"
-  | "nav-more"
-  | "nav-more-settings"
-  | "nav-more-wins"
-  | "terrain-now"
-  | "health-card"
-  | "restore-practice"
-  | "build-today"
-  | "build-start-session"
-  | "workout-add-exercise"
-  | "workout-set-row"
-  | "workout-rpe"
-  | "workout-set-style"
-  | "workout-last-time"
-  | "workout-close"
-  | "body-map"
-  | "body-territory"
-  | "room-feed"
-  | "more-sheet"
-  | "appearance-control"
-  | "role-coach";
+export const TOUR_ANCHORS = [
+  "nav-home",
+  "nav-restore",
+  "nav-build",
+  "nav-community",
+  "nav-body",
+  "nav-more",
+  "nav-more-settings",
+  "nav-more-wins",
+  "terrain-now",
+  "health-card",
+  "restore-practice",
+  "build-today",
+  "build-start-session",
+  "workout-add-exercise",
+  "workout-set-row",
+  "workout-rpe",
+  "workout-set-style",
+  "workout-last-time",
+  "workout-close",
+  "body-map",
+  "body-territory",
+  "room-feed",
+  "more-sheet",
+  "appearance-control",
+  "role-coach",
+] as const;
+
+export type TourAnchor = (typeof TOUR_ANCHORS)[number];
 
 /**
  * How a step ends.
@@ -102,6 +114,17 @@ export type TourStep = {
   optional?: boolean;
   /** Named for the quest log, which lists phases rather than every step. */
   objective?: string;
+  /**
+   * Where the rehearsal's write barrier opens and closes.
+   *
+   * Scoped to these two steps rather than to the whole walkthrough on purpose.
+   * The barrier intercepts the global `fetch`, and holding it up for the full
+   * five minutes would mean the rest of the tour — Home, Restore, Body, Room —
+   * runs with the application's networking rerouted through a tutorial. The
+   * guarantee we want is "the tutorial workout writes nothing", not "the app
+   * stops working while somebody is being taught".
+   */
+  rehearsal?: "begin" | "end";
 };
 
 export type GuidedTour = {

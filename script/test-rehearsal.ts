@@ -33,8 +33,10 @@ import {
   isRehearsing,
   refusedWrites,
   rehearsalStore,
+  deferredWrites,
   routeRehearsal,
 } from "../client/src/lib/tour/rehearsal.js";
+import { SAKRED_INTRO } from "../client/src/lib/tour/sakredIntro.js";
 
 let passed = 0;
 const failures: string[] = [];
@@ -230,6 +232,161 @@ endRehearsal();
 check("a doubled begin does not survive a single end", !isRehearsing());
 await call("POST", "/api/training/sessions/real/finish");
 check("and a real write goes out again immediately afterwards", writesEscaped().length === 1);
+
+// ─── The barrier's lifecycle ─────────────────────────────────────────────
+
+/*
+  The barrier patches the global `fetch`, which makes its lifecycle the most
+  dangerous thing about it. A rehearsal that fails to come down does not break
+  a tutorial — it breaks the application, for everything, until the app is
+  killed. So the failure modes are enumerated rather than assumed.
+*/
+
+const pristine = globalThis.fetch;
+
+beginRehearsal(STARTED, recordingFetch);
+endRehearsal();
+check("a normal exit restores the exact function that was there", globalThis.fetch === pristine);
+
+/*
+  Reference identity, not "a function that behaves the same".
+
+  The first version held `base.bind(globalThis)` and restored that — a *new*
+  function each time, one layer thicker after every rehearsal. Natively the
+  thing being replaced is `installNativeApiFetch`'s patch, which every raw
+  fetch("/api/…") in the app depends on, so quietly swapping it for a bound
+  proxy of itself is the kind of thing that works until it doesn't.
+*/
+beginRehearsal(STARTED, recordingFetch);
+const during = globalThis.fetch;
+check("the barrier really is installed while running", during !== pristine);
+endRehearsal();
+endRehearsal();
+check("and a doubled end does not restore over the top of itself", globalThis.fetch === pristine);
+
+// Three rehearsals in a row must not accumulate wrappers.
+for (let i = 0; i < 3; i++) {
+  beginRehearsal(STARTED, recordingFetch);
+  endRehearsal();
+}
+check("repeated rehearsals leave no residue", globalThis.fetch === pristine);
+
+/*
+  Something throwing mid-rehearsal is the realistic case — a render error, a
+  bad response, a component unmounting under it. The caller is expected to end
+  it from a `finally` or an effect cleanup, and what this proves is that doing
+  so works from a throwing path.
+*/
+try {
+  beginRehearsal(STARTED, recordingFetch);
+  throw new Error("something failed inside the rehearsal");
+} catch {
+  endRehearsal();
+}
+check("an error during a rehearsal still brings the barrier down", globalThis.fetch === pristine);
+
+check("ending one that never started is harmless", (() => {
+  endRehearsal();
+  return globalThis.fetch === pristine;
+})());
+
+/*
+  If something else patches on top of ours, restoring blindly would remove
+  theirs. Dropping the store instead makes the barrier transparent — every call
+  passes through once there is no rehearsal — so an un-restorable barrier
+  degrades to a no-op rather than to a stuck one.
+*/
+beginRehearsal(STARTED, recordingFetch);
+const foreign = (async (input: RequestInfo | URL, init?: RequestInit) =>
+  globalThis.fetch === foreign ? new Response("{}") : new Response("{}")) as typeof globalThis.fetch;
+globalThis.fetch = foreign;
+endRehearsal();
+check("a foreign patch on top is not clobbered", globalThis.fetch === foreign);
+check("and the rehearsal is over regardless", !isRehearsing());
+globalThis.fetch = pristine;
+
+// ─── Background systems are decided, not left to 403 ─────────────────────
+
+/*
+  The barrier is up for about a minute. Things carry on underneath it: health
+  sync pushes what the phone actually measured, a push token registers. Those
+  are real member data, not invented — refusing them would drop them and fill
+  the logs with 403s that mean nothing to whoever reads them later.
+
+  So they are held and replayed when the barrier comes down. Nothing reaches
+  the network during the interval, which is the guarantee; afterwards the
+  genuine writes land a minute late, which for a background sync is no
+  difference at all.
+*/
+escaped = [];
+beginRehearsal(STARTED, recordingFetch);
+
+const health = await call("POST", "/api/health/days", { steps: 8000 });
+const push = await call("POST", "/api/notifications/register", { token: "abc" });
+check("a real health sync is accepted rather than refused", health.status === 202);
+check("and so is a push registration", push.status === 202);
+check("neither creates error noise", refusedWrites().length === 0);
+check("but neither reaches the network yet", writesEscaped().length === 0);
+check("they are held", deferredWrites() === 2);
+
+endRehearsal();
+await new Promise((r) => setTimeout(r, 0));
+check(
+  "and go out once the barrier is down",
+  writesEscaped().length === 2,
+  writesEscaped().map((w) => `${w.method} ${w.url}`).join(", "),
+);
+
+/*
+  Deferral is permission, so it is an enumerated exception and refusal stays
+  the default. If an unknown route were deferred instead, a workout mutation
+  added next year would be queued during the rehearsal and posted the instant
+  it ended — the same contamination, sixty seconds later.
+*/
+escaped = [];
+beginRehearsal(STARTED, recordingFetch);
+const confirm = await call("POST", "/api/health/workouts/confirm", { id: "x" });
+check(
+  "confirming a workout is member training state and is refused, not deferred",
+  confirm.status === 403,
+);
+const unknown = await call("POST", "/api/whatever/comes/next", {});
+check("and an unknown route is refused rather than queued", unknown.status === 403);
+check("nothing was held", deferredWrites() === 0);
+endRehearsal();
+await new Promise((r) => setTimeout(r, 0));
+check("so nothing goes out afterwards either", writesEscaped().length === 0,
+  writesEscaped().map((w) => `${w.method} ${w.url}`).join(", "));
+
+// ─── The interval is the workout, not the walkthrough ────────────────────
+
+/*
+  Scope matters as much as strictness. Holding the barrier for the whole
+  five-minute tour would mean Home, Restore, Body and Room all run with the
+  application's networking rerouted through a tutorial. The guarantee is "the
+  rehearsal workout writes nothing", not "the app stops working while somebody
+  is being taught.
+*/
+const begins = SAKRED_INTRO.steps.filter((s) => s.rehearsal === "begin");
+const ends = SAKRED_INTRO.steps.filter((s) => s.rehearsal === "end");
+check("exactly one step opens the barrier", begins.length === 1, begins.map((s) => s.id).join(", "));
+check("and exactly one closes it", ends.length === 1, ends.map((s) => s.id).join(", "));
+check("it opens where the session is started", begins[0]?.id === "start-session");
+check("and closes where the session is closed", ends[0]?.id === "close-workout");
+
+const from = SAKRED_INTRO.steps.findIndex((s) => s.rehearsal === "begin");
+const to = SAKRED_INTRO.steps.findIndex((s) => s.rehearsal === "end");
+check("the interval runs forwards", from !== -1 && to > from);
+check(
+  "and covers only the workout lessons",
+  SAKRED_INTRO.steps.slice(from, to + 1).every((s) => s.objective === "Learn Build"),
+  SAKRED_INTRO.steps.slice(from, to + 1).map((s) => s.id).join(", "),
+);
+check(
+  "the walkthrough's other two thirds run with normal networking",
+  from > 3 && to < SAKRED_INTRO.steps.length - 4,
+  `barrier spans ${to - from + 1} of ${SAKRED_INTRO.steps.length} steps`,
+);
 
 // ─── The router, directly ────────────────────────────────────────────────
 
