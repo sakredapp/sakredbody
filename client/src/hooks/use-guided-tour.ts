@@ -45,6 +45,15 @@ import type { GuidedTour, TourAnchor, TourProgress, TourWorld } from "@/lib/tour
 export const TOUR_SECTION_ATTR = "data-tour-section";
 
 /** Called by the dashboard when its section changes. One line, no props. */
+/**
+ * Below this, two taps are one tap the hardware reported twice.
+ *
+ * Deliberately generous. The cost of ignoring a real second tap is that the
+ * member taps again; the cost of accepting a phantom one is a lesson skipped
+ * that they are never offered again.
+ */
+const DOUBLE_TAP_MS = 350;
+
 export function publishTourSection(section: string | null): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
@@ -144,8 +153,37 @@ export function useGuidedTour(
     [],
   );
 
+  /**
+   * The last index an advance was accepted from.
+   *
+   * Two taps on Continue in quick succession both ran against the same closed-
+   * over `index` and moved the walkthrough two steps — a lesson skipped, and
+   * one the member is never offered again. Measured in the browser rather than
+   * reasoned about: the QA harness dispatches two real clicks and asserts the
+   * step index moved by exactly one.
+   *
+   * A ref rather than state because the second tap can arrive before React has
+   * re-rendered, which is precisely the window the bug lived in.
+   */
+  const advancedFrom = useRef<number | null>(null);
+
+  /**
+   * When the last advance was accepted.
+   *
+   * The index guard alone is not enough: React re-renders between two taps, so
+   * the second one is an advance from a *different* index and passes it. What
+   * actually has to be rejected is the second half of one physical double-tap,
+   * and the only thing that distinguishes it is time — nobody reads a lesson
+   * and decides to continue in three hundred milliseconds.
+   */
+  const advancedAt = useRef(0);
+
   const advance = useCallback(() => {
     if (index === null || !progress) return;
+    if (advancedFrom.current === index) return;
+    if (performance.now() - advancedAt.current < DOUBLE_TAP_MS) return;
+    advancedFrom.current = index;
+    advancedAt.current = performance.now();
     const updated = complete(progress, tour, index, new Date().toISOString());
     setProgress(updated);
     writeProgress(updated);

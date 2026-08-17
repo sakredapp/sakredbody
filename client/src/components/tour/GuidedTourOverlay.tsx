@@ -232,6 +232,9 @@ export function GuidedTourOverlay({
           {/* Decoration only. Never intercepts the tap it is drawing around. */}
           <div
             aria-hidden="true"
+            /* The QA harness measures this against the target's own rect.
+               Geometry you cannot select is geometry nobody checks. */
+            data-testid="tour-halo"
             className={cn(
               "absolute rounded-xl pointer-events-none",
               "ring-2 ring-[hsl(var(--gold))]/70",
