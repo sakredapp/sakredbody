@@ -1,8 +1,9 @@
 -- ─── Functions the policies depend on ─────────────────────────────────────
 --
--- Production has 37 functions in `public`; 31 of them belong to pg_trgm and
--- arrive with the extension. These six are ours, and the policies in 04 do not
--- work without them.
+-- These six are ours, and the policies in 06 do not work without them — which
+-- is why this file is 04 and not, as it was until the QA branch said so out
+-- loud, 05. Their bodies are SQL rather than plpgsql, so Postgres validates
+-- them at CREATE time: the tables in 02 and 03 must already exist.
 --
 -- ── One thing found while writing this down ───────────────────────────────
 --
@@ -21,8 +22,6 @@
 -- Both are reproduced here so the QA branch matches production exactly. Which
 -- one should survive is a decision, not a cleanup, and it belongs to whoever
 -- owns Community. Recorded rather than quietly resolved.
-
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 CREATE OR REPLACE FUNCTION public.is_sakred_admin()
  RETURNS boolean

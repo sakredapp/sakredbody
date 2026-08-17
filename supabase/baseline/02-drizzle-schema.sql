@@ -878,6 +878,16 @@ CREATE TABLE "member_workouts" (
 	"updated_at" timestamp with time zone DEFAULT now()
 );
 --> statement-breakpoint
+CREATE TABLE "session_exercises" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"session_id" uuid NOT NULL,
+	"exercise_id" text NOT NULL,
+	"habit_exercise_id" uuid,
+	"position" integer DEFAULT 0 NOT NULL,
+	"superset_group" uuid,
+	"created_at" timestamp with time zone DEFAULT now()
+);
+--> statement-breakpoint
 CREATE TABLE "training_observations" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" varchar NOT NULL,
@@ -913,6 +923,8 @@ CREATE TABLE "workout_sets" (
 	"distance_m" real,
 	"weight_kg" real DEFAULT 0 NOT NULL,
 	"is_warmup" boolean DEFAULT false NOT NULL,
+	"set_style" text DEFAULT 'normal' NOT NULL,
+	"to_failure" boolean DEFAULT false NOT NULL,
 	"rpe" real,
 	"note" text,
 	"created_at" timestamp with time zone DEFAULT now()
@@ -1412,6 +1424,9 @@ CREATE UNIQUE INDEX "uq_member_build_profile" ON "member_build_profile" USING bt
 CREATE INDEX "idx_member_workout_exercises" ON "member_workout_exercises" USING btree ("member_workout_id","order_index");--> statement-breakpoint
 CREATE INDEX "idx_member_workout_exercises_ex" ON "member_workout_exercises" USING btree ("exercise_id");--> statement-breakpoint
 CREATE INDEX "idx_member_workouts_user" ON "member_workouts" USING btree ("user_id","is_archived");--> statement-breakpoint
+CREATE UNIQUE INDEX "uq_session_exercises_session_exercise" ON "session_exercises" USING btree ("session_id","exercise_id");--> statement-breakpoint
+CREATE INDEX "idx_session_exercises_session" ON "session_exercises" USING btree ("session_id","position");--> statement-breakpoint
+CREATE INDEX "idx_session_exercises_group" ON "session_exercises" USING btree ("superset_group");--> statement-breakpoint
 CREATE INDEX "idx_training_observations_user" ON "training_observations" USING btree ("user_id","on_date");--> statement-breakpoint
 CREATE INDEX "idx_training_observations_exercise" ON "training_observations" USING btree ("user_id","exercise_id");--> statement-breakpoint
 CREATE INDEX "idx_training_observations_session" ON "training_observations" USING btree ("session_id");--> statement-breakpoint

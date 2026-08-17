@@ -1,5 +1,5 @@
 -- Policies, tables a–m. Introspected from production 16 Aug 2026.
--- Depends on the helper functions in 05: is_sakred_admin(), can_see_channel().
+-- Depends on the helper functions in 04: is_sakred_admin(), can_see_channel().
 CREATE POLICY applications_admin ON public.applications AS PERMISSIVE FOR ALL TO public USING (is_sakred_admin()) WITH CHECK (is_sakred_admin());
 CREATE POLICY sakred_applications_insert ON public.applications AS PERMISSIVE FOR INSERT TO public WITH CHECK (true);
 CREATE POLICY sakred_applications_select ON public.applications AS PERMISSIVE FOR SELECT TO public USING (is_sakred_admin());

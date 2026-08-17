@@ -22,6 +22,7 @@
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
+import { GENERATED_PART } from "./baseline.js";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
 const BASELINE = join(ROOT, "supabase/schema-baseline.sql");
@@ -61,9 +62,25 @@ const sql = existsSync(BASELINE) ? readFileSync(BASELINE, "utf8") : "";
 const tables = (sql.match(/CREATE TABLE/g) ?? []).length;
 const policies = (sql.match(/CREATE POLICY/g) ?? []).length;
 
-/** The counts production reported when the baseline was cut. */
-check("it creates every table production has", tables === 93, `${tables} of 93`);
-check("and carries every policy", policies === 154, `${policies} of 154`);
+/**
+ * What production holds, and what of it is the baseline's job.
+ *
+ * Read from production on 17 Aug 2026: 94 tables, 155 policies, 90 tables with
+ * RLS on, 6 functions of our own. The baseline accounts for all but one of
+ * each, and the one is `session_exercises` — created, secured and given its
+ * single policy by the post-cutoff migration that replays on top. So:
+ *
+ *     baseline 94 tables · 154 policies · 89 enables
+ *   + 2026-08-16-session-exercises.sql          +1 policy · +1 enable
+ *   = production 94 · 155 · 90
+ *
+ * The table count matches without the migration because part 02 is generated
+ * from `shared/schema.ts` as it stands today rather than as it stood at the
+ * cutoff — the migration's `create table if not exists` then finds it already
+ * there and adds only what Drizzle cannot say.
+ */
+check("it creates every table production has", tables === 94, `${tables} of 94`);
+check("and carries every policy the baseline is responsible for", policies === 154, `${policies} of 154`);
 check("row-level security is enabled where production enables it",
   (sql.match(/ENABLE ROW LEVEL SECURITY/g) ?? []).length === 89);
 check("the helper functions the policies need are present",
@@ -88,7 +105,12 @@ check("the cutoff rule is written down, not remembered",
 const NON_DRIZZLE_TABLES: readonly string[] = [];
 
 {
-  const drizzlePart = join(ROOT, "supabase/baseline/01-drizzle-schema.sql");
+  /*
+    Named by the assembler rather than spelled out here. The part was 01 until
+    the functions had to move ahead of the policies, and a second copy of the
+    filename is a second thing to forget.
+  */
+  const drizzlePart = join(ROOT, "supabase/baseline", GENERATED_PART);
   const drizzleTables = new Set(
     [...readFileSync(drizzlePart, "utf8").matchAll(/^CREATE TABLE "([a-z_]+)"/gm)].map((m) => m[1]),
   );
@@ -101,7 +123,7 @@ const NON_DRIZZLE_TABLES: readonly string[] = [];
   check("every baseline table is in the Drizzle schema", missing.length === 0, missing.join(", "));
   check("and the allowlist is still empty", NON_DRIZZLE_TABLES.length === 0,
     NON_DRIZZLE_TABLES.join(", "));
-  check("Drizzle emits all 93", drizzleTables.size === 93, `${drizzleTables.size}`);
+  check("Drizzle emits all 94", drizzleTables.size === 94, `${drizzleTables.size}`);
 }
 
 /**
@@ -259,14 +281,71 @@ if (process.env.SAKRED_QA !== "1") {
     check("the rebuilt schema has every table the baseline creates", after.rows[0].n >= tables,
       `${after.rows[0].n} of ${tables}`);
     /*
-      RLS on with zero policies is the failure that looks like success — a
-      table nobody can read, which reads in the app as "the data is gone".
+      RLS on with zero policies is normally the failure that looks like
+      success — a table nobody can read, which reads in the app as "the data is
+      gone". On these eleven it is the intended posture: they are reached only
+      through the server's service-role connection, which bypasses RLS, so
+      enabled-with-no-policy is a closed door to every anon and authenticated
+      client. `session_exercises` states the same thing explicitly with a
+      `using (false)` policy, which is the clearer spelling of it.
+
+      Read from production 17 Aug 2026 and identical there, so the check is
+      parity rather than a wish: a twelfth appearing means somebody enabled RLS
+      and forgot the policy, and a disappearance means one of these opened up.
     */
+    const CLOSED_TO_CLIENTS: readonly string[] = [
+      "auth_tokens", "coaching_attachments", "coaching_checkin_requests",
+      "coaching_plan_items", "coaching_plans", "member_workout_exercises",
+      "member_workouts", "notifications", "password_reset_tokens",
+      "push_tokens", "support_requests",
+    ];
     const naked = await client.query(
       "select t.tablename from pg_tables t join pg_class c on c.relname=t.tablename join pg_namespace ns on ns.oid=c.relnamespace and ns.nspname='public' where t.schemaname='public' and c.relrowsecurity and not exists (select 1 from pg_policies p where p.schemaname='public' and p.tablename=t.tablename)",
     );
-    check("no table has RLS enabled and no policy", naked.rowCount === 0,
-      naked.rows.map((r) => r.tablename).join(", "));
+    const found = naked.rows.map((r) => r.tablename as string).sort();
+    const unexpected = found.filter((t) => !CLOSED_TO_CLIENTS.includes(t));
+    const opened = CLOSED_TO_CLIENTS.filter((t) => !found.includes(t));
+    check("no table has RLS enabled and no policy by accident", unexpected.length === 0,
+      unexpected.join(", "));
+    check("and the ones deliberately closed to clients are still closed", opened.length === 0,
+      opened.join(", "));
+
+    /*
+      ── The rules, not just the shape ────────────────────────────────────
+
+      Counting tables was never enough and the first green run proved it: 94
+      tables, 90 with RLS, 155 policies — and 18 foreign keys where production
+      has 99, 12 CHECK constraints where production has 116, no
+      `uniq_open_workout_per_member`, and neither trigger. A database that
+      accepts rows production refuses is the most expensive kind of test
+      environment, because everything passes.
+
+      Read from production 17 Aug 2026. A figure that moves means production
+      gained something the repository has not been told about, which is the
+      original failure and is worth failing for.
+    */
+    const PRODUCTION = {
+      "foreign keys": [
+        99,
+        "select count(*)::int n from pg_constraint c join pg_class t on t.oid=c.conrelid join pg_namespace ns on ns.oid=t.relnamespace where ns.nspname='public' and c.contype='f'",
+      ],
+      "CHECK constraints": [
+        116,
+        "select count(*)::int n from pg_constraint c join pg_class t on t.oid=c.conrelid join pg_namespace ns on ns.oid=t.relnamespace where ns.nspname='public' and c.contype='c'",
+      ],
+      indexes: [325, "select count(*)::int n from pg_indexes where schemaname='public'"],
+      columns: [1008, "select count(*)::int n from information_schema.columns where table_schema='public'"],
+      triggers: [
+        2,
+        "select count(*)::int n from pg_trigger t join pg_class c on c.oid=t.tgrelid join pg_namespace ns on ns.oid=c.relnamespace where ns.nspname='public' and not t.tgisinternal",
+      ],
+    } as const;
+
+    for (const [what, [expected, q]] of Object.entries(PRODUCTION)) {
+      const { rows } = await client.query<{ n: number }>(q as string);
+      check(`the rebuilt schema has production's ${what}`, rows[0].n === expected,
+        `${rows[0].n} of ${expected}`);
+    }
   }
 
   await client.end();
