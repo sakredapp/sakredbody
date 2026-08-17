@@ -619,6 +619,7 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
                   onClick={() => start.mutate(s.habitId)}
                   disabled={start.isPending}
                   data-testid="button-start-session"
+                  data-tour-id="build-start-session"
                 >
                   {start.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Start this session"}
                 </Button>

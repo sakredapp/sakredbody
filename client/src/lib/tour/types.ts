@@ -64,6 +64,7 @@ export const TOUR_ANCHORS = [
   "room-feed",
   "more-sheet",
   "appearance-control",
+  "atmosphere-choice",
   "role-coach",
 ] as const;
 
@@ -125,6 +126,15 @@ export type TourStep = {
    * stops working while somebody is being taught".
    */
   rehearsal?: "begin" | "end";
+  /**
+   * A step that asks for a decision rather than pointing at a control.
+   *
+   * The panel renders the chooser itself, so there is nothing on the page to
+   * cut a hole around — which is right: the member is not being shown where
+   * something lives, they are choosing, and the answer changes the whole screen
+   * underneath them.
+   */
+  choice?: "appearance";
 };
 
 export type GuidedTour = {

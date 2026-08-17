@@ -191,7 +191,7 @@ export function HealthCard() {
   };
 
   return (
-    <div className="rounded-2xl border border-border/40 bg-white/[0.03] p-5 space-y-4">
+    <div className="rounded-2xl border border-border/40 bg-white/[0.03] p-5 space-y-4" data-tour-id="health-card">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-lg font-display font-semibold tracking-tight">

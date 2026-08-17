@@ -42,6 +42,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { createPortal } from "react-dom";
 import type { Resolution } from "@/lib/tour/engine";
 import type { Objective } from "@/lib/tour/engine";
+import { resolveTarget } from "@/lib/tour/resolveTarget";
+import { AtmosphereChoice } from "@/components/tour/AtmosphereChoice";
 import { usePrefersReducedMotion } from "@/hooks/use-reduced-motion";
 import { cn } from "@/lib/utils";
 
@@ -61,6 +63,7 @@ const PAD = 8;
 
 export function GuidedTourOverlay({
   resolution,
+  instance,
   objectives,
   stepNumber,
   stepCount,
@@ -69,6 +72,8 @@ export function GuidedTourOverlay({
   onTargetTap,
 }: {
   resolution: Resolution;
+  /** Which of several like-named controls this step means. */
+  instance?: string | null;
   objectives: Objective[];
   stepNumber: number;
   stepCount: number;
@@ -82,6 +87,10 @@ export function GuidedTourOverlay({
 
   const anchor = resolution.kind === "ready" ? resolution.anchor : null;
   const step = resolution.step;
+  // A step whose completion is the member pressing the thing needs a control
+  // that can be pressed; one that merely explains a card does not, and would
+  // otherwise fail on a disabled button it was only ever pointing at.
+  const needsTap = step.advance.kind === "tap" || step.advance.kind === "present";
 
   /*
     Bring the target somewhere a person can see before measuring it.
@@ -91,9 +100,14 @@ export function GuidedTourOverlay({
   */
   useLayoutEffect(() => {
     if (!anchor) return;
-    const el = document.querySelector<HTMLElement>(`[data-tour-id="${anchor}"]`);
-    el?.scrollIntoView({ block: "center", behavior: reduced ? "auto" : "smooth" });
-  }, [anchor, reduced]);
+    const found = resolveTarget({ anchor, instance, needsInteraction: needsTap });
+    if (found.ok && found.scrollNeeded) {
+      (found.el as HTMLElement).scrollIntoView({
+        block: "center",
+        behavior: reduced ? "auto" : "smooth",
+      });
+    }
+  }, [anchor, instance, needsTap, reduced]);
 
   useEffect(() => {
     if (!anchor) {
@@ -104,7 +118,13 @@ export function GuidedTourOverlay({
     let last: Rect | null = null;
 
     const measure = () => {
-      const el = document.querySelector<HTMLElement>(`[data-tour-id="${anchor}"]`);
+      // Re-resolved every frame rather than held: the chosen instance can stop
+      // being the right one mid-step. A layout crosses its breakpoint and the
+      // visible twin becomes the other element; a sheet opens and a previously
+      // hidden row becomes the real target. Holding the element found at mount
+      // is how a spotlight ends up on a node that is no longer on screen.
+      const found = resolveTarget({ anchor, instance, needsInteraction: needsTap });
+      const el = found.ok ? (found.el as HTMLElement) : null;
       const next = el
         ? (() => {
             const r = el.getBoundingClientRect();
@@ -120,7 +140,7 @@ export function GuidedTourOverlay({
 
     frame = requestAnimationFrame(measure);
     return () => cancelAnimationFrame(frame);
-  }, [anchor]);
+  }, [anchor, instance, needsTap]);
 
   /*
     The tap the step is waiting for.
@@ -271,6 +291,8 @@ export function GuidedTourOverlay({
           >
             {waiting ? "One moment…" : step.body}
           </p>
+
+          {step.choice === "appearance" && !waiting && <AtmosphereChoice />}
 
           <ObjectiveList objectives={objectives} />
 

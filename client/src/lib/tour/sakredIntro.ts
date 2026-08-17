@@ -61,9 +61,9 @@ export const SAKRED_INTRO: GuidedTour = {
       anchor: "terrain-now",
       title: "Your terrain",
       body:
-        "Sakred reads your recent signals together rather than treating one number " +
-        "as the whole story.\n\nIt's a reading, not a verdict. Your body still has " +
-        "the final vote.",
+        "Sakred's current read of the whole terrain — not one score, and not one " +
+        "number off a wearable.\n\nIt's a reading, not a verdict. Your body still " +
+        "has the final vote.",
       advance: { kind: "continue" },
     },
     {
@@ -74,9 +74,9 @@ export const SAKRED_INTRO: GuidedTour = {
       optional: true,
       title: "What your phone knows",
       body:
-        "If you've connected Apple Health or Health Connect, sleep and movement " +
-        "arrive here on their own.\n\nIf you haven't, Sakred still works — it just " +
-        "listens to you instead of your watch. You can connect it any time in Settings.",
+        "Your devices add measured context — sleep, recovery signals, movement.\n\n" +
+        "They inform the picture. They don't get the final vote.\n\nNot connected? " +
+        "Sakred still works. You can add it any time in Settings.",
       advance: { kind: "continue" },
     },
 
@@ -98,9 +98,9 @@ export const SAKRED_INTRO: GuidedTour = {
       optional: true,
       title: "This changes with you",
       body:
-        "What's offered here moves with your state. Recovery, breath, sleep and " +
-        "stillness are tools you pick up — not identities you take on.\n\nOpen one " +
-        "if you're curious. You don't have to do it now.",
+        "Restore creates room — for recovery, regulation and adaptation.\n\nWhat's " +
+        "offered moves with your state. These are tools you pick up, not identities " +
+        "you take on.\n\nOpen one if you're curious. You don't have to do it now.",
       advance: { kind: "continue" },
     },
 
@@ -111,8 +111,8 @@ export const SAKRED_INTRO: GuidedTour = {
       anchor: "nav-build",
       title: "Build",
       body:
-        "Where Sakred turns readiness into capacity — strength, structure, and " +
-        "intensity that's worth spending.\n\nTap Build.",
+        "Build adds useful demand when the terrain can support it.\n\nIt develops " +
+        "capacity — not effort for its own sake.\n\nTap Build.",
       advance: { kind: "section", section: "build" },
     },
     {
@@ -135,8 +135,10 @@ export const SAKRED_INTRO: GuidedTour = {
       rehearsal: "begin",
       title: "Starting a session",
       body:
-        "This opens your workout.\n\nOpen one now and I'll show you how logging " +
-        "works. Nothing you do in here is recorded — this one's a rehearsal.",
+        "This opens your workout. What you actually do becomes part of what Sakred " +
+        "knows next — it carries the demand forward rather than treating every day " +
+        "as if nothing happened.\n\nOpen one now and I'll show you how logging " +
+        "works. Nothing in here is recorded — this one's a rehearsal.",
       advance: { kind: "present", anchor: "workout-add-exercise" },
     },
 
@@ -166,9 +168,10 @@ export const SAKRED_INTRO: GuidedTour = {
       anchor: "workout-rpe",
       title: "How hard it felt",
       body:
-        "RPE tells Sakred what the number can't — whether that set cost you nothing " +
-        "or everything.\n\nYou don't have to turn every set into homework. Use it " +
-        "when the effort is worth recording.",
+        "Weight tells Sakred what you lifted. RPE helps show what that effort cost " +
+        "today.\n\nYou don't have to turn every ordinary set into homework. Use it " +
+        "when the effort is worth recording — left blank, it stays unknown rather " +
+        "than being read as easy.",
       advance: { kind: "continue" },
     },
     {
@@ -189,9 +192,10 @@ export const SAKRED_INTRO: GuidedTour = {
       optional: true,
       title: "Last time",
       body:
-        "Once you've trained a movement before, Sakred puts that session beside " +
-        "today's.\n\nIt's a reference, not an instruction. More weight isn't the only " +
-        "way a lift goes better — and how the warm-up landed is information too.",
+        "This is an example. Once you begin training, it becomes your own previous " +
+        "performance for the movement.\n\nA reference, not an instruction. More " +
+        "weight isn't the only way a lift goes better, and how the warm-up landed is " +
+        "information too.",
       advance: { kind: "continue" },
     },
     {
@@ -224,8 +228,9 @@ export const SAKRED_INTRO: GuidedTour = {
       anchor: "body-map",
       title: "Territories, not parts",
       body:
-        "These help you see where a signal belongs — and how one region carries " +
-        "another. Sleep shows up in the gut. Stress shows up in the jaw.",
+        "The map behind the signals.\n\nIt shows where something belongs and how one " +
+        "region carries another — sleep shows up in the gut, stress shows up in the " +
+        "jaw. The point is to understand the system, not only to follow it.",
       advance: { kind: "continue" },
     },
     {
@@ -293,6 +298,48 @@ export const SAKRED_INTRO: GuidedTour = {
       advance: { kind: "continue" },
     },
 
+    // ── The lesson the rest of it was for ────────────────────────────────
+    /*
+      The one step somebody would otherwise need a person sitting beside them
+      to learn. Everything above teaches where things are; this teaches what to
+      do tomorrow morning, which is the actual thing being asked for when
+      somebody says "can you show me how to use this".
+    */
+    {
+      id: "rhythm",
+      title: "Your rhythm with Sakred",
+      body:
+        "See where you are.\n\nAdd what technology can't know.\n\nRestore or Build " +
+        "according to the day.\n\nRecord what actually happened.\n\nNotice the " +
+        "response.\n\nOver time Sakred gains context — and you gain a clearer read " +
+        "of your own patterns.",
+      advance: { kind: "continue" },
+    },
+
+    // ── The finishing ritual ─────────────────────────────────────────────
+    /*
+      Not a preference field. The member picks the world the app opens into,
+      the whole application changes underneath the overlay while they are still
+      standing in it, and the night/day idea becomes something they have seen
+      rather than something they were told.
+
+      System is deliberately absent here. It is a third answer to a question
+      the member has not been asked yet, and offering it at this moment turns a
+      choice between two atmospheres into a settings screen. It stays available
+      in Settings, where somebody looking for it will look.
+    */
+    {
+      id: "atmosphere",
+      objective: "Choose your atmosphere",
+      section: "settings",
+      choice: "appearance",
+      title: "Choose your atmosphere",
+      body:
+        "One last thing.\n\nSakred can meet you in two atmospheres. The system " +
+        "underneath is exactly the same — pick the one you want to live in.",
+      advance: { kind: "continue" },
+    },
+
     // ── Done ─────────────────────────────────────────────────────────────
     {
       id: "complete",
@@ -300,7 +347,8 @@ export const SAKRED_INTRO: GuidedTour = {
       body:
         "That's the map.\n\nYou don't need to master any of it today. Use the system, " +
         "notice how you respond, and Sakred gets more useful as you get more familiar " +
-        "with your own body.",
+        "with your own body.\n\nYou can change the atmosphere any time in More → " +
+        "Settings → Appearance.",
       advance: { kind: "continue" },
     },
   ],

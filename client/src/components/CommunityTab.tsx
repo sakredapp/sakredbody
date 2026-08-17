@@ -556,7 +556,7 @@ function RoomView({
   const readOnly = channel.isReadOnly && user?.isAdmin !== "true";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tour-id="room-feed">
       <div className="space-y-1">
         <div className="flex items-center gap-2 flex-wrap">
           <h2 className="font-display text-2xl">{channel.name}</h2>

@@ -289,7 +289,7 @@ check("on the same step", resumeAt(interrupted, TOUR) === 1);
 const intro = readFileSync("client/src/lib/tour/sakredIntro.ts", "utf8");
 check(
   "the walkthrough tells the member the session is a rehearsal",
-  /rehearsal/i.test(intro) && /Nothing you do in here is recorded/i.test(intro),
+  /rehearsal/i.test(intro) && /Nothing in here is recorded/i.test(intro),
 );
 check(
   "and says plainly that closing it keeps nothing",
@@ -428,7 +428,7 @@ check(
 );
 check(
   "an offscreen target is brought into view before it is pointed at",
-  /scrollIntoView\(\{ block: "center"/.test(overlay),
+  /scrollIntoView\(\{\s*block: "center"/.test(overlay),
 );
 check(
   "the panel moves out of the way when the target is low on the screen",
@@ -482,23 +482,20 @@ check(
   an anchor is either on a control or on this list. That is a deliberately
   awkward place to leave work, which is the point.
 */
-const PENDING = new Set<TourAnchor>([
-  "terrain-now",
-  "health-card",
-  "restore-practice",
-  "build-today",
-  "build-start-session",
-  "workout-add-exercise",
-  "workout-set-row",
-  "workout-rpe",
-  "workout-set-style",
-  "workout-last-time",
-  "workout-close",
-  "body-map",
-  "body-territory",
-  "room-feed",
-  "appearance-control",
-]);
+const PENDING = new Set<TourAnchor>([]);
+
+/*
+  Resume reconstruction: not built yet.
+
+  A hand-set flag, and deliberately not inferred from the source — there is no
+  regex that honestly answers "does resume rebuild the world". It flips when the
+  work lands and the tests below it exist, and until then it holds the mounting
+  gate shut on its own.
+*/
+const RESUME_RECONSTRUCTS = false;
+
+const begins = TOUR.steps.filter((s) => s.rehearsal === "begin").length;
+const ends = TOUR.steps.filter((s) => s.rehearsal === "end").length;
 
 const placed = new Set(
   execSync('grep -rho \'data-tour-id="[a-z-]*"\' client/src || true', { encoding: "utf8" })
@@ -573,23 +570,68 @@ check("the pending list holds only anchors a step actually wants", unusedP.lengt
 /*
   The mounting gate.
 
-  While anything is pending the overlay must not be rendered anywhere, so a
-  member cannot meet a walkthrough that points at nothing. This is the
-  assertion that stops a half-built tutorial shipping because the engine was
-  finished and the wiring was "nearly done".
+  Anchors were the whole gate when anchors were the whole remaining work. They
+  are not any more, and leaving the condition as `PENDING.size === 0` would
+  have meant the overlay became mountable the moment the last anchor landed —
+  with resume still unable to reconstruct a section, which is the failure that
+  looks worst: a member reopens the app, the tutorial restores step eleven onto
+  Home, and the spotlight waits forever for a control that only exists inside a
+  workout.
+
+  So the gate is the list, every item is measured rather than asserted, and the
+  overlay may not be rendered anywhere until all of them are true.
 */
+const usesResolver = /resolveTarget\(/.test(overlay) && !/querySelector\(`\[data-tour-id/.test(overlay);
+const teaches = (needle: RegExp) => needle.test(intro);
+
+const GATES: Record<string, boolean> = {
+  "25+ anchors placed": PENDING.size === 0 && unaccounted.length === 0,
+  "visible-instance resolver in use": usesResolver,
+  "rehearsal zero-write proven": /test-rehearsal/.test(readFileSync("package.json", "utf8")),
+  "rehearsal barrier scoped to the workout": begins === 1 && ends === 1,
+  "resume reconstructs route and section": RESUME_RECONSTRUCTS,
+  "intelligence-loop copy complete":
+    teaches(/whole terrain/i) &&
+    teaches(/don't get the final vote/i) &&
+    teaches(/what that effort cost/i) &&
+    teaches(/Restore creates room/i) &&
+    teaches(/useful demand when the terrain can support it/i) &&
+    teaches(/map behind the signals/i) &&
+    teaches(/Your rhythm with Sakred/i),
+};
+
+/*
+  An unmet gate is a status, not a failure. Failing the suite for work that is
+  honestly outstanding trains people to run it with a flag, and then the one
+  assertion that matters below stops being run at all. The gate list is
+  reported; only mounting under an unmet gate is an error.
+*/
+const unmet = Object.entries(GATES).filter(([, met]) => !met).map(([name]) => name);
+passed += Object.values(GATES).filter(Boolean).length;
+
 const mountedIn = execSync(
   "grep -rl GuidedTourOverlay client/src --include=*.tsx | grep -v components/tour/ || true",
   { encoding: "utf8" },
 ).trim();
+const allGatesMet = Object.values(GATES).every(Boolean);
 check(
-  "the walkthrough is not mounted while any anchor is still pending",
-  PENDING.size === 0 || mountedIn === "",
-  `${PENDING.size} pending, mounted in: ${mountedIn || "nothing"}`,
+  "the walkthrough is mounted nowhere until every gate is met",
+  allGatesMet || mountedIn === "",
+  `unmet: ${unmet.join(", ")} — mounted in: ${mountedIn || "nothing"}`,
 );
 
 const anchored = TOUR.steps.filter((s) => s.anchor);
-check("most steps point at something real", anchored.length >= TOUR.steps.length - 3);
+const unanchored = TOUR.steps.filter((s) => !s.anchor);
+check(
+  "every step without a target is deliberately explanatory or a choice",
+  unanchored.every((s) => s.advance.kind === "continue"),
+  unanchored.filter((s) => s.advance.kind !== "continue").map((s) => s.id).join(", "),
+);
+check(
+  "and they are the few they should be",
+  unanchored.length <= 4,
+  unanchored.map((s) => s.id).join(", "),
+);
 check(
   "every step has somewhere to go",
   TOUR.steps.every((s) => s.advance.kind !== "continue" || s.title.length > 0),
@@ -649,6 +691,12 @@ if (failures.length) {
   console.error("");
   process.exit(1);
 }
+const placedCount = TOUR_ANCHORS.filter((a) => placed.has(a)).length;
 console.log(
-  `✓ ${passed} guided tour assertions passed (${TOUR.steps.length} steps, ${log.length} objectives)`,
+  `✓ ${passed} guided tour assertions passed ` +
+    `(${TOUR.steps.length} steps, ${log.length} objectives, ` +
+    `${placedCount}/${TOUR_ANCHORS.length} anchors placed)`,
 );
+if (unmet.length) {
+  console.log(`  mounting gate held — outstanding: ${unmet.join(", ")}`);
+}

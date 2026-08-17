@@ -134,7 +134,7 @@ export function TodaysBuild({
   const alternates = gate.options.filter((s) => s !== primary);
 
   return (
-    <Panel title="Today's Build">
+    <Panel title="Today's Build" data-tour-id="build-today">
       <div className="space-y-4">
         <p className="font-display text-lg leading-snug" data-testid="build-headline">
           {gate.headline}

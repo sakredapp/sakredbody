@@ -116,6 +116,16 @@ const FIXED: Record<string, string> = {
   // The checkerboard and scrim are properties of an image editor. They exist to
   // read *against* an arbitrary photograph, which is what makes them neutral.
   "client/src/components/portal/PhotoCrop.tsx": "image editor furniture",
+  /*
+    The one place in the portal where baked colour is the correct answer.
+
+    The walkthrough's closing step shows both atmospheres side by side so the
+    member can choose between them. A themed token resolves to whichever theme
+    is currently active — so tokenizing these previews would render both cards
+    identically and make the choice invisible. They have to hold their own
+    colours precisely because everything else holds the theme's.
+  */
+  "client/src/components/tour/AtmosphereChoice.tsx": "shows both themes at once",
 };
 
 /**

@@ -291,7 +291,11 @@ function SetRow({
   const asMinutes = duration && isPracticeCategory(m.category);
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div
+      className="flex items-center gap-1.5"
+      data-tour-id="workout-set-row"
+      data-tour-instance={testId}
+    >
       <span className="text-[11px] text-muted-foreground w-4 shrink-0">{index}</span>
 
       {m.takesLoad && (
@@ -359,7 +363,12 @@ function SetMeta({
   testId: string;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5" data-testid={testId}>
+    <div
+      className="flex flex-wrap items-center gap-x-3 gap-y-1.5"
+      data-testid={testId}
+      data-tour-id="workout-set-style"
+      data-tour-instance={testId}
+    >
       {SET_STYLES.map((s) => (
         <button
           key={s}
@@ -390,6 +399,8 @@ function SetMeta({
           className="h-7 w-12 px-1.5 text-center"
           aria-label="RPE, 1 to 10"
           data-testid={`${testId}-rpe`}
+          data-tour-id="workout-rpe"
+          data-tour-instance={testId}
         />
       </label>
 
@@ -1054,6 +1065,7 @@ function Sheet() {
             className="h-9 w-9 -ml-1.5 grid place-items-center rounded-full text-muted-foreground tap-clean"
             aria-label="Collapse workout"
             data-testid="collapse-workout"
+            data-tour-id="workout-close"
           >
             <ChevronDown className="h-5 w-5" />
           </button>
@@ -1271,6 +1283,8 @@ function Sheet() {
                 <div
                   className="flex items-start justify-between gap-3"
                   data-testid={`last-time-${m.id}`}
+                  data-tour-id="workout-last-time"
+                  data-tour-instance={m.id}
                 >
                   <div className="min-w-0">
                     <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground/70">
@@ -1437,7 +1451,7 @@ function Sheet() {
           );
         })}
 
-        <Button variant="outline" className="w-full" onClick={() => setPicking(true)} data-testid="add-movement">
+        <Button variant="outline" className="w-full" onClick={() => setPicking(true)} data-testid="add-movement" data-tour-id="workout-add-exercise">
           <Plus className="h-3.5 w-3.5 mr-1.5" />
           Add a movement
         </Button>

@@ -68,6 +68,7 @@ export function TerrainToday({ onOpenRestore }: { onOpenRestore?: () => void }) 
         onOpenRestore && "hover:border-[hsl(var(--gold))]/30 transition-colors",
       )}
       data-testid="terrain-today"
+      data-tour-id="terrain-now"
     >
       {/* Was "Today's terrain". Two readers in a row asked what that meant and
           guessed diet, then protocols — so the label says what the card is for

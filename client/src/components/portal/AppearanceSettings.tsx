@@ -38,6 +38,7 @@ export function AppearanceSettings() {
       <div
         className="grid grid-cols-3 gap-1 rounded-xl border border-border/60 p-1"
         role="radiogroup"
+        data-tour-id="appearance-control"
         aria-label="Appearance"
       >
         {OPTIONS.map(({ value, label, Icon }) => {

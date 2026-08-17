@@ -457,6 +457,8 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
                 disabled={start.isPending}
                 className="rounded-full border border-[hsl(var(--gold))]/20 px-2.5 py-1 text-xs text-muted-foreground tap-clean hover:border-[hsl(var(--gold))]/50 hover:text-foreground transition-colors disabled:opacity-50"
                 data-testid={`restore-start-${c.id}`}
+                data-tour-id="restore-practice"
+                data-tour-instance={c.id}
               >
                 {c.label}
               </button>
