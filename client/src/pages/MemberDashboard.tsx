@@ -450,17 +450,36 @@ export default function MemberDashboard() {
             {access.atLeast("coach") && (
               <Link
                 href="/coach"
+                /*
+                  Labelled at every width, unlike Admin below.
+                  It was `hidden sm:inline`, and `sm` is 640px — so on the 393px
+                  phone this is the door to somebody's whole working day, it
+                  rendered as a bare 14px glyph beside an equally bare glyph for
+                  Admin. Two unlabelled gold circles, one of which is the back
+                  office. The word costs about fifty pixels in a row that on a
+                  phone holds only the logo, these pills, help and the avatar —
+                  the desktop nav is `hidden md:flex` and absent here — so the
+                  space it was saving was never contested.
+                */
                 className="tap inline-flex items-center gap-1.5 px-3 rounded-full border border-gold/35 text-gold text-xs uppercase tracking-widest hover:border-gold/70 transition-colors"
                 data-testid="link-coach"
               >
                 <Users className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Coach</span>
+                <span>Coach</span>
               </Link>
             )}
             {access.isStaff && (
               <Link
                 href="/admin"
+                /*
+                  Compact on a phone, and that is the right call for this one:
+                  the back office is not a surface anybody runs their day from,
+                  and an admin who needs it knows where it is. The label returns
+                  at 640px. What it must not be is an *unnamed* control, so the
+                  glyph carries the name for assistive tech at every width.
+                */
                 className="tap inline-flex items-center gap-1.5 px-3 rounded-full border border-gold/35 text-gold text-xs uppercase tracking-widest hover:border-gold/70 transition-colors"
+                aria-label="Admin"
                 data-testid="link-admin"
               >
                 <ShieldCheck className="w-3.5 h-3.5" />
