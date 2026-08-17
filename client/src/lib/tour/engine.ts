@@ -25,6 +25,7 @@ import type {
   TourStep,
   TourWorld,
 } from "./types";
+import { AUTO_START_ENABLED } from "./rollout";
 
 /**
  * How long a step will wait for its target before it stops waiting.
@@ -148,6 +149,23 @@ export function resumeAt(progress: TourProgress | null, tour: GuidedTour): numbe
   const done = new Set(progress.completed);
   const first = tour.steps.findIndex((s) => !done.has(s.id));
   return first === -1 ? tour.steps.length : first;
+}
+
+/**
+ * The question the application actually asks.
+ *
+ * Split from `shouldStart` rather than folded into it, because the two answer
+ * different things and only one of them is engineering. `shouldStart` is "are
+ * the preconditions met" — testable, and true today. This is "is the product
+ * ready for every member to meet this on opening the app", which is a judgement
+ * the suite must not be able to make on the code's behalf.
+ *
+ * The hook calls this one. Replay and the QA reset call neither: they run the
+ * same tour through the same engine deliberately, so what gets rehearsed is
+ * what will ship rather than a demo build of it.
+ */
+export function mayAutoStart(progress: TourProgress | null, tour: GuidedTour, c: StartConditions): boolean {
+  return AUTO_START_ENABLED && shouldStart(progress, tour, c);
 }
 
 /**

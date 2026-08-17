@@ -36,7 +36,7 @@ import {
   pause as pauseAt,
   resolve,
   resumeAt,
-  shouldStart,
+  mayAutoStart,
 } from "@/lib/tour/engine";
 import { readProgress, writeProgress } from "@/lib/tour/progress";
 import type { GuidedTour, TourAnchor, TourProgress, TourWorld } from "@/lib/tour/types";
@@ -84,7 +84,7 @@ export function useGuidedTour(tour: GuidedTour, conditions: StartConditions): Ru
   useEffect(() => {
     if (index !== null) return;
     const stored = readProgress(tour);
-    if (!shouldStart(stored, tour, conditions)) return;
+    if (!mayAutoStart(stored, tour, conditions)) return;
     const at = resumeAt(stored, tour);
     if (at >= tour.steps.length) return;
     setProgress(stored ?? emptyProgress(tour));

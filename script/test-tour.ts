@@ -35,6 +35,7 @@ import {
   replay,
   resolve,
   resumeAt,
+  mayAutoStart,
   shouldStart,
   unseenSteps,
 } from "../client/src/lib/tour/engine.js";
@@ -44,6 +45,7 @@ import {
   roleTours,
 } from "../client/src/lib/tour/sakredIntro.js";
 import { isProgress, progressKey } from "../client/src/lib/tour/progress.js";
+import { AUTO_START_ENABLED, REQUIRED_TOUR_VERSION, owesRequiredTour } from "../client/src/lib/tour/rollout.js";
 import type { GuidedTour, TourAnchor, TourProgress, TourWorld } from "../client/src/lib/tour/types.js";
 
 let passed = 0;
@@ -90,6 +92,34 @@ check("nor mid-redirect", !shouldStart(null, TOUR, { ...READY, redirecting: true
 check(
   "nor underneath a native permission dialog",
   !shouldStart(null, TOUR, { ...READY, systemDialogOpen: true }),
+);
+
+/*
+  And not yet at all, whatever the conditions say.
+
+  `shouldStart` answers an engineering question — are the preconditions met —
+  and it is true above. `mayAutoStart` answers a product one, and the product
+  has not said yes. Until the dedicated walkthrough pass has been run on
+  devices, a defect in the tutorial would become a *mandatory* defect, arriving
+  unskippable as the first thing every existing member sees on opening the app.
+
+  Turning it on is one line and one deliberate commit, which is the right
+  amount of ceremony for that.
+*/
+check("automatic rollout is off, and off explicitly", AUTO_START_ENABLED === false);
+check("so nothing starts on its own yet", !mayAutoStart(null, TOUR, READY));
+check(
+  "not even for a member part-way through one",
+  !mayAutoStart(complete(emptyProgress(TOUR), TOUR, 0, NOW), TOUR, READY),
+);
+check(
+  "and while it is off, nobody is owed the required walkthrough",
+  !owesRequiredTour(null) && !owesRequiredTour(0),
+);
+check("the required version is pinned rather than derived", REQUIRED_TOUR_VERSION === 1);
+check(
+  "the hook asks the product question, not the engineering one",
+  /mayAutoStart\(/.test(readFileSync("client/src/hooks/use-guided-tour.ts", "utf8")),
 );
 
 // ─── 2. A returning member is left alone ─────────────────────────────────
