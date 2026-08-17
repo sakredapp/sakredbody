@@ -38,12 +38,18 @@ import {
   subscribeAppearance,
   watchSystemAppearance,
 } from "@/lib/appearance";
+import { applyNativeChrome } from "@/lib/nativeChrome";
 
 export function useInkSurface() {
   useEffect(() => {
     const paint = () => {
       applySurface(true);
-      applyTheme(resolveAppearance(appearance(), prefersDark()));
+      const resolved = resolveAppearance(appearance(), prefersDark());
+      applyTheme(resolved);
+      // After the attribute, never before: the chrome colour is read back from
+      // the computed `--ink`, so the stylesheet has to have resolved the new
+      // theme first or the status bar is painted one change behind.
+      void applyNativeChrome(resolved);
     };
 
     paint();
@@ -70,6 +76,11 @@ export function useInkSurface() {
       unwatch();
       applySurface(false);
       applyTheme(null);
+      // Marketing resolves `:root`, where `--ink` is the dark ground its
+      // `.tone-ink` bands are built on — which is what the static theme-color
+      // in index.html has always claimed. Leaving daylight chrome behind on
+      // the way out would be a regression on pages nobody asked to change.
+      void applyNativeChrome("dark");
     };
   }, []);
 }

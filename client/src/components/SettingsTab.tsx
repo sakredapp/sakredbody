@@ -26,6 +26,7 @@ import { ReplaySetup } from "@/components/portal/ReplaySetup";
 import { AboutYouSettings } from "@/components/portal/AboutYouSettings";
 import { PhotoSettings } from "@/components/portal/PhotoSettings";
 import { MovementSettings } from "@/components/portal/MovementSettings";
+import { AppearanceSettings } from "@/components/portal/AppearanceSettings";
 import { InfoTip } from "@/components/ui/info-tip";
 import { EyeOff, Scale, LogOut, ShieldOff } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -114,6 +115,15 @@ export function SettingsTab({
           basketball. */}
       <Panel title="Movement you do">
         <MovementSettings />
+      </Panel>
+
+      {/* ── Appearance ─────────────────────────────────────────────────────
+          Above health and below the panels about the member themselves,
+          because it is the one setting whose effect is already visible while
+          you are reading this screen. Device-local, so there is nothing to
+          save and nothing to fail. */}
+      <Panel title="Appearance">
+        <AppearanceSettings />
       </Panel>
 
       {/* ── Health, reminders and the widget ───────────────────────────────

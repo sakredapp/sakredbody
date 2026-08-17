@@ -32,6 +32,7 @@ import {
   resolveAppearance,
   type Appearance,
 } from "../client/src/lib/appearance.js";
+import { hslTripletToHex, statusBarStyleFor } from "../client/src/lib/nativeChrome.js";
 
 let passed = 0;
 const failures: string[] = [];
@@ -221,6 +222,110 @@ check(
 check(
   "the daylight scrollbar does not keep the dark theme's full-strength gold",
   /html\[data-theme="light"\] \{\s*scrollbar-color: hsl\(var\(--gold-dark\)/.test(css),
+);
+
+/*
+  The trap, asserted in both directions.
+
+  Capacitor names its status-bar styles after the *background* they are for,
+  not the icons they draw: `Style.Dark` means "dark background", so it draws
+  light icons. Read the other way round — which is the natural reading — a
+  member on Light gets white icons on a limestone bar and loses the clock, the
+  battery and the signal indicator entirely. That is not a cosmetic defect, and
+  it is invisible in a browser, so it is asserted here rather than trusted to
+  be caught on a device.
+*/
+check(
+  "dark appearance asks for the style that draws light icons",
+  statusBarStyleFor("dark") === "DARK",
+);
+check(
+  "light appearance asks for the style that draws dark icons",
+  statusBarStyleFor("light") === "LIGHT",
+);
+
+/*
+  The status bar and the web layer have to agree on one colour, and the
+  stylesheet is where that colour lives. These pin the conversion the native
+  side needs to read it — `#1C1A17` is the ink already compiled into the splash
+  drawable, the Android window background and the static theme-color meta, so
+  the dark case is checkable against three things that shipped before this did.
+*/
+check(
+  "the dark ground converts to the ink the splash and window background already use",
+  hslTripletToHex("30 10% 10%")?.toLowerCase() === "#1c1a17",
+  String(hslTripletToHex("30 10% 10%")),
+);
+check(
+  "and the daylight ground converts to warm limestone, not white",
+  hslTripletToHex("40 26% 92%")?.toLowerCase() === "#f0ece5",
+  String(hslTripletToHex("40 26% 92%")),
+);
+check(
+  "a custom property read back with its surrounding whitespace still parses",
+  hslTripletToHex("  40 26% 92%  ")?.toLowerCase() === "#f0ece5",
+);
+check(
+  "an achromatic value does not drift off grey",
+  hslTripletToHex("0 0% 100%") === "#ffffff" && hslTripletToHex("0 0% 0%") === "#000000",
+);
+
+/*
+  Refusing beats guessing. If the token is missing or malformed — a renamed
+  variable, a `var()` that did not resolve — the previous colour staying on the
+  bar is a far better outcome than an arbitrary one being painted over it.
+*/
+check(
+  "an unresolvable token yields nothing rather than a plausible colour",
+  hslTripletToHex("") === null &&
+    hslTripletToHex("var(--nope)") === null &&
+    hslTripletToHex("40 26%") === null,
+);
+
+/*
+  Ordering, which a diff will not show you.
+
+  The chrome colour is read back from the *computed* `--ink`, so if the native
+  call were made before the attribute landed it would sample the outgoing theme
+  and paint the status bar one change behind — visible only as a bar that is
+  always wrong by exactly one tap.
+*/
+const surfaceHook = readFileSync("client/src/hooks/use-ink-surface.ts", "utf8");
+check(
+  "the theme attribute is applied before the native chrome reads it back",
+  surfaceHook.indexOf("applyTheme(resolved)") > -1 &&
+    surfaceHook.indexOf("applyTheme(resolved)") <
+      surfaceHook.indexOf("applyNativeChrome(resolved)"),
+);
+check(
+  "and leaving the portal hands the chrome back to the marketing ground",
+  /applySurface\(false\);[\s\S]{0,600}applyNativeChrome\("dark"\)/.test(surfaceHook),
+);
+
+/*
+  A setting that writes to a server would need a pending state, an error state
+  and a way to be wrong on one device. This one deliberately has none of those,
+  and the way it stays that way is by never acquiring a mutation.
+*/
+const panel = readFileSync("client/src/components/portal/AppearanceSettings.tsx", "utf8");
+// Comments stripped: the file explains at length why there is no Save button,
+// and searching the prose for the word it argues against would always fail.
+const panelCode = panel.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+check(
+  "appearance applies on tap rather than on save",
+  /onClick=\{\(\) => choose\(value\)\}/.test(panelCode) && !/Save/i.test(panelCode),
+);
+check(
+  "and it never becomes a request that can fail",
+  !/useMutation|apiRequest|fetch\(/.test(panel),
+);
+check(
+  "all three choices are offered",
+  ["system", "light", "dark"].every((v) => panel.includes(`value: "${v}"`)),
+);
+check(
+  "and Settings actually renders it",
+  /<AppearanceSettings \/>/.test(readFileSync("client/src/components/SettingsTab.tsx", "utf8")),
 );
 
 // ─── Result ──────────────────────────────────────────────────────────────
