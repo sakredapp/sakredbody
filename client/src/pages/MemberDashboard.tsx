@@ -63,6 +63,7 @@ import { WorkoutSheet, WorkoutSheetProvider } from "@/components/build/WorkoutSh
 import { RestoreTab } from "@/components/RestoreTab";
 import { SettingsTab } from "@/components/SettingsTab";
 import { useHealthAutoSync } from "@/hooks/use-health";
+import { publishTourSection } from "@/hooks/use-guided-tour";
 import { Onboarding } from "@/components/portal/Onboarding";
 import {
   DropdownMenu,
@@ -261,6 +262,25 @@ export default function MemberDashboard() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [section]);
+
+  /**
+   * The one thing the guided walkthrough needs from this page.
+   *
+   * A step ends when the app *reaches* a screen — "tap Build" is satisfied by
+   * Build being open, however the member got there. Since a section is state
+   * rather than a route, the tour has no way to observe that from outside; and
+   * threading tour props through the nav, the tabs, the sheets and the workout
+   * would couple every screen here to a feature most members see once.
+   *
+   * So it goes on the document element, the same place the surface and the
+   * theme already live, and the tour reads it. Cleared on unmount so a tour
+   * left running cannot be told the app is still on a section it has left.
+   */
+  useEffect(() => {
+    publishTourSection(section);
+    return () => publishTourSection(null);
+  }, [section]);
+
   const [showBookingDialog, setShowBookingDialog] = useState(false);
 
   // Health syncs when the app comes to the foreground, throttled — neither

@@ -425,7 +425,10 @@ export function MemberBottomNav({
                 "transition-colors",
                 active ? "text-[hsl(var(--gold))]" : "text-muted-foreground",
               )}
-              data-testid={`nav-${id}`}
+              data-testid={`nav-`}
+              // Named separately from the test id on purpose: renaming a test id is a
+              // refactoring concern, and it must not silently unhook the walkthrough.
+              data-tour-id={`nav-${id}`}
             >
               {/*
                 Thinner than Lucide's 2px default, which reads as heavy at
@@ -451,6 +454,7 @@ export function MemberBottomNav({
                 inMore ? "text-[hsl(var(--gold))]" : "text-muted-foreground",
               )}
               data-testid="nav-more"
+              data-tour-id="nav-more"
               aria-label="More sections"
             >
               <span className="relative">
@@ -469,7 +473,11 @@ export function MemberBottomNav({
             </button>
           </SheetTrigger>
 
-          <SheetContent side="bottom" className="pb-safe">
+          {/* The sheet itself is a tour anchor as well as its rows: the More
+              step ends when this opens, not when the button is pressed, so a
+              member who opens it a second time isn't stuck on a completed
+              instruction. */}
+          <SheetContent side="bottom" className="pb-safe" data-tour-id="more-sheet">
             <SheetHeader className="text-left">
               <SheetTitle className="font-display text-xl font-normal">
                 Everything else
@@ -488,7 +496,8 @@ export function MemberBottomNav({
                   <button
                     onClick={() => onChange(d.section!)}
                     className={rowClass(section === d.section)}
-                    data-testid={`nav-more-${d.id}`}
+                    data-testid={`nav-more-`}
+                    data-tour-id={`nav-more-${d.id}`}
                   >
                     <RowBody d={d} active={section === d.section} />
                   </button>
@@ -518,7 +527,8 @@ export function MemberBottomNav({
                       <Link
                         href={d.href!}
                         className={rowClass(false)}
-                        data-testid={`nav-more-${d.id}`}
+                        data-testid={`nav-more-`}
+                        data-tour-id={`nav-more-${d.id}`}
                       >
                         <RowBody d={d} active={false} />
                       </Link>
@@ -598,7 +608,13 @@ export function MemberTopNav({
         <>
           <span className="mx-1 h-4 w-px bg-border/70 shrink-0" aria-hidden="true" />
           {roles.map(({ id, label, href, badge }) => (
-            <Link key={id} href={href!} className={pill(false)} data-testid={`member-role-${id}`}>
+            <Link
+              key={id}
+              href={href!}
+              className={pill(false)}
+              data-testid={`member-role-${id}`}
+              data-tour-id={`role-${id}`}
+            >
               {label}
               {(badge ?? 0) > 0 && (
                 <span className="ml-1.5 text-xs text-[hsl(var(--gold))] tabular-nums">

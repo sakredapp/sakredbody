@@ -24,6 +24,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { execSync } from "node:child_process";
 import {
   ANCHOR_TIMEOUT_MS,
   complete,
@@ -437,6 +438,94 @@ check(
 check(
   "no step locates its target by CSS path",
   !/querySelector\(['"`][.#]/.test(overlay) && !/nth-child/.test(overlay + intro),
+);
+
+/*
+  Every target a step names must exist on a real control.
+
+  This is what makes named anchors worth more than CSS paths. A path breaks
+  silently in production on the first screen a new member sees; a name that
+  nothing carries fails here, at the moment it is typed.
+
+  `PENDING` is the wiring still to be placed, enumerated rather than assumed —
+  an anchor is either on a control or on this list. That is a deliberately
+  awkward place to leave work, which is the point.
+*/
+const PENDING = new Set<TourAnchor>([
+  "terrain-now",
+  "health-card",
+  "restore-practice",
+  "build-today",
+  "build-start-session",
+  "workout-add-exercise",
+  "workout-set-row",
+  "workout-rpe",
+  "workout-set-style",
+  "workout-last-time",
+  "workout-close",
+  "body-map",
+  "body-territory",
+  "room-feed",
+  "appearance-control",
+]);
+
+const placed = new Set(
+  execSync('grep -rho \'data-tour-id="[a-z-]*"\' client/src || true', { encoding: "utf8" })
+    .split("\n")
+    .map((l) => l.match(/data-tour-id="([a-z-]*)"/)?.[1])
+    .filter((v): v is string => !!v),
+);
+
+/*
+  The nav and the role pills build their anchor from an id, so the literal
+  string never appears in the source and a grep cannot see it. Their shape is
+  asserted here instead, once, and the ids they produce are then known.
+*/
+const navSrc = readFileSync("client/src/components/MemberNav.tsx", "utf8");
+const navGenerates = /data-tour-id=\{`nav-\$\{id\}`\}/.test(navSrc);
+const moreGenerates = /data-tour-id=\{`nav-more-\$\{d\.id\}`\}/.test(navSrc);
+const roleGenerates = /data-tour-id=\{`role-\$\{id\}`\}/.test(navSrc);
+check("the primary bar carries a tour anchor per destination", navGenerates);
+check("the More sheet carries one per row", moreGenerates);
+check("and the role pills carry one each", roleGenerates);
+if (navGenerates) for (const a of ["nav-home", "nav-restore", "nav-build", "nav-community", "nav-body"]) placed.add(a);
+if (moreGenerates) for (const a of ["nav-more-settings", "nav-more-wins"]) placed.add(a);
+if (roleGenerates) placed.add("role-coach");
+
+const named = new Set<TourAnchor>(
+  [...TOUR.steps, ...SAKRED_COACH_INTRO.steps].flatMap((s) => {
+    const a: TourAnchor[] = [];
+    if (s.anchor) a.push(s.anchor);
+    if ("anchor" in s.advance) a.push(s.advance.anchor);
+    return a;
+  }),
+);
+
+const missing = [...named].filter((a) => !placed.has(a) && !PENDING.has(a));
+check("every anchor a step names exists on a real control", missing.length === 0, missing.join(", "));
+
+const staleP = [...PENDING].filter((a) => placed.has(a));
+check("and nothing lingers on the pending list once it is wired", staleP.length === 0, staleP.join(", "));
+
+const unusedP = [...PENDING].filter((a) => !named.has(a));
+check("the pending list holds only anchors a step actually wants", unusedP.length === 0, unusedP.join(", "));
+
+/*
+  The mounting gate.
+
+  While anything is pending the overlay must not be rendered anywhere, so a
+  member cannot meet a walkthrough that points at nothing. This is the
+  assertion that stops a half-built tutorial shipping because the engine was
+  finished and the wiring was "nearly done".
+*/
+const mountedIn = execSync(
+  "grep -rl GuidedTourOverlay client/src --include=*.tsx | grep -v components/tour/ || true",
+  { encoding: "utf8" },
+).trim();
+check(
+  "the walkthrough is not mounted while any anchor is still pending",
+  PENDING.size === 0 || mountedIn === "",
+  `${PENDING.size} pending, mounted in: ${mountedIn || "nothing"}`,
 );
 
 const anchored = TOUR.steps.filter((s) => s.anchor);
