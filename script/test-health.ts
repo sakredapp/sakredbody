@@ -1809,6 +1809,33 @@ console.log("\nThe Android health lifecycle survives a part of it failing\n");
   check("an Android shell with no provider is a distinct reason",
     /setReason/.test(hook));
 
+  /*
+    Sharing the probe between components is only safe while the answer stays
+    revisable. Health Connect is installable: the member who is told to go and
+    get it must be able to come back to a different message without killing
+    the app. `singleFlight.ts` proves the cell *can* be invalidated; these
+    prove something in the product actually invalidates it, which is the half
+    that could be deleted without any unit test noticing.
+  */
+  check("the shared probe is a single-flight cell, not a held promise",
+    /new SingleFlight</.test(hook) && !/let probe: Promise/.test(hook));
+  check("connecting re-asks the device", /invalidateHealthProbe\("connect"\)/.test(hook));
+  check("disconnecting re-asks the device", /invalidateHealthProbe\("disconnect"\)/.test(hook));
+  check("a resume re-asks only when the last answer was negative",
+    /available === false\) invalidateHealthProbe\("resume"\)/.test(hook));
+  // Matched inside the handler's own body rather than anywhere in the file:
+  // the first version of this check was satisfied by the function's own
+  // declaration, so deleting every call site left it passing.
+  const onResume = hook.slice(hook.indexOf("const onResume ="));
+  const onResumeBody = onResume.slice(0, onResume.indexOf("};") + 2);
+  check("and something actually calls it on resume",
+    /reprobeOnResume\(\)/.test(onResumeBody), `${onResumeBody.length} chars of handler`);
+  check("from the ungated hydration effect, which is the whole point — a device "
+    + "answering 'no' never reaches the effect gated on 'yes'",
+    hook.indexOf("const onResume =") < hook.indexOf("!enabled || !available"));
+  check("components subscribe to the probe rather than reading it once",
+    /subscribeHealthProbe\(read\)/.test(hook));
+
   // ── Permission: this platform's types only ──
   check("the request asks for this platform's types",
     /read: readTypesFor\(healthPlatform\(\)\)/.test(src));

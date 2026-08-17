@@ -24,6 +24,7 @@ import {
   noteHealth,
 } from "@/lib/healthTrace";
 import { HealthOrchestrator } from "@/lib/healthOrchestrator";
+import { SingleFlight } from "@/lib/singleFlight";
 import {
   disableBackgroundSync,
   enableBackgroundSync,
@@ -248,7 +249,7 @@ export function useHealthView(days = 30) {
 export type { HealthView };
 
 /**
- * The device probe, run once per app process rather than once per component.
+ * The device probe: shared between callers, not frozen for the app's lifetime.
  *
  * ── Why this moved to module scope ────────────────────────────────────────
  *
@@ -258,79 +259,141 @@ export type { HealthView };
  * fired its own bridge call and its own `health.probe` event, which is why a
  * single member's telemetry showed eighteen probes from one session. That is
  * not merely noisy: on Android each probe is a real round trip to the Health
- * Connect app, they queue behind one another, and the answer is identical
- * every time because the question — "does this device have a health store" —
- * cannot change while the app is running.
+ * Connect app and they queue behind one another.
  *
- * So the work is done once and everyone shares the result. A promise is the
- * natural shape: callers arriving during the probe await the same one, and
- * callers arriving after it get a resolved value immediately with no second
- * effect and no second render.
+ * ── Why sharing it is not the same as caching it ──────────────────────────
+ *
+ * The obvious fix — hold the promise forever — trades eighteen right answers
+ * for one that can go wrong and never recover. The question this asks is not
+ * fixed for the life of the process:
+ *
+ *   Android · Health Connect is a separate app. It can be absent, mid-update,
+ *             or simply not answering, and every one of those resolves to
+ *             `available: false` with a reason telling the member to install
+ *             or update it. They do. They come back to an app that still says
+ *             the same thing until it is force-quit.
+ *   iOS     · HealthKit itself does not come and go, but a `false` here can
+ *             still come from a bridge that did not answer in time, which is
+ *             a statement about one moment rather than about the device.
+ *
+ * Note the asymmetry: a negative answer is the one that can turn out to be
+ * wrong. A positive one cannot spoil in any way a member would notice.
+ *
+ * So `SingleFlight` holds both behaviours apart — concurrent callers share one
+ * run, and a lifecycle change discards the answer so the next asker gets a
+ * fresh one. See `invalidateHealthProbe` for what counts as a lifecycle
+ * change, and `singleFlight.ts` for why a superseded run may not write back.
  */
-let probe: Promise<{ available: boolean; reason?: string }> | null = null;
+type Availability = { available: boolean; reason?: string };
 
-function nativeAvailability(): Promise<{ available: boolean; reason?: string }> {
-  if (probe) return probe;
+/** What prompted the current run, for telemetry. Set by the invalidator. */
+let probeTrigger = "launch";
 
-  markHealth("native_probe_started");
+/**
+ * The diagnostic probe is fired independently of the answer, not inside it.
+ *
+ * It used to sit in the `.then()` of `healthAvailability()`, which meant the
+ * one piece of evidence that would explain a broken probe could only be
+ * recorded when the probe worked. It never fired once, on any device, ever —
+ * and that absence turned out to *be* the finding: the call was hanging
+ * rather than failing. Instrumentation that can only report success is not
+ * instrumentation.
+ *
+ * Only on a phone: a browser reporting "not a phone app" is noise.
+ */
+function reportProbeDetail(trigger: string): void {
+  if (!Capacitor.isNativePlatform()) return;
 
   /**
-   * The diagnostic probe is fired independently of the answer, not inside it.
+   * Reported whatever happens, including nothing happening.
    *
-   * It used to sit in the `.then()` of `healthAvailability()`, which meant the
-   * one piece of evidence that would explain a broken probe could only be
-   * recorded when the probe worked. It never fired once, on any device, ever —
-   * and that absence turned out to *be* the finding: the call was hanging
-   * rather than failing. Instrumentation that can only report success is not
-   * instrumentation.
-   *
-   * Only on a phone: a browser reporting "not a phone app" is noise.
+   * Two rounds of fixes went in and this event still never arrived — and an
+   * absent event cannot distinguish "the code did not run" from "the code ran
+   * and hung" from "the send failed". Racing it against a timer removes the
+   * first two possibilities: something is always posted, and `stage` says how
+   * far it got.
    */
-  if (Capacitor.isNativePlatform()) {
-    /**
-     * Reported whatever happens, including nothing happening.
-     *
-     * Two rounds of fixes went in and this event still never arrived — and an
-     * absent event cannot distinguish "the code did not run" from "the code
-     * ran and hung" from "the send failed". Racing it against a timer removes
-     * the first two possibilities: something is always posted, and `stage`
-     * says how far it got.
-     */
-    const progress = { stage: "start" };
-    const stalled = new Promise<Record<string, unknown>>((resolve) =>
-      setTimeout(() => resolve({ stage: `stalled:${progress.stage}` }), 6_000),
+  const progress = { stage: "start" };
+  const stalled = new Promise<Record<string, unknown>>((resolve) =>
+    setTimeout(() => resolve({ stage: `stalled:${progress.stage}` }), 6_000),
+  );
+  void Promise.race([healthProbeDetail(progress).then((d) => ({ stage: "resolved", ...d })), stalled])
+    .catch((err) => ({ stage: "threw", error: String(err?.message ?? err) }))
+    .then((props) =>
+      track("health.probe", {
+        surface: "health",
+        // `trigger` is what keeps a re-probe legible. Several probe events in
+        // one session used to mean component fan-out and nothing else; now
+        // they can also mean the member went to install Health Connect and
+        // came back, and those two readings call for opposite responses.
+        props: { ...props, trigger, platform: Capacitor.getPlatform() },
+      }),
     );
-    void Promise.race([
-      healthProbeDetail(progress).then((d) => ({ stage: "resolved", ...d })),
-      stalled,
-    ])
-      .catch((err) => ({ stage: "threw", error: String(err?.message ?? err) }))
-      .then((props) =>
-        track("health.probe", {
-          surface: "health",
-          props: { ...props, platform: Capacitor.getPlatform() },
-        }),
-      );
-  }
+}
 
-  probe = healthAvailability()
+const availability = new SingleFlight<Availability>(() => {
+  markHealth("native_probe_started");
+  reportProbeDetail(probeTrigger);
+
+  return healthAvailability()
     .then((a) => ({ available: a.available, reason: a.reason }))
     // `available` staying null is the state that hid this feature on every
     // device: null reads as "still deciding", and everything downstream waits
-    // politely and forever. A rejection is a definite no.
+    // politely and forever. A rejection is a definite no — a *revisable* one,
+    // now that the cell can be invalidated.
     .catch((err) => ({ available: false, reason: String(err?.message ?? err) }))
     .then((a) => {
       markHealth("native_probe_resolved");
       noteHealth("native_available", a.available);
       return a;
     });
+});
 
-  return probe;
+function nativeAvailability(): Promise<Availability> {
+  return availability.get();
 }
 
-/** Test seam, and what a disconnect uses so a reconnect re-asks the device. */
+/** What the cell holds this instant, without asking for it. */
+function nativeAvailabilityNow(): Availability | undefined {
+  return availability.peek();
+}
+
+function subscribeHealthProbe(listener: () => void): () => void {
+  return availability.subscribe(listener);
+}
+
+/**
+ * Something happened that could change the device's answer. Ask it again.
+ *
+ * Called on connect, on disconnect, and on a resume where the last answer was
+ * negative — never on a plain re-render, and never on a schedule. Each of
+ * these is a discrete moment with a reason, which is what keeps a re-probe
+ * from becoming the probe storm this whole change was meant to end.
+ */
+export function invalidateHealthProbe(trigger: string): void {
+  probeTrigger = trigger;
+  noteHealth("probe_reprobed", trigger);
+  availability.invalidate();
+}
+
+/**
+ * A resume is only worth a bridge call if the answer might have improved.
+ *
+ * Re-asking after a negative costs one round trip and is the only way a member
+ * who just installed Health Connect gets out of the message telling them to.
+ * Re-asking after a positive costs the same round trip on every single return
+ * to the app, to confirm something that cannot usefully change — so it is not
+ * done.
+ */
+export function reprobeOnResume(): void {
+  const held = availability.peek();
+  if (held === undefined || held.available === false) invalidateHealthProbe("resume");
+}
+
+/** Test seam. A fresh process has asked nothing and holds nothing. */
 export function resetHealthProbe(): void {
-  probe = null;
+  probeTrigger = "launch";
+  availability.reset();
 }
 
 /**
@@ -342,19 +405,41 @@ export function resetHealthProbe(): void {
  */
 export function useHealthSync() {
   const queryClient = useQueryClient();
-  const [available, setAvailable] = useState<boolean | null>(null);
-  const [reason, setReason] = useState<string | undefined>();
+  // Seeded from what the cell already holds, so a component mounting after the
+  // probe has answered renders the answer on its first paint instead of
+  // flashing "still deciding" for one frame.
+  const [available, setAvailable] = useState<boolean | null>(
+    () => nativeAvailabilityNow()?.available ?? null,
+  );
+  const [reason, setReason] = useState<string | undefined>(() => nativeAvailabilityNow()?.reason);
   const platform = healthPlatform();
 
+  /*
+    Subscribed, not read once.
+
+    A mount-only read makes invalidation pointless: the cell would discard its
+    answer and nothing on screen would ever ask again, so the member who left
+    to install Health Connect comes back to the same message either way. The
+    subscription is what turns "the answer may have changed" into "the answer
+    on screen changed".
+
+    Every mounted caller waking at once is fine and is the reason this cell
+    exists — the first of them starts the single run and the rest join it.
+  */
   useEffect(() => {
     let alive = true;
-    void nativeAvailability().then((a) => {
-      if (!alive) return;
-      setAvailable(a.available);
-      setReason(a.reason);
-    });
+    const read = () => {
+      void nativeAvailability().then((a) => {
+        if (!alive) return;
+        setAvailable(a.available);
+        setReason(a.reason);
+      });
+    };
+    const unsubscribe = subscribeHealthProbe(read);
+    read();
     return () => {
       alive = false;
+      unsubscribe();
     };
   }, []);
 
@@ -376,6 +461,11 @@ export function useHealthSync() {
       return result;
     },
     onSuccess: invalidate,
+    // On settled, not on success. A connect that *failed* is the more
+    // informative case: on Android that is often where the member is sent to
+    // install or update Health Connect, so the device's answer is most likely
+    // to have moved on exactly the path where nothing succeeded.
+    onSettled: () => invalidateHealthProbe("connect"),
   });
 
   const sync = useMutation<SyncResult>({
@@ -393,6 +483,10 @@ export function useHealthSync() {
       return res.json();
     },
     onSuccess: invalidate,
+    // So a reconnect re-asks the device rather than reusing an answer formed
+    // under the previous authorization. This is what the old comment on
+    // `resetHealthProbe` claimed happened; nothing actually called it.
+    onSettled: () => invalidateHealthProbe("disconnect"),
   });
 
   return { available, reason, platform, connect, sync, disconnect };
@@ -541,8 +635,19 @@ export function useHealthAutoSync(enabled = true) {
 
     hydrate(queryClient);
 
+    /*
+      The probe re-ask lives here rather than in the native effect below,
+      because the native effect is gated on `available` — so the one device
+      state that needs re-asking is precisely the one that would never reach
+      it. `reprobeOnResume` decides whether the round trip is worth making.
+    */
+    const onResume = () => {
+      hydrate(queryClient);
+      reprobeOnResume();
+    };
+
     const onVisible = () => {
-      if (document.visibilityState === "visible") hydrate(queryClient);
+      if (document.visibilityState === "visible") onResume();
     };
     document.addEventListener("visibilitychange", onVisible);
 
@@ -551,7 +656,7 @@ export function useHealthAutoSync(enabled = true) {
     import("@capacitor/app")
       .then(({ App }) =>
         App.addListener("appStateChange", ({ isActive }) => {
-          if (isActive) hydrate(queryClient);
+          if (isActive) onResume();
         }),
       )
       .then((handle) => {

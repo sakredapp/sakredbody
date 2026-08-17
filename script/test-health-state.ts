@@ -45,6 +45,7 @@ import {
   type HealthViewInput,
 } from "../client/src/lib/healthState.js";
 import { HealthOrchestrator } from "../client/src/lib/healthOrchestrator.js";
+import { SingleFlight } from "../client/src/lib/singleFlight.js";
 
 let passed = 0;
 const failures: string[] = [];
@@ -375,9 +376,140 @@ async function orchestration() {
   check("E · and does not leave the orchestrator wedged", !failing.busy);
 }
 
+// ─── The probe: shared, not frozen ───────────────────────────────────────
+
+/*
+  Two behaviours that look identical until the answer changes.
+
+  Collapsing five per-component probes into one shared promise was the right
+  fix and it carried a hazard: the simplest implementation — hold the promise
+  forever — makes the device's answer permanent for the life of the app
+  process. On Android that is wrong in a way a member can walk into. Health
+  Connect is a separate app; when it is missing the probe resolves `false`
+  with a reason telling them to install it. They install it. They come back to
+  the same message, and only force-quitting clears it.
+
+  So every assertion below is about the distinction rather than about either
+  behaviour on its own: concurrent callers must share one run, *and* a
+  lifecycle change must be able to produce a second one. A test that proved
+  only the first would pass just as happily against the frozen version.
+*/
+async function probeSharing() {
+  const settle: Array<(v: { available: boolean }) => void> = [];
+  const cell = new SingleFlight<{ available: boolean }>(
+    () => new Promise((resolve) => settle.push(resolve)),
+  );
+
+  // ── Single-flight: three callers, one bridge call ──
+  const a = cell.get();
+  const b = cell.get();
+  const c = cell.get();
+  check("probe · concurrent callers run the device once", cell.runs === 1, `${cell.runs} runs`);
+  check("probe · and all of them await the same answer", a === b && b === c);
+
+  settle[0]({ available: false });
+  await a;
+  check("probe · the answer is held once it lands", cell.peek()?.available === false);
+
+  // ── Held: a later caller costs nothing ──
+  const later = await cell.get();
+  check("probe · a caller arriving afterwards does not re-ask", cell.runs === 1, `${cell.runs}`);
+  check("probe · and is served what we already know", later.available === false);
+
+  /*
+    ── Invalidated: the whole point ──
+
+    Told as the sequence a member actually performs, because the assertion in
+    the middle is the one worth staring at: after they install Health Connect
+    the cell is still, correctly, serving the old answer. Nothing is wrong
+    with the cell — it was never told. That is exactly why something in the
+    product has to tell it, and why the source assertions in `test-health.ts`
+    check that a resume, a connect and a disconnect all do.
+
+    Nothing here awaits a promise that a broken `invalidate` would never
+    settle. A memoized version must fail these, not hang on them.
+  */
+  let deviceHasHealthConnect = false;
+  const changing = new SingleFlight<{ available: boolean }>(async () => ({
+    available: deviceHasHealthConnect,
+  }));
+
+  check("probe · the phone answers no", (await changing.get()).available === false);
+  deviceHasHealthConnect = true; // the member goes and installs it
+  check(
+    "probe · and until it is told otherwise, no is what the app keeps showing",
+    (await changing.get()).available === false,
+    "not a defect — the cell has not been told anything changed",
+  );
+
+  changing.invalidate();
+  check("probe · invalidation discards the held answer", changing.peek() === undefined);
+  check("probe · so the next asker re-runs it", (await changing.get()).available === true);
+  check("probe · which took a second device call, not a cached one", changing.runs === 2, `${changing.runs}`);
+
+  /*
+    A run that was already in flight when the world changed is answering the
+    old question. It must resolve its own callers — they asked in good faith
+    and are owed an answer — but it must not install that answer as the truth,
+    or invalidating during a probe would look fixed and then unfix itself a
+    moment later.
+  */
+  const stale = new SingleFlight<{ available: boolean }>(
+    () => new Promise((resolve) => settle.push(resolve)),
+  );
+  const inflight = stale.get();
+  stale.invalidate();
+  settle[1]({ available: false });
+  check(
+    "probe · a superseded run still answers its own callers",
+    (await inflight).available === false,
+  );
+  check("probe · but does not write back over the invalidation", stale.peek() === undefined);
+
+  /*
+    Nobody re-asks a cell they were never told about. Without this the
+    invalidation above is theatre: the value is discarded and every screen
+    keeps rendering the state it read on mount, which is the same outcome as
+    never invalidating at all.
+  */
+  let woken = 0;
+  const watched = new SingleFlight<{ available: boolean }>(async () => ({ available: true }));
+  const unsubscribe = watched.subscribe(() => {
+    woken++;
+  });
+  await watched.get();
+  const wokenOnAnswer = woken;
+  check("probe · subscribers are woken when an answer lands", wokenOnAnswer >= 1, `${woken}`);
+  watched.invalidate();
+  check("probe · and woken again when it is discarded", woken > wokenOnAnswer, `${woken}`);
+  unsubscribe();
+  watched.invalidate();
+  check("probe · an unsubscribed listener stops being woken", woken === wokenOnAnswer + 1, `${woken}`);
+
+  /*
+    A failure is not an answer. Caching a rejection forever is the memoization
+    trap in its worst form — one unlucky bridge timeout at launch and the
+    feature is gone until the app is killed.
+  */
+  let attempts = 0;
+  const flaky = new SingleFlight<{ available: boolean }>(async () => {
+    attempts++;
+    if (attempts === 1) throw new Error("Health Connect didn't respond");
+    return { available: true };
+  });
+  await flaky.get().catch(() => {});
+  check("probe · a rejection is not held", flaky.peek() === undefined);
+  check(
+    "probe · and the next asker tries again",
+    (await flaky.get()).available === true,
+    `${attempts} attempts`,
+  );
+}
+
 // ─── Result ──────────────────────────────────────────────────────────────
 
 await orchestration();
+await probeSharing();
 
 if (failures.length) {
   console.error("\n✗ health state\n");
