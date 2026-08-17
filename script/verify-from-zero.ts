@@ -29,6 +29,23 @@ const BASELINE = join(ROOT, "supabase/schema-baseline.sql");
 /** Everything at or before this migration is inside the baseline already. */
 export const BASELINE_CUTOFF = "20260815212610";
 
+/**
+ * Migration files newer than the baseline cutoff.
+ *
+ * Named by date, so lexical order is chronological — which is only true
+ * because the convention has been kept, and is asserted by the offline checks
+ * above rather than assumed here.
+ */
+function postBaselineMigrations(): string[] {
+  const dir = join(ROOT, "supabase");
+  return readdirSync(dir)
+    .filter((f) => f.endsWith(".sql") && f !== "schema-baseline.sql")
+    .filter((f) => /^\d{4}-\d{2}-\d{2}/.test(f))
+    .filter((f) => f.replace(/\D/g, "") > BASELINE_CUTOFF.slice(0, 8))
+    .sort()
+    .map((f) => join(dir, f));
+}
+
 let failed = 0;
 const check = (name: string, ok: boolean, detail?: string) => {
   if (!ok) {
@@ -152,14 +169,107 @@ const NON_DRIZZLE_TABLES: readonly string[] = [];
     uncreatable.join(", "));
 }
 
-if (!process.env.DATABASE_URL) {
+/*
+  ── The live path ─────────────────────────────────────────────────────────
+
+  Deliberately not `DATABASE_URL`. That variable is what the application uses,
+  and a reconstruction tool that reads it is one mistyped shell away from
+  applying a schema baseline over production. It reads the QA-only variable
+  through `requireQaTarget`, which refuses on five independent grounds before
+  a connection is opened at all.
+
+  Two more refusals live here, after connecting, because configuration can be
+  right and the target still wrong: a database with tables in it is not empty,
+  and a database with people in it is not QA.
+*/
+if (process.env.SAKRED_QA !== "1") {
   console.log(
-    "\n  · No DATABASE_URL. Offline checks only — the reconstruction itself needs\n" +
-      "    an empty database. Point this at the QA branch to prove it end to end.",
+    "\n  · Offline checks only. Set SAKRED_QA=1 and SAKREDBODY_QA_DATABASE_URL\n" +
+      "    (see .env.qa) to rebuild the QA branch from zero and prove parity.",
   );
 } else {
-  console.log("\n  · DATABASE_URL set — reconstruction against a live target is not yet");
-  console.log("    implemented. It must refuse any database containing rows.");
+  const { requireQaTarget, looksLikeRealMembers } = await import("./qa-target.js");
+  const pg = (await import("pg")).default;
+
+  const url = requireQaTarget(process.env);
+  const client = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
+  await client.connect();
+
+  const existing = await client.query(
+    "select tablename from pg_tables where schemaname = 'public' order by tablename",
+  );
+
+  if (existing.rowCount > 0) {
+    /*
+      Refusing to reconstruct over a database that already has something in it.
+      "Apply the baseline anyway" is how a QA database quietly diverges from
+      what the repository says, and the whole point of this script is that the
+      repository can produce the schema from nothing.
+    */
+    const hasUsers = existing.rows.some((r) => r.tablename === "users");
+    if (hasUsers) {
+      const emails = await client.query("select email from users limit 200");
+      check(
+        "the target holds no real people",
+        !looksLikeRealMembers(emails.rows.map((r) => String(r.email))),
+        "found an address outside @sakred.local — this is not a QA database",
+      );
+    }
+    console.log(`\n  · Target already has ${existing.rowCount} tables. Not reconstructing over it.`);
+    console.log("    Reset the branch to prove reconstruction from zero.");
+  } else {
+    const files = [BASELINE, ...postBaselineMigrations()];
+    console.log(`\n  · Empty target. Applying ${files.length} file(s) from the repository.`);
+
+    for (const file of files) {
+      const name = file.split("/").pop();
+      try {
+        /*
+          Whole-file, in a transaction, the same way the Management API runs
+          these. A migration that half-applies is worse than one that fails:
+          the second is a clear error, the first is a schema nobody can
+          reproduce from a commit.
+        */
+        await client.query("begin");
+        await client.query(readFileSync(file, "utf8"));
+        await client.query("commit");
+      } catch (err) {
+        await client.query("rollback").catch(() => undefined);
+        check(`applying ${name}`, false, String((err as Error).message).split("\n")[0]);
+        break;
+      }
+    }
+
+    const after = await client.query(
+      "select count(*)::int n from pg_tables where schemaname = 'public'",
+    );
+    const rls = await client.query(
+      "select count(*)::int n from pg_tables t where t.schemaname='public' and exists (select 1 from pg_class c join pg_namespace ns on ns.oid=c.relnamespace where ns.nspname='public' and c.relname=t.tablename and c.relrowsecurity)",
+    );
+    const pol = await client.query("select count(*)::int n from pg_policies where schemaname='public'");
+    const fns = await client.query(
+      "select count(*)::int n from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace where ns.nspname='public'",
+    );
+
+    console.log(
+      `    rebuilt: ${after.rows[0].n} tables · ${rls.rows[0].n} with RLS · ` +
+        `${pol.rows[0].n} policies · ${fns.rows[0].n} functions`,
+    );
+
+    check("the rebuilt schema has every table the baseline creates", after.rows[0].n >= tables,
+      `${after.rows[0].n} of ${tables}`);
+    /*
+      RLS on with zero policies is the failure that looks like success — a
+      table nobody can read, which reads in the app as "the data is gone".
+    */
+    const naked = await client.query(
+      "select t.tablename from pg_tables t join pg_class c on c.relname=t.tablename join pg_namespace ns on ns.oid=c.relnamespace and ns.nspname='public' where t.schemaname='public' and c.relrowsecurity and not exists (select 1 from pg_policies p where p.schemaname='public' and p.tablename=t.tablename)",
+    );
+    check("no table has RLS enabled and no policy", naked.rowCount === 0,
+      naked.rows.map((r) => r.tablename).join(", "));
+  }
+
+  await client.end();
 }
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${failed} failed\n`);
