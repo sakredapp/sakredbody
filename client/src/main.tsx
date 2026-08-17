@@ -1,7 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { createRoot } from "react-dom/client";
 import App from "./App";
-import { applyInkSurfaceAtBoot } from "./lib/inkSurface";
+import { applyInkSurfaceAtBoot, isPortalPath } from "./lib/inkSurface";
 import { installNativeApiFetch } from "./lib/apiFetch";
 import "./index.css";
 
@@ -12,9 +12,30 @@ import "./index.css";
 installNativeApiFetch();
 
 // Before render, not inside it. The portal pages are lazy chunks, so a
-// fallback paints before they mount — and without this it paints in the light
-// palette, flashing cream over the whole screen on every cold load of /member.
+// fallback paints before they mount — and without this it paints in whichever
+// palette the stylesheet happens to default to, flashing a full screen of the
+// wrong atmosphere on every cold load of /member. Both attributes are set
+// here: the surface from the URL, the theme from a synchronous read of the
+// stored preference.
 applyInkSurfaceAtBoot();
+
+/**
+ * Recover an appearance that outlived its web storage.
+ *
+ * `localStorage` in a WebView is not permanent — iOS evicts it under storage
+ * pressure and "Clear website data" removes it — so the preference is mirrored
+ * into Capacitor Preferences on every change. This reads that mirror back, and
+ * only when nothing is stored locally: there is no preference on screen to
+ * contradict in that case, so adopting a late answer cannot be a visible
+ * change of mind. Reading it unconditionally would resolve the theme twice on
+ * every cold launch, with the second answer arriving after the first paint —
+ * which is the flash this whole arrangement exists to avoid.
+ */
+if (Capacitor.isNativePlatform()) {
+  void import("./lib/appearance").then((m) =>
+    m.hydrateFromNative(() => isPortalPath(window.location.pathname)),
+  );
+}
 
 /**
  * Before render, because a cold start caused by a tap delivers that tap as soon

@@ -1,7 +1,11 @@
 import type { Config } from "tailwindcss";
 
 export default {
-  darkMode: ["class"],
+  // Not `class`. The dark palette is selected by an attribute now, because the
+  // `.dark` class was simultaneously the portal's route marker — see the note
+  // above the palette in index.css. `dark:` variants keep working unchanged;
+  // they compile against this selector instead of `.dark`.
+  darkMode: ["selector", '[data-theme="dark"]'],
   content: ["./client/index.html", "./client/src/**/*.{js,jsx,ts,tsx}"],
   theme: {
     extend: {

@@ -1,21 +1,35 @@
 /**
- * Which URLs are the portal, and putting the page on dark ground before the
- * first paint.
+ * Which URLs are the portal, and getting the first frame into the right
+ * atmosphere before React exists.
  *
  * ── Why this runs before React ────────────────────────────────────────────
  *
  * The portal pages are lazily loaded chunks, so something renders in their
  * place while the chunk downloads. Applying the theme when the page component
  * mounts is therefore always one render too late: the fallback paints
- * `bg-background`, which resolves to the light palette, and a cold load of
- * /member flashes a full-screen cream rectangle before turning dark.
+ * `bg-background` and a cold load of /member flashes a full-screen rectangle
+ * of the wrong palette before settling.
  *
- * Deciding from the URL at boot costs one string comparison and removes the
- * flash entirely, including the very first paint before React has hydrated.
+ * ── What changed when appearance became a choice ──────────────────────────
  *
- * The hook in hooks/use-ink-surface.ts still owns the class during the
+ * This used to add `dark` from the URL, which quietly made two claims at once:
+ * that the route is the portal, and that the portal is dark. The second stops
+ * being true the moment a member picks Light, so the two are now set
+ * separately — `data-surface` from the path here, `data-theme` from the stored
+ * preference in `appearance.ts`. The boot cost is unchanged: one string
+ * comparison and one synchronous storage read.
+ *
+ * The hook in hooks/use-ink-surface.ts owns both attributes during the
  * session — this only gets the first frame right.
  */
+
+import {
+  appearance,
+  applySurface,
+  applyTheme,
+  prefersDark,
+  resolveAppearance,
+} from "./appearance";
 
 /** Kept in sync with the portal routes in App.tsx. */
 const PORTAL_PATHS = ["/member", "/coaching", "/admin", "/app"];
@@ -47,7 +61,11 @@ export function isPortalPath(pathname: string): boolean {
 /** Called once from main.tsx, before render. */
 export function applyInkSurfaceAtBoot(): void {
   if (typeof document === "undefined") return;
-  if (isPortalPath(window.location.pathname)) {
-    document.documentElement.classList.add("dark");
-  }
+  const portal = isPortalPath(window.location.pathname);
+  applySurface(portal);
+  // Marketing gets no theme attribute at all rather than an explicit "light".
+  // Those pages run their own `.tone-ink` / `.tone-light` banding against
+  // `:root` and are outside the appearance system; naming a theme for them
+  // would put them inside it and change pages nobody asked to change.
+  applyTheme(portal ? resolveAppearance(appearance(), prefersDark()) : null);
 }
