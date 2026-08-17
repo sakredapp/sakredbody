@@ -24,7 +24,8 @@
     "test:bedrock": "tsx script/test-bedrock.ts",
     "native:paths": "node script/normalise-native-paths.mjs",
     "db:qa-reset": "tsx script/qa-reset.ts",
-    "db:qa-seed": "tsx script/qa-seed.ts"
+    "db:qa-seed": "tsx script/qa-seed.ts",
+    "qa:auth": "tsx script/qa-auth-matrix.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.116.0",

@@ -23,6 +23,7 @@ import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { GENERATED_PART } from "./baseline.js";
+import { PRODUCTION_SHAPE, SHAPE_QUERIES } from "./production-shape.js";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
 const BASELINE = join(ROOT, "supabase/schema-baseline.sql");
@@ -63,26 +64,33 @@ const tables = (sql.match(/CREATE TABLE/g) ?? []).length;
 const policies = (sql.match(/CREATE POLICY/g) ?? []).length;
 
 /**
- * What production holds, and what of it is the baseline's job.
+ * What of production's shape is the baseline's job, and what the migrations add.
  *
- * Read from production on 17 Aug 2026: 94 tables, 155 policies, 90 tables with
- * RLS on, 6 functions of our own. The baseline accounts for all but one of
- * each, and the one is `session_exercises` — created, secured and given its
- * single policy by the post-cutoff migration that replays on top. So:
+ * Derived rather than remembered. The baseline is responsible for everything
+ * production has minus whatever the post-cutoff migrations create on top of it,
+ * so both halves are counted from files: `PRODUCTION_SHAPE` is the one reading
+ * that cannot be taken from the repository, and the migration side is grepped
+ * out of the files that will actually replay.
  *
- *     baseline 94 tables · 154 policies · 89 enables
- *   + 2026-08-16-session-exercises.sql          +1 policy · +1 enable
- *   = production 94 · 155 · 90
- *
- * The table count matches without the migration because part 02 is generated
- * from `shared/schema.ts` as it stands today rather than as it stood at the
- * cutoff — the migration's `create table if not exists` then finds it already
- * there and adds only what Drizzle cannot say.
+ * Today that arithmetic is 155 − 1 = 154 policies and 90 − 1 = 89 enables,
+ * both supplied by `2026-08-16-session-exercises.sql`. Writing 154 and 89 down
+ * would mean the next migration that adds a policy silently breaks this.
  */
-check("it creates every table production has", tables === 94, `${tables} of 94`);
-check("and carries every policy the baseline is responsible for", policies === 154, `${policies} of 154`);
+const migrationSql = postBaselineMigrations().map((f) => readFileSync(f, "utf8")).join("\n");
+const countIn = (text: string, re: RegExp) => (text.match(re) ?? []).length;
+
+const POLICY = /create policy/gi;
+const ENABLE = /enable row level security/gi;
+
+const baselinePolicies = PRODUCTION_SHAPE.policies - countIn(migrationSql, POLICY);
+const baselineEnables = PRODUCTION_SHAPE.rlsEnabled - countIn(migrationSql, ENABLE);
+
+check("it creates every table production has", tables === PRODUCTION_SHAPE.tables,
+  `${tables} of ${PRODUCTION_SHAPE.tables}`);
+check("and carries every policy the migrations do not add later",
+  policies === baselinePolicies, `${policies} of ${baselinePolicies}`);
 check("row-level security is enabled where production enables it",
-  (sql.match(/ENABLE ROW LEVEL SECURITY/g) ?? []).length === 89);
+  countIn(sql, ENABLE) === baselineEnables, `${countIn(sql, ENABLE)} of ${baselineEnables}`);
 check("the helper functions the policies need are present",
   /FUNCTION public\.is_sakred_admin/.test(sql) && /FUNCTION public\.can_see_channel/.test(sql));
 check("the cutoff rule is written down, not remembered",
@@ -123,7 +131,8 @@ const NON_DRIZZLE_TABLES: readonly string[] = [];
   check("every baseline table is in the Drizzle schema", missing.length === 0, missing.join(", "));
   check("and the allowlist is still empty", NON_DRIZZLE_TABLES.length === 0,
     NON_DRIZZLE_TABLES.join(", "));
-  check("Drizzle emits all 94", drizzleTables.size === 94, `${drizzleTables.size}`);
+  check(`Drizzle emits all ${PRODUCTION_SHAPE.tables}`, drizzleTables.size === PRODUCTION_SHAPE.tables,
+    `${drizzleTables.size}`);
 }
 
 /**
@@ -324,26 +333,9 @@ if (process.env.SAKRED_QA !== "1") {
       gained something the repository has not been told about, which is the
       original failure and is worth failing for.
     */
-    const PRODUCTION = {
-      "foreign keys": [
-        99,
-        "select count(*)::int n from pg_constraint c join pg_class t on t.oid=c.conrelid join pg_namespace ns on ns.oid=t.relnamespace where ns.nspname='public' and c.contype='f'",
-      ],
-      "CHECK constraints": [
-        116,
-        "select count(*)::int n from pg_constraint c join pg_class t on t.oid=c.conrelid join pg_namespace ns on ns.oid=t.relnamespace where ns.nspname='public' and c.contype='c'",
-      ],
-      indexes: [325, "select count(*)::int n from pg_indexes where schemaname='public'"],
-      columns: [1008, "select count(*)::int n from information_schema.columns where table_schema='public'"],
-      triggers: [
-        2,
-        "select count(*)::int n from pg_trigger t join pg_class c on c.oid=t.tgrelid join pg_namespace ns on ns.oid=c.relnamespace where ns.nspname='public' and not t.tgisinternal",
-      ],
-    } as const;
-
-    for (const [what, [expected, q]] of Object.entries(PRODUCTION)) {
-      const { rows } = await client.query<{ n: number }>(q as string);
-      check(`the rebuilt schema has production's ${what}`, rows[0].n === expected,
+    for (const [what, expected] of Object.entries(PRODUCTION_SHAPE)) {
+      const { rows } = await client.query<{ n: number }>(SHAPE_QUERIES[what as keyof typeof PRODUCTION_SHAPE]);
+      check(`the rebuilt schema matches production on ${what}`, rows[0].n === expected,
         `${rows[0].n} of ${expected}`);
     }
   }
