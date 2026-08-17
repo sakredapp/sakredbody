@@ -37,6 +37,7 @@ import {
   resolve,
   resumeAt,
   mayAutoStart,
+  shouldStart,
 } from "@/lib/tour/engine";
 import { readProgress, writeProgress } from "@/lib/tour/progress";
 import type { GuidedTour, TourAnchor, TourProgress, TourWorld } from "@/lib/tour/types";
@@ -65,7 +66,17 @@ export type RunningTour = {
   markTapped: () => void;
 };
 
-export function useGuidedTour(tour: GuidedTour, conditions: StartConditions): RunningTour | null {
+export function useGuidedTour(
+  tour: GuidedTour,
+  conditions: StartConditions,
+  /*
+    Replay and QA bypass the rollout question entirely: the member asked for
+    this one, so "is the product ready to require it" does not apply. The
+    preconditions still do — a walkthrough started over skeletons is just as
+    broken when somebody asked for it.
+  */
+  forced = false,
+): RunningTour | null {
   const [progress, setProgress] = useState<TourProgress | null>(null);
   const [index, setIndex] = useState<number | null>(null);
   const [world, setWorld] = useState<TourWorld>({ section: null, present: new Set(), waitedMs: 0 });
@@ -84,13 +95,13 @@ export function useGuidedTour(tour: GuidedTour, conditions: StartConditions): Ru
   useEffect(() => {
     if (index !== null) return;
     const stored = readProgress(tour);
-    if (!mayAutoStart(stored, tour, conditions)) return;
+    if (!(forced ? shouldStart(stored, tour, conditions) : mayAutoStart(stored, tour, conditions))) return;
     const at = resumeAt(stored, tour);
     if (at >= tour.steps.length) return;
     setProgress(stored ?? emptyProgress(tour));
     setIndex(at);
     stepStartedAt.current = performance.now();
-  }, [tour, conditions, index]);
+  }, [tour, conditions, index, forced]);
 
   const step = index === null ? null : tour.steps[index] ?? null;
 

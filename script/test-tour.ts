@@ -492,7 +492,7 @@ const PENDING = new Set<TourAnchor>([]);
   work lands and the tests below it exist, and until then it holds the mounting
   gate shut on its own.
 */
-const RESUME_RECONSTRUCTS = false;
+const RESUME_RECONSTRUCTS = /test-resume/.test(readFileSync("package.json", "utf8"));
 
 const begins = TOUR.steps.filter((s) => s.rehearsal === "begin").length;
 const ends = TOUR.steps.filter((s) => s.rehearsal === "end").length;
@@ -610,7 +610,7 @@ const unmet = Object.entries(GATES).filter(([, met]) => !met).map(([name]) => na
 passed += Object.values(GATES).filter(Boolean).length;
 
 const mountedIn = execSync(
-  "grep -rl GuidedTourOverlay client/src --include=*.tsx | grep -v components/tour/ || true",
+  'grep -rlE "GuidedTourOverlay|<TourHost" client/src --include=*.tsx | grep -v components/tour/ || true',
   { encoding: "utf8" },
 ).trim();
 const allGatesMet = Object.values(GATES).every(Boolean);

@@ -60,3 +60,37 @@ export function owesRequiredTour(lastCompletedRequiredVersion: number | null): b
   if (!AUTO_START_ENABLED) return false;
   return (lastCompletedRequiredVersion ?? 0) < REQUIRED_TOUR_VERSION;
 }
+
+/**
+ * QA and replay: running the real walkthrough without requiring it of anybody.
+ *
+ * The first time this feature mounts should be through here, not through a
+ * rollout. Same tour, same engine, same overlay — so what gets rehearsed on a
+ * device is what will eventually ship, rather than a demo build of it.
+ *
+ * Opt-in per device and never automatic: `?tour=replay` turns it on, which is
+ * something a person does deliberately with a URL, and cannot happen to a
+ * member. Replay from Settings will set the same flag.
+ */
+export const QA_REPLAY_KEY = "sakred.tour.replay";
+
+export function qaReplayRequested(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    if (new URLSearchParams(window.location.search).get("tour") === "replay") {
+      window.localStorage.setItem(QA_REPLAY_KEY, "1");
+      return true;
+    }
+    return window.localStorage.getItem(QA_REPLAY_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function endQaReplay(): void {
+  try {
+    window.localStorage.removeItem(QA_REPLAY_KEY);
+  } catch {
+    // Nothing stored; nothing to clear.
+  }
+}

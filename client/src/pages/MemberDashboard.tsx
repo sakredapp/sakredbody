@@ -64,6 +64,7 @@ import { RestoreTab } from "@/components/RestoreTab";
 import { SettingsTab } from "@/components/SettingsTab";
 import { useHealthAutoSync } from "@/hooks/use-health";
 import { publishTourSection } from "@/hooks/use-guided-tour";
+import { TourHost } from "@/components/tour/TourHost";
 import { Onboarding } from "@/components/portal/Onboarding";
 import {
   DropdownMenu,
@@ -1144,6 +1145,20 @@ export default function MemberDashboard() {
         </div>
       </div>
       <MemberBottomNav section={section} onChange={setSection} />
+
+      {/* QA and replay only. `AUTO_START_ENABLED` is false, so this never
+          starts on its own — it mounts on an explicit per-device flag, which is
+          how the walkthrough gets exercised on real phones before it is
+          required of anybody. */}
+      <TourHost
+        conditions={{
+          authenticated: true,
+          intakeComplete: true,
+          homeReady: true,
+          redirecting: false,
+          systemDialogOpen: false,
+        }}
+      />
 
       {/*
         Above the header and the nav both, so expanding it makes the app the

@@ -59,7 +59,7 @@ export type RehearsalVerdict =
 
 export const REHEARSAL_SESSION_ID = "rehearsal-session";
 
-type RehearsalSet = {
+export type RehearsalSet = {
   id: string;
   sessionExerciseId: string;
   weight: number | null;
@@ -70,7 +70,7 @@ type RehearsalSet = {
   position: number;
 };
 
-type RehearsalExercise = {
+export type RehearsalExercise = {
   id: string;
   exerciseId: string;
   name: string;
@@ -386,9 +386,18 @@ function json(status: number, body: unknown): Response {
  * is the one failure mode of this design that would be worse than not having
  * it, since it would break the member's real workout instead.
  */
-export function beginRehearsal(startedAt: string, fetchImpl?: typeof globalThis.fetch): void {
+export function beginRehearsal(
+  startedAt: string,
+  fetchImpl?: typeof globalThis.fetch,
+  /*
+    A store rebuilt from the tutorial script, when the member is resuming into
+    the middle of the workout lesson rather than walking there. Still purely in
+    memory — resume reconstructs, it never restores something that was saved.
+  */
+  seeded?: RehearsalStore,
+): void {
   if (store) return;
-  store = createStore(startedAt);
+  store = seeded ?? createStore(startedAt);
   refused = [];
   deferred = [];
 
