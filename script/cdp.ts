@@ -43,20 +43,37 @@ export class Browser {
   private pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>();
   private events = new Map<string, ((params: any) => void)[]>();
 
-  constructor(private readonly port = 9333) {}
+  /**
+   * A port and profile nobody else is holding.
+   *
+   * ── The flake this fixes ──────────────────────────────────────────────
+   *
+   * A fixed port and a fixed profile directory meant a Chrome leaked by a
+   * crashed run kept both. The next run's launch could not bind, and
+   * `awaitTarget` cheerfully found the OLD browser on that port and drove its
+   * stale tab — which presents as "the overlay never mounted", on a first run,
+   * intermittently. Two turns were spent suspecting application cold start.
+   *
+   * Randomising per instance makes runs independent, and `close` takes the
+   * profile with it.
+   */
+  private readonly profile: string;
+
+  constructor(private readonly port = 9200 + Math.floor(Math.random() * 700)) {
+    this.profile = join(process.env.TMPDIR ?? "/tmp", `sakred-cdp-${this.port}-${process.pid}`);
+  }
 
   async launch(): Promise<void> {
     const { existsSync } = await import("node:fs");
     const bin = CHROME_CANDIDATES.find((p) => existsSync(p));
     if (!bin) throw new Error(`No Chrome found. Looked in:\n  ${CHROME_CANDIDATES.join("\n  ")}`);
 
-    const profile = join(process.env.TMPDIR ?? "/tmp", `sakred-cdp-${this.port}`);
-    mkdirSync(profile, { recursive: true });
+    mkdirSync(this.profile, { recursive: true });
 
     this.proc = spawn(bin, [
       "--headless=new",
       `--remote-debugging-port=${this.port}`,
-      `--user-data-dir=${profile}`,
+      `--user-data-dir=${this.profile}`,
       "--no-first-run",
       "--no-default-browser-check",
       "--disable-extensions",
@@ -237,5 +254,10 @@ export class Browser {
   async close(): Promise<void> {
     try { this.ws?.close(); } catch { /* already gone */ }
     this.proc?.kill();
+    /* Leave nothing for the next run to attach to by accident. */
+    try {
+      const { rmSync } = await import("node:fs");
+      rmSync(this.profile, { recursive: true, force: true });
+    } catch { /* the OS will get it */ }
   }
 }
