@@ -45,15 +45,6 @@ import type { GuidedTour, TourAnchor, TourProgress, TourWorld } from "@/lib/tour
 export const TOUR_SECTION_ATTR = "data-tour-section";
 
 /** Called by the dashboard when its section changes. One line, no props. */
-/**
- * Below this, two taps are one tap the hardware reported twice.
- *
- * Deliberately generous. The cost of ignoring a real second tap is that the
- * member taps again; the cost of accepting a phantom one is a lesson skipped
- * that they are never offered again.
- */
-const DOUBLE_TAP_MS = 350;
-
 export function publishTourSection(section: string | null): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
@@ -167,23 +158,31 @@ export function useGuidedTour(
    */
   const advancedFrom = useRef<number | null>(null);
 
-  /**
-   * When the last advance was accepted.
-   *
-   * The index guard alone is not enough: React re-renders between two taps, so
-   * the second one is an advance from a *different* index and passes it. What
-   * actually has to be rejected is the second half of one physical double-tap,
-   * and the only thing that distinguishes it is time — nobody reads a lesson
-   * and decides to continue in three hundred milliseconds.
-   */
-  const advancedAt = useRef(0);
+  /*
+    There was a second guard here: reject any advance within 350ms of the last
+    one. It was measured against the wrong event and rejected a real tap.
 
+    A member taking one physical double-tap produces two clicks about *one
+    millisecond* apart — measured, not guessed; see script/qa-input.ts. A member
+    reading the next lesson and pressing Continue produces one click a few
+    hundred milliseconds later. A window drawn between those two on the clock
+    since the *previous advance* has to be large enough to cover the first and
+    therefore large enough to swallow the second, which is exactly what
+    happened: the walkthrough's own driver had its first Continue on every step
+    ignored, and a member who taps promptly would have had the same experience
+    with no way to know why.
+
+    The distinguishing fact is not how long since the last advance. It is how
+    long the control being pressed has existed — the ghost tap lands on a button
+    that mounted a millisecond ago, under a finger that was already coming down
+    for the previous one. That is guarded where the button is, in
+    GuidedTourOverlay, and it does not need to know anything about time since
+    the last step.
+  */
   const advance = useCallback(() => {
     if (index === null || !progress) return;
     if (advancedFrom.current === index) return;
-    if (performance.now() - advancedAt.current < DOUBLE_TAP_MS) return;
     advancedFrom.current = index;
-    advancedAt.current = performance.now();
     const updated = complete(progress, tour, index, new Date().toISOString());
     setProgress(updated);
     writeProgress(updated);

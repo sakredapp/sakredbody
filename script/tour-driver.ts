@@ -55,6 +55,21 @@ export class TourDriverError extends Error {
 
 const STEP_TIMEOUT_MS = 15_000;
 
+/**
+ * How long a member spends looking at a lesson before touching anything.
+ *
+ * The driver was pressing Continue within a few milliseconds of the panel
+ * mounting, which no hand can do — and the overlay now ignores a press that
+ * arrives before its control has plausibly been seen, because that is the tail
+ * of the gesture that mounted it rather than a new decision.
+ *
+ * So this is not tuning the test to the guard. It is the driver modelling a
+ * member instead of a script: an instrument that acts faster than a hand
+ * cannot tell you what a hand will experience. A quarter of a second is still
+ * far quicker than anybody reads.
+ */
+const READ_PAUSE_MS = 250;
+
 export class TourDriver {
   constructor(private readonly b: Browser, private readonly tour = SAKRED_INTRO) {}
 
@@ -90,6 +105,10 @@ export class TourDriver {
       const r = named[0].getBoundingClientRect();
       return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
     `);
+  }
+
+  private pause(ms: number): Promise<unknown> {
+    return this.b.evaluate(`return new Promise(r => setTimeout(() => r(true), ${ms}));`);
   }
 
   private continuePoint(): Promise<Point | null> {
@@ -153,6 +172,8 @@ export class TourDriver {
         );
       }
     }
+    await this.pause(READ_PAUSE_MS);
+
     if (step.advance.kind === "continue") {
       const at = await this.continuePoint();
       if (!at) throw new TourDriverError("NO_CONTINUE", `step ${step.id} advances on Continue and offers none`);

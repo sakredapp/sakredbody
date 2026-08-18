@@ -62,6 +62,16 @@ const SAME = (a: Rect | null, b: Rect | null) =>
 /** Breathing room around the cutout so the halo doesn't clip the control. */
 const PAD = 8;
 
+/**
+ * Below this, a press on a freshly-mounted tutorial control is the tail of the
+ * gesture that mounted it rather than a new decision.
+ *
+ * Two orders of magnitude above the measured 1ms gap between the halves of a
+ * double-tap, and an order of magnitude below the time it takes to read a
+ * sentence and decide to move on.
+ */
+const GHOST_TAP_MS = 120;
+
 export function GuidedTourOverlay({
   resolution,
   instance,
@@ -200,6 +210,26 @@ export function GuidedTourOverlay({
   */
   const degraded = resolution.kind === "degraded";
 
+  /*
+    How long this step's Continue has been on screen.
+
+    The one fact that separates a member pressing Continue from the second half
+    of one physical double-tap. Measured in the browser rather than reasoned
+    about: the two clicks of a double-tap arrive about a millisecond apart, and
+    the second lands wherever the re-render put things — sometimes a harmless
+    DIV, sometimes the new Continue, which skips a lesson the member is never
+    offered again.
+
+    So the button ignores a press that arrives before it has plausibly been
+    seen. Nothing is disabled and nothing is hidden: a member who taps again
+    gets what they asked for immediately, because by then the control is older
+    than the window.
+  */
+  const shownAt = useRef(performance.now());
+  useEffect(() => {
+    shownAt.current = performance.now();
+  }, [step.id]);
+
   // Low on the screen means the bottom panel would sit on top of it. The
   // primary navigation is a bottom bar, so this is the common case rather than
   // the exceptional one.
@@ -208,7 +238,22 @@ export function GuidedTourOverlay({
 
   const body = (
     <div
-      className="fixed inset-0 z-[120]"
+      /*
+        `pointer-events-none` on the container, restored on each piece that is
+        meant to block.
+
+        The four-rectangle scrim below is built so that nothing covers the hole
+        — that is the entire reason it is four rectangles and not a mask. This
+        wrapper was quietly defeating it: a `fixed inset-0` div is a hit target
+        whether or not it paints anything, so `elementFromPoint` at the centre
+        of the highlighted control returned the overlay, and every step that
+        asks the member to tap something was untappable. The walkthrough could
+        be read and not used.
+
+        Measured, not reasoned about: the QA driver tapped the highlighted
+        Restore tab and the tap landed on `tour-overlay`.
+      */
+      className="fixed inset-0 z-[120] pointer-events-none"
       role="dialog"
       aria-modal="true"
       aria-labelledby="tour-title"
@@ -263,7 +308,8 @@ export function GuidedTourOverlay({
       {/* ── The dialogue panel ───────────────────────────────────────────── */}
       <div
         className={cn(
-          "absolute left-0 right-0 px-4",
+          /* The panel is the other half that must stay interactive. */
+          "absolute left-0 right-0 px-4 pointer-events-auto",
           panelAtTop ? "top-0 pt-[calc(env(safe-area-inset-top)+0.75rem)]" : "bottom-0 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]",
         )}
       >
@@ -340,6 +386,12 @@ export function GuidedTourOverlay({
                 type="button"
                 onClick={() => {
                   /*
+                    ~1ms is a ghost; ~200ms is a person. GHOST_TAP_MS sits
+                    between them, far closer to the ghost than to any real
+                    reading time, so it cannot swallow a deliberate press.
+                  */
+                  if (performance.now() - shownAt.current < GHOST_TAP_MS) return;
+                  /*
                     Say that this lesson degraded, before moving past it. A run
                     that ends with the walkthrough marked complete must not be
                     indistinguishable from one where three lessons never found
@@ -389,7 +441,7 @@ function Scrim({ style }: { style: React.CSSProperties }) {
   return (
     <div
       aria-hidden="true"
-      className="absolute bg-[hsl(var(--tour-scrim))] transition-opacity duration-200"
+      className="absolute bg-[hsl(var(--tour-scrim))] transition-opacity duration-200 pointer-events-auto"
       style={style}
       // The blocking half of "only the target is interactive". Swallowed here
       // rather than ignored, so a stray tap does nothing at all instead of
