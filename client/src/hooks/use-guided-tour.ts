@@ -84,6 +84,17 @@ export function useGuidedTour(
 
   const tapped = useRef(false);
   const stepStartedAt = useRef(0);
+  /**
+   * Which step the world in state was measured for.
+   *
+   * The frame loop watches the *current* step's anchors, so for one render
+   * after the step changes `world` still describes the previous one. Reading a
+   * completion condition against that is reading the wrong screen — and for an
+   * `absent` advance it is actively wrong, because an anchor the previous step
+   * never watched is trivially "not present" and the new step completes before
+   * anybody has looked at it. `close-workout` skipped itself exactly that way.
+   */
+  const measuredFor = useRef<string | null>(null);
 
   /*
     Start once, and only once.
@@ -125,6 +136,7 @@ export function useGuidedTour(
     const tick = () => {
       const present = new Set<TourAnchor>();
       for (const a of watched) if (anchorPresent(a)) present.add(a);
+      measuredFor.current = step.id;
       setWorld({
         section: document.documentElement.getAttribute(TOUR_SECTION_ATTR),
         present,
@@ -253,8 +265,26 @@ export function useGuidedTour(
       skip();
       return;
     }
+
+    /*
+      The advance condition is the contract; the anchor is only what the
+      overlay points at.
+
+      `close-workout` points at the close button and completes when the set row
+      is gone. Tapping close removes both — so the step's own anchor vanished,
+      `resolve` reported "waiting", and the check below never ran. The member
+      did exactly what was asked and the walkthrough stopped, forever, on a
+      lesson whose whole instruction is to make something disappear.
+
+      So satisfaction is tested first. A step that has been completed is
+      complete whether or not the thing it was pointing at is still on screen.
+    */
+    if (measuredFor.current === step.id && isSatisfied(step.advance, world, tapped.current)) {
+      advance();
+      return;
+    }
+
     if (resolution.kind !== "ready") return;
-    if (isSatisfied(step.advance, world, tapped.current)) advance();
   }, [resolution, step, world, advance, skip]);
 
   if (index === null || !step || !resolution) return null;

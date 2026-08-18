@@ -258,6 +258,35 @@ function openSession(store: RehearsalStore) {
     logged,
     exercises: session(store).exercises,
     observations: [],
+    /*
+      What LAST TIME is drawn from.
+
+      `REHEARSAL_LAST_TIME` has existed since the lesson was written and was
+      hung on each exercise as `lastTime` — a field the workout screen does not
+      read. It reads `session.previous`, keyed by exercise id, so the panel
+      never rendered and the lesson pointed at nothing.
+
+      Keyed for every movement in the rehearsal rather than one: whichever the
+      member picked from six hundred is the one the lesson has to teach on, and
+      a rehearsal that only works for bench press is a rehearsal of bench press.
+    */
+    previous: Object.fromEntries(
+      store.exercises.map((e) => [
+        e.exerciseId,
+        {
+          exerciseId: e.exerciseId,
+          onDate: REHEARSAL_LAST_TIME.performedAt.slice(0, 10),
+          sets: REHEARSAL_LAST_TIME.sets.map((set) => ({
+            reps: set.reps,
+            durationSeconds: null,
+            distanceM: null,
+            weight: set.weight,
+            rpe: set.rpe,
+            isWarmup: false,
+          })),
+        },
+      ]),
+    ),
   };
 }
 
