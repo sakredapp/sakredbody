@@ -126,6 +126,15 @@ export type TourStep = {
    * stops working while somebody is being taught".
    */
   rehearsal?: "begin" | "end";
+
+  /**
+   * This lesson accepts any one of several like controls.
+   *
+   * Declared, never inferred — see `TargetRequest.anyInstance`. Without it the
+   * Body Map lesson could not be highlighted at all: nine territories, nine
+   * correct answers, and a resolver that correctly refuses to guess.
+   */
+  anyInstance?: boolean;
   /**
    * A step that asks for a decision rather than pointing at a control.
    *

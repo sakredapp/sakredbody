@@ -77,6 +77,20 @@ export type TargetRequest = {
   instance?: string | null;
   /** Whether the member has to press it, as opposed to merely look at it. */
   needsInteraction: boolean;
+  /**
+   * The step means "any of these", and says so.
+   *
+   * Different instances normally mean different controls, and a step that has
+   * not said which one is a step with a bug — reporting that is more useful
+   * than picking one. But some lessons genuinely invite a free choice: "open
+   * one territory, anything that interests you" is nine equally correct
+   * answers, and demanding the step name one would be demanding it lie about
+   * what it is teaching.
+   *
+   * So the exception is declared by the step rather than inferred, and the
+   * ambiguity rule still protects every step that has not declared it.
+   */
+  anyInstance?: boolean;
 };
 
 const visible = (c: Candidate) =>
@@ -130,7 +144,7 @@ export function chooseCandidate(
     useful than picking one.
   */
   const instances = new Set(pool.map(({ c }) => c.instance));
-  if (instances.size > 1) {
+  if (instances.size > 1 && !request.anyInstance) {
     return { ok: false, reason: "ambiguous", candidates: pool.length };
   }
 

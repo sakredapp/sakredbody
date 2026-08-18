@@ -132,7 +132,11 @@ export class TourDriver {
   }
 
   /** Centre of the visible instance, or null. The resolver's rule, not `[0]`. */
-  private async pointFor(anchor: string, instance: string | null): Promise<Point | null> {
+  private async pointFor(
+    anchor: string,
+    instance: string | null,
+    anyInstance = false,
+  ): Promise<Point | null> {
     return this.b.evaluate<Point | null>(`
       const all = [...document.querySelectorAll('[data-tour-id="${anchor}"]')];
       const visible = all.filter(e => {
@@ -141,7 +145,14 @@ export class TourDriver {
         return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && Number(s.opacity) > 0.05;
       });
       const named = ${instance ? `visible.filter(e => e.getAttribute("data-tour-instance") === ${JSON.stringify(instance)})` : "visible"};
-      if (named.length !== 1) return null;
+      /*
+        A step that accepts any of several like controls gets the first one on
+        screen, which is what a member choosing freely would land on. Every
+        other step still requires exactly one, so an ambiguous target stays a
+        finding rather than becoming a coin toss.
+      */
+      if (named.length !== 1 && !${JSON.stringify(!!anyInstance)}) return null;
+      if (named.length === 0) return null;
       const r = named[0].getBoundingClientRect();
       return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
     `);
@@ -226,7 +237,7 @@ export class TourDriver {
         `step ${step.id} advances on ${step.advance.kind} but highlights nothing to touch`,
       );
     }
-    const at = await this.pointFor(step.anchor, instance);
+    const at = await this.pointFor(step.anchor, instance, step.anyInstance ?? false);
     if (!at) {
       throw new TourDriverError(
         "TARGET_UNRESOLVED",

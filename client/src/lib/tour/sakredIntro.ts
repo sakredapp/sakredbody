@@ -249,6 +249,8 @@ export const SAKRED_INTRO: GuidedTour = {
       objective: "Open the Body Map",
       section: "body",
       anchor: "body-territory",
+      /* Nine territories, nine correct answers. See TourStep.anyInstance. */
+      anyInstance: true,
       title: "Have a look",
       body: "Open one territory. Anything that interests you — you can come back.",
       advance: { kind: "tap" },

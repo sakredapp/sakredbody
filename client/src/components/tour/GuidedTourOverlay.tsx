@@ -111,7 +111,7 @@ export function GuidedTourOverlay({
   */
   useLayoutEffect(() => {
     if (!anchor) return;
-    const found = resolveTarget({ anchor, instance, needsInteraction: needsTap });
+    const found = resolveTarget({ anchor, instance, needsInteraction: needsTap, anyInstance: step.anyInstance });
     if (found.ok && found.scrollNeeded) {
       (found.el as HTMLElement).scrollIntoView({
         block: "center",
@@ -134,7 +134,7 @@ export function GuidedTourOverlay({
       // visible twin becomes the other element; a sheet opens and a previously
       // hidden row becomes the real target. Holding the element found at mount
       // is how a spotlight ends up on a node that is no longer on screen.
-      const found = resolveTarget({ anchor, instance, needsInteraction: needsTap });
+      const found = resolveTarget({ anchor, instance, needsInteraction: needsTap, anyInstance: step.anyInstance });
       const el = found.ok ? (found.el as HTMLElement) : null;
       const next = el
         ? (() => {
