@@ -81,9 +81,25 @@ check("a rehearsal is running", isRehearsing());
   movement, log a set, correct it, record effort, mark it taken to failure, add
   a second movement, then close without finishing.
 */
-const open = await (await call("GET", "/api/training/sessions/open")).json();
+/*
+  `{ session: … }`, because that is what the real route answers.
+
+  These two assertions used to read `open.rehearsal` off the top level, which
+  passed while the rehearsal served a bare session — and that mismatch was the
+  bug: the workout screen reads `data.session`, found undefined, and closed
+  itself one tap after the tutorial asked the member to add a movement. A test
+  written against the imitation rather than the route it imitates cannot catch
+  that, so it is written against the route.
+*/
+const openBody = await (await call("GET", "/api/training/sessions/open")).json();
+const open = openBody.session;
+check("the open route answers the shape the app reads", !!open);
 check("the open session is the rehearsal, never the member's real one", open.rehearsal === true);
 check("and it is labelled as such wherever it surfaces", open.title === "Rehearsal");
+check(
+  "and it carries the contents the workout screen renders from",
+  Array.isArray(open.logged) && Array.isArray(open.exercises),
+);
 
 await call("POST", "/api/training/sessions", { title: "Rehearsal" });
 await call("POST", "/api/training/sessions/rehearsal-session/exercises", {
