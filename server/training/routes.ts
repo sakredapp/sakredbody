@@ -424,6 +424,70 @@ async function sessionHistory(userId: string) {
   };
 }
 
+/**
+ * Every set of one movement, newest day first.
+ *
+ * Warm-ups are included and labelled rather than dropped: a member who logs
+ * their ramp wants to see it, and the readers that must exclude it — volume,
+ * the e1RM series, terrain's movement events — already do so by `is_warmup`.
+ *
+ * RPE, style and failure come back only where they were actually recorded. A
+ * null stays null all the way to the screen; inventing a middling RPE for the
+ * sets somebody left blank would put a number in their history they never
+ * said.
+ */
+async function movementSets(userId: string, exerciseId: string) {
+  const unit = await unitFor(userId);
+
+  const [movement] = await db
+    .select({ id: exercises.id, name: exercises.name, trackingType: exercises.trackingType })
+    .from(exercises)
+    .where(eq(exercises.id, exerciseId))
+    .limit(1);
+  if (!movement) return { unit, movement: null, days: [] };
+
+  const rows = await db
+    .select({
+      onDate: workoutSessions.onDate,
+      sessionId: workoutSessions.id,
+      sessionTitle: workoutSessions.title,
+      setIndex: workoutSets.setIndex,
+      reps: workoutSets.reps,
+      durationSeconds: workoutSets.durationSeconds,
+      distanceM: workoutSets.distanceM,
+      weightKg: workoutSets.weightKg,
+      isWarmup: workoutSets.isWarmup,
+      setStyle: workoutSets.setStyle,
+      toFailure: workoutSets.toFailure,
+      rpe: workoutSets.rpe,
+      note: workoutSets.note,
+    })
+    .from(workoutSets)
+    .innerJoin(workoutSessions, eq(workoutSets.sessionId, workoutSessions.id))
+    .where(and(eq(workoutSessions.userId, userId), eq(workoutSets.exerciseId, exerciseId)))
+    .orderBy(desc(workoutSessions.onDate), asc(workoutSets.setIndex))
+    .limit(400);
+
+  const days: {
+    onDate: string;
+    sessionId: string;
+    sessionTitle: string | null;
+    sets: Array<Omit<(typeof rows)[number], "onDate" | "sessionId" | "sessionTitle" | "weightKg"> & {
+      weight: number | null;
+    }>;
+  }[] = [];
+
+  for (const row of rows) {
+    const { onDate, sessionId, sessionTitle, weightKg, ...set } = row;
+    const last = days[days.length - 1];
+    const entry = { ...set, weight: out(weightKg, unit) };
+    if (last && last.sessionId === sessionId) last.sets.push(entry);
+    else days.push({ onDate, sessionId, sessionTitle, sets: [entry] });
+  }
+
+  return { unit, movement, days };
+}
+
 export function registerTrainingRoutes(app: Express) {
   // ─── Catalogue ───────────────────────────────────────────────────────────
 
@@ -1594,6 +1658,44 @@ export function registerTrainingRoutes(app: Express) {
     async (req, res) => {
       try {
         res.json(await sessionHistory(param(req, "memberId")));
+      } catch (err) {
+        fail(res, err);
+      }
+    },
+  );
+
+  /**
+   * One movement, day by day, as it was actually performed.
+   *
+   * ── Why this is not the progression endpoint ──────────────────────────
+   *
+   * `/exercises/:id/history` answers "is this going up" — one estimated 1RM per
+   * day, which is the right shape for a line and the wrong shape for a person
+   * standing in a gym trying to remember what they did last Tuesday. They want
+   * the sets: the weight, the reps, whether it was a warm-up, whether they
+   * called failure.
+   *
+   * A read model over the canonical tables, not a second history. Nothing here
+   * is stored; every number is `workout_sets` joined to the session that dates
+   * it.
+   */
+  app.get("/api/training/exercises/:id/sets", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      res.json(await movementSets(userId, param(req, "id")));
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
+  /** The same movement, read by the client's coach. */
+  app.get(
+    "/api/coach/clients/:memberId/movements/:exerciseId/sets",
+    isAuthenticated,
+    requireCoachOf("memberId"),
+    async (req, res) => {
+      try {
+        res.json(await movementSets(param(req, "memberId"), param(req, "exerciseId")));
       } catch (err) {
         fail(res, err);
       }

@@ -26,6 +26,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Panel } from "@/components/portal/Panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MediaImage } from "@/components/MediaImage";
+import { MovementHistory } from "@/components/build/MovementHistory";
 import { summariseSession, type LoggedSet, type WeightUnit } from "@shared/models/training";
 import type { ProgressPhoto } from "@/components/ProgressPhotos";
 
@@ -34,7 +35,12 @@ type Session = {
   onDate: string;
   title: string | null;
   durationMinutes: number | null;
-  sets: LoggedSet[];
+  /*
+    The route returns the exercise id alongside every set — `LoggedSet` is the
+    shape the summariser wants and deliberately does not carry it, so the two
+    are intersected here rather than widening the shared model for one screen.
+  */
+  sets: (LoggedSet & { exerciseId: string })[];
 };
 
 async function readJson<T>(url: string): Promise<T> {
@@ -45,6 +51,8 @@ async function readJson<T>(url: string): Promise<T> {
 
 export function MovementAndProgress({ memberId }: { memberId: string }) {
   const [open, setOpen] = useState<ProgressPhoto | null>(null);
+  /** The client's own history of one movement, opened from a session line. */
+  const [inspecting, setInspecting] = useState<{ id: string; name: string } | null>(null);
 
   const movement = useQuery<{ unit: WeightUnit; sessions: Session[] }>({
     queryKey: ["/api/coach/clients", memberId, "movement"],
@@ -105,6 +113,28 @@ export function MovementAndProgress({ memberId }: { memberId: string }) {
                     </li>
                   ))}
                 </ul>
+
+                {/*
+                  Each movement in the session opens the client's own history of
+                  it. A coach adjusting a weight is asking "what have they been
+                  doing here", and the answer is three taps away rather than a
+                  question they have to ask in the thread.
+                */}
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                  {Array.from(new Map(s.sets.map((x) => [x.exerciseId, x.name])).entries()).map(
+                    ([id, label]) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setInspecting({ id, name: label })}
+                        className="text-[10px] uppercase tracking-wide text-muted-foreground/60 hover:text-foreground tap-clean"
+                        data-testid={`button-coach-movement-${id}`}
+                      >
+                        {label}
+                      </button>
+                    ),
+                  )}
+                </div>
               </li>
             ))}
           </ul>
@@ -137,6 +167,15 @@ export function MovementAndProgress({ memberId }: { memberId: string }) {
           </div>
         )}
       </Panel>
+
+      {inspecting && (
+        <MovementHistory
+          exerciseId={inspecting.id}
+          name={inspecting.name}
+          memberId={memberId}
+          onClose={() => setInspecting(null)}
+        />
+      )}
 
       {open && (
         <div

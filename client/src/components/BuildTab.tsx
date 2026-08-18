@@ -38,6 +38,7 @@ import { SectionHeading, Panel, StatTile } from "@/components/portal/Panel";
 import { HabitPanel } from "@/components/habits/HabitPanel";
 import { TodayRead } from "@/components/TodayRead";
 import { MemberBuild } from "@/components/build/MemberBuild";
+import { MovementHistory } from "@/components/build/MovementHistory";
 import { TodaysBuild, RecentBuild, MemoryDisclosure } from "@/components/build/BuildToday";
 import { Elapsed } from "@/components/build/Elapsed";
 import { WorkoutInProgress } from "@/components/build/WorkoutInProgress";
@@ -158,6 +159,8 @@ function targetLabel(l: PrescribedLift): string {
 export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
   const { toast } = useToast();
   const qc = useQueryClient();
+  /** The movement whose own history is open over the screen, if any. */
+  const [inspecting, setInspecting] = useState<{ id: string; name: string } | null>(null);
   /**
    * Where an ad-hoc workout goes.
    *
@@ -633,7 +636,22 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
                   <div className="space-y-3">
                     <div className="flex items-start justify-between gap-3 flex-wrap">
                       <div className="min-w-0">
-                        <h3 className="font-display text-lg leading-tight">{lift.name}</h3>
+                        {/*
+                          The name opens what they have actually done on this
+                          movement. Their own history is the thing they reach
+                          for when deciding today's weight, and until now the
+                          only way to it was scrolling their whole week.
+                        */}
+                        <button
+                          type="button"
+                          onClick={() => setInspecting({ id: lift.exerciseId, name: lift.name })}
+                          className="text-left tap-clean"
+                          data-testid={`button-movement-history-${lift.exerciseId}`}
+                        >
+                          <h3 className="font-display text-lg leading-tight underline decoration-dotted decoration-muted-foreground/40 underline-offset-4">
+                            {lift.name}
+                          </h3>
+                        </button>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {targetLabel(lift)}
                           {lift.targetPercent1rm ? ` · ${lift.targetPercent1rm}% of your max` : ""}
@@ -842,6 +860,14 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
           stored the same way underneath, so nothing is converted or lost.
         </InfoTip>
       </p>
+
+      {inspecting && (
+        <MovementHistory
+          exerciseId={inspecting.id}
+          name={inspecting.name}
+          onClose={() => setInspecting(null)}
+        />
+      )}
     </div>
   );
 }
