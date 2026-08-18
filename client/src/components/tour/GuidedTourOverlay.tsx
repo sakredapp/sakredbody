@@ -309,7 +309,21 @@ export function GuidedTourOverlay({
               Pause for now
             </button>
 
-            {(explanatory || resolution.kind === "degraded") && (
+            {/*
+              No Continue while the lesson is still looking for its subject.
+
+              It used to render one here, enabled, under the words "One
+              moment…" — and pressing it did nothing, because there is nothing
+              yet to continue from. A control that invites a tap and answers
+              with silence is worse than no control: the member concludes the
+              app is broken, which on that evidence is a reasonable thing to
+              conclude.
+
+              `degraded` is different and still offers it. That is the bounded
+              give-up after six seconds of waiting, and moving on is exactly
+              the right thing to be able to do at that point.
+            */}
+            {((explanatory && !waiting) || resolution.kind === "degraded") && (
               <button
                 type="button"
                 onClick={onContinue}
