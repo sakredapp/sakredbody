@@ -134,6 +134,25 @@ export class TourDriver {
    * Continue step the member action is a real tap on that anchor.
    */
   private async act(step: TourStep, instance: string | null): Promise<void> {
+    /*
+      A member does not tap Continue at a lesson pointing somewhere blank —
+      they wait for the thing being explained to appear, and so does this. The
+      overlay renders an enabled Continue during that wait which does nothing
+      when pressed (a defect in its own right), so a driver that clicks
+      immediately reports the step as broken when it is merely still loading.
+    */
+    if (step.anchor) {
+      const deadline = Date.now() + 12_000;
+      while (Date.now() < deadline && !(await this.present(step.anchor))) {
+        await this.b.settle();
+      }
+      if (!(await this.present(step.anchor))) {
+        throw new TourDriverError(
+          "TARGET_NEVER_RENDERED",
+          `step ${step.id}: ${step.anchor} never appeared for this member`,
+        );
+      }
+    }
     if (step.advance.kind === "continue") {
       const at = await this.continuePoint();
       if (!at) throw new TourDriverError("NO_CONTINUE", `step ${step.id} advances on Continue and offers none`);
