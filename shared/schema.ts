@@ -26,6 +26,8 @@ export * from "./models/rhythmTracking.js";
 export * from "./models/suggestions.js";
 export * from "./models/apothecary.js";
 export * from "./models/profilePhotos.js";
+export * from "./models/media.js";
+export * from "./models/progressPhotos.js";
 /*
  * These three were defined, used by the server, applied to production by
  * migration — and never re-exported here. `shared/schema.ts` is the file

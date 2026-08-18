@@ -193,6 +193,32 @@ export const communityMessages = pgTable(
     audioDurationSeconds: integer("audio_duration_seconds"),
 
     /**
+     * A photograph, when there is one.
+     *
+     * A reference into `media_assets` rather than a URL column, because the
+     * question "who may see this" is answered by the asset's purpose and not
+     * by whoever happens to be rendering the message. See
+     * `shared/models/media.ts`.
+     */
+    imageAssetId: uuid("image_asset_id"),
+
+    /**
+     * The workout this message is about, when it is about one.
+     *
+     * A reference, not a snapshot. The member's sets are already stored
+     * canonically in `workout_sessions` / `session_exercises` / `workout_sets`,
+     * and copying a summary into the Room would create a second version of the
+     * same training that drifts the moment they correct a set. The card is
+     * rendered from the real rows, filtered to what a share is allowed to
+     * contain — see `server/community/sharedWorkout.ts`.
+     *
+     * `ON DELETE SET NULL` in the migration: deleting a workout must not
+     * delete the conversation about it, and a share whose session is gone
+     * degrades to whatever the member wrote alongside it.
+     */
+    sharedSessionId: uuid("shared_session_id"),
+
+    /**
      * Deleting a message with replies would orphan the conversation, so a
      * delete is a tombstone: the row stays, the body is replaced, and the
      * thread keeps its shape.
@@ -228,10 +254,18 @@ export const postMessageSchema = z
     audioUrl: z.string().url().nullable().optional(),
     audioMime: z.string().max(80).nullable().optional(),
     audioDurationSeconds: z.number().int().min(1).max(600).nullable().optional(),
+    imageAssetId: z.string().uuid().nullable().optional(),
+    sharedSessionId: z.string().uuid().nullable().optional(),
   })
-  .refine((v) => v.body.trim().length > 0 || !!v.audioUrl, {
-    message: "Say something, or record it.",
-  });
+  /*
+    A message has to be *something*. Words, a recording, a photograph, or a
+    workout — four ways to say something and one rule, rather than a refinement
+    that quietly stopped being true when photos arrived.
+  */
+  .refine(
+    (v) => v.body.trim().length > 0 || !!v.audioUrl || !!v.imageAssetId || !!v.sharedSessionId,
+    { message: "Say something, or show something." },
+  );
 
 export const editMessageSchema = z.object({
   body: z.string().min(1).max(8000),

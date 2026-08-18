@@ -21,9 +21,9 @@
  */
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { join } from "node:path";
+import { join, basename } from "node:path";
 import { GENERATED_PART } from "./baseline.js";
-import { PRODUCTION_SHAPE, SHAPE_QUERIES } from "./production-shape.js";
+import { PRODUCTION_SHAPE, SHAPE_READ_AT, SHAPE_QUERIES } from "./production-shape.js";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
 const BASELINE = join(ROOT, "supabase/schema-baseline.sql");
@@ -47,6 +47,31 @@ function postBaselineMigrations(): string[] {
     .sort()
     .map((f) => join(dir, f));
 }
+
+/** The date in a migration's filename, as the same digits the cutoff uses. */
+const dateOf = (file: string) => basename(file).slice(0, 10).replace(/\D/g, "");
+
+/**
+ * The post-baseline migrations production already had when the shape was read.
+ *
+ * This is the set whose objects are *inside* `PRODUCTION_SHAPE`, and therefore
+ * the only set that may be subtracted from it to work out what the baseline
+ * itself must contain.
+ */
+const appliedMigrations = () =>
+  postBaselineMigrations().filter((f) => dateOf(f) <= SHAPE_READ_AT);
+
+/**
+ * The ones written since — in the repository, not yet in production.
+ *
+ * A rebuild from zero replays these too, so it will legitimately have more
+ * tables, policies and constraints than the reading describes. That excess is
+ * the pending release. It is named rather than absorbed, because a verifier
+ * that silently tolerates "more than expected" is one that would also tolerate
+ * a stray table nobody meant to create.
+ */
+const pendingMigrations = () =>
+  postBaselineMigrations().filter((f) => dateOf(f) > SHAPE_READ_AT);
 
 let failed = 0;
 const check = (name: string, ok: boolean, detail?: string) => {
@@ -75,8 +100,14 @@ const policies = (sql.match(/CREATE POLICY/g) ?? []).length;
  * Today that arithmetic is 155 − 1 = 154 policies and 90 − 1 = 89 enables,
  * both supplied by `2026-08-16-session-exercises.sql`. Writing 154 and 89 down
  * would mean the next migration that adds a policy silently breaks this.
+ *
+ * Only migrations production *had when the reading was taken* may be
+ * subtracted — see `SHAPE_READ_AT`. Subtracting an unapplied one asks the
+ * baseline to be smaller than production to make room for something
+ * production does not have, which fails with a number that invites somebody
+ * to edit the measurement.
  */
-const migrationSql = postBaselineMigrations().map((f) => readFileSync(f, "utf8")).join("\n");
+const migrationSql = appliedMigrations().map((f) => readFileSync(f, "utf8")).join("\n");
 const countIn = (text: string, re: RegExp) => (text.match(re) ?? []).length;
 
 const POLICY = /create policy/gi;
@@ -333,10 +364,28 @@ if (process.env.SAKRED_QA !== "1") {
       gained something the repository has not been told about, which is the
       original failure and is worth failing for.
     */
+    /*
+      When a migration has been written but not yet applied to production, the
+      rebuild legitimately has *more* than the reading describes. So the
+      comparison relaxes in exactly one direction, and the pending files are
+      printed — an unexplained excess is still visible, it just isn't a
+      failure, whereas a shortfall always is.
+    */
+    const pending = pendingMigrations().map((f) => basename(f));
+    if (pending.length) {
+      console.log(`  · ${pending.length} migration(s) not yet in the 17 Aug reading:`);
+      for (const f of pending) console.log(`      ${f}`);
+    }
+
     for (const [what, expected] of Object.entries(PRODUCTION_SHAPE)) {
       const { rows } = await client.query<{ n: number }>(SHAPE_QUERIES[what as keyof typeof PRODUCTION_SHAPE]);
-      check(`the rebuilt schema matches production on ${what}`, rows[0].n === expected,
-        `${rows[0].n} of ${expected}`);
+      const measured = rows[0].n;
+      const ok = pending.length ? measured >= expected : measured === expected;
+      check(`the rebuilt schema matches production on ${what}`, ok,
+        `${measured} of ${expected}`);
+      if (pending.length && measured > expected) {
+        console.log(`  · ${what}: +${measured - expected} from the pending migrations`);
+      }
     }
   }
 

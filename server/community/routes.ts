@@ -168,7 +168,7 @@ export async function visibleChannelIds(userId: string): Promise<string[]> {
     .map((c) => c.id);
 }
 
-async function canSee(userId: string, channelId: string): Promise<boolean> {
+export async function canSee(userId: string, channelId: string): Promise<boolean> {
   return (await visibleChannelIds(userId)).includes(channelId);
 }
 

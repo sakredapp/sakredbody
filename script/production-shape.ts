@@ -48,6 +48,24 @@
  *        join pg_namespace n on n.oid=c.relnamespace
  *        where n.nspname='public' and not t.tgisinternal);
  */
+/**
+ * When the reading above was taken.
+ *
+ * The date matters as much as the numbers. A migration written after this
+ * point is in the repository and *not* in production, so a rebuild from zero
+ * legitimately produces more tables than this reading describes — and the
+ * arithmetic that derives the baseline's share has to subtract only the
+ * migrations production actually has, not every file on disk.
+ *
+ * Without this the first unapplied migration makes the offline check fail with
+ * a number nobody can act on, and the obvious fix — editing the constants — is
+ * the one that quietly turns a measurement into a guess.
+ *
+ * Compared against the leading date in a migration filename, so it is the same
+ * ordering rule the cutoff already relies on.
+ */
+export const SHAPE_READ_AT = "20260817";
+
 export const PRODUCTION_SHAPE = {
   tables: 94,
   policies: 155,
