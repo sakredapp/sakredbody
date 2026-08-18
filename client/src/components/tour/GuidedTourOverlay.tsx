@@ -302,7 +302,24 @@ export function GuidedTourOverlay({
           />
         </>
       ) : (
-        <Scrim style={{ inset: 0 }} />
+        /*
+          No target, so nothing may be blocked.
+
+          The four-rectangle scrim blocks everything *except* the highlighted
+          control. With no control located there is nothing to make an
+          exception for, and a full-screen blocking scrim then swallows the
+          entire app — including, precisely, the thing the tour is waiting for.
+
+          That is not hypothetical. Tapping "Add" opens the movement picker,
+          which removes `workout-add-exercise` from the document; the overlay
+          fell back to this scrim, and every movement in the picker became
+          untappable. The lesson said "Add one" and then made it impossible.
+
+          So the fallback dims and does not intercept. The member can act, the
+          tour sees the result, and the moment a rect is known the blocking
+          rectangles come back.
+        */
+        <Scrim style={{ inset: 0 }} blocking={false} />
       )}
 
       {/* ── The dialogue panel ───────────────────────────────────────────── */}
@@ -437,16 +454,32 @@ export function GuidedTourOverlay({
  * daylight app dark for its duration has switched the member's theme without
  * asking.
  */
-function Scrim({ style }: { style: React.CSSProperties }) {
+function Scrim({
+  style,
+  /**
+   * Whether this piece is one of the four that surround a located target.
+   *
+   * False only for the no-target fallback, which dims the screen without
+   * taking it over — see the note at the call site. Everything else blocks,
+   * because that is the half of "only the target is interactive" that this
+   * component exists for.
+   */
+  blocking = true,
+}: {
+  style: React.CSSProperties;
+  blocking?: boolean;
+}) {
   return (
     <div
       aria-hidden="true"
-      className="absolute bg-[hsl(var(--tour-scrim))] transition-opacity duration-200 pointer-events-auto"
+      className={cn(
+        "absolute bg-[hsl(var(--tour-scrim))] transition-opacity duration-200",
+        blocking ? "pointer-events-auto" : "pointer-events-none",
+      )}
       style={style}
-      // The blocking half of "only the target is interactive". Swallowed here
-      // rather than ignored, so a stray tap does nothing at all instead of
-      // reaching a control the state machine is not expecting.
-      onPointerDown={(e) => e.preventDefault()}
+      // Swallowed rather than ignored, so a stray tap does nothing at all
+      // instead of reaching a control the state machine is not expecting.
+      onPointerDown={blocking ? (e) => e.preventDefault() : undefined}
     />
   );
 }

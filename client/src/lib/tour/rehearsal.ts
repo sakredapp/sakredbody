@@ -202,7 +202,63 @@ export function routeRehearsal(
 
 function readFrom(path: string, store: RehearsalStore): unknown {
   if (/^\/api\/training\/memory/.test(path)) return [];
+  /*
+    The open-session route answers `{ session: … }`, not a bare session.
+
+    This returned the bare object, so the workout screen read `data.session`,
+    found `undefined`, concluded the workout had ended and closed itself — one
+    tap after the tutorial asked the member to add a movement. Nothing threw
+    and nothing was written; the lesson simply became impossible.
+
+    A rehearsal that serves a different shape from the route it is imitating is
+    not a rehearsal of that route. So the shape is matched here, and the sets
+    the store holds are flattened into the same `logged` array the real route
+    builds.
+  */
+  if (/\/sessions\/open$/.test(path)) return { session: openSession(store) };
   return session(store);
+}
+
+/**
+ * What `/api/training/sessions/open` returns, from the rehearsal's own store.
+ *
+ * Field-for-field with the real route where the store knows the answer. What
+ * it cannot know — a movement's category, whether it takes load — was never
+ * sent by the client, which posts only an id; those stay undefined rather than
+ * being invented, and the screen renders them exactly as it would for a
+ * movement whose catalogue row had not arrived yet.
+ */
+function openSession(store: RehearsalStore) {
+  const logged = store.exercises.flatMap((e) =>
+    e.sets.map((set, i) => ({
+      id: set.id,
+      exerciseId: e.exerciseId,
+      name: e.name,
+      setIndex: set.position || i + 1,
+      reps: set.reps,
+      durationSeconds: null,
+      distanceM: null,
+      weight: set.weight,
+      isWarmup: set.setStyle === "warmup",
+      setStyle: set.setStyle ?? "normal",
+      toFailure: set.toFailure,
+      rpe: set.rpe,
+    })),
+  );
+
+  return {
+    id: store.sessionId,
+    title: "Rehearsal",
+    onDate: store.startedAt.slice(0, 10),
+    habitId: null,
+    startedAt: store.startedAt,
+    rehearsal: true,
+    sets: logged.length,
+    unit: "lb",
+    logged,
+    exercises: session(store).exercises,
+    observations: [],
+  };
 }
 
 function session(store: RehearsalStore) {

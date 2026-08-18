@@ -55,6 +55,9 @@ export class TourDriverError extends Error {
 
 const STEP_TIMEOUT_MS = 15_000;
 
+/** How long a chooser gets to fill before the driver gives up on it. */
+const CHOOSER_TIMEOUT_MS = 8_000;
+
 /**
  * How long a member spends looking at a lesson before touching anything.
  *
@@ -260,14 +263,51 @@ export class TourDriver {
       forever.
     */
     for (let depth = 0; depth < 4; depth++) {
-      if (await this.alreadySatisfied(step.advance)) return;
-      const now = await this.selectable();
-      const answer = optionFrom(now.filter((id) => !seen.includes(id)));
+      const answer = await this.waitForOptions(step.advance, seen);
       if (!answer) return;
-      seen = now;
+      seen = await this.selectable();
       await this.choose(answer);
       await this.b.settle();
     }
+  }
+
+  /**
+   * Wait for the chooser to actually fill, then name the answer.
+   *
+   * The movement picker asks the server for six hundred and sixty-six
+   * movements; the request takes about four hundred milliseconds and the list
+   * renders after that. Sampling once, immediately after the tap, sees the
+   * category chips that render instantly and nothing else — which is how this
+   * driver spent a session reporting that the catalogue "never loads" when it
+   * loads perfectly well half a second later.
+   *
+   * A hand would wait. So does this, and it stops the moment there is either
+   * an answer or a satisfied step, rather than sleeping a fixed amount.
+   */
+  private async waitForOptions(advance: Advance, before: readonly string[]): Promise<string | null> {
+    const deadline = Date.now() + CHOOSER_TIMEOUT_MS;
+    let best: string | null = null;
+    while (Date.now() < deadline) {
+      if (await this.alreadySatisfied(advance)) return null;
+      const now = await this.selectable();
+      const fresh = now.filter((id) => !before.includes(id));
+      /*
+        A list item is an answer. Anything else that appeared alongside it is
+        chrome — a filter, a dismiss, a heading control — and pressing chrome
+        is how this driver used to close the sheet and blame the lesson.
+      */
+      const inList = (await this.listOptions()).filter((id) => fresh.includes(id));
+      const answer = inList.length ? inList[0] : optionFrom(fresh);
+      /*
+        Keep looking after the first answer appears. The chips arrive before
+        the list does, and both are "new" — so the first plausible answer is
+        the wrong one for as long as something larger is still on its way.
+      */
+      if (answer && answer === best) return answer;
+      best = answer;
+      await this.b.settle();
+    }
+    return best;
   }
 
   /**
@@ -278,8 +318,28 @@ export class TourDriver {
    * the right failure — an unnamed control is one no test can talk about.
    */
   private selectable(): Promise<string[]> {
+    return this.selectableIn("");
+  }
+
+  /**
+   * The same controls, but only those the page has put in a list.
+   *
+   * The distinction is doing real work. A picker shows filter chips and
+   * results together, and both were named `movement-…` — so a prefix
+   * heuristic chose "Strength" (a filter) over "Cobra" (an answer), forever.
+   * The page already says which is which: results are `<li>` inside a `<ul>`,
+   * filters are a row of chips. That is a structural fact about the markup
+   * rather than a guess about naming, and it holds for any list this app
+   * renders.
+   */
+  private listOptions(): Promise<string[]> {
+    return this.selectableIn("li ");
+  }
+
+  private selectableIn(scope: string): Promise<string[]> {
+    const q = (tag: string) => `${scope}${tag}[data-testid]`;
     return this.b.evaluate<string[]>(`
-      return [...document.querySelectorAll('button[data-testid], a[data-testid], [role="button"][data-testid]')]
+      return [...document.querySelectorAll('${q("button")}, ${q("a")}, ${scope}[role="button"][data-testid]')]
         .filter(e => {
           const r = e.getBoundingClientRect();
           const s = getComputedStyle(e);
