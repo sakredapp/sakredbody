@@ -201,6 +201,17 @@ export function MemberBuild({
               }}
               disabled={startSession.isPending}
               data-testid="build-start-empty"
+              /*
+                The walkthrough's "start a session" lesson used to point only at
+                the prescribed session's own button, which exists for members a
+                coach has written a day for. A member without a coach reached
+                that lesson and it waited for a control they will never have —
+                the tour stopped dead on the most common account there is.
+
+                Both are the same act, and only one of them is ever on screen,
+                so the resolver still sees exactly one visible instance.
+              */
+              data-tour-id="build-start-session"
             >
               <Play className="h-3.5 w-3.5 mr-1.5" />
               Start a session
