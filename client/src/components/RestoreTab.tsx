@@ -33,6 +33,7 @@ import { seedOpenWorkout } from "@/hooks/use-open-workout";
 import { type RunningSession } from "@/lib/startSession";
 import { useWorkoutSheet } from "@/components/build/WorkoutSheet";
 import { RestoreMemory } from "@/components/build/TrainingMemory";
+import { RecentSessions } from "@/components/build/RecentSessions";
 import { TodayRead } from "@/components/TodayRead";
 import { RhythmSection } from "@/components/RhythmCards";
 import { Panel, SectionHeading } from "@/components/portal/Panel";
@@ -436,6 +437,15 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
         observation, one reader, two useful readings — see `trainingMemory`.
       */}
       <RestoreMemory />
+
+      {/*
+        What they have actually been doing to restore, from both places it is
+        recorded — logged practice and whatever their phone captured. Thirty
+        days rather than seven: restorative work is weekly at best for most
+        people, and a seven-day window shows an empty panel to somebody who has
+        been perfectly consistent.
+      */}
+      <RecentSessions days={30} lens="restore" title="Your Restore history" />
 
       {/* ── Restoring is something you do, not only something you skip ── */}
       <Panel title="Movement that restores" data-testid="restore-movement">

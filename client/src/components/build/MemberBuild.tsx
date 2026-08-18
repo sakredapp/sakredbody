@@ -287,6 +287,14 @@ export function MemberBuild({
       <RecentSessions />
 
       {/*
+        The week above is everything, unfiltered, and stays that way — it is
+        what Build has always shown. This is the longer view of training
+        specifically, which is the one a member goes looking for when they want
+        to know whether the last month added up to anything.
+      */}
+      <RecentSessions days={30} lens="build" title="Your Build history" />
+
+      {/*
         Under the history rather than beside it. A progress photograph is a
         record of the same weeks the sessions above describe, and putting it in
         its own destination would make it a feature somebody has to go and find.
