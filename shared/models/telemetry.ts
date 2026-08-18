@@ -153,6 +153,20 @@ export const EVENT_NAMES = [
   // the error events do.
   "support.submitted",
 
+  /**
+   * A walkthrough lesson that was left behind rather than taught.
+   *
+   * Recorded when the member takes the degraded escape — the subject of the
+   * lesson never rendered, they waited six seconds, and they moved on. It is
+   * deliberately not the same as completing a step: a run that reaches the end
+   * with three of these in it did not teach twenty-six lessons, and a
+   * completion count that cannot tell the difference would report a broken
+   * walkthrough as a successful one.
+   *
+   * Carries the step id and nothing else.
+   */
+  "tour.step_degraded",
+
   // Failures worth knowing about, rather than an empty catch.
   "error.client",
   "error.server",

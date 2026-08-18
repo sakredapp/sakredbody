@@ -44,6 +44,34 @@ export function walkthroughGates(placed: ReadonlySet<string>, pending: number): 
       SAKRED_INTRO.steps.filter((s) => s.rehearsal === "begin").length === 1 &&
       SAKRED_INTRO.steps.filter((s) => s.rehearsal === "end").length === 1,
     "resume reconstructs route, section and rehearsal": /test-resume/.test(pkg),
+
+    /*
+      No enabled control that answers a tap with silence.
+
+      The overlay used to render Continue during the wait for a lesson's
+      subject. Pressing it did nothing — there was nothing yet to continue
+      from — and a member on that evidence concludes the app is broken. The
+      gate is the shape of the condition rather than a runtime probe: the
+      Continue must be excluded while `waiting`, and the only other way to
+      reach it must be `degraded`, which is the bounded give-up.
+    */
+    "no dead enabled tutorial control":
+      /\{\(\(explanatory && !waiting\) \|\| degraded\) && \(/.test(overlay) &&
+      /const waiting = resolution\.kind === "waiting"/.test(overlay) &&
+      /const degraded = resolution\.kind === "degraded"/.test(overlay),
+
+    /*
+      And a lesson that was skipped is not counted as one that was taught.
+
+      The degraded escape carries its own label and its own event. Without
+      both, a run that reached the end past three lessons whose subject never
+      rendered would report as a clean 26/26 — which is exactly the summary
+      this gate exists to stop being written.
+    */
+    "a degraded lesson is distinguishable from a taught one":
+      /Continue for now/.test(overlay) &&
+      /tour\.step_degraded/.test(overlay) &&
+      /"tour\.step_degraded"/.test(read("shared/models/telemetry.ts")),
     "intelligence-loop copy complete":
       teaches(/whole terrain/i) &&
       teaches(/don't get the final vote/i) &&

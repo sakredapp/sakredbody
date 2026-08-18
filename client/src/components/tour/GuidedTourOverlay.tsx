@@ -46,6 +46,7 @@ import { resolveTarget } from "@/lib/tour/resolveTarget";
 import { AtmosphereChoice } from "@/components/tour/AtmosphereChoice";
 import { usePrefersReducedMotion } from "@/hooks/use-reduced-motion";
 import { cn } from "@/lib/utils";
+import { track } from "@/lib/track";
 
 type Rect = { top: number; left: number; width: number; height: number };
 
@@ -192,6 +193,12 @@ export function GuidedTourOverlay({
 
   const waiting = resolution.kind === "waiting";
   const explanatory = step.advance.kind === "continue";
+  /*
+    The lesson gave up looking. Distinct from `waiting`, and distinct from a
+    lesson that was taught — see the note on the button below, and the
+    telemetry that records the difference.
+  */
+  const degraded = resolution.kind === "degraded";
 
   // Low on the screen means the bottom panel would sit on top of it. The
   // primary navigation is a bottom bar, so this is the common case rather than
@@ -321,20 +328,40 @@ export function GuidedTourOverlay({
 
               `degraded` is different and still offers it. That is the bounded
               give-up after six seconds of waiting, and moving on is exactly
-              the right thing to be able to do at that point.
+              the right thing to be able to do at that point — but it is not
+              the same act, so it does not wear the same word. "Continue for
+              now" says what happened: the lesson could not find its subject
+              and is being left behind rather than taught. A member who reads
+              "Continue" there would remember being shown something they were
+              never shown.
             */}
-            {((explanatory && !waiting) || resolution.kind === "degraded") && (
+            {((explanatory && !waiting) || degraded) && (
               <button
                 type="button"
-                onClick={onContinue}
+                onClick={() => {
+                  /*
+                    Say that this lesson degraded, before moving past it. A run
+                    that ends with the walkthrough marked complete must not be
+                    indistinguishable from one where three lessons never found
+                    their subject.
+                  */
+                  if (degraded) track("tour.step_degraded", { surface: "walkthrough", subjectId: step.id });
+                  onContinue();
+                }}
                 className={cn(
                   "rounded-full px-5 py-2 text-sm tap-clean transition-colors",
-                  "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold-text))]",
-                  "hover:bg-[hsl(var(--gold))]/25",
+                  degraded
+                    ? "bg-muted text-muted-foreground hover:bg-muted/80"
+                    : "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold-text))] hover:bg-[hsl(var(--gold))]/25",
                 )}
-                data-testid="button-tour-continue"
+                data-testid={degraded ? "button-tour-continue-degraded" : "button-tour-continue"}
+                data-tour-degraded={degraded ? "true" : undefined}
               >
-                {stepNumber === stepCount ? "Enter Sakred" : "Continue"}
+                {degraded
+                  ? "Continue for now"
+                  : stepNumber === stepCount
+                    ? "Enter Sakred"
+                    : "Continue"}
               </button>
             )}
           </div>

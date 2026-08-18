@@ -49,7 +49,7 @@ export const TOUR_ANCHORS = [
   "nav-more-settings",
   "nav-more-wins",
   "terrain-now",
-  "health-card",
+  "health-context",
   "restore-practice",
   "build-today",
   "build-start-session",

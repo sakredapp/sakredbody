@@ -70,13 +70,24 @@ export const SAKRED_INTRO: GuidedTour = {
       id: "health",
       objective: "Understand Home",
       section: "home",
-      anchor: "health-card",
+      /*
+        The provenance line on the terrain card, not the coaching HealthCard.
+
+        Health is not a separate pillar of Home and was never going to become
+        one for the sake of a lesson — the coaching HealthCard is rendered only
+        inside CoachingDashboard, so a walkthrough targeting it was waiting for
+        an element that does not exist on a member's screen. Terrain is where a
+        member meets measured data, so the lesson points at the sentence that
+        says where this reading came from.
+      */
+      anchor: "health-context",
       optional: true,
-      title: "What your phone knows",
+      title: "What your devices add",
       body:
-        "Your devices add measured context — sleep, recovery signals, movement.\n\n" +
-        "They inform the picture. They don't get the final vote.\n\nNot connected? " +
-        "Sakred still works. You can add it any time in Settings.",
+        "Your devices add measured context such as sleep, recovery signals and " +
+        "movement.\n\nThey inform the picture; they don't get the final vote.\n\n" +
+        "Nothing connected? Sakred still works without one — you can add it any " +
+        "time in Settings.",
       advance: { kind: "continue" },
     },
 
