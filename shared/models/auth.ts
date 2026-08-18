@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
+import { index, integer, jsonb, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
 
 // Session storage table for express-session with connect-pg-simple.
 export const sessions = pgTable(
@@ -17,6 +17,24 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),
   password: varchar("password"),
+
+  /**
+   * Where this coach's client alerts should go, if not their account email.
+   *
+   * A destination, not an identity. Changing it must never change how somebody
+   * signs in, and a typo in a preferences form must never be able to lock them
+   * out of their own account — which is why it is a second column rather than
+   * an edit to `email`, and why no second auth account is created for it.
+   *
+   * Unverified until `coachNotificationEmailVerifiedAt` is set. Until then it
+   * is an address somebody typed rather than one anybody has proven they can
+   * read, and sending a client's health context to it on that basis would be a
+   * disclosure decided by a keystroke.
+   */
+  coachNotificationEmail: varchar("coach_notification_email"),
+  coachNotificationEmailVerifiedAt: timestamp("coach_notification_email_verified_at", {
+    withTimezone: true,
+  }),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
@@ -219,6 +237,55 @@ export const passwordResetTokens = pgTable(
 );
 
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+
+
+/**
+ * Proving somebody can read an address before anything is sent to it.
+ *
+ * ── Why not reuse password_reset_tokens ──────────────────────────────────
+ *
+ * Because that table's whole design is about the account's own identity: one
+ * purpose, an hour's life, and a row that means "whoever holds this may change
+ * the password". Adding a second meaning to it would put a token that grants
+ * password access and a token that changes a notification preference in the
+ * same table, distinguished by a column every reader would have to remember to
+ * check. The failure that follows from forgetting is the worst one available.
+ *
+ * `purpose` exists here so a second kind of address verification does not need
+ * a migration that has to guess at existing rows — but it is constrained to
+ * the one value that exists, so it cannot quietly acquire meanings.
+ *
+ * `usedAt` rather than deletion, so a second click on the same link can say
+ * "already confirmed" instead of "invalid link".
+ */
+export const emailVerificationTokens = pgTable(
+  "email_verification_tokens",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull(),
+    /** Only `coach_notification` today; a CHECK in the migration holds it. */
+    purpose: text("purpose").notNull(),
+    /** The address being proven. Kept here rather than read back off the user
+     *  row, so a link cannot confirm an address the coach has since changed. */
+    email: varchar("email").notNull(),
+    tokenHash: varchar("token_hash").notNull().unique(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+  },
+  (t) => [index("idx_email_verification_user").on(t.userId, t.purpose)],
+);
+
+export type EmailVerificationToken = typeof emailVerificationTokens.$inferSelect;
+
+/**
+ * A day, rather than the reset token's hour.
+ *
+ * This link grants nothing — worst case somebody confirms an address they
+ * already control — and a coach who sets this at the end of a working day
+ * should not find it dead in the morning.
+ */
+export const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 
 /** How long a reset link stays good. */
 export const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;

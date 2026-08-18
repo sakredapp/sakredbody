@@ -39,6 +39,16 @@ import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import { db } from "../db.js";
 import { isAuthenticated } from "../auth/index.js";
 import { users } from "../../shared/models/auth.js";
+import { z } from "zod";
+import { storage } from "../storage.js";
+import { atLeast, effectiveRole } from "../../shared/models/access.js";
+import {
+  clearNotificationEmail,
+  confirmNotificationEmail,
+  hasPendingVerification,
+  notificationDestination,
+  requestNotificationEmail,
+} from "./notificationEmail.js";
 import {
   coachRelationships,
   coachingMessages,
@@ -262,6 +272,83 @@ export function registerCoachClientRoutes(app: Express): void {
       }
     },
   );
+
+  /**
+   * Where this coach's alerts go, and what is pending.
+   *
+   * `atLeast(role, "coach")` rather than a relationship: a coach with no
+   * clients yet still has a destination to set, and setting it before the first
+   * assignment is the sensible order.
+   */
+  app.get("/api/coach/notification-email", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId!;
+      const me = await storage.getUser(userId);
+      if (!me || !atLeast(effectiveRole(me), "coach")) {
+        return res.status(403).json({ message: "You don't have access to that" });
+      }
+      const destination = await notificationDestination(userId);
+      if (!destination) return res.status(404).json({ message: "No such account" });
+      res.json({ ...destination, pending: await hasPendingVerification(userId) });
+    } catch (err) {
+      fail(res, "notification-email", err);
+    }
+  });
+
+  /**
+   * Set a new destination. It does not take effect until confirmed.
+   *
+   * A coach edits their own and nobody else's — there is no member id in this
+   * path and no branch that reads one.
+   */
+  app.put("/api/coach/notification-email", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId!;
+      const me = await storage.getUser(userId);
+      if (!me || !atLeast(effectiveRole(me), "coach")) {
+        return res.status(403).json({ message: "You don't have access to that" });
+      }
+
+      const parsed = z
+        .object({ email: z.string().email().max(255).nullable() })
+        .safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "That doesn't look like an email address" });
+      }
+
+      if (parsed.data.email === null) {
+        await clearNotificationEmail(userId);
+      } else {
+        await requestNotificationEmail(userId, parsed.data.email, me.firstName ?? null);
+      }
+
+      const destination = await notificationDestination(userId);
+      res.json({ ...destination, pending: await hasPendingVerification(userId) });
+    } catch (err) {
+      fail(res, "notification-email", err);
+    }
+  });
+
+  /**
+   * Redeem a confirmation link.
+   *
+   * Authenticated deliberately: the link changes where a coach's client alerts
+   * are delivered, and a bare token in an email that anybody could open would
+   * make forwarding that email enough to redirect them.
+   */
+  app.post("/api/coach/notification-email/confirm", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const token = typeof req.body?.token === "string" ? req.body.token : "";
+      if (!token) return res.status(400).json({ message: "That link is missing its token" });
+      const outcome = await confirmNotificationEmail(token);
+      if (outcome === "invalid") {
+        return res.status(400).json({ message: "That link has expired or is no longer valid." });
+      }
+      res.json({ outcome });
+    } catch (err) {
+      fail(res, "notification-email-confirm", err);
+    }
+  });
 
   app.get("/api/coach/clients", isAuthenticated, async (req: Request, res: Response) => {
     try {
