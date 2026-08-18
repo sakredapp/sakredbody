@@ -54,7 +54,20 @@ import { ReportDialog } from "@/components/ReportDialog";
 import { VoiceRecorderControl, VoiceMemoPlayer } from "@/components/VoiceMemo";
 
 /** Kept short deliberately. A long picker turns a reaction into a decision. */
-const REACTIONS = ["🔥", "🙏", "💛", "👀", "🌙"];
+/**
+ * One reaction, deliberately.
+ *
+ * This was five emoji behind a `+` picker. The picker is the beginning of an
+ * engagement surface — five becomes twelve, twelve becomes a tray, and a
+ * member starts choosing how to feel about a post before they have finished
+ * reading it. Room is for acknowledgement and conversation, not for scoring
+ * each other.
+ *
+ * So: one thumb. Tap to acknowledge, tap again to take it back. The storage
+ * model still carries `emoji`, so a second reaction remains a product decision
+ * rather than a migration, and nothing here forecloses it.
+ */
+const LIKE = "\u{1F44D}";
 
 // ─── Composer ──────────────────────────────────────────────────────────────
 
@@ -173,59 +186,50 @@ function Reactions({
   message: Message;
   onToggle: (emoji: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const has = new Set(message.reactions.map((r) => r.emoji));
+  const like = message.reactions.find((r) => r.emoji === LIKE);
+  const count = like?.count ?? 0;
+  const mine = !!like?.mine;
 
   return (
     <div className="flex items-center gap-1 flex-wrap">
-      {message.reactions.map((r) => (
-        <button
-          key={r.emoji}
-          onClick={() => onToggle(r.emoji)}
-          className={cn(
-            "text-xs rounded-full px-2 py-0.5 border transition-colors",
-            r.mine
-              ? "border-[hsl(var(--gold))] bg-[hsl(var(--gold))]/15"
-              : "border-border/60 hover:border-[hsl(var(--gold))]/50",
-          )}
-          data-testid={`button-reaction-${r.emoji}`}
-        >
-          {r.emoji} {r.count}
-        </button>
-      ))}
+      <button
+        onClick={() => onToggle(LIKE)}
+        aria-pressed={mine}
+        aria-label={mine ? "Remove your acknowledgement" : "Acknowledge this"}
+        className={cn(
+          "text-xs rounded-full px-2 py-0.5 border transition-colors tap-clean",
+          mine
+            ? "border-[hsl(var(--gold))] bg-[hsl(var(--gold))]/15"
+            : "border-border/60 text-muted-foreground/70 hover:border-[hsl(var(--gold))]/50",
+        )}
+        data-testid="button-reaction-like"
+      >
+        {/* The count only once somebody has. A standing "0" invites nothing. */}
+        {LIKE}{count > 0 ? ` ${count}` : ""}
+      </button>
 
-      {open ? (
-        <span className="flex items-center gap-0.5">
-          {REACTIONS.filter((e) => !has.has(e)).map((e) => (
-            <button
-              key={e}
-              onClick={() => {
-                onToggle(e);
-                setOpen(false);
-              }}
-              className="text-xs rounded-full px-1.5 py-0.5 hover:bg-muted"
-            >
-              {e}
-            </button>
-          ))}
+      {/*
+        Any reaction from before this change still renders, read-only in
+        spirit — tapping removes your own. Nothing is migrated away, and a
+        member who reacted with a moon last week does not find it vanished.
+      */}
+      {message.reactions
+        .filter((r) => r.emoji !== LIKE)
+        .map((r) => (
           <button
-            onClick={() => setOpen(false)}
-            className="text-muted-foreground/60 px-1"
-            aria-label="Close"
+            key={r.emoji}
+            onClick={() => onToggle(r.emoji)}
+            className={cn(
+              "text-xs rounded-full px-2 py-0.5 border transition-colors",
+              r.mine
+                ? "border-[hsl(var(--gold))] bg-[hsl(var(--gold))]/15"
+                : "border-border/60 hover:border-[hsl(var(--gold))]/50",
+            )}
+            data-testid={`button-reaction-${r.emoji}`}
           >
-            <X className="h-3 w-3" />
+            {r.emoji} {r.count}
           </button>
-        </span>
-      ) : (
-        <button
-          onClick={() => setOpen(true)}
-          className="text-xs text-muted-foreground/50 hover:text-[hsl(var(--gold))] px-1.5 py-0.5"
-          aria-label="Add a reaction"
-          data-testid="button-add-reaction"
-        >
-          +
-        </button>
-      )}
+        ))}
     </div>
   );
 }
