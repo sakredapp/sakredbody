@@ -38,6 +38,7 @@ import { db, transactionally } from "../db.js";
 import { and, asc, desc, eq, gte, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { isAuthenticated } from "../auth/index.js";
+import { requireCoachOf } from "../coaching/relationships.js";
 import { storage } from "../storage.js";
 import {
   exercises,
@@ -364,6 +365,63 @@ async function shareSessionWithRoom(
     .where(eq(communityMessages.id, message.id));
 
   return { ok: true, messageId: message.id };
+}
+
+/**
+ * Everything this member has logged, with the sets inside each session.
+ *
+ * Lifted out of the route so a coach reads exactly what the member reads. Two
+ * implementations of "their history" is how a coach ends up looking at a
+ * different week from the person they are talking to — the same drift that
+ * `server/movement/history.ts` was written to end for terrain.
+ *
+ * Sixty sessions, which is a season rather than a week: the caller decides how
+ * much of it to show.
+ */
+async function sessionHistory(userId: string) {
+  const unit = await unitFor(userId);
+
+  const sessions = await db
+    .select()
+    .from(workoutSessions)
+    .where(eq(workoutSessions.userId, userId))
+    .orderBy(desc(workoutSessions.onDate))
+    .limit(60);
+
+  if (sessions.length === 0) return { unit, sessions: [] };
+
+  const sets = await db
+    .select({
+      id: workoutSets.id,
+      sessionId: workoutSets.sessionId,
+      exerciseId: workoutSets.exerciseId,
+      name: exercises.name,
+      // History has to be able to tell a 45-minute class from a 45-second
+      // hold, and the number alone cannot.
+      category: exercises.category,
+      trackingType: exercises.trackingType,
+      setIndex: workoutSets.setIndex,
+      reps: workoutSets.reps,
+      durationSeconds: workoutSets.durationSeconds,
+      distanceM: workoutSets.distanceM,
+      weightKg: workoutSets.weightKg,
+      isWarmup: workoutSets.isWarmup,
+      rpe: workoutSets.rpe,
+    })
+    .from(workoutSets)
+    .innerJoin(exercises, eq(workoutSets.exerciseId, exercises.id))
+    .where(inArray(workoutSets.sessionId, sessions.map((s) => s.id)))
+    .orderBy(asc(workoutSets.setIndex));
+
+  return {
+    unit,
+    sessions: sessions.map((s) => ({
+      ...s,
+      sets: sets
+        .filter((x) => x.sessionId === s.id)
+        .map((x) => ({ ...x, weight: out(x.weightKg, unit) })),
+    })),
+  };
 }
 
 export function registerTrainingRoutes(app: Express) {
@@ -1511,53 +1569,36 @@ export function registerTrainingRoutes(app: Express) {
   app.get("/api/training/sessions", isAuthenticated, async (req, res) => {
     try {
       const userId = req.session!.userId!;
-      const unit = await unitFor(userId);
-
-      const sessions = await db
-        .select()
-        .from(workoutSessions)
-        .where(eq(workoutSessions.userId, userId))
-        .orderBy(desc(workoutSessions.onDate))
-        .limit(60);
-
-      if (sessions.length === 0) return res.json({ unit, sessions: [] });
-
-      const sets = await db
-        .select({
-          id: workoutSets.id,
-          sessionId: workoutSets.sessionId,
-          exerciseId: workoutSets.exerciseId,
-          name: exercises.name,
-          // History has to be able to tell a 45-minute class from a 45-second
-          // hold, and the number alone cannot.
-          category: exercises.category,
-          trackingType: exercises.trackingType,
-          setIndex: workoutSets.setIndex,
-          reps: workoutSets.reps,
-          durationSeconds: workoutSets.durationSeconds,
-          distanceM: workoutSets.distanceM,
-          weightKg: workoutSets.weightKg,
-          isWarmup: workoutSets.isWarmup,
-          rpe: workoutSets.rpe,
-        })
-        .from(workoutSets)
-        .innerJoin(exercises, eq(workoutSets.exerciseId, exercises.id))
-        .where(inArray(workoutSets.sessionId, sessions.map((s) => s.id)))
-        .orderBy(asc(workoutSets.setIndex));
-
-      res.json({
-        unit,
-        sessions: sessions.map((s) => ({
-          ...s,
-          sets: sets
-            .filter((x) => x.sessionId === s.id)
-            .map((x) => ({ ...x, weight: out(x.weightKg, unit) })),
-        })),
-      });
+      res.json(await sessionHistory(userId));
     } catch (err) {
       fail(res, err);
     }
   });
+
+  /**
+   * The same history, read by the client's coach.
+   *
+   * Deliberately the same function rather than a coach-shaped copy: a coach and
+   * a member looking at one session have to be looking at one session, and two
+   * readers of the same tables is how they stop being.
+   *
+   * `requireCoachOf` here, not the narrower relationship-only gate. Training
+   * history is coaching data and an admin running the programme may need to see
+   * it; a progress *photograph* is not, and lives behind its own check in
+   * `server/media/progressRoutes.ts`. The two gates are different on purpose.
+   */
+  app.get(
+    "/api/coach/clients/:memberId/movement",
+    isAuthenticated,
+    requireCoachOf("memberId"),
+    async (req, res) => {
+      try {
+        res.json(await sessionHistory(param(req, "memberId")));
+      } catch (err) {
+        fail(res, err);
+      }
+    },
+  );
 
   /** One lift over time — the series the Sparkline was written for. */
   app.get("/api/training/exercises/:id/history", isAuthenticated, async (req, res) => {

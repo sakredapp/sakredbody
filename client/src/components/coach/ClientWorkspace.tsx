@@ -52,13 +52,15 @@ import {
 } from "@/hooks/use-coach";
 import type { HealthWorkout } from "@shared/schema";
 import { CheckinRequests } from "@/components/coach/CheckinRequests";
+import { MovementAndProgress } from "@/components/coach/MovementAndProgress";
 import { cn } from "@/lib/utils";
 
-type Tab = "overview" | "activity" | "habits" | "plan" | "messages";
+type Tab = "overview" | "activity" | "movement" | "habits" | "plan" | "messages";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "activity", label: "Activity" },
+  { id: "movement", label: "Movement & Progress" },
   { id: "habits", label: "Habits" },
   { id: "plan", label: "Plan" },
   { id: "messages", label: "Messages" },
@@ -822,6 +824,7 @@ export function ClientWorkspace({
 
       {tab === "overview" && <Overview memberId={memberId} memberName={name} />}
       {tab === "activity" && <Activity memberId={memberId} />}
+      {tab === "movement" && <MovementAndProgress memberId={memberId} />}
       {tab === "habits" && <Habits memberId={memberId} />}
       {tab === "plan" && <Plan memberId={memberId} memberName={name} />}
       {tab === "messages" && <Messages memberId={memberId} memberName={name} />}
