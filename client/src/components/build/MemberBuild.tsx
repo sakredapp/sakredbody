@@ -35,6 +35,8 @@ import { MovementPicker, type Movement } from "./MovementPicker";
 import { NewMovement, type NewMovementInput } from "./NewMovement";
 import { LogPractice } from "./LogPractice";
 import { RecentSessions } from "./RecentSessions";
+import { ProgressPhotos } from "@/components/ProgressPhotos";
+import { useMyCoach } from "@/hooks/use-coaching";
 import { TodaysMovement } from "@/components/portal/TodaysMovement";
 import { ModalityPrompt } from "./Modalities";
 import { cn } from "@/lib/utils";
@@ -86,6 +88,9 @@ export function MemberBuild({
   const [logging, setLogging] = useState(false);
 
   const workouts = useQuery<SavedWorkout[]>({ queryKey: ["/api/training/workouts"] });
+
+  /* Only so the progress-photo panel can say who can see one, truthfully. */
+  const myCoach = useMyCoach();
 
   /**
    * A workout already running when they tried to begin another.
@@ -280,6 +285,13 @@ export function MemberBuild({
       <ModalityPrompt />
 
       <RecentSessions />
+
+      {/*
+        Under the history rather than beside it. A progress photograph is a
+        record of the same weeks the sessions above describe, and putting it in
+        its own destination would make it a feature somebody has to go and find.
+      */}
+      <ProgressPhotos hasCoach={!!myCoach.data?.coach} />
 
       {logging && <LogPractice onClose={() => setLogging(false)} />}
 
