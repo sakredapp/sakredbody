@@ -30,7 +30,7 @@ import type { GuidedTour } from "./types";
 
 export const SAKRED_INTRO: GuidedTour = {
   id: "sakred_intro",
-  version: 1,
+  version: 2,
   steps: [
     // ── Welcome ──────────────────────────────────────────────────────────
     {

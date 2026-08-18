@@ -117,7 +117,52 @@ check(
   "and while it is off, nobody is owed the required walkthrough",
   !owesRequiredTour(null) && !owesRequiredTour(0),
 );
-check("the required version is pinned rather than derived", REQUIRED_TOUR_VERSION === 1);
+/*
+  Pinned rather than derived, which is the property that matters — writing
+  `REQUIRED_TOUR_VERSION = TOUR.version` would make every improvement to the
+  walkthrough a compulsory interruption for everybody who already sat through
+  it. Asserted against the source rather than the value, so the number is free
+  to move when somebody decides it should.
+*/
+check(
+  "the required version is a literal, not the tour's own version",
+  /REQUIRED_TOUR_VERSION = \d+;/.test(
+    readFileSync("client/src/lib/tour/rollout.ts", "utf8"),
+  ),
+);
+
+/* You cannot require a version of the walkthrough that has not been written. */
+check(
+  "and never asks for a version that does not exist",
+  REQUIRED_TOUR_VERSION >= 1 && REQUIRED_TOUR_VERSION <= TOUR.version,
+  `required ${REQUIRED_TOUR_VERSION}, tour ${TOUR.version}`,
+);
+
+/*
+  ── The required bump, which is what resets the walkthrough for everybody ──
+
+  A member who finished v1 has a record saying so. When the required version
+  moves past theirs they are offered the walkthrough again, from the start —
+  not from "the first step you have not done", which for a completed record is
+  past the end.
+*/
+{
+  const finishedV1 = { ...emptyProgress(TOUR), version: 1, completed: TOUR.steps.map((s) => s.id), completedAt: NOW, stepId: null };
+  check(
+    "a record older than the required version is owed the walkthrough again",
+    shouldStart(finishedV1, TOUR, READY),
+  );
+  check(
+    "and is taken to the beginning rather than past the end",
+    resumeAt(finishedV1, TOUR) === 0,
+    String(resumeAt(finishedV1, TOUR)),
+  );
+  const finishedCurrent = { ...emptyProgress(TOUR), completed: TOUR.steps.map((s) => s.id), completedAt: NOW, stepId: null };
+  check(
+    "a record at the required version is left alone",
+    !shouldStart(finishedCurrent, TOUR, READY),
+  );
+}
 check(
   "the hook asks the product question, not the engineering one",
   /mayAutoStart\(/.test(readFileSync("client/src/hooks/use-guided-tour.ts", "utf8")),

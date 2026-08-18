@@ -25,6 +25,19 @@ export type Gates = Record<string, boolean>;
 
 export function walkthroughGates(placed: ReadonlySet<string>, pending: number): Gates {
   const overlay = read("client/src/components/tour/GuidedTourOverlay.tsx");
+  /*
+    Comments *and* imports stripped.
+
+    The hook explains at length why it calls these, and it imports them by
+    name — so a check that greps the file passes on a version where the calls
+    have been deleted and only the import remains. Twice now a guard has been
+    satisfied by the prose or the plumbing around the thing it was meant to
+    check; what has to be found is the call.
+  */
+  const hook = read("client/src/hooks/use-guided-tour.ts")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "")
+    .replace(/^import[\s\S]*?;$/gm, "");
   const intro = read("client/src/lib/tour/sakredIntro.ts");
   const pkg = read("package.json");
   const teaches = (needle: RegExp) => needle.test(intro);
@@ -39,7 +52,19 @@ export function walkthroughGates(placed: ReadonlySet<string>, pending: number): 
     "every anchor placed": pending === 0 && unaccounted.length === 0,
     "visible-instance resolver in use":
       /resolveTarget\(/.test(overlay) && !/querySelector\(`\[data-tour-id/.test(overlay),
+    /*
+      The test proves the router. This proves it is plugged in.
+
+      `beginRehearsal` and `endRehearsal` were written, thoroughly tested, and
+      called from nowhere in the application — so the workout lesson said
+      "Nothing in here is recorded" and then created a real session on the
+      member's account. The old gate checked that the test file was in the npm
+      script, which is a statement about the repository rather than about the
+      product.
+    */
     "rehearsal zero-write proven": /test-rehearsal/.test(pkg),
+    "and the rehearsal barrier is actually installed by the running tour":
+      /beginRehearsal\(/.test(hook) && /endRehearsal\b/.test(hook),
     "rehearsal barrier scoped to the workout":
       SAKRED_INTRO.steps.filter((s) => s.rehearsal === "begin").length === 1 &&
       SAKRED_INTRO.steps.filter((s) => s.rehearsal === "end").length === 1,

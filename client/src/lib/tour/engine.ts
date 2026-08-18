@@ -25,7 +25,7 @@ import type {
   TourStep,
   TourWorld,
 } from "./types";
-import { AUTO_START_ENABLED } from "./rollout";
+import { AUTO_START_ENABLED, REQUIRED_TOUR_VERSION } from "./rollout";
 
 /**
  * How long a step will wait for its target before it stops waiting.
@@ -119,6 +119,20 @@ export function shouldStart(progress: TourProgress | null, tour: GuidedTour, c: 
   if (!c.homeReady || c.redirecting || c.systemDialogOpen) return false;
 
   if (!progress) return true;
+
+  /*
+    A record older than the required version is owed this walkthrough again,
+    finished or not.
+
+    This is the one case where a completion does not settle the question. The
+    required version is bumped when the walkthrough has changed enough that
+    having seen the old one is not the same as having been taught the app — and
+    at that point "they already did it" is an answer to a question nobody
+    asked. Their old record is untouched on disk, under its own key; this only
+    decides what to show them next.
+  */
+  if (progress.version < REQUIRED_TOUR_VERSION) return true;
+
   if (progress.completedAt) return false;
   // A different version with no completion recorded is an unfinished tour that
   // has since been rewritten. Start it, from the beginning of the new one.
@@ -140,6 +154,18 @@ export function shouldStart(progress: TourProgress | null, tour: GuidedTour, c: 
  */
 export function resumeAt(progress: TourProgress | null, tour: GuidedTour): number {
   if (!progress) return 0;
+
+  /*
+    A required bump starts at the beginning, not at "the first step you have
+    not already done".
+
+    The unseen-steps rule below is right for an ordinary version bump — nobody
+    should sit through an hour they finished last month to see three new
+    lessons. It is wrong here: a required bump says the whole thing is being
+    taught again, and dropping somebody into step nineteen of a walkthrough
+    they are meant to be re-shown is worse than either extreme.
+  */
+  if (progress.version < REQUIRED_TOUR_VERSION) return 0;
 
   if (progress.version === tour.version && progress.stepId) {
     const at = tour.steps.findIndex((s) => s.id === progress.stepId);

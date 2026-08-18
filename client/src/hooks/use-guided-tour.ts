@@ -40,6 +40,7 @@ import {
   shouldStart,
 } from "@/lib/tour/engine";
 import { readProgress, writeProgress } from "@/lib/tour/progress";
+import { beginRehearsal, endRehearsal } from "@/lib/tour/rehearsal";
 import type { GuidedTour, TourAnchor, TourProgress, TourWorld } from "@/lib/tour/types";
 
 export const TOUR_SECTION_ATTR = "data-tour-section";
@@ -134,6 +135,33 @@ export function useGuidedTour(
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [step]);
+
+  /*
+    The rehearsal barrier, opened and closed by the steps that say so.
+
+    `beginRehearsal` and `endRehearsal` were written, tested in isolation, and
+    never called from anywhere in the app. The consequence was not subtle: the
+    workout lesson says "Nothing in here is recorded — this one's a rehearsal"
+    and then created a real session, added real movements to it, and left it
+    open on the member's account. Every QA run had to delete one afterwards,
+    which is how it was found.
+
+    The gate that was supposed to cover this checked that the rehearsal *test*
+    was in the npm script. It proved the router's logic and said nothing about
+    whether the router was installed — the same shape as the tour anchor that
+    existed in the JSX and never in the DOM.
+
+    Started as an effect keyed on the step so it runs after render, and torn
+    down on unmount so that pausing, navigating away, closing the sheet or
+    throwing all bring the barrier down. `endRehearsal` is idempotent and safe
+    to call when nothing is running.
+  */
+  useEffect(() => {
+    if (step?.rehearsal === "begin") beginRehearsal(new Date().toISOString());
+    else if (step?.rehearsal === "end") endRehearsal();
+  }, [step]);
+
+  useEffect(() => endRehearsal, []);
 
   const goTo = useCallback(
     (next: number) => {

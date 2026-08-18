@@ -70,6 +70,43 @@ const STEP_TIMEOUT_MS = 15_000;
  */
 const READ_PAUSE_MS = 250;
 
+
+/**
+ * Which of the newly-appeared controls is an *answer* rather than an escape.
+ *
+ * A chooser puts many siblings on screen at once — five hundred movements, a
+ * list of saved workouts — and they share a testid prefix because that is how
+ * a list gets named. The Cancel beside it is a singleton.
+ *
+ * So: group by prefix, take the largest group, take its first member. Picking
+ * whatever appeared first in the DOM instead was tried, and it closed the
+ * workout sheet — the driver pressed the picker's own dismiss control and then
+ * reported the lesson broken.
+ *
+ * A tie, or nothing but singletons, means the app did not ask a question this
+ * driver can answer. Better to leave the step failing with a name than to
+ * press an arbitrary button and report whatever happens next.
+ */
+export function optionFrom(appeared: readonly string[]): string | null {
+  const groups = new Map<string, string[]>();
+  for (const id of appeared) {
+    const prefix = id.split("-")[0];
+    groups.set(prefix, [...(groups.get(prefix) ?? []), id]);
+  }
+  let best: string[] | null = null;
+  let tied = false;
+  for (const members of groups.values()) {
+    if (!best || members.length > best.length) {
+      best = members;
+      tied = false;
+    } else if (members.length === best.length) {
+      tied = true;
+    }
+  }
+  if (!best || best.length < 2 || tied) return null;
+  return best[0];
+}
+
 export class TourDriver {
   constructor(private readonly b: Browser, private readonly tour = SAKRED_INTRO) {}
 
@@ -193,7 +230,74 @@ export class TourDriver {
         `step ${step.id}: ${step.anchor}${instance ? `[${instance}]` : ""} is absent, hidden or ambiguous`,
       );
     }
+
+    /*
+      Some controls ask a question back.
+
+      "Add one" is a lesson pointing at a button that opens a list of five
+      hundred movements — the member's action is the tap *and* the choice, and
+      a driver that only taps sits waiting for a set row that cannot exist
+      until something has been chosen.
+
+      Rather than teach this file that `add-exercise` opens a picker, it
+      notices the general shape: a tap that was supposed to satisfy the step
+      did not, and controls appeared that were not on screen a moment ago. The
+      first of those is the answer to whatever was asked. That covers a
+      movement picker, and it covers the next chooser somebody adds without
+      this file needing to hear about it.
+    */
+    let seen = await this.selectable();
     await this.b.clickAt(at.x, at.y);
+    await this.b.settle();
+
+    /*
+      Keep answering until the lesson's own condition is met.
+
+      One follow-through is not enough: the movement picker asks twice — a
+      group, then a movement inside it — and stopping after the first leaves
+      the tour waiting for a set row behind one more tap. Bounded at four so a
+      chooser that never resolves fails with a name rather than clicking
+      forever.
+    */
+    for (let depth = 0; depth < 4; depth++) {
+      if (await this.alreadySatisfied(step.advance)) return;
+      const now = await this.selectable();
+      const answer = optionFrom(now.filter((id) => !seen.includes(id)));
+      if (!answer) return;
+      seen = now;
+      await this.choose(answer);
+      await this.b.settle();
+    }
+  }
+
+  /**
+   * Every enabled control on screen that can be identified, as testids.
+   *
+   * The identity is `data-testid` because that is what this codebase gives its
+   * controls; anything without one is invisible to this comparison, which is
+   * the right failure — an unnamed control is one no test can talk about.
+   */
+  private selectable(): Promise<string[]> {
+    return this.b.evaluate<string[]>(`
+      return [...document.querySelectorAll('button[data-testid], a[data-testid], [role="button"][data-testid]')]
+        .filter(e => {
+          const r = e.getBoundingClientRect();
+          const s = getComputedStyle(e);
+          return r.width > 0 && r.height > 0 && s.visibility !== "hidden"
+            && Number(s.opacity) > 0.05 && !e.hasAttribute("disabled");
+        })
+        .map(e => e.getAttribute("data-testid"));
+    `);
+  }
+
+  private async choose(testId: string): Promise<void> {
+    const at = await this.b.evaluate<Point | null>(`
+      const el = document.querySelector('[data-testid=' + JSON.stringify(${JSON.stringify(testId)}) + ']');
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    `);
+    if (at) await this.b.clickAt(at.x, at.y);
   }
 
   /** One step: satisfy it, then observe where the tour actually went. */

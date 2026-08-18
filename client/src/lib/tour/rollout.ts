@@ -34,8 +34,17 @@
  * automatically require it of everybody. A tour can be improved without that
  * improvement becoming a compulsory interruption for people who already
  * learned the app from v1.
+ *
+ * ── Why this is 2 ────────────────────────────────────────────────────────
+ *
+ * Because v1 was, for most of its life, unusable in a way nobody could see
+ * from the source: the overlay's own wrapper intercepted every highlighted
+ * control, so a member could read the lessons and not act on any of them. That
+ * is not a walkthrough somebody has been taught by, whatever their stored
+ * record says — so anyone carrying a v1 record is offered this one from the
+ * beginning. Their old record stays where it is, under its own key.
  */
-export const REQUIRED_TOUR_VERSION = 1;
+export const REQUIRED_TOUR_VERSION = 2;
 
 /**
  * Automatic first-run start.
