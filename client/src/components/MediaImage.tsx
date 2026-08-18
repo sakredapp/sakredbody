@@ -120,7 +120,7 @@ export function MediaImage({
   return (
     <div
       ref={holder}
-      className={cn("relative overflow-hidden rounded-xl bg-white/5", className)}
+      className={cn("relative overflow-hidden rounded-xl bg-muted/40", className)}
       style={{ aspectRatio: aspect }}
       data-testid="media-image"
     >
@@ -137,11 +137,11 @@ export function MediaImage({
           coach's screen is a thing they need to know is missing, not a gap
           they read as "this member didn't take one".
         */
-        <div className="flex h-full w-full items-center justify-center px-3 text-center text-[11px] text-white/40">
+        <div className="flex h-full w-full items-center justify-center px-3 text-center text-[11px] text-muted-foreground/70">
           This photo couldn't be loaded
         </div>
       ) : (
-        <div className="h-full w-full animate-pulse bg-white/5" />
+        <div className="h-full w-full animate-pulse bg-muted/40" />
       )}
     </div>
   );

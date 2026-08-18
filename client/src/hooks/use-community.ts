@@ -29,6 +29,25 @@ export interface Reaction {
   mine: boolean;
 }
 
+/** One movement on a shared workout card. Working sets only. */
+export interface SharedMovement {
+  exerciseId: string;
+  name: string;
+  sets: number;
+  reps: number | null;
+  topWeightKg: number | null;
+  supersetGroup: string | null;
+}
+
+export interface SharedWorkout {
+  sessionId: string;
+  title: string | null;
+  onDate: string;
+  durationMinutes: number | null;
+  movements: SharedMovement[];
+  volumeKg: number | null;
+}
+
 export interface Message {
   id: string;
   channelId: string;
@@ -47,6 +66,16 @@ export interface Message {
   audioMime?: string | null;
 
   audioDurationSeconds?: number | null;
+  /** A photograph, when there is one. An id, never a URL — see MediaImage. */
+  imageAssetId?: string | null;
+
+  /**
+   * The workout this post is about, rendered from the member's real sets
+   * rather than a summary copied into the message. Null when the session has
+   * since been deleted, which leaves whatever they wrote alongside it.
+   */
+  workout?: SharedWorkout | null;
+
   replyCount: number;
   deletedAt: string | null;
   editedAt: string | null;
@@ -147,6 +176,8 @@ export function usePostMessage() {
       audioUrl?: string | null;
       audioMime?: string | null;
       audioDurationSeconds?: number | null;
+      imageAssetId?: string | null;
+      sharedSessionId?: string | null;
     }) => send<Message>("POST", "/api/community/messages", input),
     onSuccess: (created) => invalidateConversation(created.channelId, created.rootId),
   });

@@ -52,6 +52,9 @@ import type { Channel } from "@shared/schema";
 import { SectionHeading } from "@/components/portal/Panel";
 import { ReportDialog } from "@/components/ReportDialog";
 import { VoiceRecorderControl, VoiceMemoPlayer } from "@/components/VoiceMemo";
+import { MediaImage } from "@/components/MediaImage";
+import { PhotoAttach, type PhotoAttachment } from "@/components/PhotoAttach";
+import { SharedWorkoutCard } from "@/components/SharedWorkoutCard";
 
 /** Kept short deliberately. A long picker turns a reaction into a decision. */
 /**
@@ -80,18 +83,26 @@ function Composer({
   onSubmit,
   onCancel,
   allowVoice = false,
+  allowPhoto = false,
 }: {
   placeholder: string;
   submitLabel: string;
   initial?: string;
   autoFocus?: boolean;
   pending: boolean;
-  onSubmit: (body: string, audio?: { url: string; mime: string; durationSeconds: number }) => void;
+  onSubmit: (
+    body: string,
+    audio?: { url: string; mime: string; durationSeconds: number },
+    imageAssetId?: string | null,
+  ) => void;
   onCancel?: () => void;
   /** Off for edits — you can add words to a memo, not re-record it. */
   allowVoice?: boolean;
+  /** Off for edits and replies to announcements. */
+  allowPhoto?: boolean;
 }) {
   const [body, setBody] = useState(initial);
+  const [photo, setPhoto] = useState<PhotoAttachment | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -109,9 +120,15 @@ function Composer({
 
   const submit = () => {
     const text = body.trim();
-    if (!text || pending) return;
-    onSubmit(text);
+    /*
+      A photograph is a thing to say. Requiring words alongside it would mean
+      the one post nobody needs to caption — here is the lift — is the one the
+      composer refuses to send.
+    */
+    if ((!text && !photo) || pending) return;
+    onSubmit(text, undefined, photo?.assetId ?? null);
     setBody("");
+    setPhoto(null);
   };
 
   return (
@@ -144,7 +161,7 @@ function Composer({
         <Button
           size="sm"
           onClick={submit}
-          disabled={!body.trim() || pending}
+          disabled={(!body.trim() && !photo) || pending}
           className="bg-gold border-gold-border text-white"
           data-testid="button-community-send"
         >
@@ -158,9 +175,20 @@ function Composer({
           <VoiceRecorderControl
             disabled={pending}
             onSend={(audio) => {
-              onSubmit(body.trim(), audio);
+              onSubmit(body.trim(), audio, photo?.assetId ?? null);
               setBody("");
+              setPhoto(null);
             }}
+          />
+        )}
+
+        {allowPhoto && (
+          <PhotoAttach
+            purpose="room"
+            attached={photo}
+            onAttached={setPhoto}
+            onCleared={() => setPhoto(null)}
+            disabled={pending}
           />
         )}
 
@@ -305,11 +333,29 @@ function MessageBody({
             onCancel={onCancelEdit}
           />
         ) : (
-          // whitespace-pre-wrap so paragraph breaks survive; break-words so a
-          // pasted URL can't push the column wider than the phone.
-          <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words">
-            {message.body}
-          </p>
+          <>
+            {/* whitespace-pre-wrap so paragraph breaks survive; break-words so
+                a pasted URL can't push the column wider than the phone. */}
+            {message.body && (
+              <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words">
+                {message.body}
+              </p>
+            )}
+
+            {/* The workout above the photograph: the card is what the post is
+                about, the picture is how it looked. */}
+            {message.workout && <SharedWorkoutCard workout={message.workout} />}
+
+            {message.imageAssetId && (
+              <MediaImage
+                assetId={message.imageAssetId}
+                variant="display"
+                alt={`Photo shared by ${displayName(message.author)}`}
+                aspect="4 / 3"
+                className="max-w-sm"
+              />
+            )}
+          </>
         )}
 
         {!gone && !editing && (
@@ -453,7 +499,8 @@ function ThreadNode({
               autoFocus
               pending={post.isPending}
               allowVoice
-              onSubmit={(body, audio) => {
+              allowPhoto
+              onSubmit={(body, audio, imageAssetId) => {
                 post.mutate(
                   {
                     channelId,
@@ -462,6 +509,7 @@ function ThreadNode({
                     audioUrl: audio?.url ?? null,
                     audioMime: audio?.mime ?? null,
                     audioDurationSeconds: audio?.durationSeconds ?? null,
+                    imageAssetId,
                   },
                   { onError: (e) => toast({ title: e.message, variant: "destructive" }) },
                 );
@@ -585,7 +633,8 @@ function RoomView({
           submitLabel="Post"
           pending={post.isPending}
           allowVoice
-          onSubmit={(body, audio) =>
+          allowPhoto
+          onSubmit={(body, audio, imageAssetId) =>
             post.mutate(
               {
                 channelId: channel.id,
@@ -593,6 +642,7 @@ function RoomView({
                 audioUrl: audio?.url ?? null,
                 audioMime: audio?.mime ?? null,
                 audioDurationSeconds: audio?.durationSeconds ?? null,
+                imageAssetId,
               },
               { onError: (e) => toast({ title: e.message, variant: "destructive" }) },
             )

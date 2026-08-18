@@ -51,6 +51,8 @@ import {
 import { headlineOptions, segmentHeadline } from "../../shared/utils/highlight.js";
 import { blockedBy } from "../moderation/index.js";
 import { uploadFile } from "../supabaseStorage.js";
+import { ownsSession, sharedWorkoutsFor } from "./sharedWorkout.js";
+import { mediaAssets } from "../../shared/schema.js";
 
 function isAdmin(req: Request, res: Response, next: NextFunction) {
   const userId = req.session?.userId;
@@ -85,8 +87,17 @@ function fail(res: Response, err: unknown) {
 function present(m: typeof communityMessages.$inferSelect) {
   if (!m.deletedAt) return m;
   // The row survives so replies underneath it keep their shape. The words
-  // don't — deleting must actually delete what was said.
-  return { ...m, body: "", userId: "", deleted: true };
+  // don't — deleting must actually delete what was said. That now includes
+  // what was shown: a tombstone that kept rendering the photograph would mean
+  // deleting a post removed the caption and left the picture.
+  return {
+    ...m,
+    body: "",
+    userId: "",
+    imageAssetId: null,
+    sharedSessionId: null,
+    deleted: true,
+  };
 }
 
 // ─── The gate ──────────────────────────────────────────────────────────────
@@ -170,6 +181,18 @@ export async function visibleChannelIds(userId: string): Promise<string[]> {
 
 export async function canSee(userId: string, channelId: string): Promise<boolean> {
   return (await visibleChannelIds(userId)).includes(channelId);
+}
+
+/**
+ * The workout cards for a page of messages, keyed by session.
+ *
+ * One query for the whole page rather than one per share — a feed that issues
+ * twenty extra round trips is a feed that feels broken on a phone.
+ */
+async function workoutsFor(rows: { sharedSessionId: string | null; deletedAt: Date | null }[]) {
+  return sharedWorkoutsFor(
+    rows.filter((m) => !m.deletedAt).map((m) => m.sharedSessionId ?? ""),
+  );
 }
 
 /** Author details for a set of messages, in one query. */
@@ -275,12 +298,14 @@ export function registerCommunityRoutes(app: Express) {
 
       const authors = await authorsFor(rows);
       const reactions = await reactionsFor(rows, userId);
+      const workouts = await workoutsFor(rows);
 
       res.json(
         rows.map((m) => ({
           ...present(m),
           author: m.deletedAt ? null : authors.get(m.userId) ?? null,
           reactions: reactions.get(m.id) ?? [],
+          workout: m.sharedSessionId ? workouts.get(m.sharedSessionId) ?? null : null,
         })),
       );
     } catch (err) {
@@ -328,12 +353,14 @@ export function registerCommunityRoutes(app: Express) {
 
       const authors = await authorsFor(rows);
       const byMessage = await reactionsFor(rows, userId);
+      const workouts = await workoutsFor(rows);
 
       res.json(
         rows.map((m) => ({
           ...present(m),
           author: m.deletedAt ? null : authors.get(m.userId) ?? null,
           reactions: byMessage.get(m.id) ?? [],
+          workout: m.sharedSessionId ? workouts.get(m.sharedSessionId) ?? null : null,
         })),
       );
     } catch (err) {
@@ -450,6 +477,32 @@ export function registerCommunityRoutes(app: Express) {
         rootId = parent.rootId ?? parent.id;
       }
 
+      /*
+        Both attachments are checked against the poster, not merely accepted.
+
+        An image id is a uuid somebody could have seen in their own timeline;
+        without this, posting one they do not own would publish another
+        member's photograph into a room. The purpose check is the second half:
+        an asset uploaded as `progress` is readable by that member's coach and
+        nobody else, and attaching one to a message would leave a photo in the
+        feed that most of the room renders as a broken tile — and the rest
+        renders as a private photograph. Sharing a progress photo to the Room
+        is a separate act that uploads a separate `room` asset.
+      */
+      if (input.imageAssetId) {
+        const [asset] = await db
+          .select({ ownerUserId: mediaAssets.ownerUserId, purpose: mediaAssets.purpose })
+          .from(mediaAssets)
+          .where(eq(mediaAssets.id, input.imageAssetId));
+        if (!asset || asset.ownerUserId !== userId || asset.purpose !== "room") {
+          return res.status(404).json({ message: "No such image" });
+        }
+      }
+
+      if (input.sharedSessionId && !(await ownsSession(userId, input.sharedSessionId))) {
+        return res.status(404).json({ message: "No such workout" });
+      }
+
       const [created] = await db
         .insert(communityMessages)
         .values({
@@ -462,6 +515,8 @@ export function registerCommunityRoutes(app: Express) {
           audioUrl: input.audioUrl ?? null,
           audioMime: input.audioMime ?? null,
           audioDurationSeconds: input.audioDurationSeconds ?? null,
+          imageAssetId: input.imageAssetId ?? null,
+          sharedSessionId: input.sharedSessionId ?? null,
         })
         .returning();
 
