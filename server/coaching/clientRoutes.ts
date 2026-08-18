@@ -40,6 +40,7 @@ import { db } from "../db.js";
 import { isAuthenticated } from "../auth/index.js";
 import { users } from "../../shared/models/auth.js";
 import {
+  coachRelationships,
   coachingMessages,
   wellnessRoutines,
   userRoutines,
@@ -226,11 +227,49 @@ export function registerCoachClientRoutes(app: Express): void {
    * that shows ten metrics per member is a monitoring station, and it invites
    * the kind of watching that this product is explicitly not for.
    */
+  /**
+   * "I have looked at this client."
+   *
+   * Explicit, and the only thing that moves the cursor. Rendering the page does
+   * not — see the note on the column in shared/models/coaching.ts.
+   *
+   * `requireCoachOf` rather than the narrower relationship check: an
+   * administrator standing in for a coach is doing something legitimate, and
+   * `coachAccess` records which of the two it was rather than writing an admin
+   * into the roster as somebody's coach.
+   */
+  app.post(
+    "/api/coach/clients/:memberId/reviewed",
+    isAuthenticated,
+    requireCoachOf("memberId"),
+    async (req: Request, res: Response) => {
+      try {
+        const userId = req.session!.userId!;
+        const now = new Date();
+        await db
+          .update(coachRelationships)
+          .set({ lastReviewedAt: now, updatedAt: now })
+          .where(
+            and(
+              eq(coachRelationships.coachUserId, userId),
+              eq(coachRelationships.memberUserId, String(req.params.memberId)),
+              eq(coachRelationships.status, "active"),
+            ),
+          );
+        res.json({ lastReviewedAt: now.toISOString() });
+      } catch (err) {
+        fail(res, "reviewed", err);
+      }
+    },
+  );
+
   app.get("/api/coach/clients", isAuthenticated, async (req: Request, res: Response) => {
     try {
       const userId = req.session!.userId!;
       const rows = await clientsOf(userId);
       if (!rows.length) return res.json({ clients: [] });
+
+      const reviewedAt = new Map(rows.map((r) => [r.memberUserId, r.lastReviewedAt]));
 
       const memberIds = rows.map((r) => r.memberUserId);
 
@@ -300,6 +339,18 @@ export function registerCoachClientRoutes(app: Express): void {
               ? { at: message.createdAt, from: message.senderRole }
               : null,
             unread: unread.get(r.memberUserId) ?? 0,
+            /**
+             * When this coach last said they had looked, and whether anything
+             * has happened since.
+             *
+             * "Since" is deliberately message-shaped for now: it is the one
+             * signal that already arrives on this route, and a needs-attention
+             * flag built on a number the roster does not have would be a second
+             * query per client on the screen a coach opens most. A client with
+             * an unread message or a message newer than the mark is the honest
+             * answer to "has anything changed since I looked".
+             */
+            lastReviewedAt: reviewedAt.get(r.memberUserId)?.toISOString() ?? null,
           };
         }),
       );

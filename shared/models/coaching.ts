@@ -605,6 +605,17 @@ export const coachRelationships = pgTable(
      *  messages and plans attributable after somebody takes over. */
     endedAt: timestamp("ended_at", { withTimezone: true }),
 
+    /**
+     * When the coach last said they had looked at this client.
+     *
+     * Stamped by a control they press, never by opening the page — a coach who
+     * taps a name to find a phone number has not reviewed anybody, and a cursor
+     * that moved on view would unflag exactly the client they opened by
+     * accident. Null means never, which is the honest state for every
+     * relationship that existed before this column.
+     */
+    lastReviewedAt: timestamp("last_reviewed_at", { withTimezone: true }),
+
     /** Which admin did this. Null rather than invented for any future
      *  automated path. */
     assignedBy: varchar("assigned_by"),
