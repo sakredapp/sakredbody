@@ -92,6 +92,8 @@ import {
 } from "@/hooks/use-open-workout";
 import { Elapsed } from "@/components/build/Elapsed";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { PhotoAttach, type PhotoAttachment } from "@/components/PhotoAttach";
 import { Input } from "@/components/ui/input";
 import { MovementPicker, type Movement } from "./MovementPicker";
 import { NewMovement } from "./NewMovement";
@@ -1535,9 +1537,16 @@ function Logged() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const done = justFinished!;
+  const [composing, setComposing] = useState(false);
+  const [caption, setCaption] = useState("");
+  const [photo, setPhoto] = useState<PhotoAttachment | null>(null);
 
   const share = useMutation({
-    mutationFn: async () => apiRequest("POST", `/api/training/sessions/${done.id}/share`, {}),
+    mutationFn: async () =>
+      apiRequest("POST", `/api/training/sessions/${done.id}/share`, {
+        caption,
+        imageAssetId: photo?.assetId ?? null,
+      }),
     onSuccess: () => {
       setJustFinished({ ...done, shared: true });
       qc.invalidateQueries({ queryKey: ["/api/community/messages"] });
@@ -1559,16 +1568,50 @@ function Logged() {
 
           {done.shared ? (
             <p className="text-sm text-[hsl(var(--gold))]">It's in the room.</p>
+          ) : composing ? (
+            /*
+              The words and the picture, once they have said they want to
+              share. Offered here rather than as a second screen: what they
+              actually did is on the card the room will render, so the only
+              thing left to decide is what to say about it.
+            */
+            <div className="space-y-3 text-left">
+              <Textarea
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                placeholder="Say something about it (optional)"
+                rows={2}
+                maxLength={8000}
+                className="resize-none min-h-0"
+                data-testid="input-share-caption"
+              />
+              <PhotoAttach
+                purpose="room"
+                attached={photo}
+                onAttached={setPhoto}
+                onCleared={() => setPhoto(null)}
+                disabled={share.isPending}
+                label="Add a photo"
+              />
+              <Button
+                className="w-full"
+                onClick={() => share.mutate()}
+                disabled={share.isPending}
+                data-testid="share-to-room-confirm"
+              >
+                <Users className="h-3.5 w-3.5 mr-1.5" />
+                {share.isPending ? "Posting…" : "Post it"}
+              </Button>
+            </div>
           ) : (
             <Button
               variant="outline"
               className="w-full"
-              onClick={() => share.mutate()}
-              disabled={share.isPending}
+              onClick={() => setComposing(true)}
               data-testid="share-to-room"
             >
               <Users className="h-3.5 w-3.5 mr-1.5" />
-              {share.isPending ? "Posting…" : "Share it with the room"}
+              Share it with the room
             </Button>
           )}
 

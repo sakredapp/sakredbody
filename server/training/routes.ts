@@ -43,6 +43,7 @@ import {
   exercises,
   habitExercises,
   bodyMeasurements,
+  mediaAssets,
   workoutSessions,
   workoutSets,
   sessionExercises,
@@ -289,9 +290,8 @@ async function shareSessionWithCoach(userId: string, sessionId: string): Promise
 async function shareSessionWithRoom(
   userId: string,
   sessionId: string,
+  extras: { caption?: string; imageAssetId?: string | null } = {},
 ): Promise<{ ok: true; messageId: string } | { ok: false; reason: string }> {
-  const unit = await unitFor(userId);
-
   const [session] = await db
     .select()
     .from(workoutSessions)
@@ -334,16 +334,25 @@ async function shareSessionWithRoom(
     .limit(1);
   if (!room) return { ok: false, reason: "You're not in a room yet." };
 
-  const lines = summariseSession(
-    working.map((r) => ({ ...r, weight: out(r.weightKg, unit) })),
-    unit,
-  );
-  const title = session.title?.trim() || "Training";
-  const body = [`${title} — ${working.length} sets`, "", ...lines].join("\n");
+  /*
+    The sets used to be flattened into the message body here, by the same
+    `summariseSession` that writes the coach's copy. They are not any more:
+    the message carries the session id and the Room renders the card from the
+    real rows, so a corrected set corrects the post rather than leaving a
+    paragraph that disagrees with the history it came from.
 
+    What stays in the body is what the member typed. That is the one part of a
+    share nobody else can generate.
+  */
   const [message] = await db
     .insert(communityMessages)
-    .values({ channelId: room.id, userId, body })
+    .values({
+      channelId: room.id,
+      userId,
+      body: (extras.caption ?? "").trim().slice(0, 8000),
+      sharedSessionId: session.id,
+      imageAssetId: extras.imageAssetId ?? null,
+    })
     .returning({ id: communityMessages.id });
 
   // A top-level message is its own root. Matching what the community handler
@@ -1317,7 +1326,29 @@ export function registerTrainingRoutes(app: Express) {
   app.post("/api/training/sessions/:id/share", isAuthenticated, async (req, res) => {
     try {
       const userId = req.session!.userId!;
-      const result = await shareSessionWithRoom(userId, param(req, "id"));
+
+      /*
+        The photograph is verified here rather than trusted, on the same two
+        grounds the Room composer uses: it has to be theirs, and it has to have
+        been uploaded as a Room photo. A progress photo attached to a public
+        post would be readable by nobody in the room and private to everybody
+        outside it — which is to say, a broken tile hiding a real mistake.
+      */
+      const imageAssetId = typeof req.body?.imageAssetId === "string" ? req.body.imageAssetId : null;
+      if (imageAssetId) {
+        const [asset] = await db
+          .select({ ownerUserId: mediaAssets.ownerUserId, purpose: mediaAssets.purpose })
+          .from(mediaAssets)
+          .where(eq(mediaAssets.id, imageAssetId));
+        if (!asset || asset.ownerUserId !== userId || asset.purpose !== "room") {
+          return res.status(404).json({ message: "No such image" });
+        }
+      }
+
+      const result = await shareSessionWithRoom(userId, param(req, "id"), {
+        caption: typeof req.body?.caption === "string" ? req.body.caption : "",
+        imageAssetId,
+      });
       if (!result.ok) return res.status(400).json({ message: result.reason });
       track("training.session_shared", { userId, surface: "community", subjectId: result.messageId });
       res.status(201).json({ messageId: result.messageId });
