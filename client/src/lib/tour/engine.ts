@@ -89,7 +89,13 @@ export function isSatisfied(advance: Advance, world: TourWorld, tapped: boolean)
     case "present":
       return world.present.has(advance.anchor);
     case "absent":
-      return !world.present.has(advance.anchor);
+      /*
+        Gone, not merely not-here-yet. Without `seen`, resuming into the
+        workout lesson satisfied "the set row has disappeared" in the frame
+        before the workout had been rebuilt — the member came back and the
+        lesson had taught itself.
+      */
+      return world.seen.has(advance.anchor) && !world.present.has(advance.anchor);
   }
 }
 

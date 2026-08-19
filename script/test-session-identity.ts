@@ -137,7 +137,14 @@ console.log("\nThe mirror clears as well as sets\n");
   const sheetSrc = code("client/src/components/build/WorkoutSheet.tsx");
   check("the layer reads the same query", /useOpenWorkout\(\)/.test(sheetSrc));
   check("and closes itself when nothing is open",
-    /if \(!session && expanded && !justFinished\) collapse\(\)/.test(sheetSrc));
+    /if \(!session && !isFetching && expanded && !justFinished\) collapse\(\)/.test(sheetSrc));
+  /*
+    "No session" while the question is still being asked is not an answer.
+    Treating it as one closed the workout in the same frame anything asked to
+    open it before the query replied — which is what a resumed walkthrough
+    does, and what made a correct reconstruction invisible.
+  */
+  check("but not while it is still asking", /const \{ data, isFetching \} = useOpenWorkout\(\)/.test(sheetSrc));
   check("and renders nothing without one", /if \(!expanded \|\| !session/.test(sheetSrc));
 }
 
@@ -224,7 +231,7 @@ console.log("\nAnd finishing says so to the cache\n");
   check("the confirmation is held outside the session", /justFinished/.test(sheet));
   check("and rendered when nothing is open", /if \(justFinished\) return <Logged \/>/.test(sheet));
   check("the collapse-on-empty rule stands aside for it",
-    /if \(!session && expanded && !justFinished\) collapse\(\)/.test(sheet));
+    /if \(!session && !isFetching && expanded && !justFinished\) collapse\(\)/.test(sheet));
   check("and only Done clears it", /setJustFinished\(null\);\s*collapse\(\)/.test(sheet));
 }
 

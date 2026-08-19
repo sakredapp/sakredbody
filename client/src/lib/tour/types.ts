@@ -165,6 +165,16 @@ export type TourWorld = {
   section: string | null;
   /** Anchors currently mounted and measurable. */
   present: ReadonlySet<TourAnchor>;
+  /**
+   * Anchors that have been present at some point during this step.
+   *
+   * Only an `absent` completion needs this, and it needs it badly: "the set
+   * row is gone" and "the set row has not arrived yet" look identical from one
+   * frame, and a resumed lesson whose whole instruction is to make something
+   * disappear completed itself before the workout it was about had finished
+   * being reconstructed.
+   */
+  seen: ReadonlySet<TourAnchor>;
   /** How long the current step has been waiting for its anchor, in ms. */
   waitedMs: number;
 };

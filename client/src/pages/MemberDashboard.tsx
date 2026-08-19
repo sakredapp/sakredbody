@@ -65,6 +65,7 @@ import { SettingsTab } from "@/components/SettingsTab";
 import { useHealthAutoSync } from "@/hooks/use-health";
 import { publishTourSection } from "@/hooks/use-guided-tour";
 import { HelpPortal } from "@/components/HelpPortal";
+import { onStageRequest } from "@/lib/tour/stage";
 import { TourHost } from "@/components/tour/TourHost";
 import { Onboarding } from "@/components/portal/Onboarding";
 import {
@@ -282,6 +283,22 @@ export default function MemberDashboard() {
     publishTourSection(section);
     return () => publishTourSection(null);
   }, [section]);
+
+  /*
+    The other direction, and only ever on request.
+
+    A resumed walkthrough needs the app on the section its lesson happens in —
+    see `client/src/lib/tour/stage.ts`. Setting the section rather than
+    navigating, because these are the same screen: a route change would remount
+    the dashboard the tour has just started inside.
+  */
+  useEffect(
+    () =>
+      onStageRequest((request) => {
+        if (request.section) setSection(request.section as MemberSection);
+      }),
+    [],
+  );
 
   const [showBookingDialog, setShowBookingDialog] = useState(false);
 

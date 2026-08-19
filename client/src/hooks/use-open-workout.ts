@@ -112,6 +112,15 @@ export type PriorPerformance = {
 };
 
 export type OpenWorkout = RunningSession & {
+  /**
+   * The tutorial's rehearsal, not a workout.
+   *
+   * Set only by the walkthrough's fetch boundary — the server has no such
+   * column and never sends it — so anything keyed on this cannot reach a real
+   * session. Read by the workout screen to reopen an entry row a reconstructed
+   * rehearsal was in the middle of.
+   */
+  rehearsal?: boolean;
   /** How much has been logged, so the banner can say more than "a workout". */
   sets: number;
   /**

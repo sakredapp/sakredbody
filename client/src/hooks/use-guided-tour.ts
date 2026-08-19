@@ -42,6 +42,9 @@ import {
 import { readProgress, writeProgress } from "@/lib/tour/progress";
 import { resolveTarget } from "@/lib/tour/resolveTarget";
 import { beginRehearsal, endRehearsal } from "@/lib/tour/rehearsal";
+import { restoreSpecFor, seedRehearsal } from "@/lib/tour/restore";
+import { clearStage, requestStage } from "@/lib/tour/stage";
+import { queryClient } from "@/lib/queryClient";
 import type { GuidedTour, TourAnchor, TourProgress, TourWorld } from "@/lib/tour/types";
 
 export const TOUR_SECTION_ATTR = "data-tour-section";
@@ -128,6 +131,7 @@ export function useGuidedTour(
   const [world, setWorld] = useState<TourWorld & { stepId: string | null }>({
     section: null,
     present: new Set(),
+    seen: new Set(),
     waitedMs: 0,
     stepId: null,
   });
@@ -143,8 +147,19 @@ export function useGuidedTour(
     effect when a condition flips — health finishing its sync, say — must not
     restart a walkthrough already in progress.
   */
+  /**
+   * Whether this mount has already run the walkthrough to its end.
+   *
+   * A replay writes no progress — correctly, since reviewing the app is not
+   * un-learning it — which removed the only thing that had been stopping the
+   * start effect from firing again the moment the tour finished. It restarted
+   * from welcome, forever. Found by a driver that walked 32 lessons through a
+   * 26-lesson walkthrough.
+   */
+  const finished = useRef(false);
+
   useEffect(() => {
-    if (index !== null) return;
+    if (index !== null || finished.current) return;
     const stored = readProgress(tour);
     if (!(forced ? shouldStart(stored, tour, conditions) : mayAutoStart(stored, tour, conditions))) return;
 
@@ -163,6 +178,38 @@ export function useGuidedTour(
     setProgress(forced ? emptyProgress(tour) : stored ?? emptyProgress(tour));
     setIndex(at);
     stepStartedAt.current = performance.now();
+
+    /*
+      Put the app where the lesson happens, before the lesson opens.
+
+      Resuming at step fifteen and leaving the member on Home means a panel
+      explaining RPE over a screen with no sets on it — nothing errors, it is
+      simply nonsense, and interruption on a phone is not an edge case. The
+      spec for every step has existed in `restore.ts` since the walkthrough was
+      written; until now nothing read it.
+
+      The rehearsal is *reconstructed*, never restored: `seedRehearsal` builds
+      the movement and the logged set from seven lines of script, in memory, so
+      an app kill during the workout lesson still writes nothing.
+    */
+    const spec = restoreSpecFor(tour.steps[at]);
+    if (spec.rehearsal) {
+      beginRehearsal(new Date().toISOString(), undefined, seedRehearsal(spec.rehearsal, new Date().toISOString()));
+      /*
+        And tell the app to look again.
+
+        The open-workout query is asked on load, so by the time a resumed
+        walkthrough installs the barrier the answer "nothing is open" is either
+        already cached or already in flight — and an in-flight one lands *after*
+        the barrier with the pre-barrier answer, which is the version of this
+        that looks intermittent. Cancelled first, then reset, so the question is
+        asked again through the boundary rather than remembered from before it.
+      */
+      void queryClient
+        .cancelQueries({ queryKey: ["/api/training/sessions/open"] })
+        .then(() => queryClient.resetQueries({ queryKey: ["/api/training/sessions/open"] }));
+    }
+    requestStage({ section: spec.section, sheet: spec.sheet, workout: spec.workout });
   }, [tour, conditions, index, forced, replayFrom]);
 
   const step = index === null ? null : tour.steps[index] ?? null;
@@ -179,16 +226,23 @@ export function useGuidedTour(
   useEffect(() => {
     if (!step) return;
     let frame = 0;
+    /** Everything this step has ever had on screen. Reset with the step. */
+    const seen = new Set<TourAnchor>();
     const watched: TourAnchor[] = [];
     if (step.anchor) watched.push(step.anchor);
     if ("anchor" in step.advance) watched.push(step.advance.anchor);
 
     const tick = () => {
       const present = new Set<TourAnchor>();
-      for (const a of watched) if (anchorPresent(a)) present.add(a);
+      for (const a of watched) {
+        if (!anchorPresent(a)) continue;
+        present.add(a);
+        seen.add(a);
+      }
       setWorld({
         section: document.documentElement.getAttribute(TOUR_SECTION_ATTR),
         present,
+        seen: new Set(seen),
         waitedMs: performance.now() - stepStartedAt.current,
         stepId: step.id,
       });
@@ -223,7 +277,10 @@ export function useGuidedTour(
     else if (step?.rehearsal === "end") endRehearsal();
   }, [step]);
 
-  useEffect(() => endRehearsal, []);
+  useEffect(() => () => {
+    endRehearsal();
+    clearStage();
+  }, []);
 
   const goTo = useCallback(
     (next: number) => {
@@ -276,21 +333,26 @@ export function useGuidedTour(
     const updated = complete(progress, tour, index, new Date().toISOString());
     setProgress(updated);
     if (!forced) writeProgress(updated);
-    if (index + 1 >= tour.steps.length) setIndex(null);
-    else goTo(index + 1);
+    if (index + 1 >= tour.steps.length) {
+      finished.current = true;
+      setIndex(null);
+    } else goTo(index + 1);
   }, [index, progress, tour, goTo, forced]);
 
   const skip = useCallback(() => {
     if (index === null) return;
-    if (index + 1 >= tour.steps.length) setIndex(null);
-    else goTo(index + 1);
-  }, [index, goTo]);
+    if (index + 1 >= tour.steps.length) {
+      finished.current = true;
+      setIndex(null);
+    } else goTo(index + 1);
+  }, [index, goTo, tour]);
 
   const pause = useCallback(() => {
     if (index === null || !progress) return;
     const held = pauseAt(progress, tour, index);
     setProgress(held);
     if (!forced) writeProgress(held);
+    finished.current = true;
     setIndex(null);
   }, [index, progress, tour, forced]);
 
@@ -313,7 +375,7 @@ export function useGuidedTour(
   const resolution = useMemo(
     () =>
       step
-        ? resolve(step, measured ? world : { section: world.section, present: EMPTY, waitedMs: 0 })
+        ? resolve(step, measured ? world : { section: world.section, present: EMPTY, seen: EMPTY, waitedMs: 0 })
         : null,
     [step, world, measured],
   );

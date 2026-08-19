@@ -69,7 +69,7 @@ const READY = {
 };
 
 function world(over: Partial<TourWorld> = {}): TourWorld {
-  return { section: null, present: new Set<TourAnchor>(), waitedMs: 0, ...over };
+  return { section: null, present: new Set<TourAnchor>(), seen: new Set<TourAnchor>(), waitedMs: 0, ...over };
 }
 
 const stepAt = (i: number) => TOUR.steps[i];
@@ -243,7 +243,20 @@ check(
   "closing the rehearsal is waiting for the set row to go away",
   !isSatisfied(closeStep.advance, world({ present: new Set(["workout-set-row"] as TourAnchor[]) }), false),
 );
-check("and completes when it has", isSatisfied(closeStep.advance, world(), false));
+check(
+  "and completes when it has",
+  isSatisfied(closeStep.advance, world({ seen: new Set(["workout-set-row"] as TourAnchor[]) }), false),
+);
+/*
+  The distinction that matters on resume: "gone" and "not arrived yet" look
+  identical from one frame. A reconstructed workout takes a moment to rebuild,
+  and without this the lesson whose whole instruction is to make something
+  disappear taught itself before the thing existed.
+*/
+check(
+  "but not before the row has ever been there",
+  !isSatisfied(closeStep.advance, world(), false),
+);
 
 // ─── 5. A target that is merely late is waited for ───────────────────────
 
@@ -481,7 +494,7 @@ check(
   );
   check(
     "and a step is never resolved against another step's readings",
-    /measured \? world : \{ section: world\.section, present: EMPTY, waitedMs: 0 \}/.test(hook),
+    /measured \? world : \{ section: world\.section, present: EMPTY, seen: EMPTY, waitedMs: 0 \}/.test(hook),
   );
   check(
     "nor completed from them",

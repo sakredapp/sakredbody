@@ -45,6 +45,15 @@ export type RestoreSpec = {
   section: string | null;
   /** The More sheet has to be open for its rows to be resolvable. */
   sheet: "more" | null;
+  /**
+   * Whether the workout layer has to be in front.
+   *
+   * Declared rather than inferred from `rehearsal`, because one step needs the
+   * rehearsal installed and the workout *not* open: `start-session` is the
+   * lesson that teaches opening it, and reconstructing it already open
+   * satisfied the step on arrival and skipped the lesson.
+   */
+  workout: boolean;
   /** Which of several like-named controls, for repeated targets. */
   instance: string | null;
   rehearsal: RehearsalSnapshot | null;
@@ -101,6 +110,7 @@ export function restoreSpecFor(step: TourStep): RestoreSpec {
     */
     section: step.section ?? (snapshot ? "build" : null),
     sheet: IN_MORE_SHEET.has(step.id) ? "more" : null,
+    workout: !!snapshot && step.id !== "start-session",
     instance: instanceFor(step),
     rehearsal: snapshot,
   };

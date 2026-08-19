@@ -80,6 +80,7 @@ import {
   type WeightUnit,
 } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
+import { onStageRequest } from "@/lib/tour/stage";
 import { useToast } from "@/hooks/use-toast";
 import {
   isMissingSession,
@@ -133,6 +134,16 @@ export const useWorkoutSheet = () => useContext(SheetContext);
 
 export function WorkoutSheetProvider({ children }: { children: ReactNode }) {
   const [expanded, setExpanded] = useState(false);
+
+  /*
+    A resumed walkthrough asks for the workout to be in front.
+
+    The rehearsal it reconstructs answers `/sessions/open` with a session, so
+    the workout exists — it was simply behind the dashboard, and the lesson was
+    explaining a set row nobody could see. One-shot and only while a tour is
+    starting; see client/src/lib/tour/stage.ts.
+  */
+  useEffect(() => onStageRequest((request) => request.workout && setExpanded(true)), []);
   const [justFinished, setJustFinished] = useState<Sheet["justFinished"]>(null);
   const value = useMemo<Sheet>(
     () => ({
@@ -425,7 +436,7 @@ function SetMeta({
 
 export function WorkoutSheet() {
   const { expanded, collapse, justFinished } = useWorkoutSheet();
-  const { data } = useOpenWorkout();
+  const { data, isFetching } = useOpenWorkout();
   const session = data?.session ?? null;
 
   /**
@@ -434,10 +445,17 @@ export function WorkoutSheet() {
    *
    * Except while a confirmation is being held: that screen is about a session
    * that has deliberately just ceased to exist.
+   *
+   * And except while the question is still being asked. "No session yet"
+   * during a fetch is not an answer, and treating it as one closed the workout
+   * the instant anything asked to open it before the query had replied — which
+   * is exactly what a resumed walkthrough does: it installs the rehearsal, asks
+   * for the workout, and the sheet shut itself in the same frame. Correct
+   * underneath and invisible.
    */
   useEffect(() => {
-    if (!session && expanded && !justFinished) collapse();
-  }, [session, expanded, collapse, justFinished]);
+    if (!session && !isFetching && expanded && !justFinished) collapse();
+  }, [session, isFetching, expanded, collapse, justFinished]);
 
   // The one screen that outlives the session it is about.
   if (justFinished) return <Logged />;
@@ -473,6 +491,31 @@ function Sheet() {
    * thing to do — and asked for afterwards.
    */
   const [entering, setEntering] = useState<Record<string, boolean>>({});
+
+  /**
+   * A reconstructed rehearsal arrives mid-set.
+   *
+   * The lessons about RPE, set style and the entry row point at controls that
+   * only exist while a set is being entered — which, when the member walked
+   * here, is where they were. A rehearsal rebuilt after a force-quit had the
+   * movement and the logged set and none of that, so three lessons resumed
+   * pointing at nothing.
+   *
+   * Rehearsal-only by construction: `session.rehearsal` is set by the tutorial
+   * boundary and never by the server, so no real workout can be opened into an
+   * entry row it did not ask for.
+   */
+  useEffect(() => {
+    if (!session.rehearsal) return;
+    const ids = (session.exercises ?? []).map((m) => m.exerciseId);
+    if (!ids.length) return;
+    setEntering((prev) => {
+      if (ids.every((id) => prev[id])) return prev;
+      const next = { ...prev };
+      for (const id of ids) next[id] = true;
+      return next;
+    });
+  }, [session.rehearsal, session.exercises]);
   /** The set currently being corrected, if any, and the numbers in its boxes. */
   const [editing, setEditing] = useState<{ id: string; draft: Draft } | null>(null);
   /** Which movement is choosing a superset partner. */

@@ -24,7 +24,7 @@
  * nothing is hidden behind a scroll nobody knows to perform.
  */
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import {
   Home as HomeIcon,
@@ -58,6 +58,7 @@ import { useHasActiveCoachPlan } from "@/hooks/use-coach-plan";
 import { useAccess } from "@/hooks/use-access";
 import type { Role } from "@shared/models/access";
 import { cn } from "@/lib/utils";
+import { onStageRequest } from "@/lib/tour/stage";
 
 export type MemberSection =
   | "home"
@@ -413,6 +414,21 @@ export function MemberBottomNav({
    */
   const rolesNeedAttention = roles.some((d) => (d.badge ?? 0) > 0);
 
+  /*
+    Controlled, so a resumed walkthrough can open it.
+
+    Two of the lessons live on rows inside this sheet, and a member who paused
+    on one and came back to a closed sheet was being shown a panel about a
+    control that does not exist yet. See client/src/lib/tour/stage.ts — the
+    request is one-shot and only ever arrives when a tour is starting, so
+    nothing here fights a member who opens or closes it themselves.
+  */
+  const [moreOpen, setMoreOpen] = useState(false);
+  useEffect(
+    () => onStageRequest((request) => setMoreOpen(request.sheet === "more")),
+    [],
+  );
+
   return (
     <nav
       className={cn(
@@ -457,7 +473,7 @@ export function MemberBottomNav({
           );
         })}
 
-        <Sheet>
+        <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
           <SheetTrigger asChild>
             <button
               className={cn(
