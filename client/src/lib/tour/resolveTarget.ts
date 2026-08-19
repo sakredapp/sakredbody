@@ -173,9 +173,22 @@ export function describe(el: Element): Candidate {
   const ariaDisabled = el.getAttribute("aria-disabled") === "true";
   const nativelyDisabled = (el as HTMLButtonElement).disabled === true;
   const inert = !!el.closest("[inert]");
-  // A closed Radix sheet keeps its content mounted and marks it hidden. Without
-  // this the More step would resolve a row inside a sheet nobody has opened.
-  const inClosedLayer = !!el.closest('[data-state="closed"], [aria-hidden="true"]');
+  /*
+    A closed Radix sheet keeps its content mounted and marks it hidden, so a
+    step must not resolve a row inside a sheet nobody has opened.
+
+    Ancestors only — `closest` includes the element itself, and the *trigger*
+    of a closed sheet also carries `data-state="closed"`. `nav-more` is that
+    trigger, so the More lesson could not see the one control it exists to
+    teach: the button advertises "closed" precisely because the member has not
+    pressed it yet, which is the entire premise of the step. The overlay fell
+    back to its no-target state, the panel dropped to the bottom of the screen,
+    and it landed on top of the navigation it was pointing at.
+
+    Content genuinely inside a closed sheet still fails, on its own ancestor
+    and on the display/visibility checks below.
+  */
+  const inClosedLayer = !!el.parentElement?.closest('[data-state="closed"], [aria-hidden="true"]');
 
   return {
     instance: el.getAttribute("data-tour-instance"),
