@@ -80,9 +80,21 @@ for (const file of [
 
 // ─── 5. And the claim that there is nothing else ──────────────────────────
 
-check("no recommendation-event table exists yet",
-  !readdirSync("shared/models").some((f) => /recommendation/i.test(f)),
-  "a model file now exists — the map's last section is out of date");
+/*
+  The recommendation layer now exists, and the claim that matters has moved.
+  It is no longer "there is no such table" — it is that the table records
+  deterministic output as deterministic. A row that named a provider would mean
+  either the map is stale or somebody quietly put a model on the member path,
+  and both are things this file should refuse to let pass quietly.
+*/
+{
+  const model = readFileSync("shared/models/recommendation.ts", "utf8");
+  check("the recommendation record exists", model.includes("recommendation_events"));
+  check("and it can say a model produced something", model.includes('modelProvider: text("model_provider")'));
+  check("but the stamp it writes claims none",
+    /modelProvider: null,\s*\n\s*modelId: null,\s*\n\s*promptVersion: null,/.test(model),
+    "recommendationVersions now fills in a model — either a model reached the member path or this is fiction");
+}
 
 if (failures.length) {
   console.error("\n✗ the intelligence map no longer describes the product\n");

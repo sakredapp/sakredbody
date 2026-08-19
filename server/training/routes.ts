@@ -99,6 +99,8 @@ import {
   removeSessionExercise,
 } from "./composition.js";
 import { memberToday } from "../coaching/enrollment.js";
+import { markCompleted } from "../intelligence/attribute.js";
+import { sessionCategories } from "../movement/history.js";
 import { trainingMemory } from "./memory.js";
 import {
   readTrainingResponse,
@@ -1021,6 +1023,20 @@ export function registerTrainingRoutes(app: Express) {
       // The same event a finished session emits, because that is what this is —
       // one that happened to be recorded after the fact rather than during.
       track("training.session_finish", { userId, surface: "build", subjectId: practiceId });
+      /*
+        Against what Sakred suggested this morning, if anything.
+
+        Co-occurrence, stated as such: the member finished a session in a
+        category that was recommended today. Whether the recommendation caused
+        it is a different question and only the acceptance stamp answers it —
+        see server/intelligence/attribute.ts. Best-effort and after the
+        response is decided, because a workout is saved whether or not the
+        bookkeeping lands.
+      */
+      void sessionCategories(practiceId)
+        .then((categories) => markCompleted(userId, onDate, categories))
+        .catch(() => {});
+
 
       // Best-effort and after the commit, so a coach-thread failure cannot roll
       // back a practice the member definitely did.
@@ -1440,6 +1456,19 @@ export function registerTrainingRoutes(app: Express) {
       }
 
       track("training.session_finish", { userId, surface: "build", subjectId: row.id });
+      /*
+        Against what Sakred suggested this morning, if anything.
+
+        Co-occurrence, stated as such: the member finished a session in a
+        category that was recommended today. Whether the recommendation caused
+        it is a different question and only the acceptance stamp answers it —
+        see server/intelligence/attribute.ts. Best-effort and after the
+        response is decided, because a workout is saved whether or not the
+        bookkeeping lands.
+      */
+      void sessionCategories(row.id)
+        .then((categories) => markCompleted(userId, row.onDate, categories))
+        .catch(() => {});
       res.json(row);
     } catch (err) {
       fail(res, err);

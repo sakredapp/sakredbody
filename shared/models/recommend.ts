@@ -50,6 +50,7 @@
  * from "you slept badly, so" to "worth doing". Never invent the because.
  */
 
+import type { ReasonCode } from "./brain.js";
 import {
   EXERCISE_CATEGORIES,
   categoryLoad,
@@ -100,6 +101,17 @@ export type ReadinessRead = {
   /** Plain sentences, already translated. Never a metric name and a number. */
   reasons: string[];
   /**
+   * The same grounds, named rather than written out.
+   *
+   * A parallel array and not a field on each reason, because the two lists are
+   * genuinely different lengths: several signals move the score without
+   * earning a sentence — an HRV a little under baseline is worth a point and
+   * is not worth telling somebody about. The sentences are what the member
+   * reads; the codes are the complete record of what decided, and only the
+   * codes are ever persisted. See shared/models/recommendation.ts.
+   */
+  codes: ReasonCode[];
+  /**
    * How much we actually know. `none` means say nothing about why — see the
    * note above on not inventing the because.
    */
@@ -137,6 +149,7 @@ export function readReadiness(signals: ReadinessSignals): ReadinessRead {
   let score = 0;
   let known = 0;
   const reasons: string[] = [];
+  const codes: ReasonCode[] = [];
 
   const {
     sleepMinutes,
@@ -173,12 +186,15 @@ export function readReadiness(signals: ReadinessSignals): ReadinessRead {
     const deficit = sleepBaselineMinutes - sleepMinutes;
     if (deficit >= 90) {
       score -= 2;
+      codes.push("sleep_deficit_large");
       reasons.push(`You slept ${hm(sleepMinutes)} against your usual ${hm(sleepBaselineMinutes)}.`);
     } else if (deficit >= 45) {
       score -= 1;
+      codes.push("sleep_deficit_mild");
       reasons.push(`A short night — ${hm(sleepMinutes)}, about ${hm(deficit)} down on your usual.`);
     } else if (deficit <= -30) {
       score += 1;
+      codes.push("sleep_surplus");
       reasons.push(`You slept well — ${hm(sleepMinutes)}.`);
     }
   }
@@ -194,14 +210,17 @@ export function readReadiness(signals: ReadinessSignals): ReadinessRead {
     const over = restingHeartRate - restingHeartRateBaseline;
     if (over >= 6) {
       score -= 2;
+      codes.push("rhr_elevated_strong");
       reasons.push(
         `Your resting heart rate is ${Math.round(over)} beats above your normal, which usually means you're still recovering from something.`,
       );
     } else if (over >= 3) {
       score -= 1;
+      codes.push("rhr_elevated_mild");
       reasons.push(`Your resting heart rate is a little above its usual.`);
     } else if (over <= -2) {
       score += 1;
+      codes.push("rhr_low");
     }
   }
 
@@ -213,11 +232,14 @@ export function readReadiness(signals: ReadinessSignals): ReadinessRead {
     const ratio = hrv / hrvBaseline;
     if (ratio <= 0.8) {
       score -= 2;
+      codes.push("hrv_down_strong");
       reasons.push(`Your heart-rate variability is well down on your baseline.`);
     } else if (ratio <= 0.9) {
       score -= 1;
+      codes.push("hrv_down_mild");
     } else if (ratio >= 1.1) {
       score += 1;
+      codes.push("hrv_up");
     }
   }
 
@@ -226,13 +248,16 @@ export function readReadiness(signals: ReadinessSignals): ReadinessRead {
   if (hardSessionsRecently >= 3) {
     known++;
     score -= 2;
+    codes.push("recent_hard_load");
     reasons.push(`You've trained hard three times in the last few days.`);
   } else if (hardSessionsRecently === 2) {
     known++;
     score -= 1;
+    codes.push("recent_moderate_load");
   } else if (daysSinceLastSession != null && daysSinceLastSession >= 3) {
     known++;
     score += 1;
+    codes.push("rest_gap");
     reasons.push(`It's been ${daysSinceLastSession} days since you last moved.`);
   }
 
@@ -242,14 +267,18 @@ export function readReadiness(signals: ReadinessSignals): ReadinessRead {
     known++;
     if (terrainLean <= -2) {
       score -= 2;
+      codes.push("reported_low");
       reasons.push(`You checked in feeling low.`);
     } else if (terrainLean === -1) {
       score -= 1;
+      codes.push("reported_mild_low");
     } else if (terrainLean >= 2) {
       score += 2;
+      codes.push("reported_good");
       reasons.push(`You checked in feeling good.`);
     } else if (terrainLean === 1) {
       score += 1;
+      codes.push("reported_mild_good");
     }
   }
 
@@ -259,6 +288,7 @@ export function readReadiness(signals: ReadinessSignals): ReadinessRead {
   // The reason a member reads comes from something actually measured.
   if (cycleLean != null && cycleLean !== 0) {
     score += Math.max(-1, Math.min(1, cycleLean));
+    codes.push("cycle_lean");
     // Deliberately not counted toward `known`. A phase estimate alone is not
     // grounds to claim we can read somebody's day.
   }
@@ -266,7 +296,14 @@ export function readReadiness(signals: ReadinessSignals): ReadinessRead {
   const level: Readiness = score <= -2 ? "depleted" : score >= 2 ? "primed" : "steady";
   const confidence = known === 0 ? "none" : known === 1 ? "low" : "good";
 
-  return { level, score, reasons, confidence };
+  /*
+    With nothing known there is nothing to cite, and `no_signals` is the honest
+    code for that — an empty array would be indistinguishable from a signal set
+    that happened to move nothing.
+  */
+  if (known === 0) codes.push("no_signals");
+
+  return { level, score, reasons, codes, confidence };
 }
 
 // ─── 2. Turning the read into things to do ─────────────────────────────────
@@ -283,6 +320,14 @@ export type Suggestion = {
   /** The stretch option — something they don't usually reach for. */
   isStretch: boolean;
   side: "restore" | "build";
+  /**
+   * Why this category, out of the twenty-odd it was chosen from.
+   *
+   * The read's own grounds plus the selection's: `slot_fit` is always there
+   * because fit is what ranks, `novelty_nudge` only when novelty actually
+   * broke the tie. Recorded, never rendered — the member reads `because`.
+   */
+  codes: ReasonCode[];
 };
 
 export type SuggestionInput = {
@@ -363,7 +408,7 @@ export function suggestToday(input: SuggestionInput): Suggestion[] {
   const taken = new Set<string>();
 
   for (const slot of SLOTS[read.level]) {
-    let best: { category: string; label: string; score: number } | null = null;
+    let best: { category: string; label: string; score: number; novelty: number } | null = null;
 
     for (const entry of pool) {
       const category = entry.id;
@@ -384,8 +429,9 @@ export function suggestToday(input: SuggestionInput): Suggestion[] {
       // nudge must not be able to reach past the read of the day.
       if (read.level === "depleted" && load.stress >= 3) fit *= 0.2;
 
-      const score = fit * 2 + noveltyOf(category);
-      if (!best || score > best.score) best = { category, label: entry.label, score };
+      const novelty = noveltyOf(category);
+      const score = fit * 2 + novelty;
+      if (!best || score > best.score) best = { category, label: entry.label, score, novelty };
     }
 
     if (!best) continue;
@@ -407,6 +453,18 @@ export function suggestToday(input: SuggestionInput): Suggestion[] {
        */
       isStretch: recentCategories.length > 0 && !recency.has(best.category),
       side: sideOf(orientation),
+      /*
+        `novelty_nudge` is claimed only when novelty was doing work — an
+        unfamiliar category that also happened to be the best fit was not
+        nudged into place, and recording it as if it were would make the
+        nudge look responsible for choices it never influenced.
+      */
+      codes: [
+        "slot_fit" as const,
+        ...(best.novelty >= 1 && recentCategories.length > 0 ? (["novelty_nudge"] as const) : []),
+        ...(excluded.length > 0 ? (["category_excluded"] as const) : []),
+        ...read.codes,
+      ],
     });
   }
 

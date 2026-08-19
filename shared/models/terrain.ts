@@ -35,6 +35,7 @@
  */
 
 import { categoryLoad, type MovementLoad } from "./training.js";
+import type { ReasonCode } from "./brain.js";
 import {
   TERRAIN_SIGNALS,
   signalPulls,
@@ -104,6 +105,15 @@ export type ReasonSource = "measured" | "reported";
 
 export type TerrainReason = {
   source: ReasonSource;
+  /**
+   * The same ground, named.
+   *
+   * Required rather than optional, so a reason cannot be added without saying
+   * what it is — the alternative is a vocabulary that covers the reasons
+   * somebody remembered to code and silently omits the rest, which is worse
+   * than no vocabulary because the gaps are invisible in the aggregate.
+   */
+  code: ReasonCode;
   /** Shown to the member, in their own terms. Never a metric name. */
   text: string;
   pulls: "restore" | "build";
@@ -222,6 +232,7 @@ export function readTerrain(input: TerrainInputs): TerrainReading {
     const down = input.sleepBaseline - input.sleepRecent;
     reasons.push({
       source: "measured",
+      code: "sleep_deficit_large",
       text: `Last ${recentDays} nights: ${hm(down)} less sleep than ${against}`,
       pulls: "restore",
     });
@@ -235,6 +246,7 @@ export function readTerrain(input: TerrainInputs): TerrainReading {
   ) {
     reasons.push({
       source: "measured",
+      code: "hrv_down_mild",
       text: `Last ${recentDays} days: heart rate variability below ${against}`,
       pulls: "restore",
     });
@@ -247,6 +259,7 @@ export function readTerrain(input: TerrainInputs): TerrainReading {
   ) {
     reasons.push({
       source: "measured",
+      code: "rhr_elevated_mild",
       text: `Last ${recentDays} days: resting heart rate up on ${against}`,
       pulls: "restore",
     });
@@ -256,6 +269,7 @@ export function readTerrain(input: TerrainInputs): TerrainReading {
   if (week.stress >= HEAVY_WEEK_STRESS) {
     reasons.push({
       source: "measured",
+      code: "week_heavy",
       text: `${week.sessions} demanding session${week.sessions === 1 ? "" : "s"} this week`,
       pulls: "restore",
     });
@@ -265,11 +279,12 @@ export function readTerrain(input: TerrainInputs): TerrainReading {
     if (input.daysSinceLastSession >= 3) {
       reasons.push({
         source: "measured",
+        code: "rest_gap",
         text: `Nothing demanding in ${input.daysSinceLastSession} days`,
         pulls: "build",
       });
     } else if (week.sessions > 0) {
-      reasons.push({ source: "measured", text: "A light week so far", pulls: "build" });
+      reasons.push({ source: "measured", code: "week_light", text: "A light week so far", pulls: "build" });
     }
   }
 
@@ -277,7 +292,12 @@ export function readTerrain(input: TerrainInputs): TerrainReading {
   // the ledger every training app forgets, and the reason a heavy week after a
   // restorative one is not the same as a heavy week after another heavy one.
   if (week.restoration >= 6 && week.stress >= HEAVY_WEEK_STRESS) {
-    reasons.push({ source: "measured", text: "You have been restoring alongside it", pulls: "build" });
+    reasons.push({
+      source: "measured",
+      code: "week_light",
+      text: "You have been restoring alongside it",
+      pulls: "build",
+    });
   }
 
   if (!hasBody && input.daysSinceLastSession === null) {
@@ -369,7 +389,17 @@ export function composeTerrainNow(input: {
   const weight = Math.min(REPORT_MAX_WEIGHT, Math.abs(lean));
   const reasons: TerrainReason[] = [
     ...measured.reasons,
-    { source: "reported", text: reportedReason(input.reported!, pulls), pulls },
+    {
+      source: "reported",
+      /*
+        One code for both directions. The strength of the report is already in
+        `weight`, and splitting the code by direction would put the same fact
+        in two buckets that every query then has to remember to union.
+      */
+      code: pulls === "restore" ? "reported_low" : "reported_good",
+      text: reportedReason(input.reported!, pulls),
+      pulls,
+    },
   ];
 
   const toRestore =

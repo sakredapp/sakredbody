@@ -54,6 +54,8 @@ import {
 } from "../../shared/models/recommend.js";
 import { gatedLine } from "../../shared/models/buildToday.js";
 import { terrainFor } from "../terrain/read.js";
+import { record, withHandle, type RecommendationDraft } from "../intelligence/record.js";
+import { markDismissed } from "../intelligence/attribute.js";
 import { SELF_GUIDE, phaseLabel } from "../../shared/models/rhythm.js";
 import { relationshipGuidance, selfRelationalReads } from "../../shared/models/relating.js";
 import { moonState, elementalSeason } from "../../shared/utils/almanac.js";
@@ -202,6 +204,55 @@ export function registerTodayRoutes(app: Express): void {
       const moon = moonGuidance(moonState(at).phase);
       const season = seasonGuidance(elementalSeason(at).element);
 
+      /**
+       * Write down what was just decided, before saying it out loud.
+       *
+       * Three recommendations: the three options. The moon and the season are
+       * not here — the same words go to everybody on the planet that day,
+       * chosen by an ephemeris, and calling that a recommendation to this
+       * member would put the largest and least personal thing on the screen
+       * into the table that is supposed to measure personalisation.
+       *
+       * Terrain is not here either, and not because it isn't a
+       * recommendation — it is the most consequential one the engine makes.
+       * It is recorded where the member actually reads it, on
+       * `/api/terrain/today`. The copy on this response exists so Build can
+       * gate against the canonical state without a second request, and
+       * recording a recommendation at the point it is passed through rather
+       * than shown would count the same advice twice on the strength of an
+       * implementation detail.
+       *
+       * `relating` is not here either, this pass. It is genuinely personal
+       * and genuinely adaptive, and it is also the most sensitive thing the
+       * engine says — how somebody is likely to treat the people around them
+       * — so it gets recorded when there is a considered answer about what a
+       * thumbs-down on it would mean, not because the loop was being wired
+       * and it was nearby.
+       */
+      const drafts: RecommendationDraft[] = suggestions.map((s, rank) => ({
+        type: "today_option" as const,
+        key: s.category,
+        surface: "today",
+        canonicalActionType: "exercise_category" as const,
+        canonicalActionId: s.category,
+        reasonCodes: s.codes,
+        provenance: {
+          rank,
+          side: s.side,
+          orientation: s.orientation,
+          isStretch: s.isStretch,
+          readinessLevel: read.level,
+          /*
+            How much the engine actually knew. A recommendation made with no
+            signals is a different act from the same recommendation made with
+            three, and an aggregate that cannot separate them would judge the
+            engine on days it openly said it could not read.
+          */
+          confidence: read.confidence,
+        },
+      }));
+      const recorded = await record(userId, today, drafts);
+
       res.json({
         date: today,
         read,
@@ -214,7 +265,8 @@ export function registerTodayRoutes(app: Express): void {
          * sentences shipped, four seconds apart, off one database.
          */
         line: gatedLine(terrain.lean, readLine(read), read),
-        suggestions,
+        /** Each option carries the id of the recommendation it *is*. */
+        suggestions: suggestions.map((s) => withHandle(recorded, "today_option", s.category, s)),
         /**
          * The canonical state, passed through so Build can gate on it without
          * a second request — and so nothing downstream has to re-derive it.
@@ -283,6 +335,13 @@ export function registerTodayRoutes(app: Express): void {
           onDate: input.scope === "today" ? today : null,
         })
         .onConflictDoNothing();
+
+      /*
+        The refusal, against the recommendation it refuses. Best-effort and
+        after the dismissal itself is safely stored — a member saying "not
+        this" must take effect whether or not the bookkeeping lands.
+      */
+      void markDismissed(userId, today, input.category);
 
       res.status(204).end();
     } catch (err) {

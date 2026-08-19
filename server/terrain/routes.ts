@@ -19,6 +19,8 @@ import type { Express } from "express";
 import { isAuthenticated } from "../auth/index.js";
 import { memberToday } from "../coaching/enrollment.js";
 import { terrainFor } from "./read.js";
+import { record, withHandle } from "../intelligence/index.js";
+import type { ReasonCode } from "../../shared/models/brain.js";
 
 export function registerTerrainRoutes(app: Express): void {
   app.get("/api/terrain/today", isAuthenticated, async (req: any, res) => {
@@ -42,7 +44,41 @@ export function registerTerrainRoutes(app: Express): void {
           ? req.query.date
           : await memberToday(userId);
 
-      res.json(await terrainFor(userId, onDate));
+      const reading = await terrainFor(userId, onDate);
+
+      /**
+       * The one recommendation on this screen, recorded where it is read.
+       *
+       * `unknown` is not recorded. It is the engine saying it cannot read this
+       * body yet, and a row for it would put "we don't know" into the same
+       * table as the advice — where every aggregate would then have to
+       * remember to exclude it, and eventually one wouldn't.
+       *
+       * A date in the query string is a member scrolling back through their
+       * own history. Recording that would date-stamp today's re-read as a
+       * recommendation made last Tuesday, so only the live read is written.
+       */
+      const live = !req.query.date;
+      const recorded =
+        live && reading.lean !== "unknown"
+          ? await record(userId, onDate, [
+              {
+                type: "terrain_direction",
+                key: reading.lean,
+                surface: "terrain",
+                reasonCodes: reading.reasons.map((r) => r.code as ReasonCode),
+                provenance: {
+                  hasBody: reading.hasBody,
+                  hasReport: reading.hasReport,
+                  /* Which kinds of evidence were in play, never what any said. */
+                  sources: Array.from(new Set(reading.reasons.map((r) => r.source))),
+                  sessions: reading.week.sessions,
+                },
+              },
+            ])
+          : new Map();
+
+      res.json(withHandle(recorded, "terrain_direction", reading.lean, reading));
     } catch (err) {
       console.error("[terrain] today failed", err);
       res.status(500).json({ message: "Could not read your terrain." });

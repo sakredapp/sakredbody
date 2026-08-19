@@ -167,6 +167,17 @@ export const EVENT_NAMES = [
    */
   "tour.step_degraded",
 
+  /**
+   * A member said whether a recommendation helped.
+   *
+   * Deliberately carries the recommendation *type* and the verdict and nothing
+   * else — no id, no category, no reason. The opinion itself belongs to the
+   * member and lives in `recommendation_feedback`, keyed to them and deleted
+   * with them; this row exists so "is anybody using the thumbs" is a query
+   * that does not have to touch their answers.
+   */
+  "recommendation.feedback",
+
   // Failures worth knowing about, rather than an empty catch.
   "error.client",
   "error.server",

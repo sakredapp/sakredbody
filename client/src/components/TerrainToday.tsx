@@ -27,11 +27,18 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import {
+  RecommendationFeedback,
+} from "@/components/intelligence/RecommendationFeedback";
+import type { FeedbackReason } from "@shared/models/recommendation";
 
 type Lean = "restore" | "build" | "either" | "unknown";
 
 type Reading = {
   lean: Lean;
+  /** Present when the server recorded this read as a recommendation. */
+  recommendationId?: string;
+  feedback?: { verdict: "helpful" | "not_helpful"; reason: FeedbackReason | null } | null;
   headline: string;
   reasons: { source: "measured" | "reported"; text: string; pulls: "restore" | "build" }[];
   week: { stress: number; restoration: number; sessions: number };
@@ -72,7 +79,15 @@ export function TerrainToday({ onOpenRestore }: { onOpenRestore?: () => void }) 
   */
   const measured = data.reasons.some((r) => r.source === "measured");
 
+  /*
+    A wrapper, because the card itself is a button and the thumbs are buttons.
+
+    Nesting them would be invalid markup and, more practically, every tap on a
+    thumb would also open Restore — the member would grade the reading and be
+    thrown onto another screen for their trouble.
+  */
   return (
+    <div>
     <button
       type="button"
       onClick={onOpenRestore}
@@ -156,5 +171,17 @@ export function TerrainToday({ onOpenRestore }: { onOpenRestore?: () => void }) 
         </p>
       )}
     </button>
+
+    {/*
+      Only when there is a reading to grade. An `unknown` terrain is the engine
+      saying it cannot read this body yet, and asking whether that was helpful
+      is asking somebody to rate an admission.
+    */}
+    {!unknown && (
+      <div className="px-4">
+        <RecommendationFeedback handle={data} label="this reading" />
+      </div>
+    )}
+    </div>
   );
 }

@@ -92,26 +92,56 @@ embedding, and no conversational history.
 
 ## What this means for the learning loop
 
-The versioned recommendation record described in the brief has **no existing
-equivalent** — there is no table today that answers "what did Sakred recommend,
-to whom, when, why, and which intelligence produced it". `daily_notes` comes
-closest and covers one surface.
+The versioned recommendation record described in the brief had **no existing
+equivalent** — no table answered "what did Sakred recommend, to whom, when,
+why, and which intelligence produced it". `daily_notes` came closest and
+covered one surface, which no member sees.
 
-Two things follow, and they are worth being precise about:
+Two things followed, and they shaped what was built:
 
 1. Most of what needs identity is **deterministic**, so `model_provider` and
-   `model_id` are null for almost every recommendation this product makes.
+   `model_id` are null for every recommendation this product currently makes.
    `guidance_version` and `pattern_algorithm_version` are the fields that
    matter here; a schema that assumed everything was model-written would
    describe a different product.
-2. The provenance to attach is largely **already computed** — Terrain reasons
-   carry a `source`, habit proposals carry their decision rules. The work is
+2. The provenance to attach was largely **already computed** — Terrain reasons
+   carry a `source`, the readiness read carries its grounds. The work was
    recording it against a stable id, not inventing it.
+
+## What has since been built
+
+`recommendation_events` and `recommendation_feedback`
+(`supabase/2026-08-19-recommendation-events.sql`,
+`shared/models/recommendation.ts`).
+
+- One row per recommendation, not per render. Identity is
+  (member, local date, type, key, surface), so re-deriving the same advice is
+  an upsert and the table counts decisions rather than page loads.
+- Written from the surfaces that decide: `GET /api/today` records the three
+  options, `GET /api/terrain/today` records the direction. Both are asserted by
+  call site in `script/test-recommendation.ts`, because a recorder nothing
+  calls is the failure this repository has already had four times.
+- `model_provider`, `model_id` and `prompt_version` are **NULL on every row**,
+  and that is this document's finding rather than an unfinished field.
+- Reason codes, never reason sentences. `sleep_deficit_large` is a fact about a
+  decision; the hours are a fact about a body and stay in the request that
+  computed them. The vocabulary is closed, in `shared/models/brain.ts`.
+
+Version identity lives in `shared/models/brain.ts`: one `BRAIN_VERSION`, a
+decision version per engine, one `GUIDANCE_VERSION`. Each engine version is
+pinned to a digest of the modules it names, and `script/test-brain.ts`
+recomputes those digests on every run — so a threshold cannot change without
+the version that describes it changing too. That is the difference between a
+version field and a version field that is true.
+
+Feedback is 👍/👎 on Today's options and on the Terrain direction, and nowhere
+else; the allow-list of surfaces is enforced by test rather than by convention.
+A verdict writes one row in one table. It does not touch a rule, a threshold or
+a prompt — asserted, not merely intended.
 
 ## Not yet done
 
-The recommendation-event layer, the feedback control, the behaviour and outcome
-links, and the version fields are **not built**. This document is the audit that
-was supposed to come first, and it changes what should be built: a schema
-shaped around a deterministic engine with one model-backed corner, rather than
-around a model with deterministic fallbacks.
+Personal patterns, the personal ranking they inform, and the aggregate a person
+would publish a new Brain Version from. Outcome linkage beyond completion —
+Training Memory, RPE and next-day terrain are all recorded and none of them is
+yet joined to the recommendation that preceded them.

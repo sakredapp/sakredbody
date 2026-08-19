@@ -169,6 +169,26 @@ export type MovementEvent = {
  * free to return unordered rows in any sequence it likes, and relying on that
  * was the actual defect underneath the duplicate-activity bug.
  */
+/**
+ * What one finished session was, in Sakred's categories.
+ *
+ * The same join `movementEvents` uses, narrowed to a single session, and here
+ * for the same reason the reduction and the event list share a mapper: two
+ * places deciding what category a workout belongs to is two places that can
+ * disagree about whether a member did what Sakred suggested.
+ *
+ * Warm-ups excluded, matching everything else that reads load — a member who
+ * warmed up on a bike has not done a conditioning session.
+ */
+export async function sessionCategories(sessionId: string): Promise<string[]> {
+  const rows = await db
+    .selectDistinct({ category: exercises.category })
+    .from(workoutSets)
+    .innerJoin(exercises, eq(exercises.id, workoutSets.exerciseId))
+    .where(and(eq(workoutSets.sessionId, sessionId), eq(workoutSets.isWarmup, false)));
+  return rows.map((r) => r.category).filter(Boolean).sort();
+}
+
 export async function movementEvents(userId: string, since: string): Promise<MovementEvent[]> {
   const [logged, imported] = await Promise.all([
     db

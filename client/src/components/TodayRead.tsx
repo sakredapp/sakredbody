@@ -31,6 +31,10 @@ import { cn } from "@/lib/utils";
 import type { Suggestion, MoonGuidance, SeasonGuidance, ReadinessRead } from "@shared/models/recommend";
 import type { RelationalGuidance } from "@shared/models/relating";
 import type { TerrainLean, TerrainReason } from "@shared/models/terrain";
+import {
+  RecommendationFeedback,
+  type Feedbackable,
+} from "@/components/intelligence/RecommendationFeedback";
 
 export type TodayStat = {
   metric: string;
@@ -60,7 +64,12 @@ export type TodayResponse = {
   date: string;
   read: ReadinessRead;
   line: string;
-  suggestions: Suggestion[];
+  /**
+   * Each option carries the id of the recommendation it *is*, when the server
+   * managed to record one. Optional for the same reason `terrain` is — a
+   * bundled client outlives the deploy it was built against.
+   */
+  suggestions: (Suggestion & Feedbackable)[];
   moon: MoonGuidance | null;
   season: SeasonGuidance | null;
   sky: string | null;
@@ -93,7 +102,7 @@ export type TodayResponse = {
     reasons: TerrainReason[];
     hasBody: boolean;
     hasReport: boolean;
-  };
+  } & Feedbackable;
   rhythm: RhythmSubjectView[];
   /**
    * How their own state is landing on other people — up to two, each naming
@@ -131,7 +140,7 @@ function Option({
   onOpen,
   onDismiss,
 }: {
-  suggestion: Suggestion;
+  suggestion: Suggestion & Feedbackable;
   /**
    * Only the first card says why.
    *
@@ -141,7 +150,7 @@ function Option({
    * that, and the first version repeated it anyway.
    */
   showBecause: boolean;
-  onOpen: (s: Suggestion) => void;
+  onOpen: (s: Suggestion & Feedbackable) => void;
   onDismiss: (category: string, scope: "today" | "forever") => void;
 }) {
   const [asking, setAsking] = useState(false);
@@ -216,6 +225,15 @@ function Option({
           </button>
         </div>
       )}
+
+      {/*
+        Below the card's own actions, at caption weight. A member deciding what
+        to do this morning should reach "open this" before they reach "grade
+        this", and the visual order is what enforces that.
+      */}
+      <div className="px-4 pb-3">
+        <RecommendationFeedback handle={suggestion} label={suggestion.label} />
+      </div>
     </div>
   );
 }
@@ -402,7 +420,27 @@ export function TodayRead({
             key={s.category}
             suggestion={s}
             showBecause={i === 0}
-            onOpen={onOpenCategory}
+            onOpen={(chosen) => {
+              /*
+                The only honest source of acceptance.
+
+                Not inferred later from "they trained in that category today" —
+                a man who was always going to run on Thursday did not accept a
+                recommendation to run, and counting him would make the engine
+                look persuasive by measuring the weather. See
+                server/intelligence/attribute.ts.
+
+                Fire-and-forget, and unawaited on purpose: opening a workout
+                must never wait on bookkeeping.
+              */
+              if (chosen.recommendationId) {
+                void fetch(`/api/recommendations/${chosen.recommendationId}/accepted`, {
+                  method: "POST",
+                  credentials: "include",
+                }).catch(() => {});
+              }
+              onOpenCategory(chosen);
+            }}
             onDismiss={(category, scope) => dismiss.mutate({ category, scope })}
           />
         ))}

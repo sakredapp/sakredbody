@@ -59,7 +59,20 @@ const HEADLINE_METRICS: HealthMetric[] = [
 type Reading = {
   lean: "restore" | "build" | "either" | "unknown";
   headline: string;
-  reasons: string[];
+  /**
+   * Objects, not strings.
+   *
+   * This was declared `string[]`, which compiled — the server has never sent
+   * strings here — and rendered `{r}` straight into a list item. React throws
+   * on an object child, so the whole tab went to an error screen for anybody
+   * whose terrain had a reason at all. It survived review because the coach
+   * accounts it is mounted for had no synced body data, and an empty reasons
+   * array renders nothing.
+   *
+   * A hand-written type that disagrees with the server is not a type, it is a
+   * comment the compiler enforces against the wrong thing.
+   */
+  reasons: { source: "measured" | "reported"; text: string; pulls: "restore" | "build" }[];
 };
 
 function Tile({
@@ -131,7 +144,7 @@ function TerrainNow() {
         <ul className="mt-2 space-y-1">
           {data.reasons.slice(0, 2).map((r, i) => (
             <li key={i} className="text-[11px] text-muted-foreground leading-snug">
-              {r}
+              {r.text}
             </li>
           ))}
         </ul>

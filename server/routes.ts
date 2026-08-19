@@ -27,6 +27,7 @@ import { registerDailyRoutes } from "./daily/index.js";
 import { registerTodayRoutes } from "./today/index.js";
 import { registerCommunityRoutes } from "./community/index.js";
 import { registerTelemetryRoutes } from "./telemetry/index.js";
+import { registerIntelligenceRoutes } from "./intelligence/index.js";
 import { registerProfileRoutes } from "./profile/routes.js";
 import { registerWinRoutes } from "./wins/index.js";
 import { registerMemberRoutes } from "./members/index.js";
@@ -532,6 +533,7 @@ export async function registerRoutes(
 
   // Telemetry last: it observes the app, so nothing else should depend on it.
   registerTelemetryRoutes(app);
+  registerIntelligenceRoutes(app);
 
   // The member's own photo and display name.
   registerProfileRoutes(app);
