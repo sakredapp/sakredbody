@@ -48,10 +48,11 @@ import {
   editMessageSchema,
   MAX_THREAD_DEPTH,
 } from "../../shared/schema.js";
+import { readSharedWorkout } from "../../shared/models/community.js";
 import { headlineOptions, segmentHeadline } from "../../shared/utils/highlight.js";
 import { blockedBy } from "../moderation/index.js";
 import { uploadFile } from "../supabaseStorage.js";
-import { ownsSession, sharedWorkoutsFor } from "./sharedWorkout.js";
+import { ownsSession, publishedWorkout } from "./sharedWorkout.js";
 import { mediaAssets } from "../../shared/schema.js";
 
 function isAdmin(req: Request, res: Response, next: NextFunction) {
@@ -83,21 +84,35 @@ function fail(res: Response, err: unknown) {
   res.status(500).json({ message: "Internal Server Error" });
 }
 
-/** What a message looks like once a deleted one has been tombstoned. */
+/**
+ * What a message looks like on the wire.
+ *
+ * One place decides, which is why the workout card is assembled here rather
+ * than at each call site: the stored snapshot is the card, and the rule about
+ * what a tombstone shows has to apply to it as surely as to the words.
+ *
+ * The raw column does not go out. Sending both it and the parsed card would
+ * put every published workout on the wire twice.
+ */
 function present(m: typeof communityMessages.$inferSelect) {
-  if (!m.deletedAt) return m;
+  const { sharedWorkout, ...rest } = m;
   // The row survives so replies underneath it keep their shape. The words
-  // don't — deleting must actually delete what was said. That now includes
-  // what was shown: a tombstone that kept rendering the photograph would mean
-  // deleting a post removed the caption and left the picture.
-  return {
-    ...m,
-    body: "",
-    userId: "",
-    imageAssetId: null,
-    sharedSessionId: null,
-    deleted: true,
-  };
+  // don't — deleting must actually delete what was said. That includes what
+  // was shown: a tombstone that kept rendering the photograph would mean
+  // deleting a post removed the caption and left the picture, and one that
+  // kept rendering the workout would leave the lift.
+  if (m.deletedAt) {
+    return {
+      ...rest,
+      body: "",
+      userId: "",
+      imageAssetId: null,
+      sharedSessionId: null,
+      workout: null,
+      deleted: true,
+    };
+  }
+  return { ...rest, workout: readSharedWorkout(sharedWorkout) };
 }
 
 // ─── The gate ──────────────────────────────────────────────────────────────
@@ -181,18 +196,6 @@ export async function visibleChannelIds(userId: string): Promise<string[]> {
 
 export async function canSee(userId: string, channelId: string): Promise<boolean> {
   return (await visibleChannelIds(userId)).includes(channelId);
-}
-
-/**
- * The workout cards for a page of messages, keyed by session.
- *
- * One query for the whole page rather than one per share — a feed that issues
- * twenty extra round trips is a feed that feels broken on a phone.
- */
-async function workoutsFor(rows: { sharedSessionId: string | null; deletedAt: Date | null }[]) {
-  return sharedWorkoutsFor(
-    rows.filter((m) => !m.deletedAt).map((m) => m.sharedSessionId ?? ""),
-  );
 }
 
 /** Author details for a set of messages, in one query. */
@@ -298,14 +301,12 @@ export function registerCommunityRoutes(app: Express) {
 
       const authors = await authorsFor(rows);
       const reactions = await reactionsFor(rows, userId);
-      const workouts = await workoutsFor(rows);
 
       res.json(
         rows.map((m) => ({
           ...present(m),
           author: m.deletedAt ? null : authors.get(m.userId) ?? null,
           reactions: reactions.get(m.id) ?? [],
-          workout: m.sharedSessionId ? workouts.get(m.sharedSessionId) ?? null : null,
         })),
       );
     } catch (err) {
@@ -353,14 +354,12 @@ export function registerCommunityRoutes(app: Express) {
 
       const authors = await authorsFor(rows);
       const byMessage = await reactionsFor(rows, userId);
-      const workouts = await workoutsFor(rows);
 
       res.json(
         rows.map((m) => ({
           ...present(m),
           author: m.deletedAt ? null : authors.get(m.userId) ?? null,
           reactions: byMessage.get(m.id) ?? [],
-          workout: m.sharedSessionId ? workouts.get(m.sharedSessionId) ?? null : null,
         })),
       );
     } catch (err) {
@@ -499,8 +498,22 @@ export function registerCommunityRoutes(app: Express) {
         }
       }
 
-      if (input.sharedSessionId && !(await ownsSession(userId, input.sharedSessionId))) {
-        return res.status(404).json({ message: "No such workout" });
+      /*
+        The workout is copied here, not referenced.
+
+        Ownership first — a session id is a uuid somebody could have seen, and
+        without this a member could publish a card built from another member's
+        training. Then the copy: what goes into the row is what the Room shows
+        forever, and it is taken once, now, while the member is looking at the
+        thing they chose to share.
+      */
+      let workout = null;
+      if (input.sharedSessionId) {
+        if (!(await ownsSession(userId, input.sharedSessionId))) {
+          return res.status(404).json({ message: "No such workout" });
+        }
+        workout = await publishedWorkout(input.sharedSessionId);
+        if (!workout) return res.status(404).json({ message: "No such workout" });
       }
 
       const [created] = await db
@@ -517,6 +530,7 @@ export function registerCommunityRoutes(app: Express) {
           audioDurationSeconds: input.audioDurationSeconds ?? null,
           imageAssetId: input.imageAssetId ?? null,
           sharedSessionId: input.sharedSessionId ?? null,
+          sharedWorkout: workout,
         })
         .returning();
 

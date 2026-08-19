@@ -12,6 +12,13 @@
  * this component could not render them if it wanted to, which is the point. A
  * share is not an open diary.
  *
+ * ── It is what was published, not what is true now ────────────────────────
+ *
+ * The numbers here were copied when the member pressed share and do not move
+ * again. If they correct a set next week their training log changes and this
+ * post does not, which is the only version of it that other people's replies
+ * still make sense underneath.
+ *
  * ── Supersets are shown as the relationship they are ──────────────────────
  *
  * Movements performed together carry the same group key, so they are bracketed

@@ -80,6 +80,7 @@ import {
 // that answers "which rooms can they see", and reaching past index.js for it
 // would be the second import path to that answer.
 import { visibleChannelIds } from "../community/index.js";
+import { publishedWorkout } from "../community/sharedWorkout.js";
 import {
   bestEstimates,
   progressionSeries,
@@ -338,13 +339,20 @@ async function shareSessionWithRoom(
   /*
     The sets used to be flattened into the message body here, by the same
     `summariseSession` that writes the coach's copy. They are not any more:
-    the message carries the session id and the Room renders the card from the
-    real rows, so a corrected set corrects the post rather than leaving a
-    paragraph that disagrees with the history it came from.
+    the message carries a structured card, so the Room can render movements and
+    volume rather than a paragraph, and the client can lay it out.
+
+    The card is a copy taken now, not a reference resolved later — see
+    server/community/sharedWorkout.ts. Correcting a set corrects the training
+    log; it does not reach back into a conversation other people have already
+    replied to.
 
     What stays in the body is what the member typed. That is the one part of a
     share nobody else can generate.
   */
+  const workout = await publishedWorkout(session.id);
+  if (!workout) return { ok: false, reason: "That workout is no longer there." };
+
   const [message] = await db
     .insert(communityMessages)
     .values({
@@ -352,6 +360,7 @@ async function shareSessionWithRoom(
       userId,
       body: (extras.caption ?? "").trim().slice(0, 8000),
       sharedSessionId: session.id,
+      sharedWorkout: workout,
       imageAssetId: extras.imageAssetId ?? null,
     })
     .returning({ id: communityMessages.id });

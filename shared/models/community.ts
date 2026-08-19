@@ -27,6 +27,7 @@ import {
   boolean,
   timestamp,
   index,
+  jsonb,
   uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -146,6 +147,170 @@ export type InsertChannel = z.infer<typeof insertChannelSchema>;
 // ─── 3. MESSAGES ───────────────────────────────────────────────────────────
 
 /**
+ * What a member published to the Room about a workout.
+ *
+ * ── Why this is a copy and not a reference ────────────────────────────────
+ *
+ * It used to be a reference. The message carried the session id and the card
+ * was rendered from `workout_sets` on every read, on the reasoning that a
+ * corrected set should correct the post rather than leave the Room insisting
+ * on a typo.
+ *
+ * That reasoning is wrong about whose record each of the two is. The session
+ * is the member's private training log and they may correct it for years. The
+ * post is a sentence they said out loud, once, to other people — and other
+ * people replied to it. Re-deriving the card from live rows means editing a
+ * private note silently rewrites a public conversation: eight replies
+ * congratulating a lift that, by the time anybody scrolls back, the post no
+ * longer claims. Nobody edited the post. Nobody was told it changed.
+ *
+ * So publishing takes a copy. `sharedSessionId` stays as provenance — it is
+ * how the card links back to the real training and how "is this mine" is
+ * answered — and this is what was actually said.
+ *
+ * ── What a copy is allowed to contain ─────────────────────────────────────
+ *
+ * Only what a member chose to make public: which movements, how many working
+ * sets, the top weight, the shape of the session. Never the session note,
+ * per-set notes, RPE, or whether they went to failure — see
+ * `server/community/sharedWorkout.ts`, which is the only thing that builds
+ * one. Health measurements, Terrain reasons and Training Memory are not
+ * reachable from there at all, which is the strongest form of the same rule.
+ *
+ * ── Validated on the way out, not trusted ─────────────────────────────────
+ *
+ * A jsonb column has no shape at rest. Anything that reads a snapshot parses
+ * it through this schema first, so a row hand-edited in a console, or written
+ * by a version of this code that no longer exists, degrades to no card rather
+ * than to a client rendering `undefined`.
+ */
+export const sharedMovementSchema = z.object({
+  exerciseId: z.string(),
+  name: z.string(),
+  /** Working sets only — a warm-up ramp is not what somebody is sharing. */
+  sets: z.number().int().min(0),
+  reps: z.number().int().nullable(),
+  /** The heaviest working set, in kilograms. Null for unweighted work. */
+  topWeightKg: z.number().nullable(),
+  /** Movements performed together carry the same key. */
+  supersetGroup: z.string().nullable(),
+});
+
+export const sharedWorkoutSchema = z.object({
+  sessionId: z.string(),
+  title: z.string().nullable(),
+  onDate: z.string(),
+  durationMinutes: z.number().int().nullable(),
+  movements: z.array(sharedMovementSchema),
+  /** Total working-set volume, kilograms. Null when nothing was weighted. */
+  volumeKg: z.number().nullable(),
+  /**
+   * When the copy was taken. The card is as of this moment and no other —
+   * which is the whole point, and worth being able to say out loud rather
+   * than inferring from the message's own timestamp.
+   */
+  publishedAt: z.string(),
+});
+
+export type SharedMovement = z.infer<typeof sharedMovementSchema>;
+export type SharedWorkout = z.infer<typeof sharedWorkoutSchema>;
+
+/**
+ * Read a stored snapshot, or nothing.
+ *
+ * Never throws. A message whose snapshot cannot be parsed is still a message,
+ * and the words the member wrote alongside it are still worth showing.
+ */
+export function readSharedWorkout(value: unknown): SharedWorkout | null {
+  if (!value) return null;
+  const parsed = sharedWorkoutSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
+/** The session facts a card may show. Deliberately four columns. */
+export type SessionRow = {
+  id: string;
+  title: string | null;
+  onDate: string;
+  durationMinutes: number | null;
+};
+
+/** One movement's place in the session. No notes, no prescription. */
+export type CompositionRow = {
+  exerciseId: string;
+  supersetGroup: string | null;
+  name: string | null;
+};
+
+/** One working set. Weight and reps only — not RPE, failure, or its note. */
+export type SetRow = {
+  exerciseId: string;
+  reps: number | null;
+  weightKg: number;
+};
+
+/**
+ * The presentation, from rows that have already been narrowed.
+ *
+ * Here rather than beside the queries so the arithmetic can be tested with no
+ * database at all — importing the server module pulls in a connection, and a
+ * rule this load-bearing should not be untestable for that reason.
+ *
+ * The narrowing lives in the three row types above and in the `select` calls
+ * in server/community/sharedWorkout.ts: nothing private can reach this
+ * function to be leaked by it.
+ */
+export function summarise(
+  session: SessionRow,
+  composition: readonly CompositionRow[],
+  sets: readonly SetRow[],
+  publishedAt: string,
+): SharedWorkout {
+  const byMovement = new Map<string, { sets: number; reps: number | null; top: number | null; volume: number }>();
+  for (const s of sets) {
+    const acc = byMovement.get(s.exerciseId) ?? { sets: 0, reps: null, top: null, volume: 0 };
+    acc.sets += 1;
+    // The rep count shown is the one performed most recently that had any —
+    // a single number on a card, not a claim about every set.
+    if (s.reps != null) acc.reps = s.reps;
+    if (s.weightKg > 0) {
+      acc.top = Math.max(acc.top ?? 0, s.weightKg);
+      acc.volume += s.weightKg * (s.reps ?? 0);
+    }
+    byMovement.set(s.exerciseId, acc);
+  }
+
+  const movements: SharedMovement[] = composition.map((c) => {
+    const acc = byMovement.get(c.exerciseId);
+    return {
+      exerciseId: c.exerciseId,
+      // The slug is a readable last resort — a card that says nothing at all
+      // is worse than one that says "incline-chest-press".
+      name: c.name ?? c.exerciseId,
+      sets: acc?.sets ?? 0,
+      reps: acc?.reps ?? null,
+      topWeightKg: acc?.top ?? null,
+      supersetGroup: c.supersetGroup,
+    };
+  });
+
+  const volume = movements.reduce(
+    (total, m) => total + (byMovement.get(m.exerciseId)?.volume ?? 0),
+    0,
+  );
+
+  return {
+    sessionId: session.id,
+    title: session.title,
+    onDate: session.onDate,
+    durationMinutes: session.durationMinutes,
+    movements,
+    volumeKg: volume > 0 ? Math.round(volume) : null,
+    publishedAt,
+  };
+}
+
+/**
  * One table for both messages and threads.
  *
  * `parentId` null means it's top-level in the channel; set means it's a reply,
@@ -203,20 +368,20 @@ export const communityMessages = pgTable(
     imageAssetId: uuid("image_asset_id"),
 
     /**
-     * The workout this message is about, when it is about one.
-     *
-     * A reference, not a snapshot. The member's sets are already stored
-     * canonically in `workout_sessions` / `session_exercises` / `workout_sets`,
-     * and copying a summary into the Room would create a second version of the
-     * same training that drifts the moment they correct a set. The card is
-     * rendered from the real rows, filtered to what a share is allowed to
-     * contain — see `server/community/sharedWorkout.ts`.
+     * Which training this post came from. Provenance, not content.
      *
      * `ON DELETE SET NULL` in the migration: deleting a workout must not
-     * delete the conversation about it, and a share whose session is gone
-     * degrades to whatever the member wrote alongside it.
+     * delete the conversation about it. What the member published survives in
+     * `sharedWorkout` — the Room is edited from the Room, and a private
+     * deletion is not a public retraction. Removing the post removes the card.
      */
     sharedSessionId: uuid("shared_session_id"),
+
+    /**
+     * What was actually published. Written once, at publish time, and never
+     * again — see `sharedWorkoutSchema` above for why it is a copy.
+     */
+    sharedWorkout: jsonb("shared_workout").$type<SharedWorkout>(),
 
     /**
      * Deleting a message with replies would orphan the conversation, so a
