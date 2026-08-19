@@ -40,10 +40,14 @@ import {
   shouldStart,
 } from "@/lib/tour/engine";
 import { readProgress, writeProgress } from "@/lib/tour/progress";
+import { resolveTarget } from "@/lib/tour/resolveTarget";
 import { beginRehearsal, endRehearsal } from "@/lib/tour/rehearsal";
 import type { GuidedTour, TourAnchor, TourProgress, TourWorld } from "@/lib/tour/types";
 
 export const TOUR_SECTION_ATTR = "data-tour-section";
+
+/** What a step that has not been measured yet has seen. */
+const EMPTY: ReadonlySet<TourAnchor> = new Set();
 
 /** Called by the dashboard when its section changes. One line, no props. */
 export function publishTourSection(section: string | null): void {
@@ -53,8 +57,24 @@ export function publishTourSection(section: string | null): void {
   else root.removeAttribute(TOUR_SECTION_ATTR);
 }
 
+/**
+ * Present means *usable*, not merely in the document.
+ *
+ * This asked `querySelector`, and the overlay asked `resolveTarget`, so the
+ * two halves of the walkthrough could disagree about whether a step had its
+ * subject. On a wide screen the phone navigation is still rendered and
+ * `display: none`: the engine called the More lesson ready, the overlay could
+ * not resolve anything to spotlight, and the step sat there — no highlight, no
+ * degrade, no way forward, forever. The walkthrough could not be finished in a
+ * browser at all.
+ *
+ * `anyInstance` because presence is not a question about which one: it asks
+ * whether there is at least one the member could look at. Ambiguity between
+ * two visible instances is a question for the step's own targeting, and
+ * answering "absent" here would be a different lie.
+ */
 function anchorPresent(anchor: TourAnchor): boolean {
-  return !!document.querySelector(`[data-tour-id="${anchor}"]`);
+  return resolveTarget({ anchor, needsInteraction: false, anyInstance: true }).ok;
 }
 
 export type RunningTour = {
@@ -80,21 +100,32 @@ export function useGuidedTour(
 ): RunningTour | null {
   const [progress, setProgress] = useState<TourProgress | null>(null);
   const [index, setIndex] = useState<number | null>(null);
-  const [world, setWorld] = useState<TourWorld>({ section: null, present: new Set(), waitedMs: 0 });
+  /**
+   * The world, and which step it describes.
+   *
+   * The step id travels *with* the measurement rather than beside it, because
+   * every consumer needs the same guard and any one of them forgetting it is a
+   * silent bug. Two already happened:
+   *
+   *   · `close-workout` completed itself from the previous step's readings,
+   *     skipping the lesson whose whole instruction is to make something
+   *     disappear;
+   *   · a member who read one lesson for more than six seconds had the *next*
+   *     one skipped — `waitedMs` from the step they had been reading was
+   *     already past the give-up bound, so an optional step was dropped and a
+   *     required one degraded, both before anybody had looked for the target.
+   *     The health lesson was unreachable in every run that read Terrain
+   *     properly, which is every run by a human being.
+   */
+  const [world, setWorld] = useState<TourWorld & { stepId: string | null }>({
+    section: null,
+    present: new Set(),
+    waitedMs: 0,
+    stepId: null,
+  });
 
   const tapped = useRef(false);
   const stepStartedAt = useRef(0);
-  /**
-   * Which step the world in state was measured for.
-   *
-   * The frame loop watches the *current* step's anchors, so for one render
-   * after the step changes `world` still describes the previous one. Reading a
-   * completion condition against that is reading the wrong screen — and for an
-   * `absent` advance it is actively wrong, because an anchor the previous step
-   * never watched is trivially "not present" and the new step completes before
-   * anybody has looked at it. `close-workout` skipped itself exactly that way.
-   */
-  const measuredFor = useRef<string | null>(null);
 
   /*
     Start once, and only once.
@@ -136,11 +167,11 @@ export function useGuidedTour(
     const tick = () => {
       const present = new Set<TourAnchor>();
       for (const a of watched) if (anchorPresent(a)) present.add(a);
-      measuredFor.current = step.id;
       setWorld({
         section: document.documentElement.getAttribute(TOUR_SECTION_ATTR),
         present,
         waitedMs: performance.now() - stepStartedAt.current,
+        stepId: step.id,
       });
       frame = requestAnimationFrame(tick);
     };
@@ -248,7 +279,25 @@ export function useGuidedTour(
     tapped.current = true;
   }, []);
 
-  const resolution = useMemo(() => (step ? resolve(step, world) : null), [step, world]);
+  /** Whether the readings in `world` are about the step being judged. */
+  const measured = !!step && world.stepId === step.id;
+
+  /*
+    A step is resolved against its own measurements or against none.
+
+    For the render after a step change the frame loop has not run yet, and the
+    previous step's readings would answer questions about this one — including
+    "has this been waiting long enough to give up on", which is how a lesson
+    was skipped before anything had looked for its subject. An unmeasured step
+    has waited no time and seen nothing, which is the truth.
+  */
+  const resolution = useMemo(
+    () =>
+      step
+        ? resolve(step, measured ? world : { section: world.section, present: EMPTY, waitedMs: 0 })
+        : null,
+    [step, world, measured],
+  );
 
   /*
     Advancement, as an effect rather than inside the frame loop.
@@ -279,13 +328,13 @@ export function useGuidedTour(
       So satisfaction is tested first. A step that has been completed is
       complete whether or not the thing it was pointing at is still on screen.
     */
-    if (measuredFor.current === step.id && isSatisfied(step.advance, world, tapped.current)) {
+    if (measured && isSatisfied(step.advance, world, tapped.current)) {
       advance();
       return;
     }
 
     if (resolution.kind !== "ready") return;
-  }, [resolution, step, world, advance, skip]);
+  }, [resolution, step, world, measured, advance, skip]);
 
   if (index === null || !step || !resolution) return null;
 

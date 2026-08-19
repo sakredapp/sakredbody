@@ -52,7 +52,16 @@ export const SAKRED_INTRO: GuidedTour = {
       body:
         "Where Sakred brings the pieces together — your signals, today's direction, " +
         "and what's worth your attention now.\n\nTap Home.",
-      advance: { kind: "section", section: "home" },
+      /*
+        A tap, not a section.
+
+        The walkthrough starts on Home, so a lesson that completes when the
+        member *is* on Home was already complete when it opened: it appeared
+        and vanished inside a frame, having told nobody anything, while
+        instructing a tap it did not wait for. Found by a harness that could
+        never catch this lesson on screen to measure it.
+      */
+      advance: { kind: "tap" },
     },
     {
       id: "terrain",
@@ -106,6 +115,11 @@ export const SAKRED_INTRO: GuidedTour = {
       objective: "Visit Restore",
       section: "restore",
       anchor: "restore-practice",
+      /* Every practice card carries this anchor, and the lesson means any of
+         them — "open one if you're curious" is not a step that has forgotten
+         to say which. Declared, so the ambiguity rule still protects the
+         steps that genuinely do mean one control. */
+      anyInstance: true,
       optional: true,
       title: "This changes with you",
       body:

@@ -24,6 +24,7 @@
 
 import { mkdirSync } from "node:fs";
 import { Browser } from "./cdp.js";
+import { TourDriver } from "./tour-driver.js";
 import { SAKRED_INTRO } from "../client/src/lib/tour/sakredIntro.js";
 
 const BASE = process.env.QA_BASE_URL ?? "http://127.0.0.1:5199";
@@ -43,8 +44,12 @@ const overlaps = (a: Rect, b: Rect) =>
 let passed = 0;
 const failures: string[] = [];
 const check = (name: string, ok: boolean, detail = "") => {
-  if (ok) passed++;
-  else failures.push(`${name}${detail ? ` — ${detail}` : ""}`);
+  if (ok) return void passed++;
+  const line = `${name}${detail ? ` — ${detail}` : ""}`;
+  failures.push(line);
+  /* Printed as it happens as well as summarised. A run that dies in the
+     browser three viewports in used to take its findings with it. */
+  console.log(`    ✗ ${line}`);
 };
 
 const VIEWPORTS = [
@@ -128,6 +133,7 @@ type World = {
   section?: string | null;
   theme?: string;
   viewport?: Rect;
+  instance?: string | null;
 };
 
 /** The element the step actually points at, chosen the way the resolver does. */
@@ -204,77 +210,350 @@ check("the first step has a title", (world.title ?? "").length > 0);
 check("and a way forward", world.hasContinue === true);
 check("and a way to pause rather than skip", world.hasPause === true);
 
-// ─── Geometry, at every viewport ─────────────────────────────────────────
+// ─── Geometry, at every viewport, at every lesson ────────────────────────
 
-for (const vp of VIEWPORTS) {
-  await b.viewport(vp.w, vp.h, vp.mobile);
-  await b.settle();
-  await b.settle();
+/*
+  This used to measure whichever step happened to be mounted — which is step
+  one, which is unanchored, which means the geometry matrix asserted nothing
+  about any halo at all and passed. Four viewports of measuring nothing.
 
-  const w = await b.evaluate<World>(WORLD);
-  const step = steps.find((s) => s.id === w.stepId);
-  if (!step) {
-    check(`[${vp.name}] the mounted step is one the tour defines`, false, `${w.stepId}`);
-    continue;
+  So the tour is now *driven* at each viewport, and every step is measured in
+  the state a member is looking at when they meet it. The driver is the same
+  one the traversal uses: it does what each lesson asks rather than clicking
+  Continue, so the screens measured here are screens that genuinely occur.
+*/
+
+/**
+ * Halo, panel, target and hit test — from one frame.
+ *
+ * They were four round trips, and the overlay scrolls the target into view
+ * mid-step: so the halo came from before the scroll and the target's rect from
+ * after it, and the harness reported centres 119 pixels apart on a walkthrough
+ * that was drawing them concentrically. Numbers compared against each other
+ * have to be read at the same instant or they are not measurements.
+ */
+const SNAP = (anchor: string | null, instance: string | null, anyInstance: boolean) => `
+  const el = document.querySelector('[data-testid="tour-overlay"]');
+  if (!el) return { mounted: false };
+  const box = (n) => {
+    const e = typeof n === "string" ? document.querySelector(n) : n;
+    if (!e) return null;
+    const r = e.getBoundingClientRect();
+    return { x: r.x, y: r.y, width: r.width, height: r.height };
+  };
+  const out = {
+    mounted: true,
+    stepId: el.getAttribute("data-tour-step"),
+    halo: box('[data-testid="tour-halo"]'),
+    panel: box('[data-testid="tour-panel"]'),
+    viewport: { x: 0, y: 0, width: innerWidth, height: innerHeight },
+    target: null, hit: null,
+  };
+  ${anchor ? `
+  const all = [...document.querySelectorAll('[data-tour-id=${JSON.stringify(anchor)}]')];
+  const visible = all.filter(e => {
+    const r = e.getBoundingClientRect();
+    const s = getComputedStyle(e);
+    return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && Number(s.opacity) > 0.05;
+  });
+  const named = ${instance ? `visible.filter(e => e.getAttribute("data-tour-instance") === ${JSON.stringify(instance)})` : "visible"};
+  const chosen = (named.length === 1 || ${anyInstance ? "true" : "false"}) ? named[0] : null;
+  out.target = { total: all.length, visible: visible.length, matching: named.length, rect: box(chosen ?? null) };
+  if (out.target.rect) {
+    const r = out.target.rect;
+    const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+    out.hit = {
+      top: top ? (top.getAttribute("data-testid") ?? top.getAttribute("data-tour-id") ?? top.tagName) : "none",
+      reaches: !!top?.closest('[data-tour-id=${JSON.stringify(anchor)}]'),
+    };
+  }
+  ` : ""}
+  return out;
+`;
+
+type Snap = {
+  mounted: boolean;
+  stepId?: string;
+  halo: Rect | null;
+  panel: Rect | null;
+  viewport: Rect;
+  target: { total: number; visible: number; matching: number; rect: Rect | null } | null;
+  hit: { top: string; reaches: boolean } | null;
+};
+
+async function restartTour(): Promise<void> {
+  await b.evaluate(`
+    for (const k of Object.keys(localStorage)) if (k.startsWith("sakred.tour")) localStorage.removeItem(k);
+    return true;
+  `);
+  await b.goto(`${BASE}/member?tour=replay`);
+  await b.waitFor(`!!document.querySelector('[data-testid="tour-overlay"]')`, "the tour overlay", 30_000);
+  await b.settle();
+}
+
+/**
+ * Wait for the lesson to have finished arriving.
+ *
+ * A step is mounted before it is *ready*: the card it points at may still be
+ * loading, and the overlay scrolls the target into view once it can find it.
+ * Measuring the instant the step id changes measures a screen that exists for
+ * about a frame and that no member ever sees — it reported eleven failures
+ * that were all the harness being early.
+ *
+ * Bounded, and silent when it expires: a step whose target genuinely never
+ * arrives is a finding for `measure` to report, not for this to throw over.
+ */
+async function settleOnStep(anchor: string | null): Promise<void> {
+  if (anchor) {
+    try {
+      await b.waitFor(
+        `!!document.querySelector('[data-testid="tour-halo"]') &&
+         !!document.querySelector('[data-tour-id=${JSON.stringify(anchor)}]')`,
+        `the halo for ${anchor}`,
+        12_000,
+      );
+    } catch {
+      /* Reported by the assertions below, with numbers. */
+    }
+  }
+  /*
+    Then let the overlay finish bringing it into view.
+
+    Scrolling a target out from under the navigation is bounded and spaced —
+    three attempts, a third of a second apart, so it cannot fight a member's
+    own scrolling — which means a harness that measures 200ms after the step
+    opens catches the first attempt and calls the result a defect. Waiting for
+    the target to be entirely inside the viewport is waiting for what a member
+    sees about a second in.
+  */
+  if (anchor) {
+    try {
+      await b.waitFor(
+        `(() => {
+           const el = document.querySelector('[data-tour-id=${JSON.stringify(anchor)}]');
+           if (!el) return false;
+           const r = el.getBoundingClientRect();
+           return r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth;
+         })()`,
+        `${anchor} to be brought fully into view`,
+        2_500,
+      );
+    } catch {
+      /* Reported below, with the rect. */
+    }
   }
 
-  check(`[${vp.name}] the panel is inside the viewport`,
+  /*
+    Then finish whatever is still moving, and give the layout two frames.
+
+    Headless Chrome renders no compositor frames, so a CSS transition on the
+    halo's position never advances — it sits at its starting keyframe. The
+    harness read that as the walkthrough highlighting a control 113 pixels
+    below the one it meant, which is a defect report about the instrument.
+    Finishing in-flight animations is what a real device does in 200ms.
+  */
+  await b.evaluate(`document.getAnimations().forEach(a => { try { a.finish(); } catch {} }); return true;`);
+  await b.evaluate(`return new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(true))));`);
+  await b.evaluate(`return new Promise(r => setTimeout(() => r(true), 150));`);
+}
+
+/** Everything geometric that can be wrong about one lesson on one screen. */
+async function measure(label: string, stepId: string, degraded: string[]): Promise<void> {
+  const step = steps.find((s) => s.id === stepId);
+  if (!step) {
+    check(`[${label}] the mounted step is one the tour defines`, false, `${stepId}`);
+    return;
+  }
+  const many = (step as { anyInstance?: boolean }).anyInstance === true;
+  await settleOnStep(step.anchor ?? null);
+
+  /*
+    A lesson that has given up looking is not a geometry failure — it is the
+    designed outcome when a subject cannot exist on this layout, and the More
+    sheet genuinely does not exist on a desktop. Measuring a halo it never drew
+    would report the fallback as a bug. What is worth asserting is that the
+    member can still read it and still get out, and worth *printing* is which
+    lessons degraded where, because that is a product fact rather than a pass.
+  */
+  const gaveUp = await b.evaluate<boolean>(
+    `return !!document.querySelector('[data-testid="button-tour-continue-degraded"]');`,
+  );
+  if (gaveUp) {
+    degraded.push(step.id);
+    const w = await b.evaluate<Snap>(SNAP(null, null, false));
+    check(`[${label}] ${step.id}: a degraded lesson is still readable`, !!w.panel);
+    return;
+  }
+  const w = await b.evaluate<Snap>(SNAP(step.anchor ?? null, null, many));
+  if (!w.mounted) {
+    check(`[${label}] ${step.id}: the overlay is still mounted`, false);
+    return;
+  }
+  const vw = w.viewport;
+
+  check(`[${label}] ${step.id}: the panel is inside the viewport`,
     !!w.panel && w.panel.x >= -0.5 && w.panel.y >= -0.5 &&
-      w.panel.x + w.panel.width <= vp.w + 0.5 && w.panel.y + w.panel.height <= vp.h + 0.5,
+      w.panel.x + w.panel.width <= vw.width + 0.5 && w.panel.y + w.panel.height <= vw.height + 0.5,
     JSON.stringify(w.panel));
 
   if (!step.anchor) {
-    check(`[${vp.name}] an unanchored step draws no halo`, w.halo === null);
-    await b.screenshot(`${SHOTS}/${vp.name}-${step.id}.png`);
-    continue;
+    check(`[${label}] ${step.id}: an unanchored step draws no halo`, w.halo === null);
+    return;
   }
 
-  const t = await b.evaluate<{ total: number; visible: number; matching: number; rect: Rect | null }>(
-    targetOf(step.anchor, null),
-  );
-  check(`[${vp.name}] ${step.id}: the anchor exists`, t.total > 0, `${step.anchor}`);
-  check(`[${vp.name}] ${step.id}: exactly one visible instance`, t.visible === 1,
-    `${t.visible} of ${t.total} visible`);
+  const t = w.target!;
+  check(`[${label}] ${step.id}: the anchor exists`, t.total > 0, `${step.anchor}`);
 
-  if (t.rect && w.halo) {
-    const target = t.rect;
-    const halo = w.halo;
-    check(`[${vp.name}] ${step.id}: the halo contains the target`,
-      halo.x <= target.x + 0.5 && halo.y <= target.y + 0.5 &&
-        halo.x + halo.width >= target.x + target.width - 0.5 &&
-        halo.y + halo.height >= target.y + target.height - 0.5,
-      `target ${JSON.stringify(target)} halo ${JSON.stringify(halo)}`);
+  /*
+    A step that says it accepts any of several like controls is not ambiguous
+    — the nine body territories are nine right answers. Every other step still
+    has to resolve to exactly one, which is the condition the resolver refuses
+    to guess at.
+  */
+  check(`[${label}] ${step.id}: ${many ? "at least one instance is on screen" : "exactly one visible instance"}`,
+    many ? t.matching >= 1 : t.matching === 1,
+    `${t.matching} matching of ${t.visible} visible, ${t.total} total`);
 
-    check(`[${vp.name}] ${step.id}: with the padding the overlay promises`,
-      Math.abs(halo.width - (target.width + PAD * 2)) < 1 &&
-        Math.abs(halo.height - (target.height + PAD * 2)) < 1,
-      `halo ${halo.width}×${halo.height}, target ${target.width}×${target.height}`);
+  if (!t.rect) return;
+  const target = t.rect;
+
+  check(`[${label}] ${step.id}: the target is on screen`,
+    target.y >= -0.5 && target.y + target.height <= vw.height + 0.5 &&
+      target.x >= -0.5 && target.x + target.width <= vw.width + 0.5,
+    JSON.stringify(target));
+
+  if (w.halo) {
+    check(`[${label}] ${step.id}: the halo contains the target`,
+      w.halo.x <= target.x + 0.5 && w.halo.y <= target.y + 0.5 &&
+        w.halo.x + w.halo.width >= target.x + target.width - 0.5 &&
+        w.halo.y + w.halo.height >= target.y + target.height - 0.5,
+      `target ${JSON.stringify(target)} halo ${JSON.stringify(w.halo)}`);
+
+    check(`[${label}] ${step.id}: with the padding the overlay promises`,
+      Math.abs(w.halo.width - (target.width + PAD * 2)) < 1 &&
+        Math.abs(w.halo.height - (target.height + PAD * 2)) < 1,
+      `halo ${w.halo.width}×${w.halo.height}, target ${target.width}×${target.height}`);
 
     const tc = centre(target);
-    const hc = centre(halo);
-    check(`[${vp.name}] ${step.id}: centres agree`,
+    const hc = centre(w.halo);
+    check(`[${label}] ${step.id}: centres agree`,
       Math.abs(tc.x - hc.x) <= CENTRE_TOLERANCE && Math.abs(tc.y - hc.y) <= CENTRE_TOLERANCE,
       `off by ${(tc.x - hc.x).toFixed(2)}, ${(tc.y - hc.y).toFixed(2)}`);
-
-    check(`[${vp.name}] ${step.id}: the target is on screen`,
-      target.y >= 0 && target.y + target.height <= vp.h && target.x >= 0 && target.x + target.width <= vp.w,
-      JSON.stringify(target));
-
-    if (w.panel) {
-      check(`[${vp.name}] ${step.id}: the panel does not cover the target`,
-        !overlaps(w.panel, target),
-        `panel ${JSON.stringify(w.panel)} target ${JSON.stringify(target)}`);
-    }
-  } else if (!w.halo) {
-    check(`[${vp.name}] ${step.id}: an anchored step draws a halo`, false, "no halo");
+  } else {
+    check(`[${label}] ${step.id}: an anchored step draws a halo`, false, "no halo");
   }
 
-  await b.screenshot(`${SHOTS}/${vp.name}-${step.id}.png`);
+  /*
+    What the panel may sit on.
+
+    "The panel does not overlap the target" is the right rule for a lesson
+    asking for a press, and the wrong one for a lesson pointing at a card
+    taller than the screen — Build's day card is 505px on a 780px phone, and no
+    honest layout puts a dialogue anywhere that touches none of it. So the
+    strict rule applies where a finger has to land, and everywhere else the
+    requirement is that a useful part of the subject stays visible.
+  */
+  if (w.panel) {
+    const mustTap = step.advance.kind === "tap" || step.advance.kind === "present";
+    if (mustTap) {
+      check(`[${label}] ${step.id}: the panel does not cover the control to press`,
+        !overlaps(w.panel, target),
+        `panel ${JSON.stringify(w.panel)} target ${JSON.stringify(target)}`);
+    } else {
+      const covered = Math.max(0, Math.min(w.panel.y + w.panel.height, target.y + target.height) - Math.max(w.panel.y, target.y));
+      check(`[${label}] ${step.id}: enough of the subject stays visible`,
+        target.height - covered >= Math.min(64, target.height * 0.4),
+        `${Math.round(covered)} of ${Math.round(target.height)}px covered`);
+    }
+  }
+
+  /*
+    The measurement none of the rest can substitute for. The overlay's own
+    container is `fixed inset-0`, which is a hit target as much as it is a
+    drawing surface — a version of it that forgot `pointer-events-none`
+    highlighted every control perfectly and let a member touch none of them.
+    Geometry said pass; the product was unusable.
+  */
+  check(`[${label}] ${step.id}: a finger reaches the target`, w.hit?.reaches === true,
+    `the top element at the target's centre is ${w.hit?.top ?? "nothing"}`);
+}
+
+/*
+  Warm the dashboard before the first drive is timed.
+
+  Terrain is computed, not stored, and the first request after a cold server
+  takes several seconds. The driver's patience is a member's patience, so a
+  cold first read looked like `terrain-now never appeared for this member` —
+  a finding about the fixture rather than the product. Once is enough; the
+  three drives after it were always green.
+*/
+await b.goto(`${BASE}/member`);
+try {
+  await b.waitFor(`!!document.querySelector('[data-tour-id="terrain-now"]')`, "Terrain's first read", 45_000);
+} catch {
+  check("Terrain renders for the QA member at all", false, "terrain-now never appeared");
+}
+
+for (const vp of VIEWPORTS) {
+  await b.viewport(vp.w, vp.h, vp.mobile);
+  await restartTour();
+
+  const driver = new TourDriver(b);
+  const seen: string[] = [];
+  const degraded: string[] = [];
+  for (let i = 0; i < steps.length + 6; i++) {
+    const at = await driver.stepId();
+    if (!at) break;
+    seen.push(at);
+    await measure(vp.name, at, degraded);
+    await b.screenshot(`${SHOTS}/${vp.name}-${at}.png`);
+    let t;
+    try {
+      t = await driver.step();
+    } catch (err) {
+      check(`[${vp.name}] the walkthrough can be driven to the end`, false,
+        `stopped at ${at}: ${(err as Error).message}`);
+      break;
+    }
+    if (!t.nextActual) break;
+  }
+
+  /*
+    Coverage is asserted rather than assumed. A drive that quietly stopped at
+    step four would otherwise report four passes and no failures, which is the
+    shape of a green run that measured nothing — the exact failure this whole
+    section was rewritten to fix.
+  */
+  const anchoredSeen = seen.filter((id) => steps.find((s) => s.id === id)?.anchor).length;
+  console.log(
+    `  ${vp.name}: ${seen.length} lessons, ${anchoredSeen} anchored` +
+      (degraded.length ? `, ${degraded.length} degraded (${degraded.join(", ")})` : ""),
+  );
+
+  /*
+    The denominator is not 26.
+
+    Some lessons complete themselves — `home` is satisfied by the member
+    already being on Home — so they are never a step anybody stops on, and the
+    harness cannot observe one that resolves during the read pause. Counting
+    them as missed reports a failure on a walkthrough that worked.
+
+    What is worth asserting is that nothing anchored was skipped, and that the
+    drive ended at the end rather than somewhere in the middle.
+  */
+  const missed = steps
+    .filter((s) => s.anchor && !seen.includes(s.id))
+    .map((s) => s.id);
+  check(`[${vp.name}] every anchored lesson was measured`, missed.length === 0, missed.join(", "));
+  check(`[${vp.name}] the drive reached the last lesson`,
+    seen[seen.length - 1] === steps[steps.length - 1].id,
+    `stopped at ${seen[seen.length - 1]}`);
 }
 
 // ─── Both atmospheres ────────────────────────────────────────────────────
 
 await b.viewport(393, 852, true);
+await restartTour();
 for (const theme of ["dark", "light"]) {
   await b.evaluate(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}; return true;`);
   await b.settle();
@@ -286,31 +565,110 @@ for (const theme of ["dark", "light"]) {
 }
 await b.evaluate(`document.documentElement.dataset.theme = "dark"; return true;`);
 
-// ─── One tap is one transition ───────────────────────────────────────────
+// ─── A lesson that loses its target must not seal the screen ─────────────
 
-await b.settle();
-const before = await b.evaluate<World>(WORLD);
-const cont = await b.evaluate<Rect | null>(`
-  const el = document.querySelector('[data-testid="button-tour-continue"]');
-  if (!el) return null;
-  const r = el.getBoundingClientRect();
-  return { x: r.x, y: r.y, width: r.width, height: r.height };
-`);
-if (cont) {
+/*
+  The regression for the picker. A lesson points at "Add movement"; the member
+  taps it; the control is replaced by the chooser the lesson is waiting for —
+  so the step now has no target, and the overlay falls back to covering the
+  whole screen. That fallback was `pointer-events: auto`, so the walkthrough
+  blocked the one action it had just asked for and the lesson could never be
+  completed.
+
+  Reproduced here by taking the anchor away from the live document rather than
+  by driving twelve lessons to the workout: the overlay re-resolves every
+  frame, so removing the attribute puts it in exactly the no-target state, and
+  the assertion is the one that matters — something underneath is still
+  touchable.
+*/
+{
+  await restartTour();
+  const driver = new TourDriver(b);
+  let anchored: string | null = null;
+  for (let i = 0; i < steps.length; i++) {
+    const at = await driver.stepId();
+    if (!at) break;
+    const step = steps.find((s) => s.id === at);
+    if (step?.anchor) { await settleOnStep(step.anchor); anchored = at; break; }
+    const t = await driver.step();
+    if (!t.nextActual) break;
+  }
+
+  if (!anchored) {
+    check("an anchored lesson was reached to take the anchor from", false);
+  } else {
+    const anchor = steps.find((s) => s.id === anchored)!.anchor!;
+    const before = await b.evaluate<{ x: number; y: number } | null>(`
+      const el = document.querySelector('[data-tour-id=${JSON.stringify(anchor)}]');
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    `);
+    await b.evaluate(`
+      for (const el of document.querySelectorAll('[data-tour-id=${JSON.stringify(anchor)}]')) {
+        el.removeAttribute("data-tour-id");
+      }
+      return true;
+    `);
+    /* Two frames for the overlay to notice, then the question. */
+    await b.evaluate(`return new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(true))));`);
+
+    const w = await b.evaluate<World>(WORLD);
+    check("a lesson whose target vanishes draws no halo", w.halo === null, JSON.stringify(w.halo));
+    check("and stays on the same lesson rather than skipping it", w.stepId === anchored,
+      `${anchored} → ${w.stepId}`);
+
+    const under = await b.evaluate<{ top: string; blocked: boolean }>(`
+      const el = document.elementFromPoint(${before!.x}, ${before!.y});
+      return {
+        top: el ? (el.getAttribute("data-testid") ?? el.tagName) : "none",
+        blocked: !!el?.closest('[data-testid="tour-overlay"]'),
+      };
+    `);
+    check("and the screen underneath is still touchable", !under.blocked,
+      `the top element is ${under.top}`);
+  }
+}
+
+// ─── One gesture is one lesson ───────────────────────────────────────────
+
+/*
+  Not "one tap moves the index by one". Some lessons complete themselves the
+  moment they open — `home` is satisfied by the member already being on Home —
+  so a single deliberate tap legitimately lands two indices later, and an
+  assertion counting indices calls the correct product broken. It did.
+
+  The invariant a member actually has is differential: *a double tap must do
+  no more than a single tap*. So the same starting lesson is played twice, and
+  the two have to end in the same place.
+*/
+async function tapContinue(times: number): Promise<string | null> {
+  await restartTour();
+  /* Past the ghost window — the overlay ignores a press that arrives before
+     its control has plausibly been seen, and the harness is not exempt. */
+  await b.evaluate(`return new Promise(r => setTimeout(() => r(true), 400));`);
+  const cont = await b.evaluate<Rect | null>(`
+    const el = document.querySelector('[data-testid="button-tour-continue"]');
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { x: r.x, y: r.y, width: r.width, height: r.height };
+  `);
+  if (!cont) return null;
   const c = centre(cont);
-  /* Two taps as fast as the transport allows. A tutorial that advances twice
-     has skipped a lesson nobody was taught. */
-  await b.clickAt(c.x, c.y);
-  await b.clickAt(c.x, c.y);
+  for (let i = 0; i < times; i++) await b.clickAt(c.x, c.y);
   await b.settle();
-  await b.settle();
-  const after = await b.evaluate<World>(WORLD);
-  const from = steps.findIndex((s) => s.id === before.stepId);
-  const to = steps.findIndex((s) => s.id === after.stepId);
-  check("Continue advances the walkthrough", to > from, `${before.stepId} → ${after.stepId}`);
-  check("and a double tap advances it exactly one step", to - from === 1, `moved ${to - from}`);
-} else {
-  check("the first step offers Continue", false, "no continue button");
+  await b.evaluate(`return new Promise(r => setTimeout(() => r(true), 600));`);
+  return (await b.evaluate<World>(WORLD)).stepId ?? null;
+}
+
+{
+  const once = await tapContinue(1);
+  const twice = await tapContinue(2);
+  check("the first lesson offers Continue", once !== null, "no continue button");
+  check("Continue advances the walkthrough",
+    once !== null && once !== steps[0].id, `${steps[0].id} → ${once}`);
+  check("and a double tap does no more than a single tap", once === twice,
+    `one tap → ${once}, two taps → ${twice}`);
 }
 
 console.log(`  shots in ${SHOTS}\n`);

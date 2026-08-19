@@ -578,6 +578,25 @@ export function MemberTopNav({
         : "text-muted-foreground hover:text-foreground",
     );
 
+  /*
+    The walkthrough's anchors, on this layout too.
+
+    They were on the phone bar only, so on a laptop the Restore lesson pointed
+    at a control that exists in the document and is `display: none` — the
+    resolver correctly refused it, the step waited, and the walkthrough could
+    not be completed in a browser at all. Measured at 1280×900, where it
+    stopped dead on step four.
+
+    Named by destination rather than by layout: `nav-restore` means "the way to
+    reach Restore from the navigation", and on a wide screen that is this pill.
+    The secondary sections take the `nav-more-` names they have on a phone for
+    the same reason — the More sheet is where they live there, and this row is
+    where they live here. The one anchor with no desktop counterpart is the
+    More trigger itself, which is a phone affordance; that lesson degrades,
+    which is what degrading is for.
+  */
+  const primary = new Set(PRIMARY.map((p) => p.id));
+
   return (
     <div className="hidden md:flex items-center bg-muted/60 rounded-full p-1 gap-0.5">
       {sections.map(({ id, label, section: target }) => (
@@ -587,6 +606,7 @@ export function MemberTopNav({
           aria-current={section === target ? "page" : undefined}
           className={pill(section === target)}
           data-testid={`member-section-${id}`}
+          data-tour-id={primary.has(id) ? `nav-${id}` : `nav-more-${id}`}
         >
           {label}
         </button>

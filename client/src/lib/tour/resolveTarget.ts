@@ -46,6 +46,26 @@ export type Candidate = {
   interactive: boolean;
   /** Overlaps the viewport as it stands, before any scrolling. */
   inViewport: boolean;
+  /**
+   * Entirely inside the viewport, edges included.
+   *
+   * Distinct from `inViewport` because a control with its bottom half under
+   * the navigation bar overlaps the viewport perfectly well and cannot be
+   * read or pressed. Scrolling was asked for only when the target touched the
+   * viewport nowhere at all, so a half-covered Appearance row was declared
+   * fine, and the lesson pointed at something the member could see the top of.
+   */
+  fullyVisible: boolean;
+  /**
+   * How much of it is on screen, 0 to 1.
+   *
+   * Only consulted when a step has said it accepts any of several like
+   * controls. "Open one, anything" found eleven practice cards and took the
+   * first one overlapping the viewport — a 26px sliver at the bottom edge,
+   * which the dialogue panel then sat on top of. A member offered a free
+   * choice should be pointed at the one they can actually see.
+   */
+  visibleArea: number;
 };
 
 export type TargetFailure =
@@ -129,7 +149,7 @@ export function chooseCandidate(
   }
 
   if (pool.length === 1) {
-    return { ok: true, index: pool[0].i, scrollNeeded: !pool[0].c.inViewport };
+    return { ok: true, index: pool[0].i, scrollNeeded: !pool[0].c.fullyVisible };
   }
 
   /*
@@ -148,9 +168,10 @@ export function chooseCandidate(
     return { ok: false, reason: "ambiguous", candidates: pool.length };
   }
 
-  const onScreen = pool.find(({ c }) => c.inViewport);
+  const best = pool.reduce((a, b) => (b.c.visibleArea > a.c.visibleArea ? b : a));
+  const onScreen = pool.find(({ c }) => c.fullyVisible) ?? (best.c.visibleArea > 0 ? best : undefined);
   const pick = onScreen ?? pool[0];
-  return { ok: true, index: pick.i, scrollNeeded: !pick.c.inViewport };
+  return { ok: true, index: pick.i, scrollNeeded: !pick.c.fullyVisible };
 }
 
 // ── The DOM half ─────────────────────────────────────────────────────────
@@ -201,6 +222,13 @@ export function describe(el: Element): Candidate {
     height: rect.height,
     interactive: !nativelyDisabled && !ariaDisabled && !inert,
     inViewport: rect.bottom > 0 && rect.top < vh && rect.right > 0 && rect.left < vw,
+    fullyVisible: rect.top >= 0 && rect.left >= 0 && rect.bottom <= vh && rect.right <= vw,
+    visibleArea:
+      rect.width > 0 && rect.height > 0
+        ? (Math.max(0, Math.min(rect.bottom, vh) - Math.max(rect.top, 0)) *
+            Math.max(0, Math.min(rect.right, vw) - Math.max(rect.left, 0))) /
+          (rect.width * rect.height)
+        : 0,
   };
 }
 

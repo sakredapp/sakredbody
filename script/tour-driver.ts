@@ -162,13 +162,30 @@ export class TourDriver {
     return this.b.evaluate(`return new Promise(r => setTimeout(() => r(true), ${ms}));`);
   }
 
+  /**
+   * The way forward, whichever one the lesson is offering.
+   *
+   * A lesson whose subject never appeared offers "Continue for now" under a
+   * different test id, deliberately, so that a degraded lesson is never
+   * mistaken for a taught one. A member presses it and moves on; a driver that
+   * only knew the ordinary button reported the walkthrough as dead at the
+   * first lesson with no subject on this layout.
+   */
   private continuePoint(): Promise<Point | null> {
     return this.b.evaluate<Point | null>(`
-      const el = document.querySelector('[data-testid="button-tour-continue"]');
+      const el = document.querySelector('[data-testid="button-tour-continue"]')
+        ?? document.querySelector('[data-testid="button-tour-continue-degraded"]');
       if (!el) return null;
       const r = el.getBoundingClientRect();
       return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
     `);
+  }
+
+  /** Whether this lesson has given up looking for its subject. */
+  degraded(): Promise<boolean> {
+    return this.b.evaluate<boolean>(
+      `return !!document.querySelector('[data-testid="button-tour-continue-degraded"]');`,
+    );
   }
 
   /**
@@ -215,8 +232,12 @@ export class TourDriver {
       const deadline = Date.now() + 12_000;
       while (Date.now() < deadline && !(await this.present(step.anchor))) {
         await this.b.settle();
+        /* A lesson that has already given up is not going to start finding
+           its subject, and waiting the full twelve seconds for a verdict the
+           overlay has reached is the harness disagreeing with the product. */
+        if (await this.degraded()) break;
       }
-      if (!(await this.present(step.anchor))) {
+      if (!(await this.present(step.anchor)) && !(await this.degraded())) {
         throw new TourDriverError(
           "TARGET_NEVER_RENDERED",
           `step ${step.id}: ${step.anchor} never appeared for this member`,
@@ -224,6 +245,17 @@ export class TourDriver {
       }
     }
     await this.pause(READ_PAUSE_MS);
+
+    /*
+      A degraded lesson has exactly one way forward regardless of what it would
+      otherwise have asked for: its subject is not on screen to be tapped.
+    */
+    if (await this.degraded()) {
+      const at = await this.continuePoint();
+      if (!at) throw new TourDriverError("NO_CONTINUE", `step ${step.id} degraded and offers no way on`);
+      await this.b.clickAt(at.x, at.y);
+      return;
+    }
 
     if (step.advance.kind === "continue") {
       const at = await this.continuePoint();

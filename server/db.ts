@@ -13,9 +13,26 @@ if (!connectionString) {
   );
 }
 
+/**
+ * How many connections this process may hold.
+ *
+ * `pg` defaults to ten, which is fine against a database and wrong against a
+ * pooler with a seat limit — Supabase's session mode caps a project at fifteen
+ * clients across everything connected to it. Two processes at the default
+ * exceed that, and what it looks like from the outside is not a connection
+ * error: it is Terrain quietly failing to load, the card it draws never
+ * appearing, and a walkthrough lesson pointing at nothing. That cost most of
+ * an afternoon to recognise.
+ *
+ * Unset means `pg`'s default, so nothing changes anywhere it has not been
+ * asked to.
+ */
+const poolMax = Number(process.env.DATABASE_POOL_MAX);
+
 export const pool = new Pool({
   connectionString,
   ssl: { rejectUnauthorized: false },
+  ...(Number.isFinite(poolMax) && poolMax > 0 ? { max: poolMax } : {}),
 });
 export const db = drizzle(pool, { schema });
 

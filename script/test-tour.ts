@@ -456,6 +456,39 @@ check(
   pause(held, TOUR, 3).completed.length === 3,
 );
 
+// ─── 14b. A step is judged on its own readings ───────────────────────────
+
+/*
+  The frame loop runs after render, so for one render after a step change the
+  world in state describes the previous step. Two lessons were lost to reading
+  it anyway, and the second is the worse one: `waitedMs` belongs to the step the
+  member was just reading, so lingering over one lesson made the *next* one
+  give up before it had looked. Anything over six seconds — an ordinary read —
+  silently skipped the health lesson and degraded required ones.
+
+  The guard is that measurements carry the step they were taken for, and a step
+  with no measurements of its own is treated as having waited no time and seen
+  nothing. Asserted at the call site rather than by behaviour, because the
+  behaviour needs a browser; script/qa-walkthrough.ts is where it is proved.
+*/
+{
+  const hook = readFileSync("client/src/hooks/use-guided-tour.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+  check(
+    "measurements record which step they describe",
+    /stepId: step\.id/.test(hook) && /world\.stepId === step\.id/.test(hook),
+  );
+  check(
+    "and a step is never resolved against another step's readings",
+    /measured \? world : \{ section: world\.section, present: EMPTY, waitedMs: 0 \}/.test(hook),
+  );
+  check(
+    "nor completed from them",
+    /if \(measured && isSatisfied\(/.test(hook),
+  );
+}
+
 // ─── 15. The hole stays over the target ──────────────────────────────────
 
 /*
@@ -469,7 +502,18 @@ check(
 );
 check(
   "and state is only set when the rect actually moved",
-  /if \(!SAME\(last, next\)\)/.test(overlay),
+  /if \(!published \|\| !SAME\(last, next\)\)/.test(overlay),
+);
+/*
+  Except the first frame of a step, which must publish whatever it found —
+  including nothing. `last` starts null, so a step whose target cannot be
+  resolved compared null to null, never called `setRect`, and left the previous
+  lesson's halo on screen: the panel explained RPE while the spotlight sat on
+  the set row above it.
+*/
+check(
+  "and a step that resolves nothing clears the last one's halo",
+  /let published = false/.test(overlay) && /published = true/.test(overlay),
 );
 check(
   "an offscreen target is brought into view before it is pointed at",

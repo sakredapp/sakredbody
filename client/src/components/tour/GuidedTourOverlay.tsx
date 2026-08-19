@@ -116,9 +116,27 @@ export function GuidedTourOverlay({
    * member's own scrolling and makes the page feel possessed.
    */
   const scrolledFor = useRef<string | null>(null);
+  /**
+   * How many times this step has asked, and when it last did.
+   *
+   * Once was not enough. The Settings row and the Appearance control both sit
+   * inside surfaces that are still laying out when the step opens: the one
+   * scroll fired, moved the page as far as the layout then allowed, and the
+   * target came to rest half under the bottom navigation. Measured at
+   * 360×780, where it ended 22px below the fold.
+   *
+   * Bounded rather than continuous, because a `scrollIntoView` on every frame
+   * fights the member's own scrolling and makes the page feel possessed.
+   * Three attempts, a third of a second apart, is enough for a sheet to
+   * settle and far short of a fight.
+   */
+  const scrollTries = useRef(0);
+  const lastScrollAt = useRef(0);
 
   useLayoutEffect(() => {
     scrolledFor.current = null;
+    scrollTries.current = 0;
+    lastScrollAt.current = 0;
   }, [anchor, instance]);
 
   /*
@@ -137,9 +155,13 @@ export function GuidedTourOverlay({
   */
   const bringIntoView = useCallback(
     (found: ReturnType<typeof resolveTarget>) => {
-      if (!anchor || scrolledFor.current === anchor) return;
+      if (!anchor) return;
       if (!found.ok || !found.scrollNeeded) return;
+      if (scrolledFor.current === anchor && scrollTries.current >= 3) return;
+      if (performance.now() - lastScrollAt.current < 350) return;
       scrolledFor.current = anchor;
+      scrollTries.current += 1;
+      lastScrollAt.current = performance.now();
       (found.el as HTMLElement).scrollIntoView({
         block: "center",
         behavior: reduced ? "auto" : "smooth",
@@ -155,6 +177,16 @@ export function GuidedTourOverlay({
     }
     let frame = 0;
     let last: Rect | null = null;
+    /**
+     * The first frame always publishes, even when it publishes nothing.
+     *
+     * `last` starts null, so a step whose target cannot be resolved produced
+     * `next === null`, compared equal to `last`, and never called `setRect` —
+     * leaving the halo from the *previous* lesson on screen. The member was
+     * told about RPE while the spotlight sat on the set row above it, and the
+     * tutorial looked confidently wrong rather than honestly stuck.
+     */
+    let published = false;
 
     const measure = () => {
       // Re-resolved every frame rather than held: the chosen instance can stop
@@ -171,7 +203,8 @@ export function GuidedTourOverlay({
             return { top: r.top, left: r.left, width: r.width, height: r.height };
           })()
         : null;
-      if (!SAME(last, next)) {
+      if (!published || !SAME(last, next)) {
+        published = true;
         last = next;
         setRect(next);
       }
@@ -259,11 +292,46 @@ export function GuidedTourOverlay({
     shownAt.current = performance.now();
   }, [step.id]);
 
-  // Low on the screen means the bottom panel would sit on top of it. The
-  // primary navigation is a bottom bar, so this is the common case rather than
-  // the exceptional one.
+  /**
+   * Which end of the screen the dialogue sits at.
+   *
+   * ── Why a fraction of the viewport was not enough ─────────────────────────
+   *
+   * The rule was "put the panel at the top when the target is below 58% of the
+   * screen", which asks where the target is and never asks how tall the panel
+   * is. On a 360×780 phone the Restore lesson's panel wraps to 363px — nearly
+   * half the screen — and the target sat at 418: above the threshold, so the
+   * panel went to the bottom, where it started at 405 and covered the row of
+   * practices the lesson exists to point at. Twenty of its twenty-six pixels.
+   *
+   * So the question is the one that was always meant: *does the panel fit on
+   * this side of the target*. Measured from the panel itself, because its
+   * height depends on how the copy wraps at this width, which no constant
+   * knows. When neither side fits, the roomier one is the least bad answer and
+   * the halo still says which control is meant.
+   */
   const viewportH = typeof window === "undefined" ? 0 : window.innerHeight;
-  const panelAtTop = !!rect && rect.top + rect.height > viewportH * 0.58;
+  const [panelH, setPanelH] = useState(0);
+  useLayoutEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    const read = () => setPanelH(el.getBoundingClientRect().height);
+    read();
+    const observer = new ResizeObserver(read);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [step.id]);
+
+  const GAP = 16;
+  const panelAtTop = (() => {
+    if (!rect) return false;
+    if (!panelH) return rect.top + rect.height > viewportH * 0.58;
+    const below = viewportH - (rect.top + rect.height);
+    const above = rect.top;
+    if (below >= panelH + GAP) return false;
+    if (above >= panelH + GAP) return true;
+    return above > below;
+  })();
 
   const body = (
     <div

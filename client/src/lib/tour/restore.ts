@@ -109,22 +109,29 @@ export function restoreSpecFor(step: TourStep): RestoreSpec {
 /**
  * Which instance of a repeated control this step means.
  *
- * The rehearsal mints its ids deterministically, so the step can name the one
- * it is talking about without anything being persisted — `rehearsal-set-1` is
- * the first set of a reconstructed rehearsal by construction, not by luck.
+ * ── Why this names nothing ────────────────────────────────────────────────
+ *
+ * It used to name four: `meta-rehearsal-movement-1` and friends. Those are the
+ * ids `seedRehearsal` mints, so they are correct for a *resumed* rehearsal and
+ * wrong for every rehearsal a member has ever actually walked through — the
+ * live one takes its id from the movement they picked out of six hundred, so
+ * the control is `meta-l-sit`, or `meta-back-squat`, or whatever they chose.
+ *
+ * The resolver treats a named instance as authoritative and answers
+ * `instance-gone` when it is absent, correctly. So the four workout lessons —
+ * the set row, RPE, set style and LAST TIME — asked for a control that could
+ * not exist, resolved to nothing, and taught themselves over an unhighlighted
+ * screen. Every static check passed: the anchors were in the DOM, unique,
+ * visible, and interactive. Only measuring the running product showed the
+ * spotlight was missing.
+ *
+ * The rehearsal has exactly one movement in both worlds, so uniqueness already
+ * identifies these controls without anything being named — and if a curious
+ * member adds a second movement, the ambiguity rule degrades the lesson
+ * honestly instead of spotlighting the wrong row.
  */
-function instanceFor(step: TourStep): string | null {
-  switch (step.id) {
-    case "set-row":
-      return "log-set-rehearsal-movement-1";
-    case "rpe":
-    case "set-style":
-      return "meta-rehearsal-movement-1";
-    case "last-time":
-      return "rehearsal-movement-1";
-    default:
-      return null;
-  }
+function instanceFor(_step: TourStep): string | null {
+  return null;
 }
 
 /**

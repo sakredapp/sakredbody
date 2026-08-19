@@ -94,14 +94,29 @@ check(
 // ─── Repeated targets name their instance ────────────────────────────────
 
 /*
-  Without this, resuming at RPE resolves "the first RPE control" — which is the
-  ambiguity the target resolver refuses outright. A resumed step that cannot
-  name its instance would degrade instead of teaching.
+  These four used to assert that the workout steps *name* their instance, and
+  they passed for weeks while the product was broken.
+
+  The names were `meta-rehearsal-movement-1` and friends — the ids
+  `seedRehearsal` mints. Correct for a resumed rehearsal, and wrong for every
+  rehearsal anybody has walked through, because a live one takes its id from
+  the movement the member picked. The resolver treats a named instance as
+  authoritative, so the set row, RPE, set style and LAST TIME lessons asked for
+  a control that could not exist and taught themselves over an unhighlighted
+  screen. Only driving the running product found it.
+
+  So the invariant is the opposite one, and it is about both worlds at once:
+  nothing names an instance, and the rehearsal has exactly one movement in
+  either case, so uniqueness identifies the control without anything having to
+  guess an id.
 */
-check("the set-row step names which row", !!restoreSpecFor(step("set-row")).instance);
-check("the RPE step names which set's control", !!restoreSpecFor(step("rpe")).instance);
-check("and so does set style", !!restoreSpecFor(step("set-style")).instance);
-check("and LAST TIME names its movement", !!restoreSpecFor(step("last-time")).instance);
+for (const id of ["set-row", "rpe", "set-style", "last-time"]) {
+  check(`the ${id} step does not name an id only a resume could produce`,
+    restoreSpecFor(step(id)).instance === null);
+  const snapshot = restoreSpecFor(step(id)).rehearsal;
+  check(`and its rehearsal holds one movement, so the control is unambiguous`,
+    snapshot?.movements === 1, `${snapshot?.movements}`);
+}
 check(
   "a step with only one possible target names no instance",
   restoreSpecFor(step("home")).instance === null,

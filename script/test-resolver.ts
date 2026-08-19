@@ -39,6 +39,8 @@ function el(over: Partial<Candidate> = {}): Candidate {
     height: 44,
     interactive: true,
     inViewport: true,
+    fullyVisible: true,
+    visibleArea: 1,
     ...over,
   };
 }
@@ -144,7 +146,7 @@ check(
 */
 const twinnedRow = chooseCandidate(
   [
-    el({ instance: "rehearsal-set-1", inViewport: false }),
+    el({ instance: "rehearsal-set-1", inViewport: false, fullyVisible: false, visibleArea: 0 }),
     el({ instance: "rehearsal-set-1", inViewport: true }),
   ],
   { anchor: "workout-rpe", needsInteraction: true, instance: "rehearsal-set-1" },
@@ -187,7 +189,7 @@ check(
   !namedDisabled.ok && namedDisabled.reason === "disabled",
 );
 
-const offscreen = chooseCandidate([el({ inViewport: false })], LOOK);
+const offscreen = chooseCandidate([el({ inViewport: false, fullyVisible: false, visibleArea: 0 })], LOOK);
 check("an offscreen target still resolves", offscreen.ok);
 check("and asks to be scrolled to", offscreen.ok && offscreen.scrollNeeded === true);
 check(
@@ -200,10 +202,55 @@ check(
 check(
   "given a choice, the one on screen is preferred",
   (() => {
-    const r = chooseCandidate([el({ inViewport: false }), el({ inViewport: true })], LOOK);
+    const r = chooseCandidate(
+      [el({ inViewport: false, fullyVisible: false, visibleArea: 0 }), el({ inViewport: true })],
+      LOOK,
+    );
     return r.ok && r.index === 1 && r.scrollNeeded === false;
   })(),
 );
+
+/*
+  The case the distinction exists for: a row whose lower half is under the
+  bottom navigation. It overlaps the viewport, so the old rule called it
+  settled and the walkthrough pointed at a control the member could see the
+  top of and could not press.
+*/
+const halfUnderTheNav = chooseCandidate([el({ inViewport: true, fullyVisible: false })], LOOK);
+check("a half-covered target still resolves", halfUnderTheNav.ok);
+check("and asks to be scrolled to anyway",
+  halfUnderTheNav.ok && halfUnderTheNav.scrollNeeded === true);
+check(
+  "given a choice, fully visible beats merely overlapping",
+  (() => {
+    const r = chooseCandidate([el({ fullyVisible: false }), el()], LOOK);
+    return r.ok && r.index === 1 && r.scrollNeeded === false;
+  })(),
+);
+
+/*
+  When a step invites a free choice, point at the one they can see most of.
+  Eleven Restore cards, and the first one overlapping the viewport was a 26px
+  sliver at the bottom edge that the dialogue panel then covered.
+*/
+{
+  const ANY = { anchor: "restore-practice" as const, needsInteraction: true, anyInstance: true };
+  const r = chooseCandidate(
+    [
+      el({ instance: "a", fullyVisible: false, visibleArea: 0.08 }),
+      el({ instance: "b", fullyVisible: false, visibleArea: 0.71 }),
+      el({ instance: "c", inViewport: false, fullyVisible: false, visibleArea: 0 }),
+    ],
+    ANY,
+  );
+  check("a free choice lands on the most visible instance", r.ok && r.index === 1);
+  const whole = chooseCandidate(
+    [el({ instance: "a", fullyVisible: false, visibleArea: 0.9 }), el({ instance: "b" })],
+    ANY,
+  );
+  check("and prefers one that is entirely on screen over one that is nearly",
+    whole.ok && whole.index === 1);
+}
 
 // ─── Nothing there ───────────────────────────────────────────────────────
 
