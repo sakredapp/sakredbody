@@ -16,7 +16,7 @@ import { GuidedTourOverlay } from "@/components/tour/GuidedTourOverlay";
 import { useGuidedTour } from "@/hooks/use-guided-tour";
 import { SAKRED_INTRO } from "@/lib/tour/sakredIntro";
 import { restoreSpecFor } from "@/lib/tour/restore";
-import { qaReplayRequested } from "@/lib/tour/rollout";
+import { replayRequest } from "@/lib/tour/rollout";
 import type { StartConditions } from "@/lib/tour/engine";
 
 export function TourHost({ conditions }: { conditions: StartConditions }) {
@@ -25,8 +25,8 @@ export function TourHost({ conditions }: { conditions: StartConditions }) {
     mid-session — it is a URL flag — and re-reading it every render would put a
     storage access in the render path of the busiest screen in the app.
   */
-  const replaying = qaReplayRequested();
-  const running = useGuidedTour(SAKRED_INTRO, conditions, replaying);
+  const replaying = replayRequest();
+  const running = useGuidedTour(SAKRED_INTRO, conditions, !!replaying, replaying?.from ?? null);
 
   if (!running) return null;
 

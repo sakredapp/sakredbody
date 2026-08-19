@@ -97,6 +97,14 @@ export function useGuidedTour(
     broken when somebody asked for it.
   */
   forced = false,
+  /**
+   * Which lesson a replay begins at. Null is the beginning.
+   *
+   * Only consulted when `forced`, because it is a request the member made from
+   * the help portal — "show me the Build chapter again" — and not something the
+   * engine should ever decide for itself.
+   */
+  replayFrom: string | null = null,
 ): RunningTour | null {
   const [progress, setProgress] = useState<TourProgress | null>(null);
   const [index, setIndex] = useState<number | null>(null);
@@ -139,12 +147,23 @@ export function useGuidedTour(
     if (index !== null) return;
     const stored = readProgress(tour);
     if (!(forced ? shouldStart(stored, tour, conditions) : mayAutoStart(stored, tour, conditions))) return;
-    const at = resumeAt(stored, tour);
+
+    /*
+      A replay starts where it was asked to and leaves the record alone.
+
+      Somebody reviewing the Build chapter for the second time has not
+      un-learned the app, and a replay that rewrote their progress would take a
+      completed walkthrough and leave it looking half-finished — or, worse,
+      mark a required version complete that they never actually walked. See
+      `replay` in the engine, which exists to say exactly this.
+    */
+    const asked = forced && replayFrom ? tour.steps.findIndex((s) => s.id === replayFrom) : -1;
+    const at = asked >= 0 ? asked : forced ? 0 : resumeAt(stored, tour);
     if (at >= tour.steps.length) return;
-    setProgress(stored ?? emptyProgress(tour));
+    setProgress(forced ? emptyProgress(tour) : stored ?? emptyProgress(tour));
     setIndex(at);
     stepStartedAt.current = performance.now();
-  }, [tour, conditions, index, forced]);
+  }, [tour, conditions, index, forced, replayFrom]);
 
   const step = index === null ? null : tour.steps[index] ?? null;
 
@@ -256,10 +275,10 @@ export function useGuidedTour(
     advancedFrom.current = index;
     const updated = complete(progress, tour, index, new Date().toISOString());
     setProgress(updated);
-    writeProgress(updated);
+    if (!forced) writeProgress(updated);
     if (index + 1 >= tour.steps.length) setIndex(null);
     else goTo(index + 1);
-  }, [index, progress, tour, goTo]);
+  }, [index, progress, tour, goTo, forced]);
 
   const skip = useCallback(() => {
     if (index === null) return;
@@ -271,9 +290,9 @@ export function useGuidedTour(
     if (index === null || !progress) return;
     const held = pauseAt(progress, tour, index);
     setProgress(held);
-    writeProgress(held);
+    if (!forced) writeProgress(held);
     setIndex(null);
-  }, [index, progress, tour]);
+  }, [index, progress, tour, forced]);
 
   const markTapped = useCallback(() => {
     tapped.current = true;

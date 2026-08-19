@@ -43,6 +43,7 @@ import {
   Activity,
   GraduationCap,
   Settings,
+  LifeBuoy,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -70,6 +71,7 @@ export type MemberSection =
   | "apothecary"
   | "library"
   | "masterclass"
+  | "help"
   | "settings";
 
 /**
@@ -243,6 +245,16 @@ export const SECONDARY: Destination[] = [
     doesn't is no longer walking past a trophy case to reach the Room.
   */
   { id: "wins", label: "Progress & Wins", icon: Award, note: "What you've come through so far", section: "wins" },
+  /*
+    Above Settings, not inside it.
+
+    The walkthrough used to be reachable only from the day somebody signed up,
+    and then only from a Settings row — which is where a person looks when
+    something is wrong, not when they want to learn how the app works. This is
+    the functional door: a member who wants to know how Build works should find
+    it in one tap from the menu, without deciding first that it is a setting.
+  */
+  { id: "help", label: "How to Use Sakred", icon: LifeBuoy, note: "Learn the system and replay the walkthrough", section: "help" },
   { id: "settings", label: "Settings", icon: Settings, note: "Blocked people, units, your account", section: "settings" },
 ];
 

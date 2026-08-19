@@ -28,7 +28,7 @@ import { PhotoSettings } from "@/components/portal/PhotoSettings";
 import { MovementSettings } from "@/components/portal/MovementSettings";
 import { AppearanceSettings } from "@/components/portal/AppearanceSettings";
 import { InfoTip } from "@/components/ui/info-tip";
-import { EyeOff, Scale, LogOut, ShieldOff } from "lucide-react";
+import { EyeOff, Scale, LogOut, ShieldOff, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Blocked {
@@ -41,9 +41,12 @@ interface Blocked {
 export function SettingsTab({
   weightUnit,
   onLogout,
+  onOpenHelp,
 }: {
   weightUnit?: string | null;
   onLogout: () => void;
+  /** Opens the help portal. Settings links to it; it does not contain it. */
+  onOpenHelp?: () => void;
 }) {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -115,6 +118,32 @@ export function SettingsTab({
           basketball. */}
       <Panel title="Movement you do">
         <MovementSettings />
+      </Panel>
+
+      {/* ── Help & Walkthrough ─────────────────────────────────────────────
+          A door, not a room. Somebody who paused the walkthrough and closed
+          the app comes looking here — Settings is where people look when they
+          want something back — and what they find is a link to the one place
+          that knows the state of it, rather than a second set of controls that
+          could disagree with the first. */}
+      <Panel title="Help &amp; walkthrough">
+        <button
+          type="button"
+          onClick={onOpenHelp}
+          className="w-full flex items-center justify-between gap-3 text-left tap-clean group"
+          data-testid="button-settings-help"
+        >
+          <span className="min-w-0">
+            <span className="block text-sm text-foreground">How to Use Sakred</span>
+            <span className="block text-xs text-muted-foreground mt-0.5">
+              The map of the app, and the walkthrough — resume it, or run it again.
+            </span>
+          </span>
+          <ChevronRight
+            className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-foreground transition-colors"
+            aria-hidden="true"
+          />
+        </button>
       </Panel>
 
       {/* ── Appearance ─────────────────────────────────────────────────────

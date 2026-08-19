@@ -16,7 +16,7 @@ import { useEnrollInRoutine } from "@/hooks/use-coaching";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Lock, BookOpen, Check } from "lucide-react";
+import { ArrowLeft, Lock, BookOpen, Check, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SectionHeading } from "@/components/portal/Panel";
 import { formatLocalDateString } from "@shared/utils/dates";
@@ -282,7 +282,7 @@ function Reader({ ebookId, onBack }: { ebookId: string; onBack: () => void }) {
 
 // ─── Tab ───────────────────────────────────────────────────────────────────
 
-export function LibraryTab() {
+export function LibraryTab({ onOpenHelp }: { onOpenHelp?: () => void }) {
   const [open, setOpen] = useState<string | null>(null);
 
   return (
@@ -298,7 +298,37 @@ export function LibraryTab() {
       {open ? (
         <Reader ebookId={open} onBack={() => setOpen(null)} />
       ) : (
-        <Shelf onOpen={setOpen} />
+        <>
+          <Shelf onOpen={setOpen} />
+          {/*
+            The manual belongs on the shelf.
+
+            Not as a guide — it is an index into the app rather than something
+            to read through — but somebody standing in the Library is already
+            asking "where do I learn this", and sending them to Settings for
+            the answer is the wrong shape of help. Same destination as the More
+            row and the Settings link.
+          */}
+          {onOpenHelp && (
+            <button
+              type="button"
+              onClick={onOpenHelp}
+              className="w-full flex items-center justify-between gap-3 rounded-xl border border-[hsl(var(--gold))]/12 bg-card/40 p-4 text-left tap-clean group"
+              data-testid="button-library-help"
+            >
+              <span className="min-w-0">
+                <span className="block text-sm text-foreground">How to Use Sakred</span>
+                <span className="block text-xs text-muted-foreground mt-0.5">
+                  What each part of the app is for, and the walkthrough.
+                </span>
+              </span>
+              <ChevronRight
+                className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-foreground transition-colors"
+                aria-hidden="true"
+              />
+            </button>
+          )}
+        </>
       )}
     </div>
   );

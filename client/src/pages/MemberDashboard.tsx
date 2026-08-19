@@ -64,6 +64,7 @@ import { RestoreTab } from "@/components/RestoreTab";
 import { SettingsTab } from "@/components/SettingsTab";
 import { useHealthAutoSync } from "@/hooks/use-health";
 import { publishTourSection } from "@/hooks/use-guided-tour";
+import { HelpPortal } from "@/components/HelpPortal";
 import { TourHost } from "@/components/tour/TourHost";
 import { Onboarding } from "@/components/portal/Onboarding";
 import {
@@ -627,6 +628,19 @@ export default function MemberDashboard() {
           </motion.div>
         )}
 
+        {section === "help" && (
+          <motion.div
+            key="help"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className={`${PORTAL_COLUMN} py-6`}
+          >
+            <HelpPortal isCoach={user?.role === "coach" || user?.isAdmin === "true"} />
+          </motion.div>
+        )}
+
         {section === "settings" && (
           <motion.div
             key="settings"
@@ -636,7 +650,11 @@ export default function MemberDashboard() {
             transition={{ duration: 0.2 }}
             className={`${PORTAL_COLUMN} py-6`}
           >
-            <SettingsTab weightUnit={user?.weightUnit} onLogout={() => logout()} />
+            <SettingsTab
+              weightUnit={user?.weightUnit}
+              onLogout={() => logout()}
+              onOpenHelp={() => setSection("help")}
+            />
           </motion.div>
         )}
 
@@ -754,7 +772,7 @@ export default function MemberDashboard() {
             transition={{ duration: 0.2 }}
             className={`${PORTAL_COLUMN} py-8`}
           >
-            <LibraryTab />
+            <LibraryTab onOpenHelp={() => setSection("help")} />
           </motion.div>
         )}
 

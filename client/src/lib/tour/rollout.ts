@@ -83,17 +83,50 @@ export function owesRequiredTour(lastCompletedRequiredVersion: number | null): b
  */
 export const QA_REPLAY_KEY = "sakred.tour.replay";
 
-export function qaReplayRequested(): boolean {
-  if (typeof window === "undefined") return false;
+/**
+ * A request to run the walkthrough again, and where from.
+ *
+ * `from` is a step id — the first lesson of a chapter, when somebody asked for
+ * a chapter rather than the whole thing. Null means the beginning.
+ *
+ * Stored rather than passed as a prop because the request survives the
+ * navigation that follows it: asking from Settings means landing on Home with
+ * the tour already running, and a URL parameter would have to survive a route
+ * change the router owns.
+ */
+export type ReplayRequest = { from: string | null };
+
+export function requestReplay(from: string | null = null): void {
   try {
-    if (new URLSearchParams(window.location.search).get("tour") === "replay") {
-      window.localStorage.setItem(QA_REPLAY_KEY, "1");
-      return true;
-    }
-    return window.localStorage.getItem(QA_REPLAY_KEY) === "1";
+    window.localStorage.setItem(QA_REPLAY_KEY, from ? JSON.stringify({ from }) : "1");
   } catch {
-    return false;
+    // Nothing stored; the caller's navigation simply lands on an ordinary
+    // screen, which is a smaller failure than throwing on a button press.
   }
+}
+
+export function replayRequest(): ReplayRequest | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const url = new URLSearchParams(window.location.search);
+    if (url.get("tour") === "replay") {
+      const from = url.get("from");
+      requestReplay(from);
+      return { from: from ?? null };
+    }
+    const raw = window.localStorage.getItem(QA_REPLAY_KEY);
+    if (!raw) return null;
+    if (raw === "1") return { from: null };
+    const parsed: unknown = JSON.parse(raw);
+    const from = (parsed as { from?: unknown })?.from;
+    return { from: typeof from === "string" ? from : null };
+  } catch {
+    return null;
+  }
+}
+
+export function qaReplayRequested(): boolean {
+  return replayRequest() !== null;
 }
 
 export function endQaReplay(): void {
