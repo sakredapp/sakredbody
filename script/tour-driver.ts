@@ -237,6 +237,7 @@ export class TourDriver {
         `step ${step.id} advances on ${step.advance.kind} but highlights nothing to touch`,
       );
     }
+    await this.scrollTo(step.anchor, instance);
     const at = await this.pointFor(step.anchor, instance, step.anyInstance ?? false);
     if (!at) {
       throw new TourDriverError(
@@ -359,6 +360,48 @@ export class TourDriver {
         })
         .map(e => e.getAttribute("data-testid"));
     `);
+  }
+
+  /**
+   * Put the target on screen before touching it.
+   *
+   * A member scrolls; a driver that taps a coordinate 450px below the fold
+   * taps the page's background and reports the lesson broken. The overlay
+   * scrolls too, so this is usually a no-op — but the driver must not depend
+   * on the thing it is testing to do it.
+   */
+  private async scrollTo(anchor: string, instance: string | null): Promise<void> {
+    /*
+      Finish anything still animating in.
+
+      Headless Chrome produces no compositor frames, so a CSS enter animation
+      never advances: the More sheet reported `data-state="open"` while parked
+      at its opening keyframe, translated 484px down, with its contents
+      measurably below the fold and untappable. That is the instrument, not the
+      product — a real phone composites and the sheet arrives.
+
+      So rather than sleeping and hoping, the driver finishes in-flight
+      animations outright. A member sees the animation; a test does not need
+      to, and must not be at the mercy of whether the harness draws frames.
+    */
+    await this.b.evaluate(`
+      for (const a of document.getAnimations()) {
+        try { a.finish(); } catch { /* infinite or unfinishable; leave it */ }
+      }
+      return true;
+    `);
+    await this.b.evaluate(`
+      const all = [...document.querySelectorAll('[data-tour-id="${anchor}"]')];
+      const visible = all.filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+      const named = ${instance ? `visible.filter(e => e.getAttribute("data-tour-instance") === ${JSON.stringify(instance)})` : "visible"};
+      const el = named[0];
+      if (!el) return false;
+      const r = el.getBoundingClientRect();
+      if (r.top >= 0 && r.bottom <= window.innerHeight) return true;
+      el.scrollIntoView({ block: "center", behavior: "auto" });
+      return true;
+    `);
+    await this.b.settle();
   }
 
   private async choose(testId: string): Promise<void> {

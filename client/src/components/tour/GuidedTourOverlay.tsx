@@ -109,16 +109,44 @@ export function GuidedTourOverlay({
     Runs on the anchor changing, not every frame: a repeated scrollIntoView
     fights the member's own scrolling and makes the page feel possessed.
   */
+  /**
+   * Whether this step has already had its one scroll.
+   *
+   * One per step, not one per frame: a repeated `scrollIntoView` fights the
+   * member's own scrolling and makes the page feel possessed.
+   */
+  const scrolledFor = useRef<string | null>(null);
+
   useLayoutEffect(() => {
-    if (!anchor) return;
-    const found = resolveTarget({ anchor, instance, needsInteraction: needsTap, anyInstance: step.anyInstance });
-    if (found.ok && found.scrollNeeded) {
+    scrolledFor.current = null;
+  }, [anchor, instance]);
+
+  /*
+    Scroll when the target becomes findable, not when the step begins.
+
+    This ran once, on the step changing — and the Settings lesson opens inside
+    a sheet that is still animating at that moment, so the effect fired, found
+    nothing to scroll, and never looked again. The item sat at y=1305 in an
+    852px viewport: measured, visible, and untappable, with the tour waiting
+    for a press on something below the fold.
+
+    Attempted from the measure loop instead, guarded so it still happens at
+    most once per step. If the target is not there yet, the next frame tries;
+    once it has been brought into view, nothing touches the member's scrolling
+    again.
+  */
+  const bringIntoView = useCallback(
+    (found: ReturnType<typeof resolveTarget>) => {
+      if (!anchor || scrolledFor.current === anchor) return;
+      if (!found.ok || !found.scrollNeeded) return;
+      scrolledFor.current = anchor;
       (found.el as HTMLElement).scrollIntoView({
         block: "center",
         behavior: reduced ? "auto" : "smooth",
       });
-    }
-  }, [anchor, instance, needsTap, reduced]);
+    },
+    [anchor, reduced],
+  );
 
   useEffect(() => {
     if (!anchor) {
@@ -135,6 +163,7 @@ export function GuidedTourOverlay({
       // hidden row becomes the real target. Holding the element found at mount
       // is how a spotlight ends up on a node that is no longer on screen.
       const found = resolveTarget({ anchor, instance, needsInteraction: needsTap, anyInstance: step.anyInstance });
+      bringIntoView(found);
       const el = found.ok ? (found.el as HTMLElement) : null;
       const next = el
         ? (() => {
@@ -151,7 +180,7 @@ export function GuidedTourOverlay({
 
     frame = requestAnimationFrame(measure);
     return () => cancelAnimationFrame(frame);
-  }, [anchor, instance, needsTap]);
+  }, [anchor, instance, needsTap, bringIntoView]);
 
   /*
     The tap the step is waiting for.
