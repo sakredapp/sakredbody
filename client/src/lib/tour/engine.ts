@@ -34,7 +34,17 @@ import { AUTO_START_ENABLED, REQUIRED_TOUR_VERSION } from "./rollout";
  * still fetching; short enough that a member who hit a genuine dead end is not
  * left looking at a dimmed screen wondering whether the app has hung.
  */
-export const ANCHOR_TIMEOUT_MS = 6000;
+/**
+ * How long a lesson looks for its subject before giving up.
+ *
+ * Raised from six seconds because six is inside the range a real screen takes
+ * to arrive: the Room feed is a network read, and a slow one degraded the
+ * lesson about it — a member on a train would have met "Continue for now" on a
+ * card that was about to appear. Nine is still short enough that a genuinely
+ * missing target does not leave anybody staring at a panel, and long enough
+ * that arriving late is not treated as never.
+ */
+export const ANCHOR_TIMEOUT_MS = 9000;
 
 /** What the overlay should do about the current step, right now. */
 export type Resolution =
@@ -64,9 +74,12 @@ export function resolve(step: TourStep, world: TourWorld): Resolution {
   if (world.present.has(step.anchor)) return { kind: "ready", step, anchor: step.anchor };
   if (world.waitedMs < ANCHOR_TIMEOUT_MS) return { kind: "waiting", step, reason: "anchor" };
 
-  // The bound has passed. An optional step had nothing to teach; a required one
-  // still has something to say.
-  return step.optional ? { kind: "skip", step } : { kind: "degraded", step };
+  /*
+    The bound has passed. An optional step had nothing to teach today; a lesson
+    about an affordance this form factor does not have has nothing to teach
+    here at all; a required one still has something to say.
+  */
+  return step.optional || step.formFactor ? { kind: "skip", step } : { kind: "degraded", step };
 }
 
 /**

@@ -272,6 +272,19 @@ export class TourDriver {
     await this.scrollTo(step.anchor, instance);
     const at = await this.pointFor(step.anchor, instance, step.anyInstance ?? false);
     if (!at) {
+      /*
+        Before calling it a finding, let the walkthrough have its say.
+
+        A lesson about an affordance this form factor does not have — the More
+        sheet on a desktop — resolves nothing and is *skipped* by the engine
+        after its bound. A driver that threw the moment it could not find a
+        target reported the product's correct decision as a broken step.
+      */
+      const deadline = Date.now() + 9_000;
+      while (Date.now() < deadline) {
+        await this.pause(300);
+        if ((await this.stepId()) !== step.id) return;
+      }
       throw new TourDriverError(
         "TARGET_UNRESOLVED",
         `step ${step.id}: ${step.anchor}${instance ? `[${instance}]` : ""} is absent, hidden or ambiguous`,

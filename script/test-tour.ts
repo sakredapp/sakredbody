@@ -96,26 +96,42 @@ check(
 );
 
 /*
-  And not yet at all, whatever the conditions say.
+  And then the product's question, which is a different one.
 
   `shouldStart` answers an engineering question — are the preconditions met —
-  and it is true above. `mayAutoStart` answers a product one, and the product
-  has not said yes. Until the dedicated walkthrough pass has been run on
-  devices, a defect in the tutorial would become a *mandatory* defect, arriving
-  unskippable as the first thing every existing member sees on opening the app.
-
-  Turning it on is one line and one deliberate commit, which is the right
-  amount of ceremony for that.
+  and it is true above. `mayAutoStart` answers whether the walkthrough is meant
+  to take the screen at all, which was false for as long as it took to measure
+  it: geometry at four viewports, every checkpoint reconstructed after the app
+  is destroyed, both atmospheres applied to the real app, and the coach
+  extension. It is now true, and these assert what that means rather than
+  restating the flag.
 */
-check("automatic rollout is off, and off explicitly", AUTO_START_ENABLED === false);
-check("so nothing starts on its own yet", !mayAutoStart(null, TOUR, READY));
+check("automatic rollout is on, and on explicitly", AUTO_START_ENABLED === true);
+check("a member who has never seen it is offered it", mayAutoStart(null, TOUR, READY));
 check(
-  "not even for a member part-way through one",
-  !mayAutoStart(complete(emptyProgress(TOUR), TOUR, 0, NOW), TOUR, READY),
+  "and so is one part-way through",
+  mayAutoStart(complete(emptyProgress(TOUR), TOUR, 0, NOW), TOUR, READY),
 );
 check(
-  "and while it is off, nobody is owed the required walkthrough",
-  !owesRequiredTour(null) && !owesRequiredTour(0),
+  "somebody who finished this version is not",
+  !mayAutoStart(
+    { ...emptyProgress(TOUR), stepId: null, completedAt: NOW, completed: TOUR.steps.map((s) => s.id) },
+    TOUR,
+    READY,
+  ),
+);
+/*
+  The preconditions still decide. Rollout removes the product's hold, not the
+  rule that a walkthrough must not start over a screen of skeletons.
+*/
+check("and nothing starts over an unready Home", !mayAutoStart(null, TOUR, { ...READY, homeReady: false }));
+check(
+  "an account owing the required version is owed it",
+  owesRequiredTour(null) && owesRequiredTour(0) && owesRequiredTour(REQUIRED_TOUR_VERSION - 1),
+);
+check(
+  "and one that has it is not",
+  !owesRequiredTour(REQUIRED_TOUR_VERSION),
 );
 /*
   Pinned rather than derived, which is the property that matters — writing

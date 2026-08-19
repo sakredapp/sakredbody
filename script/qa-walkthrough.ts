@@ -365,6 +365,16 @@ async function measure(label: string, stepId: string, degraded: string[]): Promi
     return;
   }
   const many = (step as { anyInstance?: boolean }).anyInstance === true;
+
+  /*
+    A lesson about an affordance this screen does not have is not measured
+    here. The More sheet is a phone arrangement; asserting a halo for it on a
+    desktop would be asserting that the product should invent one.
+  */
+  if (step.formFactor === "phone" && (await b.evaluate<number>("return innerWidth;")) >= 768) {
+    return;
+  }
+
   await settleOnStep(step.anchor ?? null);
 
   /*
@@ -379,7 +389,7 @@ async function measure(label: string, stepId: string, degraded: string[]): Promi
     `return !!document.querySelector('[data-testid="button-tour-continue-degraded"]');`,
   );
   if (gaveUp) {
-    degraded.push(step.id);
+    degraded.push(step.formFactor ? `${step.id} (not on this form factor)` : step.id);
     const w = await b.evaluate<Snap>(SNAP(null, null, false));
     check(`[${label}] ${step.id}: a degraded lesson is still readable`, !!w.panel);
     return;
@@ -501,6 +511,14 @@ for (const vp of VIEWPORTS) {
   const driver = new TourDriver(b);
   const seen: string[] = [];
   const degraded: string[] = [];
+  /*
+    Lessons the walkthrough itself moved past.
+
+    A skipped step is never a step anybody stops on, so the harness cannot
+    observe it — and counting it as unmeasured reports a hole that is really
+    the product deciding, correctly, that it had nothing to teach here.
+  */
+  const skipped: string[] = [];
   for (let i = 0; i < steps.length + 6; i++) {
     const at = await driver.stepId();
     if (!at) break;
@@ -514,6 +532,13 @@ for (const vp of VIEWPORTS) {
       check(`[${vp.name}] the walkthrough can be driven to the end`, false,
         `stopped at ${at}: ${(err as Error).message}`);
       break;
+    }
+    if (t.nextActual) {
+      const from = steps.findIndex((s) => s.id === at);
+      const to = steps.findIndex((s) => s.id === t.nextActual);
+      if (from >= 0 && to > from + 1) {
+        for (const s of steps.slice(from + 1, to)) skipped.push(s.id);
+      }
     }
     if (!t.nextActual) break;
   }
@@ -541,9 +566,29 @@ for (const vp of VIEWPORTS) {
     What is worth asserting is that nothing anchored was skipped, and that the
     drive ended at the end rather than somewhere in the middle.
   */
+  /*
+    A lesson about the More sheet has nothing to teach on a screen that has no
+    More sheet. Not measured there, and not missing either: the release report
+    has to be able to say "not applicable on this form factor" without that
+    reading as a hole in the coverage.
+  */
+  const wide = vp.w >= 768;
   const missed = steps
-    .filter((s) => s.anchor && !seen.includes(s.id))
+    .filter(
+      (s) =>
+        s.anchor &&
+        !seen.includes(s.id) &&
+        !skipped.includes(s.id) &&
+        !(wide && s.formFactor === "phone"),
+    )
     .map((s) => s.id);
+  if (skipped.length) console.log(`  ${vp.name}: ${skipped.length} skipped (${skipped.join(", ")})`);
+  const inapplicable = steps.filter((s) => wide && s.formFactor === "phone").map((s) => s.id);
+  if (inapplicable.length) {
+    console.log(`  ${vp.name}: ${inapplicable.length} lesson(s) not applicable here (${inapplicable.join(", ")})`);
+  }
+  const unexpected = degraded.filter((d) => !d.includes("not on this form factor"));
+  check(`[${vp.name}] no lesson degraded unexpectedly`, unexpected.length === 0, unexpected.join(", "));
   check(`[${vp.name}] every anchored lesson was measured`, missed.length === 0, missed.join(", "));
   check(`[${vp.name}] the drive reached the last lesson`,
     seen[seen.length - 1] === steps[steps.length - 1].id,

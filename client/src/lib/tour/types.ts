@@ -113,6 +113,21 @@ export type TourStep = {
    * a step the member might never see.
    */
   optional?: boolean;
+  /**
+   * A lesson about an affordance only one form factor has.
+   *
+   * The More sheet is a phone arrangement: a wide screen puts every
+   * destination in one row and has no drawer to teach. On a desktop that step
+   * found its anchor rendered and `display: none`, waited, and offered
+   * "Continue for now" — which classifies a correct product as a broken
+   * lesson, in the release report and to the member.
+   *
+   * Treated like `optional` when the anchor never arrives, and distinguished
+   * from it in the report: an optional lesson had nothing to teach today, this
+   * one has nothing to teach on this screen. Faking a target so the number
+   * reaches zero would be the other way of lying about it.
+   */
+  formFactor?: "phone";
   /** Named for the quest log, which lists phases rather than every step. */
   objective?: string;
   /**

@@ -295,6 +295,7 @@ export const SAKRED_INTRO: GuidedTour = {
     {
       id: "more",
       objective: "Explore More",
+      formFactor: "phone",
       anchor: "nav-more",
       title: "Everything else",
       body:

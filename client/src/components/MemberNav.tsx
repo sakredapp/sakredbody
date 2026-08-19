@@ -424,8 +424,17 @@ export function MemberBottomNav({
     nothing here fights a member who opens or closes it themselves.
   */
   const [moreOpen, setMoreOpen] = useState(false);
+  /*
+    Opens, never closes.
+
+    A request is held briefly so a subscriber that mounts a moment late still
+    receives it — and a component that remounts for its own reasons would
+    otherwise replay a stale "no sheet needed" and shut a sheet the member is
+    reading. Closing is theirs; the walkthrough only ever asks for something
+    to be brought forward.
+  */
   useEffect(
-    () => onStageRequest((request) => setMoreOpen(request.sheet === "more")),
+    () => onStageRequest((request) => request.sheet === "more" && setMoreOpen(true)),
     [],
   );
 
@@ -556,7 +565,16 @@ export function MemberBottomNav({
                         href={d.href!}
                         className={rowClass(false)}
                         data-testid={`nav-more-`}
-                        data-tour-id={`nav-more-${d.id}`}
+                        /*
+                          `role-`, not `nav-more-`, because that is what the
+                          anchor means: the way to a workspace somebody holds.
+                          It was `nav-more-coach` here and `role-coach` on the
+                          wide row, so the coach lesson could only ever resolve
+                          the desktop pill — which is `display: none` on a
+                          phone. The extension pointed at nothing on the one
+                          form factor most coaches use.
+                        */
+                        data-tour-id={`role-${d.id}`}
                       >
                         <RowBody d={d} active={false} />
                       </Link>

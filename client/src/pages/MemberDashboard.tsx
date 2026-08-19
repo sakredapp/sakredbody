@@ -1193,6 +1193,7 @@ export default function MemberDashboard() {
           redirecting: false,
           systemDialogOpen: false,
         }}
+        role={user?.role ?? null}
       />
 
       {/*

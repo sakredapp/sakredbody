@@ -49,12 +49,35 @@ export const REQUIRED_TOUR_VERSION = 2;
 /**
  * Automatic first-run start.
  *
- * OFF until the dedicated walkthrough QA pass has been run: every step
- * exercised on a device, spotlight geometry measured rather than eyeballed,
- * both atmospheres, both platforms, and a comprehension pass with somebody who
- * has never seen Sakred.
+ * ── ON, and what that took ────────────────────────────────────────────────
+ *
+ * The condition written here was that every step be exercised on a device,
+ * the spotlight geometry measured rather than eyeballed, both atmospheres, and
+ * the walkthrough completed end to end. That has now happened, and is re-run
+ * on demand rather than remembered:
+ *
+ *   script/qa-walkthrough.ts   853 assertions · 26 lessons measured at
+ *                              393×852, 360×780, 430×932 and 1280×900
+ *   script/qa-resume.ts        182 assertions · every checkpoint reconstructed
+ *                              after the app is destroyed, 0 rehearsal writes
+ *   script/qa-atmosphere.ts    both branches, applied to the real app, kept
+ *                              across a reload and agreeing with Settings
+ *   script/qa-coach-tour.ts    the role extension runs, and neither context
+ *                              leaks into the other
+ *   script/qa-input.ts         one gesture is one lesson
+ *
+ * The comprehension pass with somebody who has never seen Sakred is a person's
+ * job and remains outstanding; it is a reason to change copy, not a reason to
+ * keep the walkthrough unreachable for the members it was written for.
+ *
+ * ── What turning this on does not do ──────────────────────────────────────
+ *
+ * It does not touch anybody's data, settings or intake. It decides one thing:
+ * whether an account that has not completed `REQUIRED_TOUR_VERSION` is offered
+ * it on entry. Manual replay from the help portal is independent of this and
+ * of completion — see `requestReplay`.
  */
-export const AUTO_START_ENABLED = false;
+export const AUTO_START_ENABLED = true;
 
 /**
  * Whether an existing member is owed the required walkthrough.
