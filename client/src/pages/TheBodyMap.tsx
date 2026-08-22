@@ -216,7 +216,7 @@ export default function TheBodyMap() {
         eyebrow="The Intelligence"
         title={<>The Body Map.</>}
         testId="text-bodymap-headline"
-        marks={["No tradition owns the body", "Every stage sets up the next", "Where you are, not what's wrong"]}
+        marks={["No tradition owns the body", "Every stage sets up the next", "Learn to read your own body"]}
       />
 
       {/* ── The figure ───────────────────────────────────────
@@ -394,7 +394,7 @@ export default function TheBodyMap() {
            stock library rather than a house. */
         image="/images/retreat-mountain.webp"
         alt="A mountain range under early light"
-        eyebrow="Not Eastern. Not Western. Human."
+        eyebrow="Credit Where It's Due"
         title={<>The synthesis is ours. <span className="text-gold">The traditions keep their names.</span></>}
         tall
         testId="text-guardrail"
@@ -499,7 +499,7 @@ export default function TheBodyMap() {
           <motion.div variants={fadeInUp}>
             <SectionHeader
               eyebrow="The Practice"
-              title={<>Reading it is half. <span className="text-gold">Living it is the rest.</span></>}
+              title={<>Where This <span className="text-gold">Gets Used</span></>}
               intro={EMBODIED_PRACTICE.promise}
               onInk
             />

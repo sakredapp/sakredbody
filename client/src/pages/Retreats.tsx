@@ -124,7 +124,7 @@ export default function Retreats() {
       <Section tone="ink">
         <SectionHeader
           eyebrow="Work With Us"
-          title={<>Different Ways In. <span className="text-gold">The Same Standard.</span></>}
+          title={<>The Standard <span className="text-gold">Doesn't Move</span></>}
           className="mb-10"
         />
         <WaysToWork current="retreats" />

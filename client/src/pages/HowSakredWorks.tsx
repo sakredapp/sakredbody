@@ -44,7 +44,7 @@ const AUTHORITY = [
     body: "Tell Sakred you're wrecked on a morning your sleep looked fine, and the reading changes. A wearable measures one thing well and has no access to what you can feel.",
   },
   {
-    title: "Guidance, not instruction",
+    title: "A plan is a proposal",
     body: "Your coach sets a plan and can raise a target; the app carries it and records what you were asked for on the day you were asked. Neither of them decides for you.",
   },
   {
@@ -180,7 +180,7 @@ export default function HowSakredWorks() {
           <motion.div variants={fadeInUp}>
             <SectionHeader
               eyebrow="Who Decides"
-              title={<>Guidance, <span className="text-gold">not authority.</span></>}
+              title={<>Nobody Here <span className="text-gold">Decides For You</span></>}
               testId="text-authority-headline"
             />
           </motion.div>
