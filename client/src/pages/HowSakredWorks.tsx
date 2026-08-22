@@ -81,7 +81,7 @@ export default function HowSakredWorks() {
             <SectionHeader
               eyebrow="The Reading"
               title={<>Sakred doesn't reduce you <span className="text-gold">to a score.</span></>}
-              intro="Two questions, in that order: what state is this body actually in, and what should today be. Four sources, and all four stay on screen underneath the answer."
+              intro="Two questions, in that order: what state is this body actually in, and what should today be. Every source stays on screen underneath the answer."
               testId="text-chain-headline"
             />
           </motion.div>

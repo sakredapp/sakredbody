@@ -166,7 +166,7 @@ function connectedTo(key: string): string[] {
 
 export default function TheBodyMap() {
   usePageMeta(
-    "The Body Map — Many Traditions, One Living Terrain | Sakred Body",
+    "The Body Map — How the Body Connects | Sakred Body",
     "The body as one connected chain, the traditions that studied each part of it, and how to tell where you currently are in it.",
   );
 
@@ -216,7 +216,7 @@ export default function TheBodyMap() {
         eyebrow="The Intelligence"
         title={<>The Body Map.</>}
         testId="text-bodymap-headline"
-        marks={["Many traditions", "One living terrain", "Nine stages, one loop"]}
+        marks={["No tradition owns the body", "Every stage sets up the next", "Where you are, not what's wrong"]}
       />
 
       {/* ── The figure ───────────────────────────────────────
@@ -232,8 +232,8 @@ export default function TheBodyMap() {
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={stagger} className="relative z-10">
           <motion.div variants={fadeInUp}>
             <SectionHeader
-              eyebrow="One Body, Many Lenses"
-              title={<>Different cultures. Different lenses. <span className="text-gold">One human body.</span></>}
+              eyebrow="The Territories"
+              title={<>Different names for <span className="text-gold">the same terrain.</span></>}
               /* The figure does not cycle under reduced motion, so the line
                  promising it does is only true for some visitors. The
                  normal-motion version keeps its full sentence. */
@@ -415,7 +415,7 @@ export default function TheBodyMap() {
             <SectionHeader
               eyebrow="How It Connects"
               title={<>The Cycle</>}
-              intro="Nine stages, and every one of them sets the conditions for the next."
+              intro="Every stage sets the conditions for the next one."
               testId="text-chain-headline"
             />
           </motion.div>
@@ -434,7 +434,7 @@ export default function TheBodyMap() {
           <motion.div variants={fadeInUp}>
             <SectionHeader
               eyebrow="What It Means"
-              title={<>Four Consequences of <span className="text-gold">Thinking This Way</span></>}
+              title={<>What Follows <span className="text-gold">From This</span></>}
               testId="text-implications-headline"
             />
           </motion.div>
@@ -461,7 +461,7 @@ export default function TheBodyMap() {
           <motion.div variants={fadeInUp}>
             <SectionHeader
               eyebrow="Reading Your Position"
-              title={<>Six Pairs Worth <span className="text-gold">Telling Apart</span></>}
+              title={<>Pairs Worth <span className="text-gold">Telling Apart</span></>}
               intro="Most people run on three signals — tired, hungry, sore — for a system producing dozens. The fix isn't more data. It's more discrimination."
               testId="text-confusions-headline"
             />

@@ -98,8 +98,8 @@ export const BEATS: Beat[] = [
   {
     key: "directions",
     eyebrow: "What it asks for",
-    line: "One body.",
-    gold: "Two directions.",
+    line: "Clearing and building are",
+    gold: "the same body's work.",
     body: "Restoration without rebuilding produces someone relaxed and fragile. Building without restoration produces someone impressive who breaks. Neither is the good half. The skill is entering one, taking what it offers, and being able to leave.",
   },
   {

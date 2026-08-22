@@ -196,7 +196,7 @@ export default function Executive() {
       <Section tone="ink">
         <SectionHeader
           eyebrow="Work With Us"
-          title={<>Three Shapes, <span className="text-gold">One Standard</span></>}
+          title={<>Different Ways In. <span className="text-gold">The Same Standard.</span></>}
           className="mb-10"
         />
         <WaysToWork current="executive" />
@@ -208,7 +208,7 @@ export default function Executive() {
           <motion.div variants={fadeInUp}>
             <SectionHeader
               eyebrow="What We Actually Work On"
-              title={<>Five Layers, <span className="text-gold">One System</span></>}
+              title={<>Nothing Here Works <span className="text-gold">On Its Own</span></>}
               testId="text-pillars-headline"
             />
           </motion.div>
@@ -239,7 +239,7 @@ export default function Executive() {
           <motion.div variants={fadeInUp}>
             <SectionHeader
               eyebrow="Who This Is For"
-              title={<>Four Ways People <span className="text-gold">Arrive Here</span></>}
+              title={<>How People <span className="text-gold">Arrive Here</span></>}
               testId="text-who-headline"
             />
           </motion.div>

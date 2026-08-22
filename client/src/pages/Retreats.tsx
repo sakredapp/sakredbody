@@ -124,7 +124,7 @@ export default function Retreats() {
       <Section tone="ink">
         <SectionHeader
           eyebrow="Work With Us"
-          title={<>Three Shapes, <span className="text-gold">One Standard</span></>}
+          title={<>Different Ways In. <span className="text-gold">The Same Standard.</span></>}
           className="mb-10"
         />
         <WaysToWork current="retreats" />
@@ -217,7 +217,7 @@ export default function Retreats() {
           <motion.div variants={fadeInUp}>
             <SectionHeader
               eyebrow="The Formats"
-              title={<>Six Ways In, <span className="text-gold">One Infrastructure</span></>}
+              title={<>Built On the Same <span className="text-gold">Infrastructure</span></>}
               intro="Concierge-managed. Application only."
               testId="text-formats-headline"
             />

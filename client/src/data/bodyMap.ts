@@ -134,7 +134,7 @@ export const MAP_REGIONS: MapRegion[] = [
     traditional: ["Ayurveda — agni", "TCM — spleen and stomach", "European herbalism and bitters", "Fermentation traditions"],
     modern: ["Digestive physiology", "Microbiome research", "Enzyme and absorption science"],
     lens:
-      "This is where the traditions converge rather than divide. Agni in Ayurveda, spleen and stomach in Chinese medicine, bitters and fermentation in Europe — four vocabularies, one recurring observation.",
+      "This is where the traditions converge rather than divide. Agni in Ayurveda, spleen and stomach in Chinese medicine, bitters and fermentation in Europe — different vocabularies, the same recurring observation.",
     measured:
       "What enters has to be received, transformed, absorbed and cleared. Enzymes, bile, the gut lining and the microbiome are where that gets specific, and nutrition turns out to be what you absorb rather than what you eat.",
     practice: ["Digestion", "Drainage", "Food"],
