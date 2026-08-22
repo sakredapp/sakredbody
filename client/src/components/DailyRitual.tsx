@@ -23,6 +23,7 @@ import {
 import { mountGem } from "@/lib/gem";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BirthDateField } from "@/components/portal/BirthFields";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Check, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -225,11 +226,13 @@ function ChartInvite({ depth }: { depth: number }) {
       <div className="grid sm:grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-muted-foreground">Birth date</label>
-          <Input
-            type="date"
+          {/* Lists rather than a native picker, for the reason in
+              `BirthFields`: the Samsung dialog is unusable and opens on today,
+              which is never the answer to this question. */}
+          <BirthDateField
             value={birthDate}
-            onChange={(e) => setBirthDate(e.target.value)}
-            data-testid="input-birth-date"
+            onChange={setBirthDate}
+            testId="input-birth-date"
           />
         </div>
         <div>

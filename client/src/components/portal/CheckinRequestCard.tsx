@@ -167,7 +167,7 @@ export function CheckinRequestCard() {
               value={note}
               onChange={(e) => setNote(e.target.value.slice(0, 1000))}
               rows={isReflection ? 4 : 2}
-              className="w-full rounded-md border border-border/40 bg-transparent p-2 text-sm"
+              className="w-full rounded-md border border-border/40 bg-transparent p-2 text-base md:text-sm"
               data-testid="checkin-request-note"
             />
           </div>

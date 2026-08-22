@@ -29,13 +29,17 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Moon, Wind, HeartPulse } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-import { FreeSession } from "@/components/build/FreeSession";
+import { seedOpenWorkout } from "@/hooks/use-open-workout";
+import { type RunningSession } from "@/lib/startSession";
+import { useWorkoutSheet } from "@/components/build/WorkoutSheet";
+import { RestoreMemory } from "@/components/build/TrainingMemory";
+import { RecentSessions } from "@/components/build/RecentSessions";
 import { TodayRead } from "@/components/TodayRead";
 import { RhythmSection } from "@/components/RhythmCards";
 import { Panel, SectionHeading } from "@/components/portal/Panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { useHealthSummary } from "@/hooks/use-health";
+import { useHealthConnection, useHealthSummary } from "@/hooks/use-health";
 import { EXERCISE_CATEGORIES, CATEGORY_LOAD, activityLabel } from "@shared/models/training";
 import { HabitPanel } from "@/components/habits/HabitPanel";
 import { TerrainCheckin } from "@/components/habits/TerrainCheckin";
@@ -235,12 +239,12 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
   /**
    * A restorative session, started here and logged by the Build engine.
    *
-   * Held in component state rather than read from `/api/training/sessions/open`
-   * because that endpoint is what Build resumes from — a sauna started on this
-   * screen and a workout started on that one are the same row, and whichever
-   * screen the member is looking at should be the one showing it.
+   * It used to be rendered inline on this screen, which meant a sauna and a
+   * squat session — the same row in `workout_sessions` — were two different
+   * looking things depending on which tab you happened to start them from. The
+   * workout layer takes both now, so this screen's job is the way in.
    */
-  const [session, setSession] = useState<{ id: string; title: string } | null>(null);
+  const workout = useWorkoutSheet();
 
   const prefs = useQuery<{ weightUnit?: "kg" | "lb" }>({ queryKey: ["/api/auth/user"] });
   const unit = prefs.data?.weightUnit === "kg" ? "kg" : "lb";
@@ -248,11 +252,13 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
   const start = useMutation({
     mutationFn: async (label: string) => {
       const res = await apiRequest("POST", "/api/training/sessions", { title: label });
-      return (await res.json()) as { id: string; title: string | null };
+      return (await res.json()) as RunningSession;
     },
-    onSuccess: (row, label) => {
-      setSession({ id: row.id, title: row.title ?? label });
-      qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
+    onSuccess: async (row) => {
+      // Seeded, not invalidated — same reason as everywhere else a session is
+      // created. See `seedOpenWorkout`.
+      await seedOpenWorkout(qc, row);
+      workout.open();
     },
   });
 
@@ -277,8 +283,17 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
    *     loading      we do not know yet — say nothing
    *     !connected   genuinely nothing linked — offer the CTA
    *     connected    linked; may still have no readings this week
+   *
+   * It now asks `/api/health/status` rather than reading `connected` off the
+   * summary. Same three states, but the third was unreachable before: the
+   * summary answers both questions in one payload, so "still loading" arrived
+   * here as `connected === false` and this screen offered the CTA anyway —
+   * the exact wrong the comment above was written to prevent, reintroduced by
+   * the source it trusted.
    */
-  const connected = health.data?.connected === true;
+  const connection = useHealthConnection();
+  const connected = connection === "connected";
+  const stillAsking = connection === "unknown";
   const noReadings = sleep === null && hrv === null && rhr === null;
 
   return (
@@ -345,8 +360,9 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">
-            {/* Only suggest connecting to somebody who has not. */}
-            {connected
+            {/* Only suggest connecting to somebody who has not — and only
+                once we know, which `stillAsking` is what makes possible. */}
+            {connected || stillAsking
               ? "Nothing to read yet. Log a session and this starts filling in."
               : "Nothing to read yet. Connect health data or log a session."}
           </p>
@@ -360,7 +376,12 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
         onAction={noReadings ? undefined : () => onOpen("coaching")}
         data-testid="restore-recovery"
       >
-        {health.isLoading ? (
+        {/*
+          A skeleton while either question is open. Falling through to the
+          "Connect health data" branch during that beat is what made a
+          connected member's Restore screen ask them to connect.
+        */}
+        {health.isLoading || stillAsking ? (
           <Skeleton className="h-14 w-full" />
         ) : !connected ? (
           <div className="space-y-3">
@@ -406,29 +427,28 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
         )}
       </Panel>
 
+      {/*
+        ── What their last session left them with ──
+
+        The other half of an answer Build already gives. A member who reported a
+        tight left low back after hinging does not need Restore repeating the
+        training advice back at them; they need to be told that today might be
+        better spent giving that area something than asking more of it. One
+        observation, one reader, two useful readings — see `trainingMemory`.
+      */}
+      <RestoreMemory />
+
+      {/*
+        What they have actually been doing to restore, from both places it is
+        recorded — logged practice and whatever their phone captured. Thirty
+        days rather than seven: restorative work is weekly at best for most
+        people, and a seven-day window shows an empty panel to somebody who has
+        been perfectly consistent.
+      */}
+      <RecentSessions days={30} lens="restore" title="Your Restore history" />
+
       {/* ── Restoring is something you do, not only something you skip ── */}
-      {session ? (
-        /*
-          The same engine Build uses, on this screen.
-          
-          Not a second implementation and not a redirect. `workout_sessions`
-          and `workout_sets` already treat a sauna and a set of squats
-          identically — the catalogue's own load numbers are what decide which
-          side of the ledger something lands on — so the only thing Restore
-          needed was a way in.
-        */
-        <FreeSession
-          sessionId={session.id}
-          title={session.title}
-          unit={unit}
-          onDone={() => {
-            setSession(null);
-            qc.invalidateQueries({ queryKey: ["/api/terrain/today"] });
-            qc.invalidateQueries({ queryKey: ["/api/today"] });
-          }}
-        />
-      ) : (
-        <Panel title="Movement that restores" data-testid="restore-movement">
+      <Panel title="Movement that restores" data-testid="restore-movement">
           <p className="text-sm text-muted-foreground mb-3">
             Rest is not the only way to give capacity back. These are logged the
             same as anything else, and they count on the other side of the ledger.
@@ -447,16 +467,17 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
                 disabled={start.isPending}
                 className="rounded-full border border-[hsl(var(--gold))]/20 px-2.5 py-1 text-xs text-muted-foreground tap-clean hover:border-[hsl(var(--gold))]/50 hover:text-foreground transition-colors disabled:opacity-50"
                 data-testid={`restore-start-${c.id}`}
+                data-tour-id="restore-practice"
+                data-tour-instance={c.id}
               >
                 {c.label}
               </button>
             ))}
           </div>
-          <p className="text-[11px] text-muted-foreground mt-3">
-            Tap one to start logging it.
-          </p>
-        </Panel>
-      )}
+        <p className="text-[11px] text-muted-foreground mt-3">
+          Tap one to start logging it.
+        </p>
+      </Panel>
 
       {/*
         An idea, for somebody who has already decided to move.

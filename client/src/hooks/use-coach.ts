@@ -60,6 +60,8 @@ export type ClientCard = {
   lastMessage: { at: string | null; from: string } | null;
   /** Messages from this client the coach hasn't read. A number, and nothing else. */
   unread: number;
+  /** When this coach last pressed Mark reviewed. Null means never. */
+  lastReviewedAt: string | null;
 };
 
 export function useMyClients() {

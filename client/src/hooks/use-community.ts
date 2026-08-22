@@ -29,6 +29,27 @@ export interface Reaction {
   mine: boolean;
 }
 
+/** One movement on a shared workout card. Working sets only. */
+export interface SharedMovement {
+  exerciseId: string;
+  name: string;
+  sets: number;
+  reps: number | null;
+  topWeightKg: number | null;
+  supersetGroup: string | null;
+}
+
+export interface SharedWorkout {
+  sessionId: string;
+  title: string | null;
+  onDate: string;
+  durationMinutes: number | null;
+  movements: SharedMovement[];
+  volumeKg: number | null;
+  /** When the member published this. The card is as of then, and only then. */
+  publishedAt: string;
+}
+
 export interface Message {
   id: string;
   channelId: string;
@@ -47,6 +68,18 @@ export interface Message {
   audioMime?: string | null;
 
   audioDurationSeconds?: number | null;
+  /** A photograph, when there is one. An id, never a URL — see MediaImage. */
+  imageAssetId?: string | null;
+
+  /**
+   * The workout this post is about, as the member published it.
+   *
+   * A copy taken at publish time, not a live view of their training log —
+   * correcting a set later corrects the log and leaves this post saying what
+   * it said. Null when the post is not about a workout, or is a tombstone.
+   */
+  workout?: SharedWorkout | null;
+
   replyCount: number;
   deletedAt: string | null;
   editedAt: string | null;
@@ -147,6 +180,8 @@ export function usePostMessage() {
       audioUrl?: string | null;
       audioMime?: string | null;
       audioDurationSeconds?: number | null;
+      imageAssetId?: string | null;
+      sharedSessionId?: string | null;
     }) => send<Message>("POST", "/api/community/messages", input),
     onSuccess: (created) => invalidateConversation(created.channelId, created.rootId),
   });

@@ -52,9 +52,25 @@ import type { Channel } from "@shared/schema";
 import { SectionHeading } from "@/components/portal/Panel";
 import { ReportDialog } from "@/components/ReportDialog";
 import { VoiceRecorderControl, VoiceMemoPlayer } from "@/components/VoiceMemo";
+import { MediaImage } from "@/components/MediaImage";
+import { PhotoAttach, type PhotoAttachment } from "@/components/PhotoAttach";
+import { SharedWorkoutCard } from "@/components/SharedWorkoutCard";
 
 /** Kept short deliberately. A long picker turns a reaction into a decision. */
-const REACTIONS = ["🔥", "🙏", "💛", "👀", "🌙"];
+/**
+ * One reaction, deliberately.
+ *
+ * This was five emoji behind a `+` picker. The picker is the beginning of an
+ * engagement surface — five becomes twelve, twelve becomes a tray, and a
+ * member starts choosing how to feel about a post before they have finished
+ * reading it. Room is for acknowledgement and conversation, not for scoring
+ * each other.
+ *
+ * So: one thumb. Tap to acknowledge, tap again to take it back. The storage
+ * model still carries `emoji`, so a second reaction remains a product decision
+ * rather than a migration, and nothing here forecloses it.
+ */
+const LIKE = "\u{1F44D}";
 
 // ─── Composer ──────────────────────────────────────────────────────────────
 
@@ -67,18 +83,26 @@ function Composer({
   onSubmit,
   onCancel,
   allowVoice = false,
+  allowPhoto = false,
 }: {
   placeholder: string;
   submitLabel: string;
   initial?: string;
   autoFocus?: boolean;
   pending: boolean;
-  onSubmit: (body: string, audio?: { url: string; mime: string; durationSeconds: number }) => void;
+  onSubmit: (
+    body: string,
+    audio?: { url: string; mime: string; durationSeconds: number },
+    imageAssetId?: string | null,
+  ) => void;
   onCancel?: () => void;
   /** Off for edits — you can add words to a memo, not re-record it. */
   allowVoice?: boolean;
+  /** Off for edits and replies to announcements. */
+  allowPhoto?: boolean;
 }) {
   const [body, setBody] = useState(initial);
+  const [photo, setPhoto] = useState<PhotoAttachment | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -96,9 +120,15 @@ function Composer({
 
   const submit = () => {
     const text = body.trim();
-    if (!text || pending) return;
-    onSubmit(text);
+    /*
+      A photograph is a thing to say. Requiring words alongside it would mean
+      the one post nobody needs to caption — here is the lift — is the one the
+      composer refuses to send.
+    */
+    if ((!text && !photo) || pending) return;
+    onSubmit(text, undefined, photo?.assetId ?? null);
     setBody("");
+    setPhoto(null);
   };
 
   return (
@@ -131,7 +161,7 @@ function Composer({
         <Button
           size="sm"
           onClick={submit}
-          disabled={!body.trim() || pending}
+          disabled={(!body.trim() && !photo) || pending}
           className="bg-gold border-gold-border text-white"
           data-testid="button-community-send"
         >
@@ -145,9 +175,20 @@ function Composer({
           <VoiceRecorderControl
             disabled={pending}
             onSend={(audio) => {
-              onSubmit(body.trim(), audio);
+              onSubmit(body.trim(), audio, photo?.assetId ?? null);
               setBody("");
+              setPhoto(null);
             }}
+          />
+        )}
+
+        {allowPhoto && (
+          <PhotoAttach
+            purpose="room"
+            attached={photo}
+            onAttached={setPhoto}
+            onCleared={() => setPhoto(null)}
+            disabled={pending}
           />
         )}
 
@@ -173,59 +214,50 @@ function Reactions({
   message: Message;
   onToggle: (emoji: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const has = new Set(message.reactions.map((r) => r.emoji));
+  const like = message.reactions.find((r) => r.emoji === LIKE);
+  const count = like?.count ?? 0;
+  const mine = !!like?.mine;
 
   return (
     <div className="flex items-center gap-1 flex-wrap">
-      {message.reactions.map((r) => (
-        <button
-          key={r.emoji}
-          onClick={() => onToggle(r.emoji)}
-          className={cn(
-            "text-xs rounded-full px-2 py-0.5 border transition-colors",
-            r.mine
-              ? "border-[hsl(var(--gold))] bg-[hsl(var(--gold))]/15"
-              : "border-border/60 hover:border-[hsl(var(--gold))]/50",
-          )}
-          data-testid={`button-reaction-${r.emoji}`}
-        >
-          {r.emoji} {r.count}
-        </button>
-      ))}
+      <button
+        onClick={() => onToggle(LIKE)}
+        aria-pressed={mine}
+        aria-label={mine ? "Remove your acknowledgement" : "Acknowledge this"}
+        className={cn(
+          "text-xs rounded-full px-2 py-0.5 border transition-colors tap-clean",
+          mine
+            ? "border-[hsl(var(--gold))] bg-[hsl(var(--gold))]/15"
+            : "border-border/60 text-muted-foreground/70 hover:border-[hsl(var(--gold))]/50",
+        )}
+        data-testid="button-reaction-like"
+      >
+        {/* The count only once somebody has. A standing "0" invites nothing. */}
+        {LIKE}{count > 0 ? ` ${count}` : ""}
+      </button>
 
-      {open ? (
-        <span className="flex items-center gap-0.5">
-          {REACTIONS.filter((e) => !has.has(e)).map((e) => (
-            <button
-              key={e}
-              onClick={() => {
-                onToggle(e);
-                setOpen(false);
-              }}
-              className="text-xs rounded-full px-1.5 py-0.5 hover:bg-muted"
-            >
-              {e}
-            </button>
-          ))}
+      {/*
+        Any reaction from before this change still renders, read-only in
+        spirit — tapping removes your own. Nothing is migrated away, and a
+        member who reacted with a moon last week does not find it vanished.
+      */}
+      {message.reactions
+        .filter((r) => r.emoji !== LIKE)
+        .map((r) => (
           <button
-            onClick={() => setOpen(false)}
-            className="text-muted-foreground/60 px-1"
-            aria-label="Close"
+            key={r.emoji}
+            onClick={() => onToggle(r.emoji)}
+            className={cn(
+              "text-xs rounded-full px-2 py-0.5 border transition-colors",
+              r.mine
+                ? "border-[hsl(var(--gold))] bg-[hsl(var(--gold))]/15"
+                : "border-border/60 hover:border-[hsl(var(--gold))]/50",
+            )}
+            data-testid={`button-reaction-${r.emoji}`}
           >
-            <X className="h-3 w-3" />
+            {r.emoji} {r.count}
           </button>
-        </span>
-      ) : (
-        <button
-          onClick={() => setOpen(true)}
-          className="text-xs text-muted-foreground/50 hover:text-[hsl(var(--gold))] px-1.5 py-0.5"
-          aria-label="Add a reaction"
-          data-testid="button-add-reaction"
-        >
-          +
-        </button>
-      )}
+        ))}
     </div>
   );
 }
@@ -301,11 +333,29 @@ function MessageBody({
             onCancel={onCancelEdit}
           />
         ) : (
-          // whitespace-pre-wrap so paragraph breaks survive; break-words so a
-          // pasted URL can't push the column wider than the phone.
-          <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words">
-            {message.body}
-          </p>
+          <>
+            {/* whitespace-pre-wrap so paragraph breaks survive; break-words so
+                a pasted URL can't push the column wider than the phone. */}
+            {message.body && (
+              <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words">
+                {message.body}
+              </p>
+            )}
+
+            {/* The workout above the photograph: the card is what the post is
+                about, the picture is how it looked. */}
+            {message.workout && <SharedWorkoutCard workout={message.workout} />}
+
+            {message.imageAssetId && (
+              <MediaImage
+                assetId={message.imageAssetId}
+                variant="display"
+                alt={`Photo shared by ${displayName(message.author)}`}
+                aspect="4 / 3"
+                className="max-w-sm"
+              />
+            )}
+          </>
         )}
 
         {!gone && !editing && (
@@ -449,7 +499,8 @@ function ThreadNode({
               autoFocus
               pending={post.isPending}
               allowVoice
-              onSubmit={(body, audio) => {
+              allowPhoto
+              onSubmit={(body, audio, imageAssetId) => {
                 post.mutate(
                   {
                     channelId,
@@ -458,6 +509,7 @@ function ThreadNode({
                     audioUrl: audio?.url ?? null,
                     audioMime: audio?.mime ?? null,
                     audioDurationSeconds: audio?.durationSeconds ?? null,
+                    imageAssetId,
                   },
                   { onError: (e) => toast({ title: e.message, variant: "destructive" }) },
                 );
@@ -556,7 +608,7 @@ function RoomView({
   const readOnly = channel.isReadOnly && user?.isAdmin !== "true";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tour-id="room-feed">
       <div className="space-y-1">
         <div className="flex items-center gap-2 flex-wrap">
           <h2 className="font-display text-2xl">{channel.name}</h2>
@@ -581,7 +633,8 @@ function RoomView({
           submitLabel="Post"
           pending={post.isPending}
           allowVoice
-          onSubmit={(body, audio) =>
+          allowPhoto
+          onSubmit={(body, audio, imageAssetId) =>
             post.mutate(
               {
                 channelId: channel.id,
@@ -589,6 +642,7 @@ function RoomView({
                 audioUrl: audio?.url ?? null,
                 audioMime: audio?.mime ?? null,
                 audioDurationSeconds: audio?.durationSeconds ?? null,
+                imageAssetId,
               },
               { onError: (e) => toast({ title: e.message, variant: "destructive" }) },
             )

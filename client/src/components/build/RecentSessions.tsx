@@ -36,6 +36,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import {
+  isPracticeCategory,
   summariseSession,
   effectivePlacement,
   PLACEMENT_LABEL,
@@ -47,6 +48,7 @@ import type { HealthWorkout } from "@shared/schema";
 import { useHealthSummary } from "@/hooks/use-health";
 import { Panel } from "@/components/portal/Panel";
 import { cn } from "@/lib/utils";
+import { formatLocalDateString, addDaysToString } from "@shared/utils/dates";
 
 type Session = {
   id: string;
@@ -102,7 +104,50 @@ const PLACEMENT_TONE: Record<WorkoutPlacement, string> = {
   both: "text-muted-foreground",
 };
 
-export function RecentSessions({ days = 7 }: { days?: number }) {
+/**
+ * Which half of the practice a list is about.
+ *
+ * `null` is everything, which is what Build's own week has always shown and
+ * still does. The two named lenses exist because Restore had no history at all
+ * — a member logged a fifty-minute mobility session and the only screen that
+ * could tell them so was on the other side of the app, under a heading about
+ * training.
+ *
+ * ── How a session is placed ───────────────────────────────────────────────
+ *
+ * An imported workout carries a placement already, derived from its type and
+ * whatever the member overrode it to. A Sakred session does not, deliberately:
+ * one session can span several categories and a single badge would be a claim
+ * the data does not support.
+ *
+ * So it is judged by its sets. A session whose movements are all practice
+ * categories — breath, mobility, tissue work, restorative movement — belongs
+ * to Restore; anything with load in it belongs to Build; and a session with
+ * both appears in both, because it genuinely was both and hiding it from one
+ * list would be the same lie in a smaller place.
+ */
+export type HistoryLens = "restore" | "build" | null;
+
+function sakredLens(sets: Session["sets"]): { restore: boolean; build: boolean } {
+  let restore = false;
+  let build = false;
+  for (const set of sets) {
+    if (isPracticeCategory(set.category)) restore = true;
+    else build = true;
+  }
+  return { restore, build };
+}
+
+export function RecentSessions({
+  days = 7,
+  lens = null,
+  title,
+}: {
+  days?: number;
+  lens?: HistoryLens;
+  /** Defaults to the honest description of the window being shown. */
+  title?: string;
+}) {
   const { data, isLoading } = useQuery<{ unit: WeightUnit; sessions: Session[] }>({
     queryKey: ["/api/training/sessions"],
     staleTime: 60_000,
@@ -113,17 +158,24 @@ export function RecentSessions({ days = 7 }: { days?: number }) {
 
   if (isLoading || !data) return null;
 
-  // The member's own date, which is what `onDate` is written against — using
-  // the device's today would put a late-evening session in the wrong bucket
-  // for anybody whose timezone differs from the one they logged it in.
-  const today = new Date().toISOString().slice(0, 10);
-  const cutoff = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  // The member's own date, which is what `onDate` is written against. This read
+  // `toISOString()`, which is the UTC date and not anybody's calendar: after
+  // 20:00 in Toronto it is already tomorrow, so the session somebody had just
+  // finished came back labelled "Yesterday". The comment here claimed the fix
+  // while the line underneath it did the opposite.
+  const today = formatLocalDateString();
+  const cutoff = addDaysToString(today, -days);
 
   // An unfinished session is one somebody is in the middle of, or abandoned.
   // Either way it is not history yet, and showing it as a completed day is a
   // small lie the rest of the screen would inherit.
   const logged: Entry[] = data.sessions
     .filter((s) => s.finishedAt && s.onDate >= cutoff && s.sets.length > 0)
+    .filter((s) => {
+      if (!lens) return true;
+      const has = sakredLens(s.sets);
+      return lens === "restore" ? has.restore : has.build;
+    })
     .map((s) => ({
       id: s.id,
       onDate: s.onDate,
@@ -156,12 +208,25 @@ export function RecentSessions({ days = 7 }: { days?: number }) {
       ),
     }));
 
-  const recent = [...logged, ...imported].sort((a, b) => b.at - a.at).slice(0, 12);
+  /*
+    An imported workout's placement is already the answer. `both` belongs to
+    either lens — a long walk is restorative and it is also movement — and an
+    entry with no placement at all is not claimed by a filtered list, because
+    guessing would put somebody's unclassified activity under a heading it may
+    not belong to.
+  */
+  const importedInLens = lens
+    ? imported.filter((e) => e.placement === lens || e.placement === "both")
+    : imported;
+
+  const recent = [...logged, ...importedInLens]
+    .sort((a, b) => b.at - a.at)
+    .slice(0, lens ? 20 : 12);
 
   if (recent.length === 0) return null;
 
   return (
-    <Panel title="This week">
+    <Panel title={title ?? (days <= 7 ? "This week" : `The last ${days} days`)}>
       <div className="space-y-3">
         {recent.map((e) => (
           <div key={e.id} className="space-y-1" data-testid={`recent-session-${e.id}`}>

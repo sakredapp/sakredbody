@@ -20,6 +20,7 @@ const FoodChart = lazyRoute("FoodChart", () => import("@/pages/FoodChart"));
 const Mastermind = lazyRoute("Mastermind", () => import("@/pages/Mastermind"));
 const LoginPage = lazyRoute("LoginPage", () => import("@/pages/LoginPage"));
 const ResetPasswordPage = lazyRoute("ResetPasswordPage", () => import("@/pages/ResetPasswordPage"));
+const VerifyEmailPage = lazyRoute("VerifyEmailPage", () => import("@/pages/VerifyEmail"));
 const MemberDashboard = lazyRoute("MemberDashboard", () => import("@/pages/MemberDashboard"));
 const AdminPortal = lazyRoute("AdminPortal", () => import("@/pages/AdminPortal"));
 const CoachWorkspace = lazyRoute("CoachWorkspace", () => import("@/pages/CoachWorkspace"));
@@ -146,6 +147,7 @@ function Router() {
       {/* Reached from an emailed link, so it must resolve on both hosts and
           while signed out. Above the auth'd routes for that reason. */}
       <Route path="/reset-password" component={ResetPasswordPage} />
+      <Route path="/verify-email" component={VerifyEmailPage} />
       <Route path="/member" component={MemberDashboard} />
       <Route path="/coaching" component={MemberDashboard} />
       {/*

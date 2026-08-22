@@ -15,7 +15,7 @@
 import { useEffect, useState } from "react";
 import { Bell, HeartPulse, LayoutGrid, Check, ExternalLink } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
-import { useHealthSummary, useHealthSync } from "@/hooks/use-health";
+import { useHealthSync, useHealthView } from "@/hooks/use-health";
 import { openHealthSettings } from "@/lib/health";
 import {
   getNoticeDepth,
@@ -40,19 +40,25 @@ const DEPTHS: { key: NoticeDepth; title: string; example: string | null }[] = [
 ];
 
 export function HealthSettings() {
-  const { available, reason, platform, connect, disconnect } = useHealthSync();
-  const { data } = useHealthSummary(30);
+  const { connect, disconnect } = useHealthSync();
+  const { view, connection, reason, platform, summary } = useHealthView(30);
   const { toast } = useToast();
 
   const [depth, setDepth] = useState<NoticeDepth>(getNoticeDepth());
   const [granted, setGranted] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const connected = data?.connected ?? false;
+  /*
+    Settings asks the connection question directly, because that is the
+    question this screen is about — not "do we hold measurements". The two
+    were the same expression before, which is how this panel and the Home
+    screen could describe the same account differently on the same launch.
+  */
+  const connected = connection === "connected";
   const isNative = Capacitor.isNativePlatform();
   const isIos = Capacitor.getPlatform() === "ios";
   const storeName = platform === "healthconnect" ? "Health Connect" : "Apple Health";
-  const metricCount = data?.metrics?.length ?? 0;
+  const metricCount = summary.data?.metrics?.length ?? 0;
 
   // The live answer, not the stored one. A member who turned notifications off
   // in iOS Settings should not see "Just the nudge" ticked here.
@@ -149,6 +155,23 @@ export function HealthSettings() {
               </p>
             )}
           </>
+        ) : connection === "unknown" ? (
+          /*
+            Still asking. This is the state the old code had no way to be in —
+            and printing "Not connected" here is precisely the sentence a
+            member reported seeing on a phone that was, in fact, connected.
+          */
+          <p className="text-sm text-muted-foreground">Checking your {storeName} connection…</p>
+        ) : connection === "error" ? (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              We couldn't check your {storeName} connection. This says nothing about your phone —
+              only that we couldn't ask.
+            </p>
+            <Button variant="outline" size="sm" onClick={() => summary.refetch()}>
+              Try again
+            </Button>
+          </div>
         ) : (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
@@ -158,7 +181,7 @@ export function HealthSettings() {
             <Button
               size="sm"
               onClick={() => connect.mutate()}
-              disabled={connect.isPending || available !== true}
+              disabled={connect.isPending || view.kind !== "disconnected"}
               data-testid="settings-health-connect"
             >
               {connect.isPending ? "Connecting…" : `Connect ${storeName}`}
@@ -167,12 +190,12 @@ export function HealthSettings() {
                 any app: it looks broken, and the member cannot tell whether
                 they mis-tapped. This is the only place that says why nothing
                 happened when they pressed it. */}
-            {available === false && (
+            {view.kind === "unavailable" && (
               <p className="text-[11px] text-destructive">
                 {reason ?? `${storeName} isn't available on this phone.`}
               </p>
             )}
-            {available === null && (
+            {view.kind === "unknown" && (
               <p className="text-[11px] text-muted-foreground">Checking {storeName}…</p>
             )}
             {connect.isError && (

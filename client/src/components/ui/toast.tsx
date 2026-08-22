@@ -14,7 +14,20 @@ const ToastViewport = React.forwardRef<
   <ToastPrimitives.Viewport
     ref={ref}
     className={cn(
-      "fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]",
+      /*
+       * The top inset, not `top-0`.
+       *
+       * On a phone the viewport is anchored to the top of the screen, and the
+       * top of the screen on an iPhone is the camera. "Posted to the room"
+       * rendered underneath the Dynamic Island — the notch ate the first line
+       * of every confirmation the app gives. The inset is added to the 1rem
+       * gap rather than replacing it, so a device without a cutout still gets
+       * the padding it had.
+       *
+       * From `sm:` the viewport moves to the bottom right and the inset is
+       * irrelevant, so it is reset there.
+       */
+      "fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 pt-[calc(env(safe-area-inset-top,0px)+1rem)] sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col sm:pt-4 md:max-w-[420px]",
       className
     )}
     {...props}

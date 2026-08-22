@@ -21,10 +21,32 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useMyClients, type ClientCard } from "@/hooks/use-coach";
 import { cn } from "@/lib/utils";
 
-type Filter = "all" | "unread" | "plan" | "no-plan";
+type Filter = "all" | "attention" | "unread" | "plan" | "no-plan";
+
+/**
+ * Something has happened with this client since the coach last said they had
+ * looked.
+ *
+ * Unread messages always qualify. Beyond that it is the message clock against
+ * the review clock, which is the one comparison this route already has the
+ * data for — a needs-attention flag that cost a second query per client would
+ * slow the screen a coach opens most, to sharpen a signal that is already
+ * mostly right.
+ *
+ * A client never reviewed counts as needing attention. That is correct on the
+ * day a coach is assigned and stops being true the moment they press the
+ * button once.
+ */
+function needsAttention(c: ClientCard): boolean {
+  if (c.unread > 0) return true;
+  if (!c.lastReviewedAt) return true;
+  const said = c.lastMessage?.at ? Date.parse(c.lastMessage.at) : 0;
+  return said > Date.parse(c.lastReviewedAt);
+}
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "all", label: "All" },
+  { id: "attention", label: "Needs attention" },
   { id: "unread", label: "Unread" },
   { id: "plan", label: "On a plan" },
   { id: "no-plan", label: "No plan" },
@@ -146,6 +168,7 @@ export function ClientRoster({
     const q = query.trim().toLowerCase();
     return clients.filter((c) => {
       if (q && !c.name.toLowerCase().includes(q)) return false;
+      if (filter === "attention" && !needsAttention(c)) return false;
       if (filter === "unread" && c.unread === 0) return false;
       if (filter === "plan" && !c.plan) return false;
       if (filter === "no-plan" && c.plan) return false;
@@ -191,7 +214,7 @@ export function ClientRoster({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search your clients"
-            className="pl-9 h-9 text-sm"
+            className="pl-9 h-9 text-base md:text-sm"
             data-testid="client-search"
           />
         </div>

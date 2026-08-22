@@ -37,6 +37,7 @@ import { useMemo, useState } from "react";
 import { explainY } from "@shared/utils/almanac";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BirthDateField, BirthTimeField } from "./BirthFields";
 import { cn } from "@/lib/utils";
 
 export type IntakeValues = {
@@ -94,15 +95,6 @@ export function IntakeStep({
   // Only recomputed when the name changes, because it walks every letter and
   // this runs on each keystroke otherwise.
   const ys = useMemo(() => explainY(fullName), [fullName]);
-
-  // Today, as the picker's ceiling. A birth date in the future is not a
-  // validation edge case, it is a typo, and the picker should not offer it.
-  const today = useMemo(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-      d.getDate(),
-    ).padStart(2, "0")}`;
-  }, []);
 
   const canSubmit = firstName.trim().length > 0 && Boolean(birthDate) && !saving;
 
@@ -213,56 +205,42 @@ export function IntakeStep({
           </div>
         )}
 
-        {/* `min-w-0` on both columns is load-bearing, not tidying. A grid item
-            defaults to min-width:auto, so a native date picker — which carries
-            a chunky intrinsic width on iOS — refuses to shrink below it and
-            spills over the neighbouring column instead of wrapping. The two
-            controls end up drawn on top of each other. Letting them shrink is
-            the fix; the wider gap is what keeps them apart once they do.
+        {/*
+          ── One layout, because there is one question ──
 
-            It was not sufficient on its own. WebKit also enforces a minimum
-            intrinsic width on the `date` and `time` controls themselves, and
-            that one ignores `width: 100%` — so the columns shrank, the inputs
-            did not, and the time control hung off the right of the card with
-            the two boxes touching where the gap should have been. The inputs
-            carry their own `min-w-0` below for that.
+          These two were side by side at some widths and stacked at others,
+          because the native controls they were built on have different
+          intrinsic widths on every platform. Three rounds of layout work went
+          into holding them together — `min-w-0` on the columns, then `min-w-0`
+          on the inputs because WebKit enforces its own minimum, then an uneven
+          `1.4fr 1fr` split — and all of it was downstream of controls that
+          could not be made to agree.
 
-            The columns are uneven because the content is: "12 Jan 2001" needs
-            noticeably more room than "01:10", and splitting them evenly is
-            what made the date side feel crammed while the time side had space
-            going spare. */}
-        <div className="grid grid-cols-1 min-[400px]:grid-cols-[1.4fr_1fr] gap-x-4 gap-y-3">
-          <div className="min-w-0 space-y-1.5">
-            <label
-              htmlFor="intake-birth-date"
-              className="text-xs uppercase tracking-[0.18em] text-muted-foreground"
-            >
+          Now they are lists (see `BirthFields`), which every platform draws the
+          same way, so both stack full-width and nothing depends on how wide the
+          phone happens to be. `max={today}` is gone with the date input and is
+          not missed: the year list ends at this year, so a future date of birth
+          is not something the control can express.
+        */}
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
               Date of birth
-            </label>
-            <Input
-              id="intake-birth-date"
-              type="date"
+            </p>
+            <BirthDateField
               value={birthDate}
-              max={today}
-              onChange={(e) => setBirthDate(e.target.value)}
-              className="w-full min-w-0 [color-scheme:dark]"
-              data-testid="intake-birth-date"
+              onChange={setBirthDate}
+              testId="intake-birth-date"
             />
           </div>
-          <div className="min-w-0 space-y-1.5">
-            <label
-              htmlFor="intake-birth-time"
-              className="text-xs uppercase tracking-[0.18em] text-muted-foreground"
-            >
+          <div className="space-y-1.5">
+            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
               Time <span className="normal-case tracking-normal">(optional)</span>
-            </label>
-            <Input
-              id="intake-birth-time"
-              type="time"
+            </p>
+            <BirthTimeField
               value={birthTime}
-              onChange={(e) => setBirthTime(e.target.value)}
-              className="w-full min-w-0 [color-scheme:dark]"
-              data-testid="intake-birth-time"
+              onChange={setBirthTime}
+              testId="intake-birth-time"
             />
           </div>
         </div>

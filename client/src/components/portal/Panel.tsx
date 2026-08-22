@@ -22,6 +22,17 @@ export function Panel({
   children,
   className,
   "data-testid": testId,
+  /*
+    Forwarded, because a walkthrough anchor written on a component and dropped
+    by it is worse than one that was never written: the release gate greps the
+    source, finds `data-tour-id="build-today"`, and reports the anchor placed
+    while the tour waits forever for an element that does not exist.
+
+    TypeScript does not catch it — unknown hyphenated JSX attributes are
+    permitted on components — so the only thing that can catch it is the
+    component accepting the prop, or a browser.
+  */
+  "data-tour-id": tourId,
 }: {
   /** Rendered in caps with wide tracking. Pass it in sentence case. */
   title?: string;
@@ -31,6 +42,7 @@ export function Panel({
   children: ReactNode;
   className?: string;
   "data-testid"?: string;
+  "data-tour-id"?: string;
 }) {
   return (
     <section
@@ -39,6 +51,7 @@ export function Panel({
         className,
       )}
       data-testid={testId}
+      data-tour-id={tourId}
     >
       {(title || action) && (
         <div className="flex items-center justify-between gap-3 mb-4">

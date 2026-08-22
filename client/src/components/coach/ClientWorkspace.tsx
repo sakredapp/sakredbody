@@ -44,6 +44,7 @@ import { Button } from "@/components/ui/button";
 import {
   useClientActivity,
   useClientHabits,
+  useMyClients,
   useClientOverview,
   useClientPlans,
   useClientTrends,
@@ -52,13 +53,15 @@ import {
 } from "@/hooks/use-coach";
 import type { HealthWorkout } from "@shared/schema";
 import { CheckinRequests } from "@/components/coach/CheckinRequests";
+import { MovementAndProgress } from "@/components/coach/MovementAndProgress";
 import { cn } from "@/lib/utils";
 
-type Tab = "overview" | "activity" | "habits" | "plan" | "messages";
+type Tab = "overview" | "activity" | "movement" | "habits" | "plan" | "messages";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "activity", label: "Activity" },
+  { id: "movement", label: "Movement & Progress" },
   { id: "habits", label: "Habits" },
   { id: "plan", label: "Plan" },
   { id: "messages", label: "Messages" },
@@ -641,6 +644,11 @@ function Plan({ memberId, memberName }: { memberId: string; memberName: string }
       <Section title="Health context" kind="health">
         {trends.isLoading ? (
           <Skeleton className="h-16 w-full" />
+        ) : trends.error ? (
+          // Not the same as a client with no phone linked, and a coach would
+          // act differently on each — one is a conversation to have, the other
+          // is nothing to do with them. Say which one this is.
+          <Empty>Couldn't load their health data. This says nothing about their connection.</Empty>
         ) : !trends.data?.connected ? (
           <Empty>
             No connected health data. Member-entered habits and check-ins still appear.
@@ -752,6 +760,46 @@ function Messages({ memberId, memberName }: { memberId: string; memberName: stri
 
 // ─── The workspace ─────────────────────────────────────────────────────────
 
+/**
+ * "I have looked at this client", with the date of the last time.
+ *
+ * Deliberately not automatic. Opening the page is not reviewing somebody: a
+ * coach who taps a name to find a phone number has reviewed nobody, and a
+ * cursor that moved on render would unflag exactly the client they opened by
+ * accident.
+ */
+function ReviewMark({ memberId }: { memberId: string }) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const clients = useMyClients();
+  const card = clients.data?.clients.find((c) => c.id === memberId);
+
+  const mark = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/coach/clients/${memberId}/reviewed`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/coach/clients"] }),
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <div className="flex items-center gap-3">
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => mark.mutate()}
+        disabled={mark.isPending}
+        data-testid="button-mark-reviewed"
+      >
+        {mark.isPending ? "Marking…" : "Mark reviewed"}
+      </Button>
+      <span className="text-[11px] text-muted-foreground/70">
+        {card?.lastReviewedAt
+          ? `Last reviewed ${new Date(card.lastReviewedAt).toLocaleDateString()}`
+          : "Not reviewed yet"}
+      </span>
+    </div>
+  );
+}
+
 export function ClientWorkspace({
   memberId,
   memberName,
@@ -791,6 +839,16 @@ export function ClientWorkspace({
         legitimate and different, and the screen says so rather than letting it
         look like a coaching relationship that exists.
       */}
+      {/*
+        The review mark, pressed rather than inferred.
+
+        It sits beside the client's name because that is where a coach is when
+        they finish reading — and it says when it last happened, so pressing it
+        is a statement with a date on it rather than a button that appears to
+        do nothing.
+      */}
+      <ReviewMark memberId={memberId} />
+
       {overview.data?.access === "admin" && (
         <p className="text-[11px] text-muted-foreground/70">
           You're viewing this as an administrator, not as their coach.
@@ -817,6 +875,7 @@ export function ClientWorkspace({
 
       {tab === "overview" && <Overview memberId={memberId} memberName={name} />}
       {tab === "activity" && <Activity memberId={memberId} />}
+      {tab === "movement" && <MovementAndProgress memberId={memberId} />}
       {tab === "habits" && <Habits memberId={memberId} />}
       {tab === "plan" && <Plan memberId={memberId} memberName={name} />}
       {tab === "messages" && <Messages memberId={memberId} memberName={name} />}

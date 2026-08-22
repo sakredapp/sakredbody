@@ -63,7 +63,11 @@ function Axis({
   onSelect: (key: BodyRegionKey) => void;
 }) {
   return (
-    <div className="relative w-full" style={{ height: `${BODY_REGION_ORDER.length * 62 + 40}px` }}>
+    <div
+      className="relative w-full"
+      style={{ height: `${BODY_REGION_ORDER.length * 62 + 40}px` }}
+      data-tour-id="body-map"
+    >
       {/* The spine, engraved rather than drawn — the same register as the
           constellation figure behind it and TerrainWheel elsewhere. */}
       <svg className="absolute inset-0 w-full h-full" aria-hidden="true">
@@ -80,6 +84,8 @@ function Axis({
             style={{ top: `${20 + i * 62}px` }}
             aria-pressed={selected}
             data-testid={`region-node-${key}`}
+            data-tour-id="body-territory"
+            data-tour-instance={key}
           >
             <span className="relative flex items-center justify-center w-12 shrink-0">
               {selected && (

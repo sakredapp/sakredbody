@@ -1062,7 +1062,112 @@ export const workoutSessions = pgTable(
   ],
 );
 
-// ─── 5. SETS ───────────────────────────────────────────────────────────────
+// ─── 5. COMPOSITION ────────────────────────────────────────────────────────
+
+/**
+ * Which movements this workout is made of — said once, in its own row.
+ *
+ * ── Why a set is not a statement of intent ────────────────────────────────
+ *
+ * Until this table existed, a workout's composition was inferred: the
+ * movements in a session were `select distinct exercise_id from workout_sets`,
+ * plus whatever the phone happened to be holding in `useState`. That inference
+ * is wrong in exactly one place, and it is the place a member stands in every
+ * time they train — the minute between choosing a movement and finishing its
+ * first set. In that minute the movement exists only in the browser's memory.
+ * Lock the phone, take a call, let iOS reclaim the tab, and it is gone, with
+ * no record anywhere that it was ever chosen.
+ *
+ * A set is a record of work done. "Incline chest press is in today's workout"
+ * is a different claim, made earlier, and it needs somewhere to live.
+ *
+ * ── Four things become expressible at once ────────────────────────────────
+ *
+ *   · a movement survives before its first set, which is the bug above;
+ *   · order is the member's, stored, rather than re-derived from whichever set
+ *     happened to be logged first;
+ *   · a superset is a relationship *between* movements, which is what it
+ *     actually is — modelling it as a kind of set would have made every
+ *     volume and e1RM reader ask what a "superset set" weighs;
+ *   · previous performance can bind to the exact movement about to be
+ *     performed, rather than to a string scraped out of the set rows.
+ *
+ * ── The link back to sets is (session, exercise), not a new column ────────
+ *
+ * `workout_sets` is untouched. There is one row here per movement per session
+ * — enforced by a unique index — so `(session_id, exercise_id)` already
+ * identifies the composition row for any set. Adding a foreign key to every
+ * historical set would have meant a backfill over the whole history of the
+ * product to gain a join that a unique index gives for free.
+ */
+export const sessionExercises = pgTable(
+  "session_exercises",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    sessionId: uuid("session_id").notNull(),
+
+    /** Text, because `exercises.id` is a slug — see the note on sets below. */
+    exerciseId: text("exercise_id").notNull(),
+
+    /** Which prescribed line this answers, when it answers one. */
+    habitExerciseId: uuid("habit_exercise_id"),
+
+    /**
+     * The order the member arranged, 0-based.
+     *
+     * Not unique. Two movements in a superset are performed together and
+     * reordering used to mean rewriting every row after the moved one; a
+     * duplicate position is resolved by `created_at`, which is stable.
+     */
+    position: integer("position").notNull().default(0),
+
+    /**
+     * Movements sharing a key are performed as a superset. Null — the usual
+     * case — means on its own.
+     *
+     * A shared key rather than a pointer to a "primary" exercise, so a tri-set
+     * or a circuit is the same shape with three or five members, and removing
+     * any one of them does not orphan the rest.
+     */
+    supersetGroup: uuid("superset_group"),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (t) => [
+    /**
+     * One row per movement per session. The workout screen has always grouped
+     * by exercise; this makes that grouping a rule the database holds rather
+     * than an assumption the client re-derives, and it is what lets a set find
+     * its composition row without carrying a second id.
+     */
+    uniqueIndex("uq_session_exercises_session_exercise").on(t.sessionId, t.exerciseId),
+    index("idx_session_exercises_session").on(t.sessionId, t.position),
+    index("idx_session_exercises_group").on(t.supersetGroup),
+  ],
+);
+
+export type SessionExercise = typeof sessionExercises.$inferSelect;
+
+// ─── 6. SETS ───────────────────────────────────────────────────────────────
+
+/**
+ * The four kinds of set worth telling apart, and the reason there is no fifth.
+ *
+ * `superset` is deliberately absent. It is the relationship between two
+ * movements, not a property of a repetition — it lives on `session_exercises`
+ * as `superset_group`. Putting it here would have made "what did this set
+ * weigh" a question with a structural answer, and every average in the product
+ * would have had to learn to skip a row that measures nothing.
+ */
+export const SET_STYLES = ["normal", "warmup", "dropset", "backoff"] as const;
+export type SetStyle = (typeof SET_STYLES)[number];
+
+export const SET_STYLE_LABEL: Record<SetStyle, string> = {
+  normal: "Working set",
+  warmup: "Warm-up",
+  dropset: "Drop set",
+  backoff: "Back-off",
+};
 
 export const workoutSets = pgTable(
   "workout_sets",
@@ -1099,6 +1204,30 @@ export const workoutSets = pgTable(
      */
     isWarmup: boolean("is_warmup").notNull().default(false),
 
+    /**
+     * What kind of set it was — see `SET_STYLES`.
+     *
+     * ── Why this does not replace `is_warmup` ────────────────────────────
+     *
+     * Every derived number in the product already reads `is_warmup`: volume,
+     * the e1RM series, the movement events terrain is built on. Rewriting all
+     * of them to test a string would be a wide change for no gain, and the
+     * two would then be free to disagree. So both are kept and a CHECK in the
+     * migration holds them equal — `(set_style = 'warmup') = is_warmup` — and
+     * every existing reader stays correct without knowing this column exists.
+     */
+    setStyle: text("set_style").notNull().default("normal"),
+
+    /**
+     * Taken to failure, recorded rather than inferred.
+     *
+     * An RPE of 10 is a member's judgement that they had nothing left. Going
+     * to actual failure is a different event with a different cost, and
+     * collapsing the two would mean the recovery reading could not tell a hard
+     * set from a set that ended with a rep the body refused.
+     */
+    toFailure: boolean("to_failure").notNull().default(false),
+
     /** Rate of perceived exertion, 1–10. Optional; most people won't use it. */
     rpe: real("rpe"),
     note: text("note"),
@@ -1109,6 +1238,167 @@ export const workoutSets = pgTable(
     index("idx_workout_sets_exercise").on(t.exerciseId),
   ],
 );
+
+/**
+ * Is this day already accounted for by something the phone recorded?
+ *
+ * ── Why this is a function and not four lines in the route ───────────────
+ *
+ * Three cases have to hold, and only one of them is the interesting one:
+ *
+ *   nothing like it that day     write the historical activity
+ *   a generic import of the      refuse, hand it over, offer to put the detail
+ *   same kind                    on the record that already has the duration
+ *   two genuinely separate       both survive — a member can train twice, and
+ *   workouts                     the dedupe must never quietly merge them
+ *
+ * The third is why the match is by category and never by "there is a workout
+ * that day". Two leg sessions on a Saturday is unusual and completely
+ * legitimate, and a rule that collapsed them would silently delete half of
+ * somebody's week. It is also why `force` exists: the member is the one who
+ * knows, and refusing twice would be worse than not asking.
+ *
+ * Only unreviewed imports are candidates. One the member has already answered
+ * about is a record they have looked at and accepted, and offering to enrich
+ * it again is the queue behaviour Confirm Activity exists to avoid.
+ */
+export function alreadyImported<T extends { workoutType: string | null; reviewedAt?: unknown }>(
+  candidates: readonly T[],
+  /** The Sakred category of what the member is trying to record. */
+  category: string | null,
+): T | null {
+  if (!category) return null;
+  return (
+    candidates.find(
+      (w) => !w.reviewedAt && externalActivityCategory(w.workoutType) === category,
+    ) ?? null
+  );
+}
+
+// ─── 5. WHAT THE BODY SAID ─────────────────────────────────────────────────
+
+/**
+ * What the member noticed, kept exactly as they said it.
+ *
+ * ── Why a table and not another `note` column ─────────────────────────────
+ *
+ * There were already three. `workout_sets.note`, `workout_sessions.note` and
+ * `member_workout_exercises.note` all existed and all had the same two
+ * problems: nothing in the app wrote to them, and nothing read them. A member
+ * could not have left a note if they had wanted to, and if they had it would
+ * have gone nowhere.
+ *
+ * The reason to make a fourth place rather than use one of the three is that
+ * none of them can hold the thing that matters. "Slight low-back discomfort on
+ * the left-leg RDL — the glute didn't feel like it was firing" is *about* a
+ * movement, in a session, on a side, and none of those columns records a side
+ * or attaches to a movement-within-a-session. A note on set 3 of 4 is not
+ * where that observation lives; it is a fact about the exercise that day.
+ *
+ * ── The raw sentence is the record ────────────────────────────────────────
+ *
+ * `note` is what the person typed and is never rewritten, summarised or
+ * replaced. Everything beside it is context or the member's own structuring of
+ * their own answer — `quality` and `side` are chosen from a short list by the
+ * member, not inferred from their words by anything.
+ *
+ * There is deliberately no column here for model-extracted tags. When
+ * extraction is worth adding it gets its own columns and its own provenance,
+ * so that an interpretation can never be mistaken for, or written over, the
+ * thing it is an interpretation of. A column with no writer is structure
+ * invented to satisfy a rule.
+ *
+ * ── What it is not ────────────────────────────────────────────────────────
+ *
+ * Not a symptom log and not a medical record. It records how training felt, in
+ * the member's words, so that the next warm-up, the next exercise choice and
+ * the next Restore suggestion can take account of it. Sakred does not diagnose
+ * from it — see the red-flag rules where this is read.
+ */
+export const OBSERVATION_QUALITIES = [
+  "good",
+  "tight",
+  "weak",
+  "discomfort",
+  "unstable",
+  "other",
+] as const;
+
+export type ObservationQuality = (typeof OBSERVATION_QUALITIES)[number];
+
+/** Left, right, both — or nothing said, which is the common case. */
+export const OBSERVATION_SIDES = ["left", "right", "both"] as const;
+export type ObservationSide = (typeof OBSERVATION_SIDES)[number];
+
+export const trainingObservations = pgTable(
+  "training_observations",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull(),
+
+    /** Always a session. An observation with no training behind it is a mood. */
+    sessionId: uuid("session_id").notNull(),
+
+    /**
+     * Which movement it is about, or null for the session as a whole.
+     *
+     * Text rather than uuid because that is what `exercises.id` is — slugs,
+     * readable in a URL, and stable across a catalogue reseed.
+     */
+    exerciseId: text("exercise_id"),
+
+    /**
+     * The member's own day, denormalised from the session.
+     *
+     * So "what did they say about hinging lately" is a range scan rather than a
+     * join through sessions on every read — this is asked on the way into a
+     * warm-up, which is a request path.
+     */
+    onDate: date("on_date").notNull(),
+
+    /** What they actually said. Never rewritten. */
+    note: text("note"),
+
+    /**
+     * One word from a short list, chosen by them.
+     *
+     * Nullable, because a sentence on its own is a complete observation and
+     * forcing a category on somebody who wanted to write "shoulder felt odd
+     * coming out of the hole" would lose more than it structures.
+     */
+    quality: text("quality"),
+    /** Nullable, and usually null. Only a per-side movement makes it a question. */
+    side: text("side"),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (t) => [
+    // The read this exists for: what has this member said lately, newest first.
+    index("idx_training_observations_user").on(t.userId, t.onDate),
+    // And: what have they said about *this* movement.
+    index("idx_training_observations_exercise").on(t.userId, t.exerciseId),
+    index("idx_training_observations_session").on(t.sessionId),
+  ],
+);
+
+export type TrainingObservation = typeof trainingObservations.$inferSelect;
+
+export const observationSchema = z
+  .object({
+    exerciseId: z.string().max(80).nullable().optional(),
+    note: z.string().trim().max(1000).nullable().optional(),
+    quality: z.enum(OBSERVATION_QUALITIES).nullable().optional(),
+    side: z.enum(OBSERVATION_SIDES).nullable().optional(),
+  })
+  /**
+   * An observation with neither a word nor a sentence records nothing. Letting
+   * one through would fill the table with rows that can only ever say "this
+   * member tapped an exercise", and the reader would have to filter them out
+   * every time it asked what somebody had noticed.
+   */
+  .refine((v) => (v.note?.trim().length ?? 0) > 0 || !!v.quality, {
+    message: "Say something, or pick how it felt.",
+  });
 
 // ─── Derived numbers ───────────────────────────────────────────────────────
 
@@ -1224,6 +1514,138 @@ export function summariseSession(sets: LoggedSet[], unit: WeightUnit): string[] 
       (top ? ` @ ${top}${unit}` : "")
     );
   });
+}
+
+// ─── What happened last time ───────────────────────────────────────────────
+
+/**
+ * The last time this movement was trained, in the shape the workout screen
+ * needs to say so.
+ *
+ * ── Why this is not the history endpoint ──────────────────────────────────
+ *
+ * `GET /exercises/:id/history` returns an estimated-1RM series — the right
+ * answer to "is this lift going up over months" and the wrong answer to the
+ * question somebody standing at a bench is actually asking, which is "what did
+ * I put on the bar last Tuesday". It had no caller for that reason. This is the
+ * other question: one date, the sets as performed, in order.
+ */
+export type PriorSet = {
+  reps: number | null;
+  durationSeconds: number | null;
+  distanceM: number | null;
+  /** In the member's own unit, already converted. */
+  weight: number | null;
+  rpe: number | null;
+  isWarmup: boolean;
+};
+
+export type PriorPerformance = {
+  exerciseId: string;
+  /** The member's own date, from the session it came from. */
+  onDate: string;
+  sets: PriorSet[];
+};
+
+/**
+ * "210 × 2 · 200 × 4 · 200 × 5" — what was done, not what it averaged to.
+ *
+ * Warm-ups are dropped. They are recorded, and a member reading the top of a
+ * movement wants the working sets; the ramp is the same every week and would
+ * push the number that matters off the end of the line.
+ *
+ * The unit is stated once, at the end, rather than on every set — six
+ * repetitions of "lb" on one line is noise, and the mixed-load case reads
+ * fine without it.
+ */
+export function priorSummary(
+  prior: PriorPerformance,
+  unit: WeightUnit,
+  trackingType: TrackingType = "reps",
+): string {
+  const working = prior.sets.filter((s) => !s.isWarmup);
+  const sets = working.length ? working : prior.sets;
+  if (sets.length === 0) return "";
+
+  if (trackingType === "duration") {
+    return sets
+      .map((s) => {
+        const secs = s.durationSeconds ?? 0;
+        return secs >= 120 ? `${Math.round(secs / 60)} min` : `${secs}s`;
+      })
+      .join(" · ");
+  }
+
+  const anyLoad = sets.some((s) => (s.weight ?? 0) > 0);
+  const body = sets
+    .map((s) => {
+      const reps = s.reps ?? 0;
+      const load = s.weight ?? 0;
+      return load > 0 ? `${load} × ${reps}` : `${reps}`;
+    })
+    .join(" · ");
+  return anyLoad ? `${body} ${unit}` : `${body} reps`;
+}
+
+/** The heaviest working set, which is the one a reference is drawn from. */
+export function topWorkingSet(prior: PriorPerformance): PriorSet | null {
+  const working = prior.sets.filter((s) => !s.isWarmup);
+  const sets = working.length ? working : prior.sets;
+  if (sets.length === 0) return null;
+  return sets.reduce((best, s) => ((s.weight ?? 0) > (best.weight ?? 0) ? s : best), sets[0]);
+}
+
+/**
+ * Qualities that mean "something about this did not feel right", as the member
+ * chose to describe it. Not a diagnosis and not read as one — see below.
+ */
+const GUARDED_QUALITIES = new Set(["discomfort", "unstable", "weak"]);
+
+/**
+ * What last time makes reasonable today — phrased as a reference, never a
+ * demand.
+ *
+ * ── The line this will not cross ──────────────────────────────────────────
+ *
+ * A member who wrote "left-sided low-back discomfort during the single-leg
+ * hinge" has told Sakred something that can justify a gentler entry into that
+ * movement. It cannot justify an opinion about why their back hurt, and it must
+ * not become one — so the guarded case says start lighter and let the warm-up
+ * decide, and says nothing at all about the body part.
+ *
+ * ── And why there is no "add 5 lb" ────────────────────────────────────────
+ *
+ * A number that goes up every week regardless of what the body reported is a
+ * bodybuilding logger wearing Sakred's colours, and it is wrong on precisely
+ * the weeks it matters: after bad sleep, into a stressed terrain, on the
+ * session where somebody should have backed off. Every sentence here is
+ * conditional on the warm-up, which is the member's own reading, taken on the
+ * day, with the bar in their hands.
+ */
+export function referenceNote(
+  prior: PriorPerformance | null,
+  unit: WeightUnit,
+  concern?: { quality?: string | null } | null,
+): string | null {
+  if (concern?.quality && GUARDED_QUALITIES.has(concern.quality)) {
+    return "Start lighter and use the warm-up to decide whether loading this fits today.";
+  }
+  if (!prior) return null;
+
+  const top = topWorkingSet(prior);
+  if (!top) return null;
+
+  const load = top.weight ?? 0;
+  const reps = top.reps;
+  const reference = load > 0 && reps ? `${load} ${unit} × ${reps}` : null;
+  if (!reference) return null;
+
+  // RPE 9 or above was already near the top of what they had. Repeating it is
+  // the honest suggestion; asking for more would be asking on no evidence.
+  if (top.rpe != null && top.rpe >= 9) {
+    return `${reference} is your reference — it was an RPE ${top.rpe} last time. Matching it is a good session.`;
+  }
+  return `${reference} is your reference. There may be room to progress if the warm-up agrees.`;
 }
 
 // ─── Units ─────────────────────────────────────────────────────────────────
@@ -1366,6 +1788,8 @@ export const logSetSchema = z
     weight: z.number().min(0).max(2000).default(0),
     unit: weightUnitEnum.default("lb"),
     isWarmup: z.boolean().default(false),
+    setStyle: z.enum(SET_STYLES).optional(),
+    toFailure: z.boolean().default(false),
     rpe: z.number().min(1).max(10).nullable().optional(),
     note: z.string().max(500).nullable().optional(),
   })
@@ -1373,6 +1797,63 @@ export const logSetSchema = z
     (v) => v.reps != null || v.durationSeconds != null || v.distanceM != null,
     { message: "A set needs reps, a duration or a distance." },
   );
+
+/**
+ * The two spellings of "this was a warm-up", made to agree.
+ *
+ * A bundled native client and a deployed server are never updated in the same
+ * instant, so for some hours after this ships there are phones sending
+ * `isWarmup` and no `setStyle`, and — once somebody updates — phones sending
+ * both. Whichever arrives, one pair comes out, and the database CHECK that
+ * holds the two columns equal never has to reject a write.
+ */
+export function reconcileSetStyle(input: {
+  setStyle?: SetStyle | null;
+  isWarmup?: boolean | null;
+}): { setStyle: SetStyle; isWarmup: boolean } {
+  if (input.setStyle) return { setStyle: input.setStyle, isWarmup: input.setStyle === "warmup" };
+  const warm = input.isWarmup === true;
+  return { setStyle: warm ? "warmup" : "normal", isWarmup: warm };
+}
+
+/**
+ * Editing a set that is already on the server.
+ *
+ * Every field optional and every field nullable, because this is a patch: a
+ * member correcting 205 to 225 sends the weight and nothing else, and a member
+ * clearing an RPE they tapped by mistake sends null rather than omitting it.
+ * The distinction between "not mentioned" and "set to nothing" is the whole
+ * reason this is not just `logSetSchema.partial()`.
+ */
+export const updateSetSchema = z
+  .object({
+    reps: z.number().int().min(1).max(500).nullable().optional(),
+    durationSeconds: z.number().int().min(1).max(86400).nullable().optional(),
+    distanceM: z.number().min(0.1).max(500000).nullable().optional(),
+    weight: z.number().min(0).max(2000).optional(),
+    unit: weightUnitEnum.optional(),
+    isWarmup: z.boolean().optional(),
+    setStyle: z.enum(SET_STYLES).optional(),
+    toFailure: z.boolean().optional(),
+    rpe: z.number().min(1).max(10).nullable().optional(),
+    note: z.string().max(500).nullable().optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: "Nothing to change." });
+
+/**
+ * Putting a movement into a workout, before anything has been done with it.
+ *
+ * `supersetWith` names an exercise already in the session rather than a group
+ * id the client would have to invent and keep. The server resolves it: if that
+ * movement already belongs to a group the new one joins it, and if it does not,
+ * a group is created holding both. A member thinking "these two go together"
+ * should not have to think about anything else.
+ */
+export const addSessionExerciseSchema = z.object({
+  exerciseId: z.string().min(1),
+  habitExerciseId: z.string().uuid().nullable().optional(),
+  supersetWith: z.string().min(1).nullable().optional(),
+});
 
 const prescribeExerciseFields = z.object({
     exerciseId: z.string().min(1),

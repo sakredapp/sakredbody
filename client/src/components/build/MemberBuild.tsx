@@ -28,9 +28,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Panel } from "@/components/portal/Panel";
+import { WorkoutInProgress } from "@/components/build/WorkoutInProgress";
+import { startSession as beginSession, type RunningSession } from "@/lib/startSession";
+import { seedOpenWorkout } from "@/hooks/use-open-workout";
 import { MovementPicker, type Movement } from "./MovementPicker";
+import { NewMovement, type NewMovementInput } from "./NewMovement";
 import { LogPractice } from "./LogPractice";
 import { RecentSessions } from "./RecentSessions";
+import { ProgressPhotos } from "@/components/ProgressPhotos";
+import { useMyCoach } from "@/hooks/use-coaching";
 import { TodaysMovement } from "@/components/portal/TodaysMovement";
 import { ModalityPrompt } from "./Modalities";
 import { cn } from "@/lib/utils";
@@ -65,7 +71,17 @@ type Draft = {
   takesLoad: boolean;
 };
 
-export function MemberBuild({ onStarted }: { onStarted: (sessionId: string, title: string) => void }) {
+export function MemberBuild({
+  /**
+   * A workout is now open. Nothing is passed back with it: the layer that
+   * shows it reads the session from `/api/training/sessions/open`, which is
+   * the same place every other surface reads it from. Handing an id and a
+   * title across would be a second copy to fall out of step with the first.
+   */
+  onStarted,
+}: {
+  onStarted: () => void;
+}) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [building, setBuilding] = useState<SavedWorkout | "new" | null>(null);
@@ -73,13 +89,61 @@ export function MemberBuild({ onStarted }: { onStarted: (sessionId: string, titl
 
   const workouts = useQuery<SavedWorkout[]>({ queryKey: ["/api/training/workouts"] });
 
-  const startSession = useMutation({
-    mutationFn: async (title: string) => {
-      const res = await apiRequest("POST", "/api/training/sessions", { title: title || null });
-      return (await res.json()) as { id: string };
+  /* Only so the progress-photo panel can say who can see one, truthfully. */
+  const myCoach = useMyCoach();
+
+  /**
+   * A workout already running when they tried to begin another.
+   *
+   * Held rather than toasted, so the card can offer the way back into it.
+   */
+  /** The refused start, held with the attempt so the way out can finish it. */
+  const [collision, setCollision] = useState<
+    { session: RunningSession; retry: () => void } | null
+  >(null);
+
+  /**
+   * Throw away the session that is in the way, then retry the one they asked
+   * for. Confirmed on the card first — see `WorkoutInProgress`, and the note
+   * there about zero-set sessions that still carry composition.
+   */
+  const discardBlocking = useMutation({
+    mutationFn: async (c: { session: RunningSession }) =>
+      apiRequest("DELETE", `/api/training/sessions/${c.session.id}`),
+    onSuccess: async (_r, c) => {
+      const retry = collision?.retry;
+      setCollision(null);
+      await qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
+      qc.invalidateQueries({ queryKey: ["/api/training/sessions"] });
+      retry?.();
     },
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
+
+  const startSession = useMutation({
+    mutationFn: (title: string) => beginSession({ title: title || null }),
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  /**
+   * Start, unless one is already open.
+   *
+   * Returns null when it collided, so both call sites stop rather than
+   * announcing a session that was never created.
+   */
+  const begin = async (title: string): Promise<{ id: string } | null> => {
+    const result = await startSession.mutateAsync(title);
+    if ("conflict" in result) {
+      setCollision({ session: result.conflict, retry: () => void begin(title) });
+      return null;
+    }
+    // The new session goes into the shared cache before anybody renders
+    // against it, so the resume strip, the timer and Build all start from the
+    // same fact — and so a `/open` read already in flight cannot come back and
+    // say nothing is running. See `seedOpenWorkout`.
+    await seedOpenWorkout(qc, result.started);
+    return result.started;
+  };
 
   const remove = useMutation({
     mutationFn: async (id: string) => apiRequest("DELETE", `/api/training/workouts/${id}`),
@@ -104,6 +168,17 @@ export function MemberBuild({ onStarted }: { onStarted: (sessionId: string, titl
       */}
       <TodaysMovement />
 
+      {collision && (
+        <WorkoutInProgress
+          session={collision.session}
+          onResume={() => {
+            onStarted();
+            setCollision(null);
+          }}
+          onDiscard={() => discardBlocking.mutate(collision)}
+          discarding={discardBlocking.isPending}
+        />
+      )}
       <Panel title="Your own training">
         <div className="space-y-4">
           <p className="text-xs text-muted-foreground leading-relaxed">
@@ -121,11 +196,22 @@ export function MemberBuild({ onStarted }: { onStarted: (sessionId: string, titl
             <Button
               size="sm"
               onClick={async () => {
-                const s = await startSession.mutateAsync("");
-                onStarted(s.id, "Today's session");
+                const s = await begin("");
+                if (s) onStarted();
               }}
               disabled={startSession.isPending}
               data-testid="build-start-empty"
+              /*
+                The walkthrough's "start a session" lesson used to point only at
+                the prescribed session's own button, which exists for members a
+                coach has written a day for. A member without a coach reached
+                that lesson and it waited for a control they will never have —
+                the tour stopped dead on the most common account there is.
+
+                Both are the same act, and only one of them is ever on screen,
+                so the resolver still sees exactly one visible instance.
+              */
+              data-tour-id="build-start-session"
             >
               <Play className="h-3.5 w-3.5 mr-1.5" />
               Start a session
@@ -175,8 +261,8 @@ export function MemberBuild({ onStarted }: { onStarted: (sessionId: string, titl
                     variant="ghost"
                     className="shrink-0"
                     onClick={async () => {
-                      const s = await startSession.mutateAsync(w.name);
-                      onStarted(s.id, w.name);
+                      const s = await begin(w.name);
+                      if (s) onStarted();
                     }}
                     data-testid={`start-workout-${w.id}`}
                   >
@@ -210,6 +296,21 @@ export function MemberBuild({ onStarted }: { onStarted: (sessionId: string, titl
       <ModalityPrompt />
 
       <RecentSessions />
+
+      {/*
+        The week above is everything, unfiltered, and stays that way — it is
+        what Build has always shown. This is the longer view of training
+        specifically, which is the one a member goes looking for when they want
+        to know whether the last month added up to anything.
+      */}
+      <RecentSessions days={30} lens="build" title="Your Build history" />
+
+      {/*
+        Under the history rather than beside it. A progress photograph is a
+        record of the same weeks the sessions above describe, and putting it in
+        its own destination would make it a feature somebody has to go and find.
+      */}
+      <ProgressPhotos hasCoach={!!myCoach.data?.coach} />
 
       {logging && <LogPractice onClose={() => setLogging(false)} />}
 
@@ -254,17 +355,23 @@ function WorkoutBuilder({
     })) ?? [],
   );
 
+  /**
+   * The same four questions the workout screen asks.
+   *
+   * This used to send the name and a hardcoded `full_body`, which is how a
+   * loaded single-leg hinge became a bilateral full-body movement that will
+   * never graph against anything. See `NewMovement` for the argument.
+   */
+  const [creating, setCreating] = useState<string | null>(null);
   const createMovement = useMutation({
-    mutationFn: async (movementName: string) => {
-      const res = await apiRequest("POST", "/api/training/exercises", {
-        name: movementName,
-        category: "full_body",
-      });
+    mutationFn: async (input: NewMovementInput) => {
+      const res = await apiRequest("POST", "/api/training/exercises", input);
       return (await res.json()) as Movement;
     },
     onSuccess: (m) => {
       qc.invalidateQueries({ queryKey: ["/api/training/exercises"] });
       add(m);
+      setCreating(null);
       toast({ title: `Added ${m.name}` });
     },
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
@@ -320,13 +427,22 @@ function WorkoutBuilder({
           </DialogTitle>
         </DialogHeader>
 
-        {picking ? (
+        {creating !== null ? (
+          <div className="flex-1 min-h-0 flex flex-col">
+            <NewMovement
+              name={creating}
+              saving={createMovement.isPending}
+              onCancel={() => setCreating(null)}
+              onCreate={(m) => createMovement.mutate(m)}
+            />
+          </div>
+        ) : picking ? (
           <div className="flex-1 min-h-0 flex flex-col">
             <MovementPicker
               only="movements"
               picked={picked}
               onPick={add}
-              onCreate={(n) => n && createMovement.mutate(n)}
+              onCreate={(n) => setCreating(n)}
               onClose={() => setPicking(false)}
             />
           </div>
@@ -369,7 +485,7 @@ function WorkoutBuilder({
                               ),
                             )
                           }
-                          className="w-11 bg-transparent border border-border/50 rounded px-1.5 py-0.5 text-[11px] text-center"
+                          className="w-11 bg-transparent border border-border/50 rounded px-1.5 py-0.5 text-base md:text-[11px] text-center"
                           aria-label="Sets"
                         />
                         <span className="text-[11px] text-muted-foreground">
@@ -389,7 +505,7 @@ function WorkoutBuilder({
                                 ),
                               )
                             }
-                            className="w-11 bg-transparent border border-border/50 rounded px-1.5 py-0.5 text-[11px] text-center"
+                            className="w-11 bg-transparent border border-border/50 rounded px-1.5 py-0.5 text-base md:text-[11px] text-center"
                             aria-label="Reps"
                           />
                         )}
@@ -417,7 +533,7 @@ function WorkoutBuilder({
           </div>
         )}
 
-        {!picking && (
+        {!picking && creating === null && (
           <div className="shrink-0 flex gap-2 pt-1">
             <Button variant="ghost" onClick={onClose} className="flex-1 text-muted-foreground">
               Cancel

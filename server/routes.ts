@@ -36,6 +36,8 @@ import { registerHealthRoutes } from "./health/index.js";
 import { registerTerrainRoutes } from "./terrain/index.js";
 import { registerHabitRoutes } from "./habits/index.js";
 import { registerModerationRoutes } from "./moderation/index.js";
+import { registerMediaRoutes } from "./media/routes.js";
+import { registerProgressPhotoRoutes } from "./media/progressRoutes.js";
 import { requireRole } from "./auth/roles.js";
 import {
   atLeast,
@@ -523,6 +525,10 @@ export async function registerRoutes(
 
   // Reporting and blocking — required by both app stores for UGC.
   registerModerationRoutes(app);
+
+  registerMediaRoutes(app);
+
+  registerProgressPhotoRoutes(app);
 
   // Telemetry last: it observes the app, so nothing else should depend on it.
   registerTelemetryRoutes(app);

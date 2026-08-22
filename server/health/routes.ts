@@ -42,6 +42,10 @@ import { db } from "../db.js";
 import { storage } from "../storage.js";
 import { isAuthenticated } from "../auth/index.js";
 import { zodMessage } from "../../shared/utils/zodMessage.js";
+import { needsConfirmation, answeredToday } from "../../shared/models/health.js";
+import { externalActivityCategory } from "../../shared/models/training.js";
+import { todayInZone } from "../../shared/utils/dates.js";
+import { users } from "../../shared/models/auth.js";
 import {
   healthConnections,
   healthDays,
@@ -402,12 +406,102 @@ export function registerHealthRoutes(app: Express) {
    * reads either of these columns — it goes through the activity's category and
    * CATEGORY_LOAD, exactly as it does for a session logged in Sakred.
    */
+  /**
+   * The one imported session worth asking about, if there is one.
+   *
+   * ── One card, one day ─────────────────────────────────────────────────────
+   *
+   * Never a queue. A member with five unreviewed strength imports sees one, and
+   * handling it does not immediately produce the next — otherwise the card
+   * becomes whack-a-mole and they learn to dismiss it unread, which costs the
+   * one prompt that mattered.
+   *
+   * The daily gate is derived from `reviewed_at` rather than stored anywhere:
+   * if anything was reviewed today, nothing new surfaces today. No extra state
+   * to keep, and it self-heals — a member who reviews nothing simply gets asked
+   * again tomorrow. Older events stay editable from history; this is the
+   * prompt, not the only way in.
+   */
+  app.get("/api/health/workouts/confirm", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId!;
+      /**
+       * The member's zone, not just their date.
+       *
+       * `reviewed_at` is an instant; "today" is a calendar day in the place the
+       * member is standing. Comparing the two means converting the instant into
+       * that calendar, which needs the zone itself — see the gate below for
+       * what reading the instant in UTC actually cost.
+       */
+      const [me] = await db
+        .select({ timezone: users.timezone })
+        .from(users)
+        .where(eq(users.id, userId));
+      const zone = me?.timezone ?? null;
+      const today = todayInZone(zone);
+
+      const recent = await db
+        .select({
+          id: healthWorkouts.id,
+          workoutType: healthWorkouts.workoutType,
+          onDate: healthWorkouts.onDate,
+          startAt: healthWorkouts.startAt,
+          durationSeconds: healthWorkouts.durationSeconds,
+          sourceApp: healthWorkouts.sourceApp,
+          reviewedAt: healthWorkouts.reviewedAt,
+        })
+        .from(healthWorkouts)
+        .where(eq(healthWorkouts.userId, userId))
+        .orderBy(desc(healthWorkouts.startAt))
+        .limit(60);
+
+      /**
+       * Already answered something today — say nothing more until tomorrow.
+       *
+       * ── Read in the member's zone, and only ever in the member's zone ─────
+       *
+       * This compared `reviewedAt.toISOString()` — a UTC calendar date — with
+       * `today`, which is the member's local one. For a member in Toronto those
+       * two disagree every evening after 20:00, which is exactly when somebody
+       * reviews the day they just finished. The gate then read false, the very
+       * next unreviewed import took the card's place, and the member saw what
+       * looked like the same card ignoring them.
+       *
+       * On 15 Aug that cost real data: two separate strength sessions, six
+       * seconds apart, both stamped "Leg Day Mixed with Rolling Out", because
+       * the second card arrived carrying the first card's answers.
+       *
+       * A date is a place as well as a number. Anything comparing an instant to
+       * a member's day converts through their zone first.
+       */
+      if (answeredToday(recent, zone, today)) return res.json({ workout: null });
+
+      const candidate = recent.find((w) => !w.reviewedAt && needsConfirmation(w.workoutType));
+      if (!candidate) return res.json({ workout: null });
+
+      res.json({
+        workout: {
+          id: candidate.id,
+          workoutType: candidate.workoutType,
+          onDate: candidate.onDate,
+          durationSeconds: candidate.durationSeconds,
+          sourceApp: candidate.sourceApp,
+          /** Sakred's own reading, stated separately from what the member says. */
+          category: externalActivityCategory(candidate.workoutType),
+        },
+      });
+    } catch (err) {
+      console.error("[health] confirm candidate failed", err);
+      res.status(500).json({ message: "Could not load that." });
+    }
+  });
+
   app.patch("/api/health/workouts/:id", isAuthenticated, async (req, res) => {
     const parsed = workoutFeedbackSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: zodMessage(parsed.error) });
 
     const userId = req.session!.userId!;
-    const { response, placement } = parsed.data;
+    const { response, placement, focus, label, reviewed } = parsed.data;
 
     // Checked before it reaches Postgres, which answers a malformed uuid with a
     // cast error and a 500 — an error page for what is really a 404.
@@ -424,6 +518,17 @@ export function registerHealthRoutes(app: Express) {
       // build an empty patch, which the schema's refinement prevents.
       if (response !== undefined) patch.userResponse = response;
       if (placement !== undefined) patch.userOrientationOverride = placement;
+      if (focus !== undefined) patch.userFocus = focus;
+      if (label !== undefined) patch.userLabel = label || null;
+      /**
+       * Any answer is also a review — otherwise a member who adds detail is
+       * asked about the same session again tomorrow. Confirm sends only
+       * `reviewed`, which is the whole of that action: no category changes, no
+       * inferred answers, nothing else touched.
+       */
+      if (reviewed || focus !== undefined || placement !== undefined || label !== undefined) {
+        patch.reviewedAt = new Date();
+      }
 
       /**
        * Scoped by user as well as id.

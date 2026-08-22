@@ -26,6 +26,7 @@ import { useState } from "react";
 import { CoachPlanCard } from "@/components/portal/CoachPlanCard";
 import { useHasActiveCoachPlan } from "@/hooks/use-coach-plan";
 import { CheckinRequestCard, useOpenCheckinRequest } from "@/components/portal/CheckinRequestCard";
+import { ConfirmActivity } from "@/components/health/ConfirmActivity";
 import { NotificationPrompt } from "@/components/portal/NotificationPrompt";
 import { useHasCoach } from "@/hooks/use-coaching";
 import { ChevronRight } from "lucide-react";
@@ -182,6 +183,10 @@ export function TodayBody({ onOpenTrends }: { onOpenTrends?: () => void }) {
       */}
       <CoachPlanCard terrainLean={terrain?.lean ?? null} />
       <CheckinRequestCard />
+      {/* Below a coach's request, which is somebody waiting on them, and above
+          the rest of Home. This is health-data interpretation rather than a
+          Build feature, so it belongs where everybody sees it. */}
+      <ConfirmActivity />
 
       {/*
         Asked only of someone it would serve, and only on a phone that could

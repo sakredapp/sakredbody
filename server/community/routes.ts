@@ -48,9 +48,12 @@ import {
   editMessageSchema,
   MAX_THREAD_DEPTH,
 } from "../../shared/schema.js";
+import { readSharedWorkout } from "../../shared/models/community.js";
 import { headlineOptions, segmentHeadline } from "../../shared/utils/highlight.js";
 import { blockedBy } from "../moderation/index.js";
 import { uploadFile } from "../supabaseStorage.js";
+import { ownsSession, publishedWorkout } from "./sharedWorkout.js";
+import { mediaAssets } from "../../shared/schema.js";
 
 function isAdmin(req: Request, res: Response, next: NextFunction) {
   const userId = req.session?.userId;
@@ -81,12 +84,35 @@ function fail(res: Response, err: unknown) {
   res.status(500).json({ message: "Internal Server Error" });
 }
 
-/** What a message looks like once a deleted one has been tombstoned. */
+/**
+ * What a message looks like on the wire.
+ *
+ * One place decides, which is why the workout card is assembled here rather
+ * than at each call site: the stored snapshot is the card, and the rule about
+ * what a tombstone shows has to apply to it as surely as to the words.
+ *
+ * The raw column does not go out. Sending both it and the parsed card would
+ * put every published workout on the wire twice.
+ */
 function present(m: typeof communityMessages.$inferSelect) {
-  if (!m.deletedAt) return m;
+  const { sharedWorkout, ...rest } = m;
   // The row survives so replies underneath it keep their shape. The words
-  // don't — deleting must actually delete what was said.
-  return { ...m, body: "", userId: "", deleted: true };
+  // don't — deleting must actually delete what was said. That includes what
+  // was shown: a tombstone that kept rendering the photograph would mean
+  // deleting a post removed the caption and left the picture, and one that
+  // kept rendering the workout would leave the lift.
+  if (m.deletedAt) {
+    return {
+      ...rest,
+      body: "",
+      userId: "",
+      imageAssetId: null,
+      sharedSessionId: null,
+      workout: null,
+      deleted: true,
+    };
+  }
+  return { ...rest, workout: readSharedWorkout(sharedWorkout) };
 }
 
 // ─── The gate ──────────────────────────────────────────────────────────────
@@ -168,7 +194,7 @@ export async function visibleChannelIds(userId: string): Promise<string[]> {
     .map((c) => c.id);
 }
 
-async function canSee(userId: string, channelId: string): Promise<boolean> {
+export async function canSee(userId: string, channelId: string): Promise<boolean> {
   return (await visibleChannelIds(userId)).includes(channelId);
 }
 
@@ -450,6 +476,46 @@ export function registerCommunityRoutes(app: Express) {
         rootId = parent.rootId ?? parent.id;
       }
 
+      /*
+        Both attachments are checked against the poster, not merely accepted.
+
+        An image id is a uuid somebody could have seen in their own timeline;
+        without this, posting one they do not own would publish another
+        member's photograph into a room. The purpose check is the second half:
+        an asset uploaded as `progress` is readable by that member's coach and
+        nobody else, and attaching one to a message would leave a photo in the
+        feed that most of the room renders as a broken tile — and the rest
+        renders as a private photograph. Sharing a progress photo to the Room
+        is a separate act that uploads a separate `room` asset.
+      */
+      if (input.imageAssetId) {
+        const [asset] = await db
+          .select({ ownerUserId: mediaAssets.ownerUserId, purpose: mediaAssets.purpose })
+          .from(mediaAssets)
+          .where(eq(mediaAssets.id, input.imageAssetId));
+        if (!asset || asset.ownerUserId !== userId || asset.purpose !== "room") {
+          return res.status(404).json({ message: "No such image" });
+        }
+      }
+
+      /*
+        The workout is copied here, not referenced.
+
+        Ownership first — a session id is a uuid somebody could have seen, and
+        without this a member could publish a card built from another member's
+        training. Then the copy: what goes into the row is what the Room shows
+        forever, and it is taken once, now, while the member is looking at the
+        thing they chose to share.
+      */
+      let workout = null;
+      if (input.sharedSessionId) {
+        if (!(await ownsSession(userId, input.sharedSessionId))) {
+          return res.status(404).json({ message: "No such workout" });
+        }
+        workout = await publishedWorkout(input.sharedSessionId);
+        if (!workout) return res.status(404).json({ message: "No such workout" });
+      }
+
       const [created] = await db
         .insert(communityMessages)
         .values({
@@ -462,6 +528,9 @@ export function registerCommunityRoutes(app: Express) {
           audioUrl: input.audioUrl ?? null,
           audioMime: input.audioMime ?? null,
           audioDurationSeconds: input.audioDurationSeconds ?? null,
+          imageAssetId: input.imageAssetId ?? null,
+          sharedSessionId: input.sharedSessionId ?? null,
+          sharedWorkout: workout,
         })
         .returning();
 

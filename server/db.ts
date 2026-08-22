@@ -13,10 +13,49 @@ if (!connectionString) {
   );
 }
 
+/**
+ * How many connections this process may hold.
+ *
+ * `pg` defaults to ten, which is fine against a database and wrong against a
+ * pooler with a seat limit — Supabase's session mode caps a project at fifteen
+ * clients across everything connected to it. Two processes at the default
+ * exceed that, and what it looks like from the outside is not a connection
+ * error: it is Terrain quietly failing to load, the card it draws never
+ * appearing, and a walkthrough lesson pointing at nothing. That cost most of
+ * an afternoon to recognise.
+ *
+ * Unset means `pg`'s default, so nothing changes anywhere it has not been
+ * asked to.
+ */
+const poolMax = Number(process.env.DATABASE_POOL_MAX);
+
 export const pool = new Pool({
   connectionString,
   ssl: { rejectUnauthorized: false },
+  ...(Number.isFinite(poolMax) && poolMax > 0 ? { max: poolMax } : {}),
 });
+/*
+  An idle connection dying is not a reason for the process to.
+
+  `pg.Pool` emits `error` for a client that fails while it is sitting in the
+  pool — a pooler recycling a seat, a network blip, a database restart — and an
+  unhandled `error` event on an EventEmitter takes Node down. It took the QA
+  server down mid-run, which is the small version of the same event taking a
+  deploy down between requests.
+
+  The pool removes the broken client itself; there is nothing to do here but
+  say so out loud and let the next request open a fresh one.
+*/
+pool.on("error", (err) => {
+  console.error(
+    JSON.stringify({
+      at: new Date().toISOString(),
+      event: "db.idle_client_error",
+      message: err instanceof Error ? err.message : String(err),
+    }),
+  );
+});
+
 export const db = drizzle(pool, { schema });
 
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];

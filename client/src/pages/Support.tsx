@@ -148,7 +148,7 @@ export default function Support() {
                   id="support-category"
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm"
                 >
                   {CATEGORIES.map((c) => (
                     <option key={c.value} value={c.value}>

@@ -457,7 +457,7 @@ function ConfigForm({
               value={memberReason}
               onChange={(e) => setMemberReason(e.target.value)}
               placeholder="Your sleep is down and this is the cheapest thing that moves it."
-              className="text-sm"
+              className="text-base md:text-sm"
               data-testid="coach-config-reason"
             />
           </div>
@@ -467,7 +467,7 @@ function ConfigForm({
               rows={2}
               value={coachNote}
               onChange={(e) => setCoachNote(e.target.value)}
-              className="text-sm"
+              className="text-base md:text-sm"
               data-testid="coach-config-note"
             />
           </div>

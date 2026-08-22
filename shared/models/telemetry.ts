@@ -127,6 +127,12 @@ export const EVENT_NAMES = [
   // behaviour: when a device reports the feature unavailable, this is the only
   // evidence anyone has, and without it the answer is guesswork.
   "health.probe",
+  // How long the first health screen took, stage by stage. Durations and
+  // counts only, never a measurement. The launch it describes takes about a
+  // minute on a real phone — and so does every candidate explanation for it,
+  // which is why elapsed time per stage is the only thing that separates
+  // them. See client/src/lib/healthTrace.ts.
+  "health.startup",
 
   // Administration. Who changed whose access, and when — the one category
   // where the audit trail matters more than the aggregate.
@@ -146,6 +152,20 @@ export const EVENT_NAMES = [
   // product is confusing, and a spike in "technical" usually arrives before
   // the error events do.
   "support.submitted",
+
+  /**
+   * A walkthrough lesson that was left behind rather than taught.
+   *
+   * Recorded when the member takes the degraded escape — the subject of the
+   * lesson never rendered, they waited six seconds, and they moved on. It is
+   * deliberately not the same as completing a step: a run that reaches the end
+   * with three of these in it did not teach twenty-six lessons, and a
+   * completion count that cannot tell the difference would report a broken
+   * walkthrough as a successful one.
+   *
+   * Carries the step id and nothing else.
+   */
+  "tour.step_degraded",
 
   // Failures worth knowing about, rather than an empty catch.
   "error.client",

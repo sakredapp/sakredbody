@@ -5,7 +5,11 @@
  *   GET    /api/training/exercises              — the catalogue, searchable
  *   GET    /api/training/today                  — today's prescribed lifts
  *   POST   /api/training/sessions               — begin one
+ *   POST   /api/training/sessions/:id/exercises — put a movement in it
+ *   PATCH  /api/training/sessions/:id/exercises/:exerciseId — superset it
+ *   DELETE /api/training/sessions/:id/exercises/:exerciseId — take it out
  *   POST   /api/training/sessions/:id/sets      — record a set
+ *   PATCH  /api/training/sets/:id               — correct one
  *   DELETE /api/training/sets/:id               — undo one
  *   POST   /api/training/sessions/:id/finish    — done
  *   GET    /api/training/sessions               — history
@@ -30,17 +34,20 @@
 
 import type { Express, Request, Response } from "express";
 import { zodMessage } from "../../shared/utils/zodMessage.js";
-import { db } from "../db.js";
+import { db, transactionally } from "../db.js";
 import { and, asc, desc, eq, gte, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { isAuthenticated } from "../auth/index.js";
+import { requireCoachOf } from "../coaching/relationships.js";
 import { storage } from "../storage.js";
 import {
   exercises,
   habitExercises,
   bodyMeasurements,
+  mediaAssets,
   workoutSessions,
   workoutSets,
+  sessionExercises,
   habits,
   routineHabits,
   users,
@@ -48,6 +55,9 @@ import {
   prescribeExerciseSchema,
   prescribeExercisePatchSchema,
   logSetSchema,
+  updateSetSchema,
+  addSessionExerciseSchema,
+  reconcileSetStyle,
   bodyMeasurementSchema,
   weightUnitEnum,
   lbToKg,
@@ -60,11 +70,17 @@ import {
   coachingMessages,
   channels,
   communityMessages,
+  healthWorkouts,
+  externalActivityCategory,
+  alreadyImported,
+  trainingObservations,
+  observationSchema,
 } from "../../shared/schema.js";
 // Through the barrel, as wins/routes.ts already does. It is the single place
 // that answers "which rooms can they see", and reaching past index.js for it
 // would be the second import path to that answer.
 import { visibleChannelIds } from "../community/index.js";
+import { publishedWorkout } from "../community/sharedWorkout.js";
 import {
   bestEstimates,
   progressionSeries,
@@ -73,7 +89,22 @@ import {
   REFERENCE_WINDOW_DAYS,
   type SetRow,
 } from "./strength.js";
+import {
+  compositionFor,
+  ensureSessionExercise,
+  ownsSession,
+  pairSessionExercise,
+  priorPerformanceFor,
+  recentConcernsFor,
+  removeSessionExercise,
+} from "./composition.js";
 import { memberToday } from "../coaching/enrollment.js";
+import { trainingMemory } from "./memory.js";
+import {
+  readTrainingResponse,
+  RESPONSE_WINDOW_DAYS,
+} from "../../shared/models/trainingResponse.js";
+import { addDaysToString } from "../../shared/utils/dates.js";
 import { track, trackError } from "../telemetry/index.js";
 
 function param(req: Request, name: string): string {
@@ -261,9 +292,8 @@ async function shareSessionWithCoach(userId: string, sessionId: string): Promise
 async function shareSessionWithRoom(
   userId: string,
   sessionId: string,
+  extras: { caption?: string; imageAssetId?: string | null } = {},
 ): Promise<{ ok: true; messageId: string } | { ok: false; reason: string }> {
-  const unit = await unitFor(userId);
-
   const [session] = await db
     .select()
     .from(workoutSessions)
@@ -306,16 +336,33 @@ async function shareSessionWithRoom(
     .limit(1);
   if (!room) return { ok: false, reason: "You're not in a room yet." };
 
-  const lines = summariseSession(
-    working.map((r) => ({ ...r, weight: out(r.weightKg, unit) })),
-    unit,
-  );
-  const title = session.title?.trim() || "Training";
-  const body = [`${title} — ${working.length} sets`, "", ...lines].join("\n");
+  /*
+    The sets used to be flattened into the message body here, by the same
+    `summariseSession` that writes the coach's copy. They are not any more:
+    the message carries a structured card, so the Room can render movements and
+    volume rather than a paragraph, and the client can lay it out.
+
+    The card is a copy taken now, not a reference resolved later — see
+    server/community/sharedWorkout.ts. Correcting a set corrects the training
+    log; it does not reach back into a conversation other people have already
+    replied to.
+
+    What stays in the body is what the member typed. That is the one part of a
+    share nobody else can generate.
+  */
+  const workout = await publishedWorkout(session.id);
+  if (!workout) return { ok: false, reason: "That workout is no longer there." };
 
   const [message] = await db
     .insert(communityMessages)
-    .values({ channelId: room.id, userId, body })
+    .values({
+      channelId: room.id,
+      userId,
+      body: (extras.caption ?? "").trim().slice(0, 8000),
+      sharedSessionId: session.id,
+      sharedWorkout: workout,
+      imageAssetId: extras.imageAssetId ?? null,
+    })
     .returning({ id: communityMessages.id });
 
   // A top-level message is its own root. Matching what the community handler
@@ -327,6 +374,127 @@ async function shareSessionWithRoom(
     .where(eq(communityMessages.id, message.id));
 
   return { ok: true, messageId: message.id };
+}
+
+/**
+ * Everything this member has logged, with the sets inside each session.
+ *
+ * Lifted out of the route so a coach reads exactly what the member reads. Two
+ * implementations of "their history" is how a coach ends up looking at a
+ * different week from the person they are talking to — the same drift that
+ * `server/movement/history.ts` was written to end for terrain.
+ *
+ * Sixty sessions, which is a season rather than a week: the caller decides how
+ * much of it to show.
+ */
+async function sessionHistory(userId: string) {
+  const unit = await unitFor(userId);
+
+  const sessions = await db
+    .select()
+    .from(workoutSessions)
+    .where(eq(workoutSessions.userId, userId))
+    .orderBy(desc(workoutSessions.onDate))
+    .limit(60);
+
+  if (sessions.length === 0) return { unit, sessions: [] };
+
+  const sets = await db
+    .select({
+      id: workoutSets.id,
+      sessionId: workoutSets.sessionId,
+      exerciseId: workoutSets.exerciseId,
+      name: exercises.name,
+      // History has to be able to tell a 45-minute class from a 45-second
+      // hold, and the number alone cannot.
+      category: exercises.category,
+      trackingType: exercises.trackingType,
+      setIndex: workoutSets.setIndex,
+      reps: workoutSets.reps,
+      durationSeconds: workoutSets.durationSeconds,
+      distanceM: workoutSets.distanceM,
+      weightKg: workoutSets.weightKg,
+      isWarmup: workoutSets.isWarmup,
+      rpe: workoutSets.rpe,
+    })
+    .from(workoutSets)
+    .innerJoin(exercises, eq(workoutSets.exerciseId, exercises.id))
+    .where(inArray(workoutSets.sessionId, sessions.map((s) => s.id)))
+    .orderBy(asc(workoutSets.setIndex));
+
+  return {
+    unit,
+    sessions: sessions.map((s) => ({
+      ...s,
+      sets: sets
+        .filter((x) => x.sessionId === s.id)
+        .map((x) => ({ ...x, weight: out(x.weightKg, unit) })),
+    })),
+  };
+}
+
+/**
+ * Every set of one movement, newest day first.
+ *
+ * Warm-ups are included and labelled rather than dropped: a member who logs
+ * their ramp wants to see it, and the readers that must exclude it — volume,
+ * the e1RM series, terrain's movement events — already do so by `is_warmup`.
+ *
+ * RPE, style and failure come back only where they were actually recorded. A
+ * null stays null all the way to the screen; inventing a middling RPE for the
+ * sets somebody left blank would put a number in their history they never
+ * said.
+ */
+async function movementSets(userId: string, exerciseId: string) {
+  const unit = await unitFor(userId);
+
+  const [movement] = await db
+    .select({ id: exercises.id, name: exercises.name, trackingType: exercises.trackingType })
+    .from(exercises)
+    .where(eq(exercises.id, exerciseId))
+    .limit(1);
+  if (!movement) return { unit, movement: null, days: [] };
+
+  const rows = await db
+    .select({
+      onDate: workoutSessions.onDate,
+      sessionId: workoutSessions.id,
+      sessionTitle: workoutSessions.title,
+      setIndex: workoutSets.setIndex,
+      reps: workoutSets.reps,
+      durationSeconds: workoutSets.durationSeconds,
+      distanceM: workoutSets.distanceM,
+      weightKg: workoutSets.weightKg,
+      isWarmup: workoutSets.isWarmup,
+      setStyle: workoutSets.setStyle,
+      toFailure: workoutSets.toFailure,
+      rpe: workoutSets.rpe,
+      note: workoutSets.note,
+    })
+    .from(workoutSets)
+    .innerJoin(workoutSessions, eq(workoutSets.sessionId, workoutSessions.id))
+    .where(and(eq(workoutSessions.userId, userId), eq(workoutSets.exerciseId, exerciseId)))
+    .orderBy(desc(workoutSessions.onDate), asc(workoutSets.setIndex))
+    .limit(400);
+
+  const days: {
+    onDate: string;
+    sessionId: string;
+    sessionTitle: string | null;
+    sets: Array<Omit<(typeof rows)[number], "onDate" | "sessionId" | "sessionTitle" | "weightKg"> & {
+      weight: number | null;
+    }>;
+  }[] = [];
+
+  for (const row of rows) {
+    const { onDate, sessionId, sessionTitle, weightKg, ...set } = row;
+    const last = days[days.length - 1];
+    const entry = { ...set, weight: out(weightKg, unit) };
+    if (last && last.sessionId === sessionId) last.sets.push(entry);
+    else days.push({ onDate, sessionId, sessionTitle, sets: [entry] });
+  }
+
+  return { unit, movement, days };
 }
 
 export function registerTrainingRoutes(app: Express) {
@@ -521,6 +689,57 @@ export function registerTrainingRoutes(app: Express) {
         if (!owned) return res.status(404).json({ message: "No such session" });
       }
 
+      /**
+       * One open workout per member, refused rather than silently merged.
+       *
+       * Nothing enforced this and it had already happened in production: five
+       * unfinished sessions across two accounts, one of them carrying two
+       * logged sets. Because the open-session route returns the *newest*, an
+       * older one becomes unreachable the moment a newer starts — it can never
+       * be finished, never reaches `movementEvents`, and the work in it is
+       * invisible to the member and to every reading built on their history.
+       *
+       * A 409 rather than returning the existing session with a 200. The caller
+       * asked to start a back session; handing it a chest session under a
+       * success code invites it to say "Back started" over the top of a
+       * workout that has been running for forty minutes. Refusing states what
+       * is true and hands over what is needed to resume.
+       */
+      const [running] = await db
+        .select({
+          id: workoutSessions.id,
+          title: workoutSessions.title,
+          habitId: workoutSessions.habitId,
+          startedAt: workoutSessions.createdAt,
+        })
+        .from(workoutSessions)
+        .where(and(eq(workoutSessions.userId, userId), isNull(workoutSessions.finishedAt)))
+        .orderBy(desc(workoutSessions.createdAt))
+        .limit(1);
+
+      if (running) {
+        /**
+         * How much is in it, with the refusal.
+         *
+         * Without this the member is offered a choice between resuming and
+         * discarding with no way to tell which is the right one. A session left
+         * open overnight with nothing logged is a mistap; the same session with
+         * eleven sets in it is a workout, and the difference has to be on the
+         * card. It cost one count query on a path that runs when somebody is
+         * already blocked.
+         */
+        const [{ n }] = await db
+          .select({ n: sql<number>`count(*)::int` })
+          .from(workoutSets)
+          .where(eq(workoutSets.sessionId, running.id));
+
+        return res.status(409).json({
+          error: "open_session_exists",
+          message: "You already have a workout in progress.",
+          session: { ...running, sets: n },
+        });
+      }
+
       const [row] = await db
         .insert(workoutSessions)
         .values({
@@ -564,6 +783,21 @@ export function registerTrainingRoutes(app: Express) {
         .from(workoutSets)
         .where(eq(workoutSets.sessionId, sessionId));
 
+      /**
+       * The movement is in the workout, said explicitly, before the set is
+       * written.
+       *
+       * Every path that logs a set reaches this line — the prescribed screen,
+       * the free session, and any client old enough not to know the
+       * composition route exists. So a set can never be the only evidence that
+       * a movement was trained, which is the condition this whole table was
+       * added to end. It is idempotent, and the usual case is that the row is
+       * already there.
+       */
+      await ensureSessionExercise(sessionId, input.exerciseId, input.habitExerciseId ?? null);
+
+      const style = reconcileSetStyle(input);
+
       const [row] = await db
         .insert(workoutSets)
         .values({
@@ -575,7 +809,9 @@ export function registerTrainingRoutes(app: Express) {
           durationSeconds: input.durationSeconds ?? null,
           distanceM: input.distanceM ?? null,
           weightKg: inKg(input.weight ?? 0, input.unit ?? unit),
-          isWarmup: input.isWarmup,
+          isWarmup: style.isWarmup,
+          setStyle: style.setStyle,
+          toFailure: input.toFailure ?? false,
           rpe: input.rpe ?? null,
           note: input.note ?? null,
         })
@@ -609,6 +845,543 @@ export function registerTrainingRoutes(app: Express) {
 
       if (!gone) return res.status(404).json({ message: "Not found" });
       res.json({ id: gone.id });
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
+  /**
+   * Throw a session away, on purpose.
+   *
+   * The counterpart to Finish, and the only other thing that ends a workout.
+   * Without it a member who started one by accident had no way out: the
+   * partial unique index means that stray session blocks every subsequent
+   * start, so "I tapped the wrong thing" became a permanent condition.
+   *
+   * Deletes rather than closing. A finished session is a claim that training
+   * happened, and an accidental tap is not training — closing it would put a
+   * phantom workout in the member's history, which is precisely what the
+   * finished-but-empty rows already taught us to avoid. The sets go with it,
+   * which is why the client asks first.
+   */
+  /**
+   * Record a practice that already happened, in one transaction.
+   *
+   * ── Why this exists beside the session routes ─────────────────────────────
+   *
+   * Logging forty-five minutes of Reformer used to be three calls: create a
+   * session, write one set, finish it. A failure between any two of them left a
+   * finished session with nothing in it — harmless, as it turned out, because
+   * movementEvents selects FROM workout_sets and an empty session contributes
+   * no rows. Harmless is not the same as correct: the contract worth having is
+   * that the request either produces a complete practice or produces nothing.
+   *
+   * It also removes the last reason for the `immediate` flag, which existed so
+   * a create-then-finish flow could sidestep the one-open-workout rule. Nothing
+   * here is ever open, so there is nothing to sidestep.
+   */
+  app.post("/api/training/practice", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      const input = z
+        .object({
+          exerciseId: z.string().uuid(),
+          title: z.string().max(120),
+          durationMinutes: z.number().int().min(1).max(1440),
+          distanceM: z.number().min(0).max(1_000_000).optional(),
+          rpe: z.number().int().min(1).max(10).optional(),
+          shareWithCoach: z.boolean().optional(),
+          note: z.string().trim().max(1000).optional(),
+          /**
+           * A day other than today.
+           *
+           * The member's history is only as good as their ability to correct
+           * it, and there was no way to. A workout their watch never saw — the
+           * phone was on the bench, the session was at a friend's gym, the app
+           * was closed — simply did not exist, and the member could see that it
+           * did not and do nothing about it.
+           *
+           * Bounded on both sides. The future is not history, and sixty days is
+           * as far back as a person can honestly place a session by memory.
+           */
+          onDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+          /**
+           * Yes, record it anyway — I have seen what you found.
+           *
+           * Only ever sent in answer to the 409 below, never by default. See
+           * the duplicate check.
+           */
+          force: z.boolean().optional(),
+        })
+        .parse(req.body ?? {});
+
+      const today = await memberToday(userId);
+      const onDate = input.onDate ?? today;
+
+      if (onDate > today) {
+        return res.status(400).json({ message: "That day hasn't happened yet." });
+      }
+      if (onDate < addDaysToString(today, -60)) {
+        return res.status(400).json({ message: "That's further back than Sakred keeps." });
+      }
+
+      /**
+       * The same workout, already imported.
+       *
+       * A member adding "Back, 60 minutes, Friday" whose watch already recorded
+       * a generic Strength Training that afternoon would be charging their body
+       * twice for one session — and the imported row is the better one to keep,
+       * because it carries the real duration, the heart rate and the source.
+       * What it lacks is the only thing the member was trying to add: which
+       * muscles, and what to call it.
+       *
+       * So this refuses and hands back the candidate, and the client offers to
+       * put the detail on it instead. `force` is how somebody says no, that was
+       * a different session — which is a real answer and stays available.
+       */
+      if (!input.force) {
+        const [movement] = await db
+          .select({ category: exercises.category })
+          .from(exercises)
+          .where(eq(exercises.id, input.exerciseId));
+        const category = movement?.category ?? null;
+
+        const sameDay = await db
+          .select({
+            id: healthWorkouts.id,
+            workoutType: healthWorkouts.workoutType,
+            durationSeconds: healthWorkouts.durationSeconds,
+            sourceApp: healthWorkouts.sourceApp,
+            onDate: healthWorkouts.onDate,
+          })
+          .from(healthWorkouts)
+          .where(
+            and(
+              eq(healthWorkouts.userId, userId),
+              eq(healthWorkouts.onDate, onDate),
+              isNull(healthWorkouts.reviewedAt),
+            ),
+          )
+          .orderBy(desc(healthWorkouts.startAt));
+
+        // The rule lives in the model, where all three cases are tested without
+        // a database. See `alreadyImported`.
+        const match = alreadyImported(
+          sameDay.map((w) => ({ ...w, reviewedAt: null })),
+          category,
+        );
+        if (match) {
+          return res.status(409).json({
+            error: "already_imported",
+            message: "Your phone already recorded something like this that day.",
+            workout: match,
+          });
+        }
+      }
+
+      const sessionId = await transactionally<string>(async (tx) => {
+        const [session] = await tx
+          .insert(workoutSessions)
+          .values({
+            userId,
+            onDate,
+            title: input.title,
+            durationMinutes: input.durationMinutes,
+            ...(input.note ? { note: input.note } : {}),
+            // Born finished. It is a record of something already done, and it
+            // must never occupy the one open-workout slot.
+            finishedAt: new Date(),
+          })
+          .returning();
+
+        // Composition inside the same transaction as the set, so a practice is
+        // never a session whose only account of what was done is a set row.
+        // Written by hand rather than through `ensureSessionExercise` because
+        // that helper takes the pool and this must take the transaction.
+        await tx.insert(sessionExercises).values({
+          sessionId: session.id,
+          exerciseId: input.exerciseId,
+          position: 0,
+        });
+
+        await tx.insert(workoutSets).values({
+          sessionId: session.id,
+          exerciseId: input.exerciseId,
+          durationSeconds: input.durationMinutes * 60,
+          ...(input.distanceM != null ? { distanceM: input.distanceM } : {}),
+          ...(input.rpe != null ? { rpe: input.rpe } : {}),
+        });
+
+        return session.id;
+      });
+      // Drizzle's transaction return widens to unknown through this helper;
+      // the insert is `.returning()` so the id is a string by construction.
+      const practiceId = sessionId as string;
+
+      // The same event a finished session emits, because that is what this is —
+      // one that happened to be recorded after the fact rather than during.
+      track("training.session_finish", { userId, surface: "build", subjectId: practiceId });
+
+      // Best-effort and after the commit, so a coach-thread failure cannot roll
+      // back a practice the member definitely did.
+      if (input.shareWithCoach) {
+        try {
+          await shareSessionWithCoach(userId, practiceId);
+        } catch (err) {
+          trackError("training.share", err, { userId });
+        }
+      }
+
+      res.status(201).json({ id: practiceId });
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
+  app.delete("/api/training/sessions/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      const id = param(req, "id");
+
+      // Ownership in the predicate, so another member's id resolves to a
+      // refusal rather than to their workout.
+      const [owned] = await db
+        .select({ id: workoutSessions.id })
+        .from(workoutSessions)
+        .where(and(eq(workoutSessions.id, id), eq(workoutSessions.userId, userId)));
+      if (!owned) return res.status(404).json({ message: "No such session" });
+
+      await db.delete(workoutSets).where(eq(workoutSets.sessionId, id));
+      await db.delete(workoutSessions).where(eq(workoutSessions.id, id));
+
+      res.json({ ok: true });
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
+  /**
+   * Take one movement back out of an open session.
+   *
+   * ── Why a route and not four calls to `DELETE /sets/:id` ─────────────────
+   *
+   * Removing a movement removes everything logged under it, and doing that one
+   * set at a time is three round trips that can half-succeed: a member on a gym
+   * wifi ends up with a movement they asked to remove still holding its second
+   * and third sets. One statement, or none of it.
+   *
+   * The member is told the count before this is called — see the confirmation
+   * in the workout screen — because this destroys work that was really done.
+   * A movement with nothing under it deletes nothing and is simply dropped from
+   * the screen.
+   */
+  app.delete(
+    "/api/training/sessions/:id/exercises/:exerciseId",
+    isAuthenticated,
+    async (req, res) => {
+      try {
+        const userId = req.session!.userId!;
+        const id = param(req, "id");
+
+        // Ownership in the predicate. An id from somebody else's session is a
+        // refusal rather than a deletion of their sets.
+        const [owned] = await db
+          .select({ id: workoutSessions.id })
+          .from(workoutSessions)
+          .where(and(eq(workoutSessions.id, id), eq(workoutSessions.userId, userId)));
+        if (!owned) return res.status(404).json({ message: "No such session" });
+
+        // Both halves: the work logged under it, and the statement that it was
+        // in the workout at all. Deleting only the sets used to leave a
+        // movement that reappeared on the next reload with nothing in it.
+        const { removed } = await removeSessionExercise(id, param(req, "exerciseId"));
+
+        res.json({ removed });
+      } catch (err) {
+        fail(res, err);
+      }
+    },
+  );
+
+  /**
+   * Put a movement into the workout, now, before anything is done with it.
+   *
+   * ── The one-minute gap this closes ────────────────────────────────────────
+   *
+   * Choosing a movement used to write nothing anywhere. It went into a React
+   * `useState` and stayed there until the first set was logged, which is
+   * usually a minute later and sometimes never — so a member who picked their
+   * next exercise, put the phone in their pocket and walked to the rack came
+   * back to a workout that had forgotten what they were about to do. Nothing
+   * was lost from the database, because nothing had ever been offered to it.
+   *
+   * The response carries what the screen needs to draw the movement it just
+   * added, including what was done last time. That is deliberate: the moment
+   * somebody selects incline press is exactly the moment "210 × 2 · 200 × 4"
+   * is worth reading, and a second request for it is a second chance to render
+   * the row without it.
+   */
+  app.post("/api/training/sessions/:id/exercises", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      const sessionId = param(req, "id");
+      const input = addSessionExerciseSchema.parse(req.body ?? {});
+
+      if (!(await ownsSession(userId, sessionId))) {
+        return res.status(404).json({ message: "No such session" });
+      }
+
+      const [exercise] = await db
+        .select({ id: exercises.id })
+        .from(exercises)
+        .where(eq(exercises.id, input.exerciseId));
+      if (!exercise) return res.status(400).json({ message: "No such exercise" });
+
+      await ensureSessionExercise(sessionId, input.exerciseId, input.habitExerciseId ?? null);
+      if (input.supersetWith) {
+        await pairSessionExercise(sessionId, input.exerciseId, input.supersetWith);
+      }
+
+      const unit = await unitFor(userId);
+      const [composition, previous] = await Promise.all([
+        compositionFor(sessionId),
+        priorPerformanceFor(userId, [input.exerciseId], sessionId, unit),
+      ]);
+
+      res.status(201).json({
+        exercises: composition,
+        previous,
+        added: composition.find((m) => m.exerciseId === input.exerciseId) ?? null,
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: zodMessage(err) });
+      }
+      fail(res, err);
+    }
+  });
+
+  /**
+   * Pair a movement with another one, or set it loose again.
+   *
+   * A superset is a relationship between exercises, so this is the only place
+   * one can be declared — there is deliberately no "superset" set type. See
+   * `SET_STYLES` for why that distinction is load-bearing rather than
+   * pedantic.
+   */
+  app.patch("/api/training/sessions/:id/exercises/:exerciseId", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      const sessionId = param(req, "id");
+      const input = z
+        .object({ supersetWith: z.string().min(1).nullable() })
+        .parse(req.body ?? {});
+
+      if (!(await ownsSession(userId, sessionId))) {
+        return res.status(404).json({ message: "No such session" });
+      }
+
+      await pairSessionExercise(sessionId, param(req, "exerciseId"), input.supersetWith);
+      res.json({ exercises: await compositionFor(sessionId) });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: zodMessage(err) });
+      }
+      fail(res, err);
+    }
+  });
+
+  /**
+   * Correct a set that is already down.
+   *
+   * ── Why a completed set has to stay editable ─────────────────────────────
+   *
+   * A logged set was a statement the screen rendered and nothing could change:
+   * the only way to fix 205 typed as 250 was to delete the row and log it
+   * again, which loses its place in the order. That is a strange thing for a
+   * training log to insist on — the number is wrong, the member knows it is
+   * wrong, and the app's answer was that history is immutable. History is
+   * immutable against *Sakred* rewriting it. It is not immutable against the
+   * person who did the work.
+   *
+   * A patch, so a member correcting a weight sends a weight. Absent means
+   * unchanged and null means cleared, and the two are different — see
+   * `updateSetSchema`.
+   */
+  app.patch("/api/training/sets/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      const setId = param(req, "id");
+      const input = updateSetSchema.parse(req.body ?? {});
+      const unit = await unitFor(userId);
+
+      // Ownership through the session, in the predicate rather than in a
+      // second query — the same rule DELETE /sets/:id follows.
+      const [existing] = await db
+        .select({ id: workoutSets.id, isWarmup: workoutSets.isWarmup, setStyle: workoutSets.setStyle })
+        .from(workoutSets)
+        .innerJoin(workoutSessions, eq(workoutSets.sessionId, workoutSessions.id))
+        .where(and(eq(workoutSets.id, setId), eq(workoutSessions.userId, userId)));
+      if (!existing) return res.status(404).json({ message: "Not found" });
+
+      const patch: Record<string, unknown> = {};
+      if ("reps" in input) patch.reps = input.reps ?? null;
+      if ("durationSeconds" in input) patch.durationSeconds = input.durationSeconds ?? null;
+      if ("distanceM" in input) patch.distanceM = input.distanceM ?? null;
+      if (input.weight !== undefined) patch.weightKg = inKg(input.weight, input.unit ?? unit);
+      if ("rpe" in input) patch.rpe = input.rpe ?? null;
+      if ("note" in input) patch.note = input.note ?? null;
+      if (input.toFailure !== undefined) patch.toFailure = input.toFailure;
+
+      /**
+       * The two warm-up columns move together or not at all. Sending neither
+       * leaves both alone; sending either sends both, so the CHECK that holds
+       * them equal never sees a half-written pair.
+       */
+      if (input.setStyle !== undefined) {
+        const style = reconcileSetStyle({ setStyle: input.setStyle });
+        patch.setStyle = style.setStyle;
+        patch.isWarmup = style.isWarmup;
+      } else if (input.isWarmup !== undefined && input.isWarmup !== existing.isWarmup) {
+        // An older client that only knows the flag. Turning it on makes the set
+        // a warm-up; turning it off returns it to a working set, which is the
+        // only style it can have had while the flag was set.
+        patch.setStyle = input.isWarmup ? "warmup" : "normal";
+        patch.isWarmup = input.isWarmup;
+      }
+
+      const [row] = await db
+        .update(workoutSets)
+        .set(patch)
+        .where(eq(workoutSets.id, setId))
+        .returning();
+
+      res.json({ ...row, weight: out(row.weightKg, unit), unit });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: zodMessage(err) });
+      }
+      fail(res, err);
+    }
+  });
+
+  /**
+   * What the body said, in the member's own words.
+   *
+   * ── Why the raw sentence is the payload ──────────────────────────────────
+   *
+   * "Slight low-back discomfort on the left-leg RDL — the glute didn't feel
+   * like it was firing" is worth more than any category it could be reduced
+   * to, and it is stored exactly as typed. `quality` and `side` are the
+   * member's own structuring of their own answer, picked from a short list;
+   * nothing here reads their sentence and decides what it meant.
+   *
+   * The date comes from the session rather than from the clock, so an
+   * observation left on a workout logged after midnight sits on the day the
+   * training happened.
+   */
+  /**
+   * What they have said lately, for the screens that are about to ask them to
+   * load something.
+   *
+   * Deliberately the whole window rather than a per-movement lookup. The list
+   * is small — notable observations only, forty-five days — and the alternative
+   * is one request per movement on a screen with eight of them, on a phone, in
+   * a gym. Matching a note to a movement is arithmetic on data the client
+   * already has.
+   */
+  app.get("/api/training/memory", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      const today = await memberToday(userId);
+
+      /**
+       * Both halves of training response, from one request.
+       *
+       * The notes are what the member said; `response` is what they did — sets
+       * at the top end, sets taken to failure, and how long ago. Restore reads
+       * them together, and a second endpoint would be a second thing to keep in
+       * step with the first. The interpretation is not here: `restoreLine` and
+       * `loadGuidance` are in the shared model, testable without a database,
+       * and Build and Restore call different ones over the same data rather
+       * than each deriving their own.
+       *
+       * Nothing about this feeds Terrain. Terrain Now stays the canonical
+       * reading of state; this is context for one screen.
+       */
+      const [notes, sets] = await Promise.all([
+        trainingMemory(userId, today),
+        db
+          .select({
+            onDate: workoutSessions.onDate,
+            rpe: workoutSets.rpe,
+            toFailure: workoutSets.toFailure,
+            isWarmup: workoutSets.isWarmup,
+          })
+          .from(workoutSets)
+          .innerJoin(workoutSessions, eq(workoutSets.sessionId, workoutSessions.id))
+          .where(
+            and(
+              eq(workoutSessions.userId, userId),
+              gte(workoutSessions.onDate, addDaysToString(today, -RESPONSE_WINDOW_DAYS)),
+            ),
+          ),
+      ]);
+
+      res.json({
+        observations: notes,
+        response: readTrainingResponse(sets, today),
+      });
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
+  app.post("/api/training/sessions/:id/observations", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      const id = param(req, "id");
+      const input = observationSchema.parse(req.body ?? {});
+
+      // Ownership in the predicate, and the session supplies the day.
+      const [owned] = await db
+        .select({ id: workoutSessions.id, onDate: workoutSessions.onDate })
+        .from(workoutSessions)
+        .where(and(eq(workoutSessions.id, id), eq(workoutSessions.userId, userId)));
+      if (!owned) return res.status(404).json({ message: "No such session" });
+
+      /**
+       * One observation per movement per session, replaced rather than stacked.
+       *
+       * A member correcting what they just wrote is correcting it, not adding a
+       * second opinion — and a list of four notes about the same exercise on
+       * the same evening is a reader's problem forever afterwards.
+       */
+      await db
+        .delete(trainingObservations)
+        .where(
+          and(
+            eq(trainingObservations.sessionId, id),
+            input.exerciseId
+              ? eq(trainingObservations.exerciseId, input.exerciseId)
+              : isNull(trainingObservations.exerciseId),
+          ),
+        );
+
+      const [row] = await db
+        .insert(trainingObservations)
+        .values({
+          userId,
+          sessionId: id,
+          exerciseId: input.exerciseId ?? null,
+          onDate: owned.onDate,
+          note: input.note?.trim() || null,
+          quality: input.quality ?? null,
+          side: input.side ?? null,
+        })
+        .returning();
+
+      res.status(201).json(row);
     } catch (err) {
       fail(res, err);
     }
@@ -684,7 +1457,29 @@ export function registerTrainingRoutes(app: Express) {
   app.post("/api/training/sessions/:id/share", isAuthenticated, async (req, res) => {
     try {
       const userId = req.session!.userId!;
-      const result = await shareSessionWithRoom(userId, param(req, "id"));
+
+      /*
+        The photograph is verified here rather than trusted, on the same two
+        grounds the Room composer uses: it has to be theirs, and it has to have
+        been uploaded as a Room photo. A progress photo attached to a public
+        post would be readable by nobody in the room and private to everybody
+        outside it — which is to say, a broken tile hiding a real mistake.
+      */
+      const imageAssetId = typeof req.body?.imageAssetId === "string" ? req.body.imageAssetId : null;
+      if (imageAssetId) {
+        const [asset] = await db
+          .select({ ownerUserId: mediaAssets.ownerUserId, purpose: mediaAssets.purpose })
+          .from(mediaAssets)
+          .where(eq(mediaAssets.id, imageAssetId));
+        if (!asset || asset.ownerUserId !== userId || asset.purpose !== "room") {
+          return res.status(404).json({ message: "No such image" });
+        }
+      }
+
+      const result = await shareSessionWithRoom(userId, param(req, "id"), {
+        caption: typeof req.body?.caption === "string" ? req.body.caption : "",
+        imageAssetId,
+      });
       if (!result.ok) return res.status(400).json({ message: result.reason });
       track("training.session_shared", { userId, surface: "community", subjectId: result.messageId });
       res.status(201).json({ messageId: result.messageId });
@@ -721,6 +1516,17 @@ export function registerTrainingRoutes(app: Express) {
           id: workoutSessions.id,
           title: workoutSessions.title,
           onDate: workoutSessions.onDate,
+          /**
+           * Which prescription this session belongs to, if any.
+           *
+           * Without it the prescribed path had nothing to rehydrate from: the
+           * session id lived in `useState`, so navigating to Home and back left
+           * a member looking at their coach's session with every log button
+           * inert, as though the workout they were halfway through had never
+           * been started. The sets were all safely on the server; only the
+           * screen had forgotten.
+           */
+          habitId: workoutSessions.habitId,
           // The timer is derived from this, never from a counter the client
           // increments — a counter dies with the component it lives in.
           startedAt: workoutSessions.createdAt,
@@ -732,12 +1538,102 @@ export function registerTrainingRoutes(app: Express) {
 
       if (!open) return res.json({ session: null });
 
-      const [{ sets }] = await db
-        .select({ sets: sql<number>`count(*)::int` })
+      /**
+       * What is in it, not just how much.
+       *
+       * The workout screen used to hold its list of movements in component
+       * state, so the sets were safe on the server and the *session* was not:
+       * force-quit mid-workout, reopen, and Build offered an empty session with
+       * a timer running on it. Everything logged was still there and there was
+       * no way to see it, which reads as data loss whether or not it is.
+       *
+       * So the open session carries its own contents. The exercise columns come
+       * along because the screen has to know how to render a row — a hold takes
+       * seconds, a class takes minutes, and a foam roll takes no weight at all
+       * — and re-deriving that from a catalogue fetch would mean the screen
+       * could render before it knew what it was rendering.
+       */
+      const unit = await unitFor(userId);
+      const logged = await db
+        .select({
+          id: workoutSets.id,
+          exerciseId: workoutSets.exerciseId,
+          name: exercises.name,
+          category: exercises.category,
+          trackingType: exercises.trackingType,
+          takesLoad: exercises.takesLoad,
+          unilateral: exercises.unilateral,
+          setIndex: workoutSets.setIndex,
+          reps: workoutSets.reps,
+          durationSeconds: workoutSets.durationSeconds,
+          distanceM: workoutSets.distanceM,
+          weightKg: workoutSets.weightKg,
+          isWarmup: workoutSets.isWarmup,
+          setStyle: workoutSets.setStyle,
+          toFailure: workoutSets.toFailure,
+          rpe: workoutSets.rpe,
+        })
         .from(workoutSets)
-        .where(eq(workoutSets.sessionId, open.id));
+        .innerJoin(exercises, eq(workoutSets.exerciseId, exercises.id))
+        .where(eq(workoutSets.sessionId, open.id))
+        .orderBy(asc(workoutSets.setIndex));
 
-      res.json({ session: { ...open, sets: Number(sets) || 0 } });
+      /**
+       * And whatever has been said about it.
+       *
+       * With the session rather than behind a second request: the note icon on
+       * a movement is either filled or it is not, and a screen that has to wait
+       * on a second round trip to know which draws it wrong first.
+       */
+      const observations = await db
+        .select({
+          id: trainingObservations.id,
+          exerciseId: trainingObservations.exerciseId,
+          note: trainingObservations.note,
+          quality: trainingObservations.quality,
+          side: trainingObservations.side,
+        })
+        .from(trainingObservations)
+        .where(eq(trainingObservations.sessionId, open.id));
+
+      /**
+       * And what the workout is *made of*, which the sets cannot say.
+       *
+       * A movement chosen and not yet performed has no set, so for as long as
+       * composition was inferred from `logged` it existed only in the phone's
+       * memory. This is the list, in the member's own order, and it is the one
+       * the screen renders — `logged` now only says what has been done under
+       * each entry.
+       */
+      const composition = await compositionFor(open.id);
+
+      /**
+       * Beside each movement, the last time it was trained.
+       *
+       * Fetched here rather than by the screen because it is the same question
+       * for every movement in the session and the screen has seven of them.
+       * `GET /exercises/:id/history` has existed for months and answers a
+       * different question — a series over time, not "what did I put on the
+       * bar last Tuesday" — which is why it had no caller.
+       */
+      const ids = composition.map((m) => m.exerciseId);
+      const [previous, concerns] = await Promise.all([
+        priorPerformanceFor(userId, ids, open.id, unit),
+        recentConcernsFor(userId, ids),
+      ]);
+
+      res.json({
+        session: {
+          ...open,
+          sets: logged.length,
+          unit,
+          logged: logged.map((s) => ({ ...s, weight: out(s.weightKg, unit) })),
+          observations,
+          exercises: composition,
+          previous,
+          concerns,
+        },
+      });
     } catch (err) {
       fail(res, err);
     }
@@ -746,53 +1642,74 @@ export function registerTrainingRoutes(app: Express) {
   app.get("/api/training/sessions", isAuthenticated, async (req, res) => {
     try {
       const userId = req.session!.userId!;
-      const unit = await unitFor(userId);
-
-      const sessions = await db
-        .select()
-        .from(workoutSessions)
-        .where(eq(workoutSessions.userId, userId))
-        .orderBy(desc(workoutSessions.onDate))
-        .limit(60);
-
-      if (sessions.length === 0) return res.json({ unit, sessions: [] });
-
-      const sets = await db
-        .select({
-          id: workoutSets.id,
-          sessionId: workoutSets.sessionId,
-          exerciseId: workoutSets.exerciseId,
-          name: exercises.name,
-          // History has to be able to tell a 45-minute class from a 45-second
-          // hold, and the number alone cannot.
-          category: exercises.category,
-          trackingType: exercises.trackingType,
-          setIndex: workoutSets.setIndex,
-          reps: workoutSets.reps,
-          durationSeconds: workoutSets.durationSeconds,
-          distanceM: workoutSets.distanceM,
-          weightKg: workoutSets.weightKg,
-          isWarmup: workoutSets.isWarmup,
-          rpe: workoutSets.rpe,
-        })
-        .from(workoutSets)
-        .innerJoin(exercises, eq(workoutSets.exerciseId, exercises.id))
-        .where(inArray(workoutSets.sessionId, sessions.map((s) => s.id)))
-        .orderBy(asc(workoutSets.setIndex));
-
-      res.json({
-        unit,
-        sessions: sessions.map((s) => ({
-          ...s,
-          sets: sets
-            .filter((x) => x.sessionId === s.id)
-            .map((x) => ({ ...x, weight: out(x.weightKg, unit) })),
-        })),
-      });
+      res.json(await sessionHistory(userId));
     } catch (err) {
       fail(res, err);
     }
   });
+
+  /**
+   * The same history, read by the client's coach.
+   *
+   * Deliberately the same function rather than a coach-shaped copy: a coach and
+   * a member looking at one session have to be looking at one session, and two
+   * readers of the same tables is how they stop being.
+   *
+   * `requireCoachOf` here, not the narrower relationship-only gate. Training
+   * history is coaching data and an admin running the programme may need to see
+   * it; a progress *photograph* is not, and lives behind its own check in
+   * `server/media/progressRoutes.ts`. The two gates are different on purpose.
+   */
+  app.get(
+    "/api/coach/clients/:memberId/movement",
+    isAuthenticated,
+    requireCoachOf("memberId"),
+    async (req, res) => {
+      try {
+        res.json(await sessionHistory(param(req, "memberId")));
+      } catch (err) {
+        fail(res, err);
+      }
+    },
+  );
+
+  /**
+   * One movement, day by day, as it was actually performed.
+   *
+   * ── Why this is not the progression endpoint ──────────────────────────
+   *
+   * `/exercises/:id/history` answers "is this going up" — one estimated 1RM per
+   * day, which is the right shape for a line and the wrong shape for a person
+   * standing in a gym trying to remember what they did last Tuesday. They want
+   * the sets: the weight, the reps, whether it was a warm-up, whether they
+   * called failure.
+   *
+   * A read model over the canonical tables, not a second history. Nothing here
+   * is stored; every number is `workout_sets` joined to the session that dates
+   * it.
+   */
+  app.get("/api/training/exercises/:id/sets", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      res.json(await movementSets(userId, param(req, "id")));
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
+  /** The same movement, read by the client's coach. */
+  app.get(
+    "/api/coach/clients/:memberId/movements/:exerciseId/sets",
+    isAuthenticated,
+    requireCoachOf("memberId"),
+    async (req, res) => {
+      try {
+        res.json(await movementSets(param(req, "memberId"), param(req, "exerciseId")));
+      } catch (err) {
+        fail(res, err);
+      }
+    },
+  );
 
   /** One lift over time — the series the Sparkline was written for. */
   app.get("/api/training/exercises/:id/history", isAuthenticated, async (req, res) => {

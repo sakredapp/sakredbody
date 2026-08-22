@@ -30,6 +30,7 @@ import { ChevronRight, MoreHorizontal, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Suggestion, MoonGuidance, SeasonGuidance, ReadinessRead } from "@shared/models/recommend";
 import type { RelationalGuidance } from "@shared/models/relating";
+import type { TerrainLean, TerrainReason } from "@shared/models/terrain";
 
 export type TodayStat = {
   metric: string;
@@ -65,6 +66,34 @@ export type TodayResponse = {
   sky: string | null;
   stats: TodayStat[];
   checkedIn: boolean;
+  /**
+   * Canonical Terrain, carried on this response so Build can gate against it.
+   *
+   * The same reading Home shows, not a second one — see
+   * `shared/models/buildToday.ts` for why every capacity claim has to defer to
+   * it rather than to the readiness level sitting beside it here.
+   *
+   * ── Optional, and permanently so ────────────────────────────────────────
+   *
+   * A native build and a server deploy are never atomic. The client is bundled
+   * into an artifact that goes through App Review and then sits on somebody's
+   * phone for as long as they leave it there; the server ships on push. So the
+   * two are always skewed in one direction or the other, and every field a
+   * native client reads is optional whether or not the current server sends it.
+   *
+   * This was learned the hard way: build 23 shipped reading `data.terrain.lean`
+   * while the deploy carrying `terrain` was still queued, and Build crashed to
+   * an error screen — `undefined is not an object` — for the whole section.
+   * Marking it required in the type made the compiler agree with an assumption
+   * that was never true at runtime.
+   */
+  terrain?: {
+    lean: TerrainLean;
+    headline: string;
+    reasons: TerrainReason[];
+    hasBody: boolean;
+    hasReport: boolean;
+  };
   rhythm: RhythmSubjectView[];
   /**
    * How their own state is landing on other people — up to two, each naming

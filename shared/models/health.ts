@@ -36,6 +36,7 @@
 
 import { sql } from "drizzle-orm";
 import { WORKOUT_RESPONSES, WORKOUT_PLACEMENTS } from "./training.js";
+import { todayInZone } from "../utils/dates.js";
 import {
   pgTable,
   text,
@@ -378,6 +379,35 @@ export const healthWorkouts = pgTable(
      */
     userOrientationOverride: text("user_orientation_override"),
 
+    /**
+     * What the member says they actually trained.
+     *
+     * An imported `strength` workout carries no muscle-group truth: only a
+     * Sakred-logged session reaches `exercises.muscleGroups` through its sets.
+     * So Sakred must never infer "yesterday was legs" from a watch — but there
+     * is no reason it cannot simply ask, and this is where the answer lives.
+     *
+     * Enrichment, not correction. The platform still said Strength Training and
+     * the load model still reads the category; this adds the one thing neither
+     * of them can know. Once it exists, "Chest has had more room than Back
+     * recently" becomes a sentence Sakred is entitled to say.
+     */
+    userFocus: text("user_focus"),
+
+    /** Their own name for it — "Back day". Never generated, only typed. */
+    userLabel: text("user_label"),
+
+    /**
+     * When they looked at it, whether or not they added anything.
+     *
+     * Separate from the answers because "reviewed and had nothing to add" and
+     * "never asked" are different states, and only the second is worth
+     * prompting about again. Without this the confirmation card has no way to
+     * stop asking, which is how a feature becomes a feed of twenty identical
+     * cards about walks.
+     */
+    reviewedAt: timestamp("reviewed_at"),
+
     syncedAt: timestamp("synced_at").defaultNow(),
   },
   (t) => [
@@ -416,14 +446,45 @@ export type HealthWorkoutInput = z.infer<typeof healthWorkoutSchema>;
  * to the platform, and an endpoint that let them be edited would quietly turn
  * imported measurements into self-reported ones.
  */
+/**
+ * What a member may say they trained.
+ *
+ * Deliberately short. A watch cannot know this and Sakred must not guess it,
+ * but that is not a reason to build a bodybuilding taxonomy — `other` plus a
+ * free label carries Olympic lifting, climbing, kettlebells or an athletic
+ * circuit without prematurely turning each into an enum nobody asked for.
+ */
+export const WORKOUT_FOCUSES = [
+  "chest", "back", "legs", "shoulders", "arms", "core",
+  "full_body", "conditioning", "other",
+] as const;
+export type WorkoutFocus = (typeof WORKOUT_FOCUSES)[number];
+
 export const workoutFeedbackSchema = z
   .object({
     response: z.enum(WORKOUT_RESPONSES).nullable().optional(),
     placement: z.enum(WORKOUT_PLACEMENTS).nullable().optional(),
+    focus: z.enum(WORKOUT_FOCUSES).nullable().optional(),
+    /** Their own words. Trimmed, bounded, never generated. */
+    label: z.string().trim().max(60).nullable().optional(),
+    /**
+     * Looked at, whether or not anything was added.
+     *
+     * Its own field because Confirm is a complete action: a member who reads
+     * the card and has nothing to add has still answered, and must not be asked
+     * again. Sending only this is the Confirm button.
+     */
+    reviewed: z.boolean().optional(),
   })
-  .refine((v) => v.response !== undefined || v.placement !== undefined, {
-    message: "Nothing to change.",
-  });
+  .refine(
+    (v) =>
+      v.response !== undefined ||
+      v.placement !== undefined ||
+      v.focus !== undefined ||
+      v.label !== undefined ||
+      v.reviewed !== undefined,
+    { message: "Nothing to change." },
+  );
 export type WorkoutFeedbackInput = z.infer<typeof workoutFeedbackSchema>;
 
 // ─── 5. THE SYNC ENVELOPE ──────────────────────────────────────────────────
@@ -445,3 +506,84 @@ export const healthSyncSchema = z.object({
   osVersion: z.string().max(60).optional().nullable(),
 });
 export type HealthSyncInput = z.infer<typeof healthSyncSchema>;
+
+/**
+ * Has this member already answered a card today?
+ *
+ * ── Why this is a function and not two lines in the route ─────────────────
+ *
+ * Because it was two lines in the route, and it was wrong for eight months in
+ * a way nothing could see. It compared `reviewedAt.toISOString().slice(0, 10)`
+ * — a UTC calendar date — against the member's local one. In Toronto those
+ * agree for twenty hours a day and disagree for four, and the four are the
+ * evening: precisely when somebody sits down and reviews the session they just
+ * finished.
+ *
+ * What that produced was not an error. The write succeeded, the card refreshed,
+ * and the *next* unreviewed import silently took its place — so the member saw
+ * a card that appeared to have ignored them, pressed Save a second time, and
+ * gave a session they had never described the previous session's name. Two rows
+ * on 15 Aug 2026, six seconds apart, identically labelled.
+ *
+ * An instant is not a day. Turning one into the other requires knowing where
+ * the member is standing, and this is the only place that conversion is
+ * allowed to happen.
+ */
+export function answeredToday<T extends { reviewedAt: Date | null }>(
+  recent: readonly T[],
+  timeZone: string | null | undefined,
+  today: string,
+): boolean {
+  return recent.some((w) => w.reviewedAt != null && todayInZone(timeZone, w.reviewedAt) === today);
+}
+
+
+/**
+ * Is this an import where the member knows something the sensor does not?
+ *
+ * ── Restraint is the whole feature ────────────────────────────────────────
+ *
+ * A watch reports dozens of passive walks a week. Asking about each of them
+ * turns a good idea into a chore queue, and the member learns to dismiss the
+ * card without reading it — at which point the one prompt that mattered gets
+ * dismissed too.
+ *
+ * So the test is not "could a member add something", which is true of
+ * everything. It is "does the source classification leave out something that
+ * changes what Sakred can say tomorrow". For a generic strength import that is
+ * the whole muscle-group question: Sakred cannot infer legs from a watch, and
+ * with the answer it can honestly say chest has had more room than back.
+ *
+ * A run is already understood. Easy-versus-intervals might refine a
+ * recommendation one day, and when it does this list is where that decision
+ * gets made — deliberately, rather than by an eager default.
+ */
+const ASKS_FOR_DETAIL: ReadonlySet<string> = new Set([
+  "strength",
+  "strengthtraining",
+  "traditionalstrengthtraining",
+  "functionalstrengthtraining",
+  "crosstraining",
+  "hiit",
+  "highintensityintervaltraining",
+  "mixedcardio",
+  "mixedmetaboliccardiotraining",
+  "other",
+]);
+
+/** Understood well enough already. Never prompted about. */
+const UNDERSTOOD: ReadonlySet<string> = new Set([
+  "walking", "running", "cycling", "biking", "swimming", "hiking",
+  "yoga", "pilates", "mobility", "stretching", "meditation", "breathwork",
+  "rowing", "elliptical", "stairs", "dance",
+]);
+
+export function needsConfirmation(workoutType: string | null | undefined): boolean {
+  const t = (workoutType ?? "").trim().toLowerCase().replace(/[\s_-]/g, "");
+  if (!t) return true; // Unknown type — the ambiguous case worth asking about.
+  if (UNDERSTOOD.has(t)) return false;
+  if (ASKS_FOR_DETAIL.has(t)) return true;
+  // Anything the mapper cannot place is ambiguous by definition, and ambiguity
+  // is exactly where a member's answer is worth having.
+  return true;
+}

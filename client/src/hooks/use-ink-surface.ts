@@ -1,47 +1,86 @@
 /**
- * Put the portal on dark ground.
- *
- * The `.dark` palette — warm blacks, gold, cream — has existed in index.css
- * since the beginning and nothing ever applied the class, so every portal
- * screen fell through to `:root`, which is the light one. The member app has
- * been rendering as a bright cream page sitting inside a site whose whole
- * identity is gold on ink. Nothing was miscoloured; the theme was simply never
- * switched on.
+ * Hold the portal's surface and atmosphere for as long as a portal page is up.
  *
  * ── Why the html element and not a wrapper div ────────────────────────────
  *
- * Putting `dark` on the page's own container is the obvious move and it is
+ * Putting the theme on the page's own container is the obvious move and it is
  * subtly wrong. Radix renders dialogs, dropdowns, selects, popovers and
  * toasts into a portal attached to `document.body` — outside the page tree
- * entirely. Scoped to a wrapper, every one of those would resolve the light
- * tokens and open as a white card over a dark app. The class has to sit above
- * both trees, and `documentElement` is the only element that is.
+ * entirely. Scoped to a wrapper, every one of those would resolve the other
+ * palette and open as a pale card over a dark app. The attribute has to sit
+ * above both trees, and `documentElement` is the only element that is.
  *
- * ── Why a hook and not a class in index.html ──────────────────────────────
+ * ── Why a hook and not an attribute in index.html ─────────────────────────
  *
  * `client/index.html` and `index.css` are shared with the marketing site,
  * which runs its own `.tone-ink` / `.tone-light` scheme to flip sections
  * between grounds. Making the document dark globally would fight that. This
- * applies on mount and removes on unmount, so the portal is dark and the
+ * applies on mount and removes on unmount, so the portal is themed and the
  * marketing pages are untouched.
+ *
+ * ── Two attributes, not one class ─────────────────────────────────────────
+ *
+ * This used to add `dark`, which conflated "this is the portal" with "this is
+ * the dark palette". Now `data-surface` says where you are and `data-theme`
+ * says what it looks like, and a member choosing Light changes only the
+ * second. The subscription is what makes the setting take effect without a
+ * reload — appearance is stored outside React, so nothing re-renders on its
+ * own when it changes.
  */
 
 import { useEffect } from "react";
+import {
+  appearance,
+  applySurface,
+  applyTheme,
+  prefersDark,
+  resolveAppearance,
+  subscribeAppearance,
+  watchSystemAppearance,
+} from "@/lib/appearance";
+import { applyNativeChrome } from "@/lib/nativeChrome";
 
 export function useInkSurface() {
   useEffect(() => {
-    const root = document.documentElement;
-    root.classList.add("dark");
+    const paint = () => {
+      applySurface(true);
+      const resolved = resolveAppearance(appearance(), prefersDark());
+      applyTheme(resolved);
+      // After the attribute, never before: the chrome colour is read back from
+      // the computed `--ink`, so the stylesheet has to have resolved the new
+      // theme first or the status bar is painted one change behind.
+      void applyNativeChrome(resolved);
+    };
 
-    // Always removed on unmount, never conditionally.
-    //
-    // The first version remembered whether the class was already present and
-    // left it alone if so, to protect a hypothetical nested portal screen.
-    // That was wrong once `applyInkSurfaceAtBoot` started setting it from the
-    // URL: landing directly on /member meant the class was already there, so
-    // the guard declined to remove it, and navigating to a marketing page
-    // left the whole site dark. Nothing nests here — wouter's Switch renders
-    // exactly one page — so the guard protected nothing and broke something.
-    return () => root.classList.remove("dark");
+    paint();
+    const unsubscribe = subscribeAppearance(paint);
+    // Registered here rather than at boot so it is torn down with the portal.
+    // On `system` this is what follows a phone into night mode while the app
+    // is open; on an explicit choice the handler reads the preference and
+    // declines.
+    const unwatch = watchSystemAppearance(() => true);
+
+    /*
+      Both attributes are always removed on unmount, never conditionally.
+
+      The first version of this remembered whether the class was already
+      present and left it alone if so, to protect a hypothetical nested portal
+      screen. That was wrong once the boot code started setting it from the
+      URL: landing directly on /member meant it was already there, so the guard
+      declined to remove it, and navigating to a marketing page left the whole
+      site dark. Nothing nests here — wouter's Switch renders exactly one page
+      — so the guard protected nothing and broke something.
+    */
+    return () => {
+      unsubscribe();
+      unwatch();
+      applySurface(false);
+      applyTheme(null);
+      // Marketing resolves `:root`, where `--ink` is the dark ground its
+      // `.tone-ink` bands are built on — which is what the static theme-color
+      // in index.html has always claimed. Leaving daylight chrome behind on
+      // the way out would be a regression on pages nobody asked to change.
+      void applyNativeChrome("dark");
+    };
   }, []);
 }

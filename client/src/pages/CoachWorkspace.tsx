@@ -27,6 +27,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useAccess } from "@/hooks/use-access";
 import { useMyClients } from "@/hooks/use-coach";
 import { ClientRoster } from "@/components/coach/ClientRoster";
+import { NotificationEmail } from "@/components/coach/NotificationEmail";
 import { ClientWorkspace } from "@/components/coach/ClientWorkspace";
 import { NotificationPrompt } from "@/components/portal/NotificationPrompt";
 
@@ -140,6 +141,14 @@ export default function CoachWorkspacePage() {
             */}
             <NotificationPrompt audience="coach" relevant={(roster?.length ?? 0) > 0} />
             <ClientRoster onOpen={(id, name) => setOpenClient({ id, name })} />
+
+            {/*
+              On the roster, under the clients, rather than in the member's own
+              Settings. It is a coaching preference, and the coach's personal
+              Sakred is deliberately the place where none of their client
+              context appears.
+            */}
+            <NotificationEmail />
           </div>
         )}
       </div>

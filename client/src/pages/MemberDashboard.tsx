@@ -15,9 +15,10 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { SakredDate } from "@/components/portal/DatePicker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { ArrowRight, BarChart3, Building2, Calendar, Check, ChevronRight, Clock, Compass, DollarSign, Dumbbell, Heart, HelpCircle, Home, Hotel, ListChecks, LogOut, Map, MapPin, MoreHorizontal, Settings, ShieldCheck, Sparkles, Star, User, UserPlus, Users, UtensilsCrossed } from "lucide-react";
+import { ArrowRight, BarChart3, Building2, Calendar, Check, ChevronRight, Clock, Compass, DollarSign, Dumbbell, Heart, HelpCircle, Home, Hotel, ListChecks, LogOut, Map, MapPin, MoreHorizontal, Settings, Sparkles, Star, User, UserPlus, Users, UtensilsCrossed } from "lucide-react";
 import type { Retreat, BookingRequest, Partner, PartnerService } from "@shared/schema";
 import {
   SERVICE_CATEGORIES,
@@ -54,13 +55,18 @@ import {
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 import { useInkSurface } from "@/hooks/use-ink-surface";
 import { PORTAL_COLUMN } from "@/lib/layout";
-import { useAccess } from "@/hooks/use-access";
 import { PortalBackdrop } from "@/components/portal/PortalBackdrop";
 import { PillarHome } from "@/components/PillarHome";
 import { BuildTab } from "@/components/BuildTab";
+import { ActiveWorkoutBar } from "@/components/build/ActiveWorkoutBar";
+import { WorkoutSheet, WorkoutSheetProvider } from "@/components/build/WorkoutSheet";
 import { RestoreTab } from "@/components/RestoreTab";
 import { SettingsTab } from "@/components/SettingsTab";
 import { useHealthAutoSync } from "@/hooks/use-health";
+import { publishTourSection } from "@/hooks/use-guided-tour";
+import { HelpPortal } from "@/components/HelpPortal";
+import { onStageRequest } from "@/lib/tour/stage";
+import { TourHost } from "@/components/tour/TourHost";
 import { Onboarding } from "@/components/portal/Onboarding";
 import {
   DropdownMenu,
@@ -75,6 +81,7 @@ import { useHasCoach } from "@/hooks/use-coaching";
 import { useUnreadCoachMessages } from "@/hooks/use-notifications";
 import { scheduleMorningNotice } from "@/lib/morningNotice";
 import { updateWidget } from "@/lib/widget";
+import { formatLocalDateString, addDaysToString } from "@shared/utils/dates";
 
 // Icon mapping (UI-only, can't live in shared/)
 const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -174,7 +181,6 @@ export default function MemberDashboard() {
   useInkSurface();
 
   const { user, isLoading: authLoading, isAuthenticated, logout } = useAuth();
-  const access = useAccess();
   const { toast } = useToast();
 
   // The server schedules by calendar date and runs in UTC; it needs to know
@@ -259,6 +265,41 @@ export default function MemberDashboard() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [section]);
+
+  /**
+   * The one thing the guided walkthrough needs from this page.
+   *
+   * A step ends when the app *reaches* a screen — "tap Build" is satisfied by
+   * Build being open, however the member got there. Since a section is state
+   * rather than a route, the tour has no way to observe that from outside; and
+   * threading tour props through the nav, the tabs, the sheets and the workout
+   * would couple every screen here to a feature most members see once.
+   *
+   * So it goes on the document element, the same place the surface and the
+   * theme already live, and the tour reads it. Cleared on unmount so a tour
+   * left running cannot be told the app is still on a section it has left.
+   */
+  useEffect(() => {
+    publishTourSection(section);
+    return () => publishTourSection(null);
+  }, [section]);
+
+  /*
+    The other direction, and only ever on request.
+
+    A resumed walkthrough needs the app on the section its lesson happens in —
+    see `client/src/lib/tour/stage.ts`. Setting the section rather than
+    navigating, because these are the same screen: a route change would remount
+    the dashboard the tour has just started inside.
+  */
+  useEffect(
+    () =>
+      onStageRequest((request) => {
+        if (request.section) setSection(request.section as MemberSection);
+      }),
+    [],
+  );
+
   const [showBookingDialog, setShowBookingDialog] = useState(false);
 
   // Health syncs when the app comes to the foreground, throttled — neither
@@ -371,12 +412,14 @@ export default function MemberDashboard() {
     return <LoginGate />;
   }
 
-  const computeEndDate = (start: string, days: number) => {
-    if (!start) return "";
-    const d = new Date(start);
-    d.setDate(d.getDate() + days);
-    return d.toISOString().split("T")[0];
-  };
+  /**
+   * `new Date("2026-09-01")` parses as UTC midnight, `setDate` then moves the
+   * *local* calendar, and `toISOString` reads it back as UTC — three different
+   * frames in four lines. West of UTC that returned a retreat end date one day
+   * late, on a booking the member submits. String arithmetic has no frames.
+   */
+  const computeEndDate = (start: string, days: number) =>
+    start ? addDaysToString(start, days) : "";
 
   const handleSubmitBooking = () => {
     if (retreatType === "private" && !tierPrivateAvailable(housingTier)) {
@@ -397,11 +440,11 @@ export default function MemberDashboard() {
   };
 
   const initials = [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join("") || "M";
-  const minDate = new Date();
-  minDate.setDate(minDate.getDate() + 14);
-  const minDateStr = minDate.toISOString().split("T")[0];
+  /** Two weeks out, counted from the member's today rather than UTC's. */
+  const minDateStr = addDaysToString(formatLocalDateString(), 14);
 
   return (
+    <WorkoutSheetProvider>
     <div className="min-h-screen bg-background relative isolate">
       {/* The star chart the marketing site uses, held far back. Fixed, so it
           behaves like the room the content is in rather than scrolling with
@@ -441,26 +484,26 @@ export default function MemberDashboard() {
               dashboard: Nick coaches and also trains, and the second is not
               forfeit for taking on the first.
             */}
-            {access.atLeast("coach") && (
-              <Link
-                href="/coach"
-                className="tap inline-flex items-center gap-1.5 px-3 rounded-full border border-gold/35 text-gold text-xs uppercase tracking-widest hover:border-gold/70 transition-colors"
-                data-testid="link-coach"
-              >
-                <Users className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Coach</span>
-              </Link>
-            )}
-            {access.isStaff && (
-              <Link
-                href="/admin"
-                className="tap inline-flex items-center gap-1.5 px-3 rounded-full border border-gold/35 text-gold text-xs uppercase tracking-widest hover:border-gold/70 transition-colors"
-                data-testid="link-admin"
-              >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Admin</span>
-              </Link>
-            )}
+            {/*
+              Coach and Admin used to be two gold pills here.
+
+              They are gone, and the reason is not tidiness. A pill in the
+              header is a bespoke control that exists once, for one role, and
+              has to be built again for the next one — which is exactly what
+              happened: Admin sat here from before roles existed, Coach was
+              added beside it, and a third would have made a row of one-offs
+              where a menu belongs.
+
+              Both now live in `ROLE_DESTINATIONS` and render under My Roles in
+              the More sheet on a phone, and at the end of the section row on a
+              desktop. One list, one architecture, and a new role is an entry in
+              it rather than another pill in here.
+
+              This also settles what a coach's own app looks like: Nick opens
+              the same Sakred Body everyone opens, and his second job is a
+              destination he goes to, not a badge he wears in the header of his
+              own dashboard.
+            */}
             {/* Help, before the avatar. Someone stuck is looking along the top
                 bar for a way to ask, and "ask a person" should not be buried
                 two taps into a menu labelled with your own face. */}
@@ -602,6 +645,19 @@ export default function MemberDashboard() {
           </motion.div>
         )}
 
+        {section === "help" && (
+          <motion.div
+            key="help"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className={`${PORTAL_COLUMN} py-6`}
+          >
+            <HelpPortal isCoach={user?.role === "coach" || user?.isAdmin === "true"} />
+          </motion.div>
+        )}
+
         {section === "settings" && (
           <motion.div
             key="settings"
@@ -611,7 +667,11 @@ export default function MemberDashboard() {
             transition={{ duration: 0.2 }}
             className={`${PORTAL_COLUMN} py-6`}
           >
-            <SettingsTab weightUnit={user?.weightUnit} onLogout={() => logout()} />
+            <SettingsTab
+              weightUnit={user?.weightUnit}
+              onLogout={() => logout()}
+              onOpenHelp={() => setSection("help")}
+            />
           </motion.div>
         )}
 
@@ -639,7 +699,7 @@ export default function MemberDashboard() {
             transition={{ duration: 0.2 }}
             className={`${PORTAL_COLUMN} py-6`}
           >
-            <BuildTab />
+            <BuildTab onOpen={setSection} />
           </motion.div>
         )}
 
@@ -729,7 +789,7 @@ export default function MemberDashboard() {
             transition={{ duration: 0.2 }}
             className={`${PORTAL_COLUMN} py-8`}
           >
-            <LibraryTab />
+            <LibraryTab onOpenHelp={() => setSection("help")} />
           </motion.div>
         )}
 
@@ -906,12 +966,12 @@ export default function MemberDashboard() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Preferred Start Date</label>
-                    <Input
-                      type="date"
+                    <SakredDate
                       value={preferredStartDate}
-                      onChange={(e) => setPreferredStartDate(e.target.value)}
+                      onChange={setPreferredStartDate}
                       min={minDateStr}
-                      data-testid="input-start-date"
+                      placeholder="Choose a start date"
+                      testId="input-start-date"
                     />
                     <p className="text-xs text-muted-foreground">At least 2 weeks out from today</p>
                   </div>
@@ -1103,7 +1163,44 @@ export default function MemberDashboard() {
       </AnimatePresence>
 
       <BottomNavSpacer />
+      {/*
+        Above the nav, below everything else. A workout that is running should
+        be reachable from wherever the member wandered to — and hidden on Build
+        itself, which is already showing it in full.
+      */}
+      <div className="fixed inset-x-0 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-40 px-4 pointer-events-none">
+        <div className="mx-auto max-w-md pointer-events-auto">
+          {/*
+            Shown on every screen now, Build included. It used to hide there
+            because Build was where the workout lived; the workout is a layer
+            over the whole app, so the strip is the way back into it from
+            everywhere — and Build is no longer a special case.
+          */}
+          <ActiveWorkoutBar onOpenBuild={() => setSection("build")} />
+        </div>
+      </div>
       <MemberBottomNav section={section} onChange={setSection} />
+
+      {/* QA and replay only. `AUTO_START_ENABLED` is false, so this never
+          starts on its own — it mounts on an explicit per-device flag, which is
+          how the walkthrough gets exercised on real phones before it is
+          required of anybody. */}
+      <TourHost
+        conditions={{
+          authenticated: true,
+          intakeComplete: true,
+          homeReady: true,
+          redirecting: false,
+          systemDialogOpen: false,
+        }}
+        role={user?.role ?? null}
+      />
+
+      {/*
+        Above the header and the nav both, so expanding it makes the app the
+        workout rather than putting the workout inside the app.
+      */}
+      <WorkoutSheet />
 
       <Dialog open={showBookingDialog} onOpenChange={setShowBookingDialog}>
         <DialogContent className="max-w-md" data-testid="dialog-booking">
@@ -1151,5 +1248,6 @@ export default function MemberDashboard() {
         </DialogContent>
       </Dialog>
     </div>
+    </WorkoutSheetProvider>
   );
 }

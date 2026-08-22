@@ -39,6 +39,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { SakredDate } from "@/components/portal/DatePicker";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
@@ -93,15 +94,11 @@ import type { Win } from "@shared/models/wins";
 
 import sakredLogo from "@assets/full_png_image_sakred__1771268151990.png";
 
-// ─── Date Utilities (client-side, matches shared/utils/dates) ───────────
+import { formatLocalDateString } from "@shared/utils/dates";
 
-function formatLocalDate(date?: Date): string {
-  const d = date || new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
+// ─── Date Utilities — one conversion, shared with the server ─────────────
+
+const formatLocalDate = (date?: Date): string => formatLocalDateString(date ?? new Date());
 
 function addDays(date: Date, n: number): Date {
   const d = new Date(date);
@@ -905,11 +902,12 @@ export function RoutinesTab() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Start Date</label>
-                <Input
-                  type="date"
+                <SakredDate
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  onChange={setStartDate}
                   min={formatLocalDate()}
+                  placeholder="Choose a start date"
+                  testId="plan-start-date"
                 />
               </div>
               <div className="space-y-2">

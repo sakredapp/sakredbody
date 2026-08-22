@@ -19,3 +19,8 @@ plugins/**/build/
 
 # Simulator builds from script/sim.sh — a full DerivedData tree, never shipped.
 .sim-build/
+
+script/.interaction-inventory.json
+.baseline-out/
+.baseline-src/
+.env.qa

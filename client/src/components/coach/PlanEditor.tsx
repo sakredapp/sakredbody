@@ -21,6 +21,7 @@ import { Plus, X, AlertTriangle, Info, Search } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { SakredDate } from "@/components/portal/DatePicker";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -154,7 +155,7 @@ function HabitPicker({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search practices"
-            className="pl-9 h-9 text-sm"
+            className="pl-9 h-9 text-base md:text-sm"
             data-testid="plan-habit-search"
           />
         </div>
@@ -257,7 +258,7 @@ function ItemRow({
               onChange={(e) =>
                 onChange({ ...item, target: e.target.value === "" ? null : Number(e.target.value) })
               }
-              className="h-8 w-24 text-sm"
+              className="h-8 w-24 text-base md:text-sm"
               data-testid={`plan-target-${item.routineHabitId}`}
             />
           </label>
@@ -277,7 +278,7 @@ function ItemRow({
                 schedule: n >= 7 ? { kind: "daily" } : { kind: "times_per_week", count: n },
               });
             }}
-            className="h-8 w-16 text-sm"
+            className="h-8 w-16 text-base md:text-sm"
             data-testid={`plan-frequency-${item.routineHabitId}`}
           />
         </label>
@@ -298,7 +299,7 @@ function ItemRow({
         onChange={(e) => onChange({ ...item, memberReason: e.target.value || null })}
         placeholder="Why this, for them to read…"
         rows={2}
-        className="text-sm resize-none"
+        className="text-base md:text-sm resize-none"
         data-testid={`plan-reason-${item.routineHabitId}`}
       />
     </div>
@@ -541,23 +542,23 @@ export function PlanEditor({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Plan focus"
-          className="text-sm"
+          className="text-base md:text-sm"
           data-testid="plan-title"
         />
         <Input
           value={focus}
           onChange={(e) => setFocus(e.target.value)}
           placeholder="One line on what this is for"
-          className="text-sm"
+          className="text-base md:text-sm"
         />
         <label className="flex items-center gap-2 text-xs text-muted-foreground">
           Through
-          <Input
-            type="date"
+          <SakredDate
             value={endsOn}
-            onChange={(e) => setEndsOn(e.target.value)}
-            className="h-8 w-40 text-sm"
-            data-testid="plan-ends-on"
+            onChange={setEndsOn}
+            placeholder="No end date"
+            className="w-40"
+            testId="plan-ends-on"
           />
         </label>
       </div>
@@ -613,7 +614,7 @@ export function PlanEditor({
           onChange={(e) => setNote(e.target.value)}
           placeholder="They will read this."
           rows={3}
-          className="text-sm resize-none"
+          className="text-base md:text-sm resize-none"
           data-testid="plan-member-note"
         />
       </div>
@@ -629,7 +630,7 @@ export function PlanEditor({
           onChange={(e) => setInternal(e.target.value)}
           placeholder="Only you see this."
           rows={2}
-          className="text-sm resize-none"
+          className="text-base md:text-sm resize-none"
           data-testid="plan-internal-note"
         />
       </div>

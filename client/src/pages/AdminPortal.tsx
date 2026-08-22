@@ -2167,7 +2167,7 @@ export default function AdminPortal() {
                         }
                       }}
                       placeholder="Reply as coach..."
-                      className="flex-1 min-h-[44px] max-h-32 resize-none text-sm"
+                      className="flex-1 min-h-[44px] max-h-32 resize-none text-base md:text-sm"
                       rows={1}
                     />
                     <Button

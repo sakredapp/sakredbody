@@ -8,12 +8,14 @@
  * permission surface rather than the plumbing.
  */
 
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import { withTimeout, BridgeTimeout } from "../client/src/lib/bridgeTimeout.js";
 import { HEALTH_UNITS, HEALTH_RANGES, healthMetricEnum } from "../shared/models/health.js";
 import {
   METRIC_PLANS,
   READ_TYPES,
+  readTypesFor,
+  exerciseMinutesFromWorkouts,
   CANONICAL_UNITS,
   localDate,
   toCanonical,
@@ -1408,12 +1410,33 @@ for (const name of ["onboarding.shown", "onboarding.answered"]) {
 const SWATCH_UNAVAIL = stripComments(SWATCH_SRC);
 check(
   "the home screen says so when health is unavailable",
-  /available === false/.test(SWATCH_UNAVAIL) && /reason/.test(SWATCH_UNAVAIL),
+  /view\.kind === "unavailable"/.test(SWATCH_UNAVAIL) && /reason/.test(SWATCH_UNAVAIL),
   "returning null for an unavailable store is indistinguishable from the feature not existing"
 );
+/*
+  These two used to read `available === false` and `available === null` — the
+  probe's own tri-state, checked at the point of render. The states they name
+  are unchanged; what moved is where they are decided. Both now come out of
+  `resolveHealthView`, which is what let the third state on this screen —
+  connected, but the summary has not answered — stop resolving to "offer
+  Connect".
+*/
 check(
   "a still-resolving probe renders nothing rather than an error",
-  /available === null/.test(SWATCH_UNAVAIL)
+  /view\.kind === "unknown"\) return null/.test(SWATCH_UNAVAIL)
+);
+/*
+  The one that mattered. This screen is Home, the first thing a member sees,
+  and every branch here used to begin `!connected &&` where `connected` came
+  from the summary payload — so before that query answered, a connected member
+  fell through to the Connect prompt on launch. Nothing on this screen may
+  offer that except a confirmed disconnection.
+*/
+check(
+  "and Home offers Connect only on a confirmed disconnection",
+  /view\.kind === "disconnected"/.test(SWATCH_UNAVAIL) &&
+    !/data\?\.connected/.test(SWATCH_UNAVAIL),
+  "the summary payload is not the connection"
 );
 check(
   "leaving early is remembered, and separately from finishing",
@@ -1688,6 +1711,193 @@ console.log("\nA native call that never answers becomes an error\n");
   );
 }
 
+/**
+ * ── We only ask Health Connect for records Health Connect has ─────────────
+ *
+ * `requestAuthorization` sends every requested type in one call, and the
+ * Android plugin parses the whole array before doing anything: the first
+ * identifier its enum does not define throws, and the *call* is rejected. So
+ * `exerciseTime` — Apple's own tally of exercise minutes, which Health Connect
+ * has no record for — took the entire integration down at first contact. The
+ * member saw "Unsupported data type: exerciseTime" in red under a Connect
+ * button that could not work however many times it was pressed.
+ *
+ * This reads the plugin's own Kotlin enum, so the next time we add a metric
+ * that only one store has, it fails here instead of on somebody's phone.
+ */
+{
+  const ENUM_PATH =
+    "node_modules/@capgo/capacitor-health/android/src/main/java/app/capgo/plugin/health/HealthDataType.kt";
+
+  if (!existsSync(ENUM_PATH)) {
+    check("the Android plugin's type enum is readable", false, "install dependencies first");
+  } else {
+    const kt = readFileSync(ENUM_PATH, "utf8");
+    const android = new Set(
+      [...kt.matchAll(/^\s+[A-Z_0-9]+\("(\w+)"/gm)].map((m) => m[1]),
+    );
+    check("the enum parsed", android.size > 15, `${android.size} types`);
+
+    /** Sleep and workouts are their own permission, not entries in the enum. */
+    const asked = readTypesFor("healthconnect").filter(
+      (t) => t !== "sleep" && t !== "workouts",
+    );
+    const unsupported = asked.filter((t) => !android.has(t));
+    check("every type we ask Health Connect for exists in its enum",
+      unsupported.length === 0, unsupported.join(", "));
+
+    /** And the check is worth having only if it would have caught the bug. */
+    const everything = readTypesFor(null).filter((t) => t !== "sleep" && t !== "workouts");
+    check("the unfiltered list would still have failed it",
+      everything.some((t) => !android.has(t)),
+      "nothing is platform-specific any more — this guard has stopped proving anything");
+
+    /**
+     * Dropping the metric on Android would have been the cheap fix and would
+     * have left an Android member's terrain permanently short a number an
+     * iPhone member has. Health Connect models training as sessions with a
+     * start and an end, so the minutes are the sessions.
+     */
+    const minutes = exerciseMinutesFromWorkouts([
+      { onDate: "2026-08-16", durationSeconds: 1800 },
+      { onDate: "2026-08-16", durationSeconds: 900 },
+      { onDate: "2026-08-15", durationSeconds: 3600 },
+      // A session a watch started and abandoned is not a minute of exercise.
+      { onDate: "2026-08-14", durationSeconds: 0 },
+      { onDate: "2026-08-13", durationSeconds: null },
+    ]);
+    check("two sessions on one day are one day's minutes",
+      minutes.find((d) => d.onDate === "2026-08-16")?.minutes === 45,
+      JSON.stringify(minutes));
+    check("and a separate day stays separate",
+      minutes.find((d) => d.onDate === "2026-08-15")?.minutes === 60);
+    check("a zero-length session contributes nothing",
+      !minutes.some((d) => d.onDate === "2026-08-14"));
+    check("and neither does one with no duration at all",
+      !minutes.some((d) => d.onDate === "2026-08-13"));
+    check("the days come back in order",
+      minutes.map((d) => d.onDate).join(",") === "2026-08-15,2026-08-16");
+
+    check("iOS still reads Apple's own tally",
+      readTypesFor("healthkit").includes("exerciseTime"));
+    check("and Android does not ask for it",
+      !readTypesFor("healthconnect").includes("exerciseTime"));
+  }
+}
+
+
+/**
+ * ── The Android lifecycle, end to end ─────────────────────────────────────
+ *
+ * connect → permission request → sync → duration derivation → disconnect.
+ *
+ * Every one of these crossed a bridge that could fail, and the failure that
+ * actually shipped was in the first step: one Apple-only identifier in the
+ * permission array and the *whole call* was rejected, so nothing downstream
+ * ever ran. These hold the shape of each step and, more importantly, that a
+ * failure in one of them does not take the others with it.
+ */
+console.log("\nThe Android health lifecycle survives a part of it failing\n");
+
+{
+  const src = stripComments(readFileSync("client/src/lib/health.ts", "utf8"));
+  const hook = stripComments(readFileSync("client/src/hooks/use-health.ts", "utf8"));
+
+  // ── Connect: availability is resolved, not assumed from the platform ──
+  check("availability is probed rather than inferred",
+    /const \[available, setAvailable\]/.test(hook) && /healthAvailability\(\)/.test(hook));
+  check("an Android shell with no provider is a distinct reason",
+    /setReason/.test(hook));
+
+  /*
+    Sharing the probe between components is only safe while the answer stays
+    revisable. Health Connect is installable: the member who is told to go and
+    get it must be able to come back to a different message without killing
+    the app. `singleFlight.ts` proves the cell *can* be invalidated; these
+    prove something in the product actually invalidates it, which is the half
+    that could be deleted without any unit test noticing.
+  */
+  check("the shared probe is a single-flight cell, not a held promise",
+    /new SingleFlight</.test(hook) && !/let probe: Promise/.test(hook));
+  check("connecting re-asks the device", /invalidateHealthProbe\("connect"\)/.test(hook));
+  check("disconnecting re-asks the device", /invalidateHealthProbe\("disconnect"\)/.test(hook));
+  check("a resume re-asks only when the last answer was negative",
+    /available === false\) invalidateHealthProbe\("resume"\)/.test(hook));
+  // Matched inside the handler's own body rather than anywhere in the file:
+  // the first version of this check was satisfied by the function's own
+  // declaration, so deleting every call site left it passing.
+  const onResume = hook.slice(hook.indexOf("const onResume ="));
+  const onResumeBody = onResume.slice(0, onResume.indexOf("};") + 2);
+  check("and something actually calls it on resume",
+    /reprobeOnResume\(\)/.test(onResumeBody), `${onResumeBody.length} chars of handler`);
+  check("from the ungated hydration effect, which is the whole point — a device "
+    + "answering 'no' never reaches the effect gated on 'yes'",
+    hook.indexOf("const onResume =") < hook.indexOf("!enabled || !available"));
+  check("components subscribe to the probe rather than reading it once",
+    /subscribeHealthProbe\(read\)/.test(hook));
+
+  // ── Permission: this platform's types only ──
+  check("the request asks for this platform's types",
+    /read: readTypesFor\(healthPlatform\(\)\)/.test(src));
+  check("and never writes", /write: \[\]/.test(src));
+  check("history access is asked for, so Android is not capped at 30 days",
+    /requestHistoryAccess: true/.test(src));
+
+  // ── Sync: one metric failing must not end the sync ──
+  const loop = src.slice(src.indexOf("for (const plan of plansFor"));
+  const body = loop.slice(0, loop.indexOf("\n  }") + 4);
+  check("there is a read loop to check", body.length > 200, `${body.length} chars`);
+  check("each metric is read inside its own try", /try \{/.test(body));
+  // The catch now also times the failed read for the launch trace, so this
+  // matches the push anywhere in the handler rather than as its first
+  // statement. What is being defended is unchanged: the failure is recorded
+  // and the loop continues to the next metric.
+  check("and a failure is recorded rather than thrown",
+    /catch \(err\) \{[\s\S]*?skipped\.push/.test(body));
+  check("so an unsupported or unavailable type skips only itself",
+    !/throw/.test(body));
+
+  /** Sleep and workouts are separately guarded, for the same reason. */
+  check("the sleep read has its own catch", /skipped\.push\(`sleep/.test(src));
+  check("and the workout read too", /skipped\.push\(`workouts/.test(src));
+
+  /**
+   * And what the member is told. A sync that skipped four metrics and posted
+   * two is not a failure, and reporting it as one would send somebody to
+   * support about a phone that is working.
+   */
+  check("what was skipped comes back to the caller", /skipped,?\s*\}/.test(src) || /skipped\b/.test(src));
+
+  // ── Derivation: after the workouts, so a failed read yields no minutes ──
+  const deriveAt = src.indexOf("exerciseMinutesFromWorkouts(workouts)");
+  const workoutAt = src.indexOf("queryWorkouts");
+  check("minutes are derived after the sessions are read",
+    deriveAt > workoutAt && workoutAt > 0);
+  check("and only on Health Connect",
+    /healthPlatform\(\) === "healthconnect"/.test(src));
+  /**
+   * A failed workout query leaves `workouts` empty, and an empty list must
+   * produce no rows rather than a confident zero — a zero would be Sakred
+   * asserting the member did not train.
+   */
+  check("no sessions means no minutes, not zero minutes",
+    exerciseMinutesFromWorkouts([]).length === 0);
+
+  // ── Disconnect: the worker stops before the rows go ──
+  const dc = hook.slice(hook.indexOf("const disconnect = useMutation"));
+  const dcBody = dc.slice(0, dc.indexOf("});") + 3);
+  check("there is a disconnect to check", dcBody.length > 80);
+  check("background sync is stopped first",
+    dcBody.indexOf("disableBackgroundSync") < dcBody.indexOf("/api/health/connection"));
+  check("then the stored measurements are deleted",
+    /apiRequest\("DELETE", "\/api\/health\/connection"\)/.test(dcBody));
+  check("and the screens are told", /onSuccess: invalidate/.test(dcBody));
+  /** Destructive, and the member is asked in words that say what goes. */
+  const card = readFileSync("client/src/components/portal/HealthCard.tsx", "utf8");
+  check("disconnect confirms before deleting", /delete every health measurement/i.test(card));
+  check("and says it cannot be undone", /cannot be undone/i.test(card));
+  check("with a pending state while it runs", /disconnect\.isPending/.test(card));
+}
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

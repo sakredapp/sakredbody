@@ -103,6 +103,23 @@
   --ink-soft: 30 8% 15%;
   --ink-foreground: 45 20% 96%;
 
+  /*
+    The guided walkthrough's two surfaces.
+
+    Tokens rather than literals because the overlay is the one place where the
+    two atmospheres need genuinely different treatment rather than different
+    values of the same idea. In the dark the scrim is deep ink and the tutorial
+    reads as the room going quiet. In daylight the same treatment would relight
+    the app as Dark for the duration of the lesson — which is changing the
+    member's theme without asking — so Light gets a warm walnut veil at low
+    alpha that dims enough for the spotlight to read and no further.
+
+    These are the fallback values, for `:root`; both themes override them.
+  */
+  --tour-scrim: 30 10% 8% / 0.82;
+  --tour-panel: 30 8% 12% / 0.94;
+  --tour-shadow: 30 12% 4% / 0.5;
+
   /* Five-element accents (TCM) — kept desaturated so gold stays dominant. */
   --element-wood: 138 25% 42%;
   --element-fire: 6 45% 52%;
@@ -111,7 +128,17 @@
   --element-water: 210 22% 38%;
 }
 
-.dark {
+/*
+  The nocturnal palette.
+
+  Selected by `[data-theme="dark"]` rather than by a `.dark` class, because
+  that class was also the portal's route marker and the two had to come apart
+  before a member could choose Light — `data-surface="portal"` now carries that
+  half. Not one value below changed when the selector did: Dark has to be
+  pixel-identical across this migration, or the migration was hiding a
+  redesign.
+*/
+[data-theme="dark"] {
   --button-outline: rgba(255,255,255, .10);
   --badge-outline: rgba(255,255,255, .05);
   --opaque-button-border-intensity: 9;
@@ -121,6 +148,11 @@
   /* Sakred Health Dark Mode — warm blacks / gold / cream */
   --background: 30 10% 10%;
   --foreground: 45 20% 96%;
+
+  /* The walkthrough at night: the room going quiet around one lit thing. */
+  --tour-scrim: 30 10% 6% / 0.84;
+  --tour-panel: 30 8% 13% / 0.94;
+  --tour-shadow: 30 12% 3% / 0.55;
 
   --card: 30 8% 15%;
   --card-foreground: 45 20% 96%;
@@ -177,6 +209,42 @@
   --gold: 39 48% 56%;
   --gold-light: 42 70% 76%;
   --gold-dark: 42 38% 47%;
+}
+
+/*
+  The daylight palette — the same temple in morning light.
+
+  Deliberately thin. `:root` already holds a warm light scheme that the
+  marketing site has shipped for as long as the site has existed: limestone
+  canvas, walnut ink, and a `--gold-text` that already darkens to bronze so
+  gold can carry type on cream. Redeclaring all of that here would fork one
+  palette into two that drift, so this block overrides only what the *app*
+  needs and differs from a marketing page.
+
+  What differs is the ground. The marketing pages are light panels floating on
+  ink — that is their design, and `--ink` staying dark in `:root` is what makes
+  it work. The portal in Light has no such banding; it is a daylight room, so
+  the ground becomes limestone and everything the ground touches follows it.
+*/
+[data-theme="light"] {
+  --ink: 40 26% 92%;
+  --ink-soft: 42 30% 96%;
+  --ink-foreground: 30 10% 12%;
+
+  /* Warm hairlines instead of the dark theme's luminous edges: on a pale
+     ground, separation comes from tone, not from glow. */
+  --elevate-1: rgba(33, 30, 25, 0.028);
+  --elevate-2: rgba(33, 30, 25, 0.055);
+
+  /* Walnut, not black, and half the strength. Enough for the spotlight to
+     read against; not enough to turn a daylight app nocturnal while it is
+     being explained. The panel stays a raised parchment card rather than
+     inverting to ink. */
+  --tour-scrim: 28 14% 22% / 0.42;
+  --tour-panel: 42 30% 97% / 0.96;
+  /* Walnut rather than black: a pure-black drop shadow on parchment reads as
+     a hole cut in the paper, not as a card lifted off it. */
+  --tour-shadow: 28 20% 26% / 0.22;
 }
 
 @layer base {
@@ -258,11 +326,25 @@
     background-color: hsl(var(--ink));
   }
   /* The page ground is ink, so the browser chrome should match it —
-     otherwise the scrollbar gutter renders as a white stripe. */
+     otherwise the scrollbar gutter renders as a white stripe.
+
+     `color-scheme` here is the fallback for pages outside the appearance
+     system, which is the marketing site and its dark ground. Inside the
+     portal, `applyTheme` sets it inline on the element from the resolved
+     appearance — an inline style outranks this, so a Light member gets light
+     form controls, a light caret and a light overscroll band without this
+     rule needing to know the theme. It governs the surfaces that give a
+     half-themed app away, which is why it is set deliberately rather than
+     left to the browser to infer. */
   html {
     background-color: hsl(var(--ink));
     color-scheme: dark;
     scrollbar-color: hsl(var(--gold) / 0.35) hsl(var(--ink));
+  }
+  /* Gold at full strength is a stripe down the side of a pale page. The dark
+     theme can afford it against ink; daylight cannot. */
+  html[data-theme="light"] {
+    scrollbar-color: hsl(var(--gold-dark) / 0.4) hsl(var(--ink));
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -681,16 +763,7 @@
     outline-offset: 2px;
   }
 
-  /*
-   * iOS zooms the page when a focused input's font-size is under 16px. Every
-   * `text-sm` field in this app is 14px, so every tap on a form was a zoom the
-   * member then had to pinch back out of.
-   */
-  @media (max-width: 640px) {
-    input, select, textarea {
-      font-size: 16px;
-    }
-  }
+  /* The iOS input-zoom guard lives outside this layer — see below. */
 
   /*
    * Respect the system setting. Several surfaces here animate continuously —
@@ -705,6 +778,26 @@
       scroll-behavior: auto !important;
     }
   }
+}
+
+/* ── Guided walkthrough spotlight ──────────────────────────────────────────
+   A slow swell in the halo's own opacity, never in its size — a ring that
+   grows and shrinks around a button reads as the button moving, and the
+   member is being asked to tap it. Deliberately gentle: this is the interior
+   of a temple, not an arcade cabinet, and the target is already the only lit
+   thing on the screen. The pulse is decoration on top of that, so removing it
+   under reduced motion costs no information — which is why the component
+   simply drops the class rather than substituting a different cue.
+   (Shared file: portal session.) */
+@keyframes tour-pulse {
+  0%, 100% { opacity: 0.62; }
+  50%      { opacity: 1; }
+}
+.tour-pulse {
+  animation: tour-pulse 2600ms cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-pulse { animation: none; }
 }
 
 /* ── StarMark ──────────────────────────────────────────────────────────────
@@ -732,4 +825,37 @@
 @media (prefers-reduced-motion: reduce) {
   .starmark-star,
   .starmark-line { animation: none; }
+}
+
+/*
+ * ── The iOS input-zoom guard ──────────────────────────────────────────────
+ *
+ * WKWebView zooms the viewport when a focused field's font-size is under 16px,
+ * and does not zoom back out when the keyboard closes. The member is left on a
+ * magnified page they have to pinch out of, mid-workout, having only tried to
+ * type a weight.
+ *
+ * This rule existed already, inside `@layer base`, and could never have worked.
+ * Tailwind emits `text-sm` into `@layer utilities`, and the cascade resolves
+ * layers before specificity — so every layered utility beats every base rule
+ * no matter how the selectors compare. `h-9 text-sm` on the three fields in a
+ * live session therefore won at 14px, and the guard silently did nothing.
+ *
+ * Unlayered, so it beats the utility rather than losing to it. Bounded to
+ * phone widths, so `md:text-sm` still applies on a desktop where there is no
+ * such zoom behaviour to defend against.
+ *
+ * Deliberately not fixed with `user-scalable=no` or `maximum-scale=1`. That
+ * removes pinch-zoom from the whole app for everybody, including people who
+ * need it to read, in order to hide one styling mistake.
+ *
+ * If a field needs to look smaller, change its padding, height or label. Not
+ * this.
+ */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
 }

@@ -33,6 +33,7 @@ import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HealthSwatches } from "@/components/portal/HealthSwatches";
 import { TerrainToday } from "@/components/TerrainToday";
+import { ConfirmActivity } from "@/components/health/ConfirmActivity";
 import type { MemberSection, CoachingTab } from "@/components/MemberNav";
 
 interface Pillar {
@@ -451,6 +452,22 @@ export function PillarHome({
       {/* What condition they are in, before what they could do about it —
           the doors mean something different once you have read this. */}
       <TerrainToday onOpenRestore={() => onOpen("restore")} />
+
+      {/*
+        ── One question, where a member will actually see it ──
+
+        This card was mounted in `TodayBody`, which the member's Home tab does
+        not render — Home is this component, and `TodayBody` belongs to the
+        coaching screen. So it was reachable by nobody, and the assertion that
+        said it "lives on Home" was reading the wrong file.
+
+        It renders nothing on the overwhelming majority of days: the server
+        offers at most one workout, only where a member's answer would change
+        what Sakred can say, and nothing at all once anything has been answered
+        that day. Underneath the terrain reading because it is about yesterday,
+        and Home opens on today.
+      */}
+      <ConfirmActivity />
 
       {/*
         Their own numbers, and then the doors. Nothing else.

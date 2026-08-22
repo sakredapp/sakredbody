@@ -38,7 +38,37 @@ import { SectionHeading, Panel, StatTile } from "@/components/portal/Panel";
 import { HabitPanel } from "@/components/habits/HabitPanel";
 import { TodayRead } from "@/components/TodayRead";
 import { MemberBuild } from "@/components/build/MemberBuild";
-import { FreeSession } from "@/components/build/FreeSession";
+import { MovementHistory } from "@/components/build/MovementHistory";
+import { TodaysBuild, RecentBuild, MemoryDisclosure } from "@/components/build/BuildToday";
+import { Elapsed } from "@/components/build/Elapsed";
+import { WorkoutInProgress } from "@/components/build/WorkoutInProgress";
+import { WhyToday } from "@/components/build/WhyToday";
+import { useWorkoutSheet } from "@/components/build/WorkoutSheet";
+
+/**
+ * A start that was refused, and the attempt that was refused — held together
+ * so the way out of the refusal can finish what the member actually asked for.
+ */
+type Collision = {
+  session: RunningSession;
+  /**
+   * What to do once the blocking session is gone. Absent when nothing was
+   * being started — a session that vanished under a member who was logging a
+   * set is a different event, and offering to "discard and start this workout"
+   * there would name a workout that does not exist.
+   */
+  retry?: () => void;
+};
+import { startSession, type RunningSession } from "@/lib/startSession";
+import {
+  isMissingSession,
+  reconcileOpenWorkout,
+  seedOpenWorkout,
+  useOpenWorkout,
+  type OpenWorkout,
+} from "@/hooks/use-open-workout";
+import type { BuildAction } from "@shared/models/buildToday";
+import type { MemberSection } from "@/components/MemberNav";
 import { Dumbbell, Check, Plus, Trophy, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { estimateOneRepMax, lbToKg, isPracticeCategory } from "@shared/models/training";
@@ -126,13 +156,37 @@ function targetLabel(l: PrescribedLift): string {
   return `${l.targetSets} sets`;
 }
 
-export function BuildTab() {
+export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
   const { toast } = useToast();
   const qc = useQueryClient();
+  /** The movement whose own history is open over the screen, if any. */
+  const [inspecting, setInspecting] = useState<{ id: string; name: string } | null>(null);
+  /**
+   * Where an ad-hoc workout goes.
+   *
+   * This screen used to render one inline, two-thirds of the way down, under a
+   * recommendation and a history list. It is a layer over the whole app now —
+   * see `WorkoutSheet` — so Build's job is to start one and get out of the way.
+   * The prescribed path below is unchanged: that screen is the prescription.
+   */
+  const workout = useWorkoutSheet();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [entries, setEntries] = useState<Record<string, Entry[]>>({});
-  /** An ad-hoc or template-started session, which has no prescription behind it. */
-  const [freeSession, setFreeSession] = useState<{ id: string; title: string } | null>(null);
+  /**
+   * A workout that was already running when they tried to start another.
+   *
+   * Held so the collision can be shown where they tapped, and cleared the
+   * moment they resume it — see `WorkoutInProgress`.
+   */
+  const [collision, setCollision] = useState<Collision | null>(null);
+  /**
+   * A recommendation the member tapped but has not started yet.
+   *
+   * Held so the "why today" can be read before committing — a recommendation
+   * that starts a workout on first tap gives somebody no way to look at the
+   * reasoning without becoming committed to it.
+   */
+  const [considering, setConsidering] = useState<{ action: BuildAction; why: string } | null>(null);
 
   /**
    * What is actually still running, according to the server.
@@ -146,30 +200,78 @@ export function BuildTab() {
    * A session ends when somebody presses Finish. Nothing else ends it, and
    * certainly not looking at your step count mid-workout.
    */
-  const openSession = useQuery<{
-    session: { id: string; title: string | null; startedAt: string; sets: number } | null;
-  }>({
-    queryKey: ["/api/training/sessions/open"],
-    queryFn: async () => {
-      const r = await fetch("/api/training/sessions/open", { credentials: "include" });
-      if (!r.ok) throw new Error("no");
-      return r.json();
-    },
-    // Cheap, and the answer changes when the member acts on another device.
-    staleTime: 15_000,
-  });
+  const openSession = useOpenWorkout();
 
+  /**
+   * Recover whatever is actually running, from the server rather than memory.
+   *
+   * Two shapes, one truth. A session carrying a `habitId` is a coach's
+   * prescription being worked through; one without is the member's own. Both
+   * are the same row in `workout_sessions`, and which local state they restore
+   * into is a presentation detail — so the branch is on the data, not on how
+   * the component happened to be entered.
+   *
+   * The prescribed half of this was missing entirely. `sessionId` was plain
+   * `useState`, so leaving Build and coming back left the log buttons disabled
+   * on a session that was still open on the server with sets already in it.
+   * Nothing was lost and there was no way to add to it.
+   */
+  /**
+   * ── And it mirrors in both directions ────────────────────────────────────
+   *
+   * This effect used to only ever *set*: `if (!open) return`. So the server
+   * could say a session had ended and the screen would keep showing it, which
+   * is how a workout deleted at 16:38 was still being written to at 16:40. A
+   * one-way mirror is not a mirror.
+   *
+   * The race that made the one-way version tempting is handled where it
+   * belongs — `seedOpenWorkout` writes a newly created session into this same
+   * cache and cancels any `/open` read already in flight, so "the server says
+   * nothing is open" can be believed the moment it is said.
+   */
   useEffect(() => {
-    const open = openSession.data?.session;
-    if (open && !freeSession) {
-      setFreeSession({ id: open.id, title: open.title ?? "Your session" });
-    }
-  }, [openSession.data, freeSession]);
+    if (!openSession.isSuccess) return;
+    const open = openSession.data.session;
+    /**
+     * Only the prescribed id lives here now. An ad-hoc session belongs to the
+     * workout layer, which reads the same query — so there is one mirror per
+     * kind of session rather than two components holding the same id.
+     */
+    const mine = open?.habitId ? open.id : null;
+    if (sessionId !== mine) setSessionId(mine);
+  }, [openSession.isSuccess, openSession.data, sessionId]);
 
-  /** Finishing is the only thing that clears it, on the server and here. */
-  const clearSession = () => {
-    setFreeSession(null);
-    qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
+  /**
+   * The session a surface was writing to does not exist any more.
+   *
+   * The screen comes down either way. Where the server has a *different*
+   * workout open — started on another device, or the one this member forgot
+   * about — it is offered through the same card a start-collision uses, with a
+   * Resume button on it. Nothing is adopted silently and nothing is created:
+   * a member who tapped "log 35 × 13" is owed the truth, not a new session
+   * with their set quietly moved into it.
+   */
+  const sessionGone = (replacement: OpenWorkout | null) => {
+    setSessionId(null);
+    setEntries({});
+    setCollision(replacement ? { session: replacement } : null);
+    toast({
+      title: replacement
+        ? "That workout had already ended."
+        : "That workout is no longer open.",
+      description: replacement
+        ? "A different one is running — resume it below."
+        : "It was finished or discarded. Start a new one when you're ready.",
+    });
+  };
+
+  /** Shared by every write scoped to a session id — see `WorkoutSheet`. */
+  const writeFailed = async (e: Error) => {
+    if (!isMissingSession(e)) {
+      toast({ title: e.message, variant: "destructive" });
+      return;
+    }
+    sessionGone(await reconcileOpenWorkout(qc));
   };
 
   const today = useQuery<TodayBuild>({
@@ -184,18 +286,85 @@ export function BuildTab() {
   const start = useMutation({
     // `apiRequest` resolves to the Response, not the body — it throws on a
     // non-2xx and hands back the raw response, so the JSON has to be read here.
-    mutationFn: async (habitId: string) => {
-      const res = await apiRequest("POST", "/api/training/sessions", { habitId });
-      return (await res.json()) as { id: string };
+    mutationFn: (habitId: string) => startSession({ habitId }),
+    onSuccess: async (result, habitId) => {
+      // A refusal is a true answer, not a failure — the member has a workout
+      // open and needs the way back into it rather than an error.
+      //
+      // The attempt is kept with it. Discarding the old session is only half
+      // an answer: what the member asked for was to start *this* workout, and
+      // making them tap Start again afterwards is the same dead end one step
+      // further along.
+      if ("conflict" in result) {
+        setCollision({ session: result.conflict, retry: () => start.mutate(habitId) });
+        return;
+      }
+      // Written into the cache rather than invalidated: the running time
+      // appears immediately, and — the reason it matters — a `/open` read
+      // issued a moment before this session existed can no longer land on top
+      // of it and report that nothing is running.
+      await seedOpenWorkout(qc, result.started);
+      setSessionId(result.started.id);
     },
-    onSuccess: (data) => setSessionId(data.id),
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  /**
+   * Start a session named for what was recommended.
+   *
+   * The name is the seed, and deliberately the whole of it. There is no
+   * `focus` column and no template system yet, so anything more would be
+   * fabricated structure — a screen of exercises nobody chose, justified by a
+   * recommendation that only ever said "chest looks useful today".
+   *
+   * So the member arrives in an empty session called Chest with the picker in
+   * front of them. That is honest about what Sakred currently knows, and the
+   * seam is there for saved routines and history to fill later.
+   */
+  const startFocus = useMutation({
+    mutationFn: (title: string) => startSession({ title }),
+    onSuccess: async (result, title) => {
+      if ("conflict" in result) {
+        setCollision({ session: result.conflict, retry: () => startFocus.mutate(title) });
+        return;
+      }
+      await seedOpenWorkout(qc, result.started);
+      // And the layer comes up. Nothing is handed to it — it reads the session
+      // from the cache this just seeded.
+      workout.open();
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  /**
+   * Throw away the session that is in the way, then start the one they asked
+   * for.
+   *
+   * Confirmed on the card before this runs — see `WorkoutInProgress`. Never
+   * automatic and never on a timer: a session with no sets can still carry
+   * exercise composition, which is a record of what somebody had chosen to do,
+   * and nothing should delete that without being asked.
+   *
+   * The retry is inside `onSuccess`, so a failed delete leaves the member
+   * exactly where they were rather than starting a second workout beside one
+   * that is still open.
+   */
+  const discardBlocking = useMutation({
+    mutationFn: async (c: Collision) =>
+      apiRequest("DELETE", `/api/training/sessions/${c.session.id}`),
+    onSuccess: async (_r, c) => {
+      setCollision(null);
+      await qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
+      qc.invalidateQueries({ queryKey: ["/api/training/sessions"] });
+      c.retry?.();
+    },
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
   const logSet = useMutation({
     mutationFn: async (body: Record<string, unknown>) =>
       apiRequest("POST", `/api/training/sessions/${sessionId}/sets`, body),
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: writeFailed,
   });
 
   const finish = useMutation({
@@ -210,11 +379,20 @@ export function BuildTab() {
       apiRequest("POST", `/api/training/sessions/${sessionId}/finish`, { shareWithCoach: true }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/training/today"] });
+      /**
+       * And the open-session query, or finishing does not stick.
+       *
+       * The rehydration effect above restores `sessionId` from whatever the
+       * server calls open. Leave that answer cached after a finish and the
+       * effect immediately puts the session back, so the member presses
+       * Finish, sees the toast, and watches the workout reappear.
+       */
+      qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
       setSessionId(null);
       setEntries({});
       toast({ title: "Session logged." });
     },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: writeFailed,
   });
 
   if (today.isLoading) {
@@ -234,6 +412,33 @@ export function BuildTab() {
     return (
       <div className="space-y-6">
         <SectionHeading title="Build" subtitle="Strength, movement and resilience." />
+
+        {/* What today supports, and what they have been building — before
+            anything asking them to fill a box in. The habits card used to be
+            the first meaningful thing on this screen, and on most days it is
+            empty, so Build opened on a blank panel for a member the app knows
+            a great deal about. */}
+        <TodaysBuild
+          onCheckIn={onOpen ? () => onOpen("restore") : undefined}
+          onAct={(action, why) => setConsidering({ action, why })}
+        />
+        {considering && (
+          <WhyToday
+            action={considering.action}
+            why={considering.why}
+            starting={start.isPending}
+            onDismiss={() => setConsidering(null)}
+            onStart={() => {
+              const a = considering.action;
+              setConsidering(null);
+              // A practice is logged after the fact, not run as a session —
+              // see `actionFor`. Nothing is created here for it.
+              if (a.kind === "practice") return;
+              startFocus.mutate(a.label);
+            }}
+          />
+        )}
+        <RecentBuild />
 
       {/* The lifestyle half of Build — protein, steps, sunlight. Separate from
           the workout builder on purpose: a session is an event with sets and
@@ -256,35 +461,24 @@ export function BuildTab() {
             prescribed sessions appear sits underneath the things they can
             actually do, in the size of a footnote, because that is its
             importance on a day it does not apply. */}
-        {freeSession ? (
-          <FreeSession
-            sessionId={freeSession.id}
-            title={freeSession.title}
-            unit={unit}
-            onDone={clearSession}
-          />
-        ) : (
-          <>
-            <MemberBuild onStarted={(id, t) => {
-              setFreeSession({ id, title: t });
-              qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
-            }} />
+        {/* Starting one raises the workout layer over the whole app. Build
+            does not render a session inline any more — see `WorkoutSheet`. */}
+        <MemberBuild onStarted={workout.open} />
 
-            {/*
-              An idea, if they want one — below the thing they came here to do.
+        {/* `TodayRead side="build"` stood here and was the contradiction
+            vector: its headline comes from `readLine`, which is generated
+            from a readiness level with no knowledge of what Terrain
+            concluded. `TodaysBuild` above renders the same suggestions
+            through the gate instead. */}
+        {/* Why leaving a note is worth five seconds — shown only once they have
+            actually left one, so it explains something happening rather than
+            asking for something. */}
+        <MemoryDisclosure />
 
-              This spent one build at the top of Home, where it stopped being
-              an optional prompt and became the app's opinion of your day. It
-              belongs next to the movement it is suggesting, on a screen
-              somebody opened having already decided to train.
-            */}
-            <TodayRead side="build" onOpenCategory={() => undefined} />
-            <p className="text-[11px] text-muted-foreground text-center max-w-sm mx-auto">
-              When your coach plans a session for today, it appears at the top of this screen with
-              its targets already worked out.
-            </p>
-          </>
-        )}
+        <p className="text-[11px] text-muted-foreground text-center max-w-sm mx-auto">
+          When your coach plans a session for today, it appears at the top of this screen with
+          its targets already worked out.
+        </p>
       </div>
     );
   }
@@ -331,6 +525,18 @@ export function BuildTab() {
     <div className="space-y-6">
       <SectionHeading title="Build" subtitle="Strength, movement and resilience." />
 
+      {/*
+        The read comes first even when a coach has written the day.
+
+        A plan is context, not a state: it says what was intended, and Terrain
+        says what the body currently supports. Showing the prescription without
+        the read is how somebody ends up training through a day their own
+        signals were arguing about — so the plan stays, in full, underneath a
+        sentence that is honest about the terrain it lands in.
+      */}
+      <TodaysBuild onCheckIn={onOpen ? () => onOpen("restore") : undefined} />
+      <RecentBuild />
+
       {/* The lifestyle half of Build — protein, steps, sunlight. Separate from
           the workout builder on purpose: a session is an event with sets and
           weights, and "hit 165g" is a standing target. Collapsing them would
@@ -364,6 +570,19 @@ export function BuildTab() {
         return (
           <div key={s.habitId} className="space-y-4">
             <Panel title={s.title}>
+              {/* Running time, so the screen says out loud that a workout is
+                  happening. Derived from the server's own timestamp — see
+                  Elapsed — so it survives leaving Build and coming back. */}
+              {active && openSession.data?.session?.startedAt && (
+                <p className="text-xs text-muted-foreground mb-3 flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--gold))]" />
+                  In progress ·{" "}
+                  <Elapsed
+                    startedAt={openSession.data.session.startedAt}
+                    className="tabular-nums"
+                  />
+                </p>
+              )}
               <div className="grid grid-cols-3 gap-3">
                 <StatTile label="Sets logged" value={`${done}/${allRows.length}`} />
                 <StatTile label={`Volume ${unit}`} value={volume.toLocaleString()} />
@@ -375,12 +594,35 @@ export function BuildTab() {
                 />
               </div>
 
-              {!active && (
+              {/* Where they tapped, so the answer arrives where the question
+                  was asked rather than as a toast in the corner. */}
+              {collision && (
+                <div className="mt-4">
+                  <WorkoutInProgress
+                    session={collision.session}
+                    onResume={() => {
+                      // Adopt whatever is actually running — the same branch the
+                      // rehydration effect uses, because it is the same truth.
+                      if (collision.session.habitId) setSessionId(collision.session.id);
+                      else workout.open();
+                      setCollision(null);
+                      qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
+                    }}
+                    onDiscard={
+                      collision.retry ? () => discardBlocking.mutate(collision) : undefined
+                    }
+                    discarding={discardBlocking.isPending}
+                  />
+                </div>
+              )}
+
+              {!active && !collision && (
                 <Button
                   className="w-full mt-4 bg-gold border-gold-border text-white"
                   onClick={() => start.mutate(s.habitId)}
                   disabled={start.isPending}
                   data-testid="button-start-session"
+                  data-tour-id="build-start-session"
                 >
                   {start.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Start this session"}
                 </Button>
@@ -394,7 +636,22 @@ export function BuildTab() {
                   <div className="space-y-3">
                     <div className="flex items-start justify-between gap-3 flex-wrap">
                       <div className="min-w-0">
-                        <h3 className="font-display text-lg leading-tight">{lift.name}</h3>
+                        {/*
+                          The name opens what they have actually done on this
+                          movement. Their own history is the thing they reach
+                          for when deciding today's weight, and until now the
+                          only way to it was scrolling their whole week.
+                        */}
+                        <button
+                          type="button"
+                          onClick={() => setInspecting({ id: lift.exerciseId, name: lift.name })}
+                          className="text-left tap-clean"
+                          data-testid={`button-movement-history-${lift.exerciseId}`}
+                        >
+                          <h3 className="font-display text-lg leading-tight underline decoration-dotted decoration-muted-foreground/40 underline-offset-4">
+                            {lift.name}
+                          </h3>
+                        </button>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {targetLabel(lift)}
                           {lift.targetPercent1rm ? ` · ${lift.targetPercent1rm}% of your max` : ""}
@@ -594,19 +851,7 @@ export function BuildTab() {
 
           Squats in the morning and a Pilates class in the evening is an
           ordinary Tuesday, not an edge case. */}
-      {freeSession ? (
-        <FreeSession
-          sessionId={freeSession.id}
-          title={freeSession.title}
-          unit={unit}
-          onDone={clearSession}
-        />
-      ) : (
-        <MemberBuild onStarted={(id, t) => {
-              setFreeSession({ id, title: t });
-              qc.invalidateQueries({ queryKey: ["/api/training/sessions/open"] });
-            }} />
-      )}
+      <MemberBuild onStarted={workout.open} />
 
       <p className="text-xs text-muted-foreground text-center">
         Weights are in {unit}.{" "}
@@ -615,6 +860,14 @@ export function BuildTab() {
           stored the same way underneath, so nothing is converted or lost.
         </InfoTip>
       </p>
+
+      {inspecting && (
+        <MovementHistory
+          exerciseId={inspecting.id}
+          name={inspecting.name}
+          onClose={() => setInspecting(null)}
+        />
+      )}
     </div>
   );
 }

@@ -141,6 +141,25 @@ export type MovementEvent = {
   /** What the member would call it, where the source named it. */
   activity: string | null;
   source: "sakred" | "imported";
+  /**
+   * What the member said this was, where they said anything.
+   *
+   * ── Enrichment beside the event, never instead of it ────────────────────
+   *
+   * An imported `strength` workout carries no muscle-group truth, so Sakred
+   * cannot infer "yesterday was legs" from a watch — but it can ask, and this
+   * is that answer travelling with the event.
+   *
+   * Deliberately additive fields rather than a rewritten `activity` or an
+   * edited `categories`. The platform still said Strength Training and the
+   * load model still reads the category, so a member calling a hard session
+   * restorative in intent changes how it reads and not what it cost. An
+   * annotation that could delete demand would let somebody quietly erase a
+   * week of training from their own terrain.
+   */
+  memberFocus: string | null;
+  memberOrientation: string | null;
+  memberLabel: string | null;
 };
 
 /**
@@ -177,6 +196,9 @@ export async function movementEvents(userId: string, since: string): Promise<Mov
         onDate: healthWorkouts.onDate,
         startAt: healthWorkouts.startAt,
         workoutType: healthWorkouts.workoutType,
+        userFocus: healthWorkouts.userFocus,
+        userOrientationOverride: healthWorkouts.userOrientationOverride,
+        userLabel: healthWorkouts.userLabel,
       })
       .from(healthWorkouts)
       .where(and(eq(healthWorkouts.userId, userId), gte(healthWorkouts.onDate, since))),
@@ -213,6 +235,10 @@ export async function movementEvents(userId: string, since: string): Promise<Mov
       categories: [row.category],
       activity: row.title?.trim() || null,
       source: "sakred",
+      // A logged session's detail lives in its sets, not in an annotation.
+      memberFocus: null,
+      memberOrientation: null,
+      memberLabel: null,
     });
   }
   for (const e of Array.from(bySession.values())) {
@@ -221,11 +247,32 @@ export async function movementEvents(userId: string, since: string): Promise<Mov
     events.push(e);
   }
 
+  /**
+   * One workout, one entry — even when two devices recorded it.
+   *
+   * A member who lifts with Sakred open is very likely also wearing a watch
+   * writing the same hour into Apple Health. `recentMovement` has always
+   * collapsed that pair, so load counted it once; this list did not, so the
+   * member's own history showed it twice under two different names. On 11 Aug
+   * one account had a Sakred session at 19:59 and an Apple Health `strength`
+   * import at 19:50 — the same workout, rendered as "Full body · 11 Aug" and
+   * "Strength · 11 Aug", one above the other.
+   *
+   * The rule is deliberately narrow: an *imported* event is dropped only when a
+   * *Sakred* event on the same day already covers that category. Two imported
+   * strength workouts on one day stay two — that is a member who trained twice,
+   * and the same account has exactly that on 14 Aug. Only the double-recording
+   * case collapses, and the survivor is the one with the sets in it.
+   */
+  const loggedCategories = new Set<string>();
+  for (const e of events) for (const c of e.categories) loggedCategories.add(`${e.onDate}|${c}`);
+
   for (const row of imported) {
     // Same rule as the reduction: an activity we cannot place is dropped rather
     // than guessed at, because an invented category feeds invented load.
     const category = externalActivityCategory(row.workoutType);
     if (!category) continue;
+    if (loggedCategories.has(`${row.onDate}|${category}`)) continue;
     events.push({
       id: row.id,
       occurredAt: row.startAt ?? null,
@@ -233,6 +280,9 @@ export async function movementEvents(userId: string, since: string): Promise<Mov
       categories: [category],
       activity: row.workoutType ?? null,
       source: "imported",
+      memberFocus: row.userFocus ?? null,
+      memberOrientation: row.userOrientationOverride ?? null,
+      memberLabel: row.userLabel?.trim() || null,
     });
   }
 

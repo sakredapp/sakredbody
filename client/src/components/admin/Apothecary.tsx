@@ -597,7 +597,7 @@ function GuidanceLinks({
                 <select
                   value={pick[p.id] ?? ""}
                   onChange={(e) => setPick({ ...pick, [p.id]: e.target.value })}
-                  className="flex-1 h-8 rounded border border-border/50 bg-transparent text-xs px-2"
+                  className="flex-1 h-8 rounded border border-border/50 bg-transparent text-base md:text-xs px-2"
                 >
                   <option value="">Attach a product…</option>
                   {products
@@ -622,7 +622,7 @@ function GuidanceLinks({
                   value={note[p.id] ?? ""}
                   onChange={(e) => setNote({ ...note, [p.id]: e.target.value })}
                   placeholder="Member note — shown in the app"
-                  className="h-8 text-xs flex-1"
+                  className="h-8 text-base md:text-xs flex-1"
                 />
                 <Button
                   size="sm"
