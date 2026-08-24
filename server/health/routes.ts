@@ -42,7 +42,7 @@ import { db } from "../db.js";
 import { storage } from "../storage.js";
 import { isAuthenticated } from "../auth/index.js";
 import { zodMessage } from "../../shared/utils/zodMessage.js";
-import { needsConfirmation, answeredToday } from "../../shared/models/health.js";
+import { needsConfirmation, answeredToday, orderedForWrite } from "../../shared/models/health.js";
 import { externalActivityCategory } from "../../shared/models/training.js";
 import { todayInZone } from "../../shared/utils/dates.js";
 import { users } from "../../shared/models/auth.js";
@@ -215,7 +215,14 @@ export function registerHealthRoutes(app: Express) {
         }
         byKey.set(`${s.onDate}|${s.metric}`, s);
       }
-      const clean = Array.from(byKey.values());
+      /*
+        Sorted, and that is what stops the deadlock rather than tidiness.
+        See `orderedForWrite`: two concurrent syncs holding the same rows in
+        opposite orders is the precondition, and a deterministic order removes
+        it. Map iteration order is the platform's delivery order, which is
+        exactly the thing that differs between two devices syncing at once.
+      */
+      const clean = orderedForWrite(Array.from(byKey.values()));
 
       let written = 0;
       if (clean.length) {

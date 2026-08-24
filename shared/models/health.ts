@@ -587,3 +587,42 @@ export function needsConfirmation(workoutType: string | null | undefined): boole
   // is exactly where a member's answer is worth having.
   return true;
 }
+
+/**
+ * The one order every sync must write in.
+ *
+ * ── The deadlock this removes ─────────────────────────────────────────────
+ *
+ * Postgres locks index tuples in the order a statement inserts them. Two
+ * concurrent syncs from the same member — a foreground refresh and a
+ * background delivery, which is the normal case on a phone — carry overlapping
+ * (date, metric) rows in whatever order the platform handed them over. If one
+ * batch reaches row B before row A and the other reaches A before B, each ends
+ * up waiting on a lock the other holds, and Postgres kills one of them:
+ *
+ *     deadlock detected
+ *     while inserting index tuple in relation "health_days"
+ *
+ * It happened nineteen times across six members in a fortnight. The member
+ * sees a sync that silently did nothing.
+ *
+ * Sorting is the whole fix, and it is a fix rather than a mitigation: a
+ * deadlock requires two transactions to acquire the same locks in opposite
+ * orders, so making the order a function of the data alone makes the
+ * precondition unreachable. A retry loop would have hidden the same collision
+ * and paid for it in latency every time.
+ *
+ * The key is the conflict target — (onDate, metric) within one member — so
+ * this orders precisely the thing that contends.
+ */
+export function orderedForWrite<T extends { onDate: string; metric: string }>(
+  samples: readonly T[],
+): T[] {
+  return [...samples].sort((a, b) =>
+    a.onDate < b.onDate ? -1
+    : a.onDate > b.onDate ? 1
+    : a.metric < b.metric ? -1
+    : a.metric > b.metric ? 1
+    : 0,
+  );
+}

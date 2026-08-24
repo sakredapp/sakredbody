@@ -1899,5 +1899,44 @@ console.log("\nThe Android health lifecycle survives a part of it failing\n");
   check("with a pending state while it runs", /disconnect\.isPending/.test(card));
 }
 
+// ─── The order two concurrent syncs must agree on ─────────────────────────
+
+/*
+  Nineteen production deadlocks in a fortnight, all of the form "while
+  inserting index tuple in relation health_days". Two syncs from one member,
+  overlapping rows, opposite insertion orders. Postgres locks index tuples in
+  statement order, so the fix is to make the order a function of the data —
+  which makes the precondition for a deadlock unreachable rather than rare.
+*/
+{
+  const { orderedForWrite } = await import("../shared/models/health.js");
+
+  const a = orderedForWrite([
+    { onDate: "2026-08-20", metric: "sleepMinutes" },
+    { onDate: "2026-08-19", metric: "restingHeartRate" },
+    { onDate: "2026-08-20", metric: "heartRateVariability" },
+  ]);
+  const b = orderedForWrite([
+    { onDate: "2026-08-20", metric: "heartRateVariability" },
+    { onDate: "2026-08-20", metric: "sleepMinutes" },
+    { onDate: "2026-08-19", metric: "restingHeartRate" },
+  ]);
+
+  /* The assertion that matters: two deliveries of one truth agree on order. */
+  check(
+    "two syncs of the same rows write them in the same order",
+    JSON.stringify(a) === JSON.stringify(b),
+    JSON.stringify(a) + " vs " + JSON.stringify(b),
+  );
+  check(
+    "…ordered by the conflict target, date first",
+    a.map((r) => `${r.onDate}|${r.metric}`).join(",") ===
+      "2026-08-19|restingHeartRate,2026-08-20|heartRateVariability,2026-08-20|sleepMinutes",
+    a.map((r) => `${r.onDate}|${r.metric}`).join(","),
+  );
+  /* Ordering must not lose or duplicate a reading. */
+  check("…and nothing is dropped", a.length === 3);
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
