@@ -136,7 +136,7 @@ export default function Build() {
           <motion.div variants={fadeInUp}>
             <SectionHeader
               eyebrow="Where It Goes Wrong"
-              title={<>Four Ways to <span className="text-gold">Waste Years</span></>}
+              title={<>How Years <span className="text-gold">Get Wasted</span></>}
               testId="text-mistakes-headline"
             />
           </motion.div>
