@@ -24,7 +24,7 @@
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const CHROME_CANDIDATES = [
@@ -35,6 +35,60 @@ const CHROME_CANDIDATES = [
 ];
 
 export type Rect = { x: number; y: number; width: number; height: number };
+
+/**
+ * Refuse to measure a product that is not the one in the working tree.
+ *
+ * ── The afternoon this cost ───────────────────────────────────────────────
+ *
+ * The QA server serves `dist/`, and a server left running from an earlier
+ * build answers every request perfectly. A motion defect in the walkthrough
+ * was traced, diagnosed, fixed, and re-traced — and the re-trace reproduced
+ * the original behaviour exactly, because :5199 was still serving a bundle
+ * from before the adaptive panel landed. The published `data-tour-weight`
+ * attribute was simply absent, which is the only reason it was caught at all.
+ *
+ * Nothing about that run looked wrong. It is the same failure as a check that
+ * silently cannot run: a green harness pointed at a stale build is worse than
+ * no harness, because it is believed.
+ *
+ * So: the newest source file, against the built entry. Cheap, and it fails
+ * loudly with the command that fixes it.
+ */
+export function assertFreshBuild(root = process.cwd()): void {
+  const built = join(root, "dist/public/index.html");
+  if (!existsSync(built)) {
+    throw new Error("No build to serve — run `npm run build && script/qa-serve.sh`");
+  }
+  const builtAt = statSync(built).mtimeMs;
+
+  let newest = 0;
+  let culprit = "";
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (/\.(tsx?|css|html)$/.test(entry.name)) {
+        const at = statSync(full).mtimeMs;
+        if (at > newest) { newest = at; culprit = full.slice(root.length + 1); }
+      }
+    }
+  };
+  for (const dir of ["client/src", "shared"]) {
+    const full = join(root, dir);
+    if (existsSync(full)) walk(full);
+  }
+
+  if (newest > builtAt) {
+    const behind = Math.round((newest - builtAt) / 1000);
+    throw new Error(
+      `The served build is ${behind}s older than ${culprit}.\n` +
+        "  Whatever this run reports would be about a product that no longer exists.\n" +
+        "  Fix: npm run build && script/qa-serve.sh",
+    );
+  }
+}
 
 export class Browser {
   private proc: ChildProcess | null = null;
@@ -64,7 +118,9 @@ export class Browser {
   }
 
   async launch(): Promise<void> {
-    const { existsSync } = await import("node:fs");
+    /* Here rather than in each harness, because a harness that forgets is
+       exactly the harness that reports a fixed defect as still broken. */
+    assertFreshBuild();
     const bin = CHROME_CANDIDATES.find((p) => existsSync(p));
     if (!bin) throw new Error(`No Chrome found. Looked in:\n  ${CHROME_CANDIDATES.join("\n  ")}`);
 

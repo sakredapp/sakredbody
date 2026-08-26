@@ -47,6 +47,19 @@ import {
 import { isProgress, progressKey } from "../client/src/lib/tour/progress.js";
 import { AUTO_START_ENABLED, REQUIRED_TOUR_VERSION, owesRequiredTour } from "../client/src/lib/tour/rollout.js";
 import { TOUR_ANCHORS } from "../client/src/lib/tour/types.js";
+import {
+  HOLD_LIMIT,
+  MAX_DIRECTED,
+  STILL_FRAMES,
+  initialMotion,
+  nextMotion,
+  padFor,
+  settleSide,
+  PAD,
+  type MotionCommand,
+  type MotionReading,
+  type MotionState,
+} from "../client/src/lib/tour/motion.js";
 import type { GuidedTour, TourAnchor, TourProgress, TourWorld } from "../client/src/lib/tour/types.js";
 
 let passed = 0;
@@ -560,11 +573,21 @@ check(
 */
 check(
   "the panel moves out of the way when the target is low on the screen",
-  /panelAtTop/.test(overlay) && /const below = viewportH - \(rect\.top \+ rect\.height\)/.test(overlay),
+  /panelAtTop/.test(overlay) && /settleSide\(/.test(overlay),
 );
+/*
+  Asserted as the room it is given, not as the spelling of the comparison.
+  This read `below >= h + GAP` and broke on a refactor that preserved the
+  behaviour exactly — and a test that fails on a rename it does not care about
+  is one whoever is in a hurry relaxes. The decision itself is covered directly
+  against `settleSide`, below.
+*/
 check(
   "and decides by whether it fits, using its own measured height",
-  /below >= h \+ GAP/.test(overlay) && /above >= h \+ GAP/.test(overlay),
+  /above: rect\.top/.test(overlay) &&
+    /below: viewportH - \(rect\.top \+ rect\.height\)/.test(overlay) &&
+    /need,/.test(overlay) &&
+    /panelH \|\| maxPanelH/.test(overlay),
 );
 /*
   The keyboard changes the usable height and never fires a resize on window.
@@ -597,10 +620,24 @@ check(
   "the halo is one clamped rectangle shared by the cutout and the ring",
   /const halo = rect/.test(overlay) && /Math\.min\(viewportW/.test(overlay),
 );
-check(
-  "and nav targets are hugged rather than padded outward",
-  /padFor/.test(overlay) && /nav-\|role-/.test(overlay),
-);
+/*
+  Asserted against the rule itself, on the anchor names the tour really uses.
+  This matched the source for the string "nav-|role-" and broke the moment the
+  rule was corrected to stop hugging the More sheet's rows — a test failing on
+  a change that fixed the thing it was guarding.
+*/
+check("and nav targets are hugged rather than padded outward", /padFor/.test(overlay));
+for (const cell of ["nav-home", "nav-restore", "nav-build", "nav-community", "nav-body", "nav-more", "role-coach"]) {
+  check(`  ${cell} is hugged`, padFor(cell) === 0);
+}
+/*
+  The rows inside the More sheet are named `nav-…` too and are not navigation
+  cells. Hugging them put the ring exactly on the row's own edge.
+*/
+for (const row of ["nav-more-settings", "nav-more-wins", "terrain-now", "restore-practice"]) {
+  check(`  ${row} keeps its breathing room`, padFor(row) === PAD, `got ${padFor(row)}`);
+}
+check("a step with no anchor still has a padding answer", padFor(undefined) === PAD);
 /*
   The keyboard. On the Add Movement lesson the picker autofocused its search
   box, so the keyboard took half the phone and the movement list the lesson was
@@ -857,6 +894,294 @@ check(
 check(
   "the quest log is orientation and not a scoreboard",
   !/\bXP\b|points|streak|coins/i.test(overlayCode),
+);
+
+
+// ─── Motion: who is allowed to move the page ─────────────────────────────
+
+/*
+  Replayed as frames, because the defect these describe is two seconds long and
+  invisible in any single one of them. The numbers are from the recorded trace
+  of the real transition at 393×852 — tap Restore, "This changes with you" —
+  where the document grew from 852 to 1919 over 1.8s and pushed the highlighted
+  card 52px out from under its own halo after the tour had already scrolled.
+*/
+function replayMotion(frames: MotionReading[]): { commands: MotionCommand[]; state: MotionState } {
+  let state = initialMotion();
+  const commands: MotionCommand[] = [];
+  for (const f of frames) {
+    const turn = nextMotion(state, f);
+    state = turn.state;
+    if (turn.command.do !== "nothing") commands.push(turn.command);
+  }
+  return { commands, state };
+}
+
+const frame = (over: Partial<MotionReading> = {}): MotionReading => ({
+  scroll: 0,
+  targetDoc: null,
+  visible: false,
+  memberMoved: false,
+  ...over,
+});
+
+/** Nothing to point at yet — the first 490ms of the trace. */
+check(
+  "a lesson whose target has not mounted does not move the page",
+  replayMotion([frame(), frame(), frame(), frame()]).commands.length === 0,
+);
+
+/**
+ * The target appears below the fold, the page carries it up, and that is the
+ * whole of the tour's intervention — one command across sixteen frames.
+ */
+{
+  const arriving: MotionReading[] = [
+    frame({ targetDoc: 974, scroll: 0 }),
+    ...[0, 30, 148, 303, 430, 490, 504].map((y) => frame({ targetDoc: 974, scroll: y })),
+    ...Array.from({ length: 8 }, () => frame({ targetDoc: 966, scroll: 504, visible: true })),
+  ];
+  const { commands } = replayMotion(arriving);
+  check(
+    "an off-screen target is scrolled to once, however many frames pass",
+    commands.length === 1 && commands[0].do === "scroll-into-view",
+    `got ${JSON.stringify(commands)}`,
+  );
+}
+
+/**
+ * The bug this replaced. A smooth scroll takes ~340ms; the old code asked
+ * again every 350ms whether the target was visible yet, and restarted the
+ * animation from mid-flight when it wasn't.
+ */
+{
+  const travelling = [0, 2, 5, 11, 19, 30, 47, 71, 101, 148, 194, 235, 272, 303].map((y) =>
+    frame({ scroll: y, targetDoc: 974 }),
+  );
+  const { commands } = replayMotion(travelling);
+  check(
+    "a scroll in flight is never restarted by a second one",
+    commands.filter((c) => c.do === "scroll-into-view").length === 1,
+    `got ${commands.length} commands`,
+  );
+}
+
+/** Landing is observed — the offset going still — never waited out. */
+{
+  const frames: MotionReading[] = [
+    ...[0, 100, 300, 480].map((y) => frame({ scroll: y, targetDoc: 974 })),
+    ...Array.from({ length: STILL_FRAMES + 1 }, () => frame({ scroll: 504, targetDoc: 966, visible: true })),
+  ];
+  const { state } = replayMotion(frames);
+  check("a landed scroll settles into a hold", state.phase === "holding", state.phase);
+  check("and remembers where the target came to rest", state.anchoredAt === 966, String(state.anchoredAt));
+}
+
+/**
+ * The drift. Restore's history and memory panels resolve after the lesson has
+ * committed, each one pushing the card further down.
+ */
+{
+  const frames: MotionReading[] = [
+    frame({ scroll: 504, targetDoc: 966, visible: true }),
+    frame({ scroll: 504, targetDoc: 966, visible: true }),
+    // content arrives above the target
+    frame({ scroll: 504, targetDoc: 1014, visible: true }),
+  ];
+  const { commands } = replayMotion(frames);
+  check(
+    "content arriving above the target is cancelled, not watched",
+    commands.length === 1 && commands[0].do === "hold" && commands[0].by === 48,
+    JSON.stringify(commands),
+  );
+}
+
+/** A hold that clamps at the end of the document is not a member scrolling. */
+{
+  let state = initialMotion();
+  for (const f of [
+    frame({ scroll: 504, targetDoc: 966, visible: true }),
+    frame({ scroll: 504, targetDoc: 966, visible: true }),
+    frame({ scroll: 504, targetDoc: 1014, visible: true }),
+  ]) state = nextMotion(state, f).state;
+  // asked for 552, the document only allowed 540
+  state = nextMotion(state, frame({ scroll: 540, targetDoc: 1014, visible: true })).state;
+  check("a clamped hold keeps holding", state.phase === "holding", state.phase);
+}
+
+/** The member always wins, and wins for the rest of the lesson. */
+{
+  const frames: MotionReading[] = [
+    frame({ scroll: 504, targetDoc: 966, visible: true }),
+    frame({ scroll: 504, targetDoc: 966, visible: true }),
+    frame({ scroll: 380, targetDoc: 966, visible: true, memberMoved: true }),
+    frame({ scroll: 380, targetDoc: 1014, visible: true }),
+    frame({ scroll: 380, targetDoc: 1100, visible: false }),
+  ];
+  const { commands, state } = replayMotion(frames);
+  check("a member's scroll releases the hold", state.phase === "released", state.phase);
+  check("and nothing scrolls after they have taken over", commands.length === 0, JSON.stringify(commands));
+}
+
+/** Momentum after a flick arrives with no further gesture events at all. */
+{
+  const frames: MotionReading[] = [
+    frame({ scroll: 504, targetDoc: 966, visible: true }),
+    frame({ scroll: 504, targetDoc: 966, visible: true }),
+    frame({ scroll: 462, targetDoc: 966, visible: true }),
+  ];
+  check(
+    "an unexplained change in the offset releases it too",
+    replayMotion(frames).state.phase === "released",
+  );
+}
+
+/** A whole section changing underneath is not a shift worth matching. */
+{
+  const frames: MotionReading[] = [
+    frame({ scroll: 504, targetDoc: 966, visible: true }),
+    frame({ scroll: 504, targetDoc: 966, visible: true }),
+    frame({ scroll: 504, targetDoc: 966 + HOLD_LIMIT + 1, visible: true }),
+  ];
+  const { commands, state } = replayMotion(frames);
+  check("a shift too large to be content settling is let go", state.phase === "released", state.phase);
+  check("rather than flung after", commands.length === 0);
+}
+
+/**
+ * A request that had no effect at all is not repeated.
+ *
+ * The page never moves, so the scroll did everything it was ever going to do,
+ * and asking again would produce the same nothing. The lesson keeps its halo
+ * and its own degrade path; it does not stand there pulling a dead lever.
+ */
+{
+  const frames: MotionReading[] = [];
+  for (let i = 0; i < 60; i++) frames.push(frame({ scroll: 100, targetDoc: 2000 }));
+  const { commands } = replayMotion(frames);
+  check(
+    "a scroll that moves nothing is asked for once and not again",
+    commands.length === 1,
+    `got ${commands.length}`,
+  );
+}
+
+/**
+ * Landing short is different, and is the case the retry exists for: the
+ * Settings row sits inside a sheet that is still laying out, so the scroll
+ * moves the page as far as the layout then allows and the target comes to
+ * rest below the fold. Measured at 360×780, 22px under the navigation.
+ */
+{
+  const frames: MotionReading[] = [];
+  let y = 0;
+  for (let round = 0; round < 8; round++) {
+    // the page moves, then goes still, and the target is still not in view
+    for (const step of [40, 120, 180]) frames.push(frame({ scroll: (y += step), targetDoc: 2000 }));
+    for (let i = 0; i < STILL_FRAMES + 1; i++) frames.push(frame({ scroll: y, targetDoc: 2000 }));
+  }
+  const { commands, state } = replayMotion(frames);
+  check(
+    `a scroll that lands short is retried, at most ${MAX_DIRECTED} times`,
+    commands.length === MAX_DIRECTED,
+    `got ${commands.length}`,
+  );
+  check("and then the lesson stops trying", state.phase === "released", state.phase);
+}
+
+/**
+ * The 25ms restart. Recorded on the real transition before this was gated:
+ * `scrollIntoView` at 687ms and again at 712ms, because the offset had not
+ * changed yet — a smooth scroll does not begin on the frame it is asked for.
+ */
+{
+  const frames: MotionReading[] = [
+    frame({ targetDoc: 974, scroll: 0 }),
+    // the animation has not started; the offset is unchanged for longer than
+    // the stillness threshold
+    ...Array.from({ length: STILL_FRAMES + 3 }, () => frame({ targetDoc: 970, scroll: 0 })),
+  ];
+  const { commands } = replayMotion(frames);
+  check(
+    "a scroll that has not begun moving yet is not mistaken for one that has landed",
+    commands.length === 1,
+    `got ${commands.length}`,
+  );
+}
+
+/** A target that unmounts must not leave a stale anchor behind. */
+{
+  const frames: MotionReading[] = [
+    frame({ scroll: 504, targetDoc: 966, visible: true }),
+    frame({ scroll: 504, targetDoc: 966, visible: true }),
+    frame({ scroll: 504, targetDoc: null }),
+  ];
+  const { state } = replayMotion(frames);
+  check("a vanished target returns the lesson to seeking", state.phase === "seeking", state.phase);
+  check("with nothing anchored", state.anchoredAt === null);
+}
+
+
+/**
+ * Arriving early is as wrong as asking twice.
+ *
+ * A target passes into the viewport partway through a five-hundred-pixel
+ * scroll. Holding from that moment records an anchor against an offset the
+ * browser is still changing, and the next frame's movement — the tour's own
+ * scroll, still running — reads exactly like the member taking over. Measured
+ * on the real transition: released at 870ms with the page still travelling
+ * from 6 to 504.
+ */
+{
+  const frames: MotionReading[] = [
+    frame({ targetDoc: 966, scroll: 0 }),
+    frame({ targetDoc: 966, scroll: 6 }),
+    // in view now, but the scroll has not finished
+    frame({ targetDoc: 966, scroll: 278, visible: true }),
+    frame({ targetDoc: 966, scroll: 421, visible: true }),
+    frame({ targetDoc: 966, scroll: 496, visible: true }),
+  ];
+  const mid = replayMotion(frames);
+  check("a target that comes into view mid-scroll is not held yet", mid.state.phase === "directing", mid.state.phase);
+  check("so the tour's own scroll is never mistaken for the member's", mid.state.reason === null, String(mid.state.reason));
+
+  const landed = replayMotion([
+    ...frames,
+    ...Array.from({ length: STILL_FRAMES + 1 }, () => frame({ targetDoc: 966, scroll: 504, visible: true })),
+  ]);
+  check("and it is held once the page stops", landed.state.phase === "holding", landed.state.phase);
+}
+
+// ─── Motion: which side the panel takes ──────────────────────────────────
+
+check(
+  "the panel sits below the target when there is room",
+  settleSide(null, { above: 100, below: 400, need: 300 }) === false,
+);
+check(
+  "and moves above it when there is not",
+  settleSide(null, { above: 500, below: 100, need: 300 }) === true,
+);
+check(
+  "with neither side roomy enough, the roomier one wins",
+  settleSide(null, { above: 200, below: 120, need: 300 }) === true,
+);
+/*
+  The flip this prevents: during one directed scroll the Restore card travelled
+  from 974 to 462, and a side recomputed from that rect crosses the threshold
+  mid-flight and swaps ends of the screen while the page is still moving.
+*/
+check(
+  "a decided side is kept while it still fits",
+  settleSide(true, { above: 320, below: 500, need: 300 }) === true,
+);
+check(
+  "and only given up when it genuinely stops fitting",
+  settleSide(true, { above: 120, below: 500, need: 300 }) === false,
+);
+check(
+  "a side that fits nowhere is not swapped for another that fits nowhere",
+  settleSide(false, { above: 100, below: 100, need: 300 }) === false,
 );
 
 // ─── Storage ─────────────────────────────────────────────────────────────

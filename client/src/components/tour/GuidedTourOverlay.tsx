@@ -48,8 +48,26 @@ import { usePrefersReducedMotion } from "@/hooks/use-reduced-motion";
 import { cn } from "@/lib/utils";
 import { track } from "@/lib/track";
 import { lessonWeight, PANEL, veilFor } from "@/lib/tour/weight";
+import { initialMotion, nextMotion, padFor, settleSide, type MotionState } from "@/lib/tour/motion";
 
 type Rect = { top: number; left: number; width: number; height: number };
+
+/**
+ * The element that actually moves when this target is scrolled to.
+ *
+ * Not assumed to be the document: the portal has run with the window as the
+ * scroller and with an inner pane as the scroller at different breakpoints,
+ * and a hold applied to the wrong one is a hold that does nothing while
+ * looking like it worked. Walked from the target outwards, so it is whatever
+ * `scrollIntoView` would have moved.
+ */
+function scrollerFor(el: Element): Element {
+  for (let node = el.parentElement; node; node = node.parentElement) {
+    const overflow = getComputedStyle(node).overflowY;
+    if (/(auto|scroll|overlay)/.test(overflow) && node.scrollHeight > node.clientHeight + 1) return node;
+  }
+  return document.scrollingElement ?? document.documentElement;
+}
 
 const SAME = (a: Rect | null, b: Rect | null) =>
   a === b ||
@@ -59,9 +77,6 @@ const SAME = (a: Rect | null, b: Rect | null) =>
     Math.abs(a.left - b.left) < 0.5 &&
     Math.abs(a.width - b.width) < 0.5 &&
     Math.abs(a.height - b.height) < 0.5);
-
-/** Breathing room around the cutout so the halo doesn't clip the control. */
-const PAD = 8;
 
 /**
  * How much room a target of this kind wants around it.
@@ -83,10 +98,6 @@ const PAD = 8;
  * halo tracing its bounds is what makes it look chosen rather than
  * approximated. Everything else keeps the 8px it was designed with.
  */
-function padFor(anchor: string | undefined): number {
-  if (!anchor) return PAD;
-  return /^(nav-|role-)/.test(anchor) ? 0 : PAD;
-}
 
 /**
  * Below this, a press on a freshly-mounted tutorial control is the tail of the
@@ -130,71 +141,61 @@ export function GuidedTourOverlay({
   const needsTap = step.advance.kind === "tap" || step.advance.kind === "present";
 
   /*
-    Bring the target somewhere a person can see before measuring it.
+    Everything that is allowed to move the page while this lesson runs.
 
-    Runs on the anchor changing, not every frame: a repeated scrollIntoView
-    fights the member's own scrolling and makes the page feel possessed.
+    One owner, one state machine, and every transition caused by something
+    observed rather than timed — see `lib/tour/motion.ts` for the trace this
+    was built from. What it replaced asked again every 350ms, which restarted
+    an in-flight smooth scroll with a fresh one from wherever it had reached.
   */
-  /**
-   * Whether this step has already had its one scroll.
-   *
-   * One per step, not one per frame: a repeated `scrollIntoView` fights the
-   * member's own scrolling and makes the page feel possessed.
-   */
-  const scrolledFor = useRef<string | null>(null);
-  /**
-   * How many times this step has asked, and when it last did.
-   *
-   * Once was not enough. The Settings row and the Appearance control both sit
-   * inside surfaces that are still laying out when the step opens: the one
-   * scroll fired, moved the page as far as the layout then allowed, and the
-   * target came to rest half under the bottom navigation. Measured at
-   * 360×780, where it ended 22px below the fold.
-   *
-   * Bounded rather than continuous, because a `scrollIntoView` on every frame
-   * fights the member's own scrolling and makes the page feel possessed.
-   * Three attempts, a third of a second apart, is enough for a sheet to
-   * settle and far short of a fight.
-   */
-  const scrollTries = useRef(0);
-  const lastScrollAt = useRef(0);
+  const motion = useRef<MotionState>(initialMotion());
+  /** The scroller that actually moves this target. Cached per anchor. */
+  const scroller = useRef<Element | null>(null);
+  /** A gesture since the last frame. The member outranks the walkthrough. */
+  const memberMoved = useRef(false);
+  /** What `overflow-anchor` was before the lesson borrowed it. */
+  const anchoring = useRef<{ el: HTMLElement; was: string } | null>(null);
 
   useLayoutEffect(() => {
-    scrolledFor.current = null;
-    scrollTries.current = 0;
-    lastScrollAt.current = 0;
+    motion.current = initialMotion();
+    scroller.current = null;
+    memberMoved.current = false;
+    return () => {
+      if (anchoring.current) {
+        anchoring.current.el.style.overflowAnchor = anchoring.current.was;
+        anchoring.current = null;
+      }
+      document.documentElement.removeAttribute("data-tour-motion");
+      document.documentElement.removeAttribute("data-tour-scrolls");
+    };
   }, [anchor, instance]);
 
   /*
-    Scroll when the target becomes findable, not when the step begins.
+    The member taking the page back.
 
-    This ran once, on the step changing — and the Settings lesson opens inside
-    a sheet that is still animating at that moment, so the effect fired, found
-    nothing to scroll, and never looked again. The item sat at y=1305 in an
-    852px viewport: measured, visible, and untappable, with the tour waiting
-    for a press on something below the fold.
-
-    Attempted from the measure loop instead, guarded so it still happens at
-    most once per step. If the target is not there yet, the next frame tries;
-    once it has been brought into view, nothing touches the member's scrolling
-    again.
+    Passive, capture, and on the window: the gesture may be over a control the
+    scrim is blocking, or over the target itself, and either way it is the
+    member's intent. Momentum after a flick arrives with no further events at
+    all, which is why the machine also watches the offset — this is the fast
+    signal, not the only one.
   */
-  const bringIntoView = useCallback(
-    (found: ReturnType<typeof resolveTarget>) => {
-      if (!anchor) return;
-      if (!found.ok || !found.scrollNeeded) return;
-      if (scrolledFor.current === anchor && scrollTries.current >= 3) return;
-      if (performance.now() - lastScrollAt.current < 350) return;
-      scrolledFor.current = anchor;
-      scrollTries.current += 1;
-      lastScrollAt.current = performance.now();
-      (found.el as HTMLElement).scrollIntoView({
-        block: "center",
-        behavior: reduced ? "auto" : "smooth",
-      });
-    },
-    [anchor, reduced],
-  );
+  useEffect(() => {
+    if (!anchor) return;
+    const took = () => {
+      memberMoved.current = true;
+    };
+    const key = (e: KeyboardEvent) => {
+      if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(e.key)) took();
+    };
+    window.addEventListener("wheel", took, { passive: true, capture: true });
+    window.addEventListener("touchmove", took, { passive: true, capture: true });
+    window.addEventListener("keydown", key, true);
+    return () => {
+      window.removeEventListener("wheel", took, true);
+      window.removeEventListener("touchmove", took, true);
+      window.removeEventListener("keydown", key, true);
+    };
+  }, [anchor]);
 
   useEffect(() => {
     if (!anchor) {
@@ -221,7 +222,6 @@ export function GuidedTourOverlay({
       // hidden row becomes the real target. Holding the element found at mount
       // is how a spotlight ends up on a node that is no longer on screen.
       const found = resolveTarget({ anchor, instance, needsInteraction: needsTap, anyInstance: step.anyInstance });
-      bringIntoView(found);
       const el = found.ok ? (found.el as HTMLElement) : null;
       const next = el
         ? (() => {
@@ -229,6 +229,61 @@ export function GuidedTourOverlay({
             return { top: r.top, left: r.left, width: r.width, height: r.height };
           })()
         : null;
+
+      /*
+        One frame of the motion machine, on the rect just measured rather than
+        on the one React last rendered — a hold that answers a shift a frame
+        late is a hold you can see.
+      */
+      if (el && !scroller.current) {
+        const box = scrollerFor(el);
+        scroller.current = box;
+        /*
+          Take the browser out of the argument.
+
+          Chrome anchors scrolling by itself when content above the viewport
+          changes size, adjusting the offset with no script involved — which
+          is a second owner doing a crude version of the hold below, and the
+          machine correctly read it as somebody else moving the page and let
+          go. Worse, it is not a *reliable* second owner: WebKit has never
+          implemented scroll anchoring, so on the iPhone these lessons were
+          measured on there is nothing there at all and the drift is the full
+          52px. Two engines behaving differently is the thing to remove.
+        */
+        if (box instanceof HTMLElement) {
+          anchoring.current = { el: box, was: box.style.overflowAnchor };
+          box.style.overflowAnchor = "none";
+        }
+      }
+      const box = scroller.current;
+      const offset = box ? box.scrollTop : 0;
+      const took = memberMoved.current;
+      memberMoved.current = false;
+      const turn = nextMotion(motion.current, {
+        scroll: offset,
+        targetDoc: next ? next.top + offset : null,
+        visible: found.ok && !found.scrollNeeded,
+        memberMoved: took,
+      });
+      motion.current = turn.state;
+      /*
+        Published, because a motion defect is two seconds long and invisible in
+        any single frame. The QA harness reads this to assert that a lesson
+        reaches `holding` and that nothing scrolls afterwards; a phase kept only
+        in a ref is a phase nobody can check.
+      */
+      document.documentElement.setAttribute(
+        "data-tour-motion",
+        turn.state.reason ? `${turn.state.phase}:${turn.state.reason}` : turn.state.phase,
+      );
+      document.documentElement.setAttribute("data-tour-scrolls", String(turn.state.spent));
+      if (turn.command.do === "scroll-into-view" && el) {
+        el.scrollIntoView({ block: "center", behavior: reduced ? "auto" : "smooth" });
+      } else if (turn.command.do === "hold" && box) {
+        /* Instant, always. A smooth correction is a second animation on top of
+           the content shift it exists to hide. */
+        box.scrollTop = offset + turn.command.by;
+      }
       if (!published || !SAME(last, next)) {
         published = true;
         last = next;
@@ -239,7 +294,7 @@ export function GuidedTourOverlay({
 
     frame = requestAnimationFrame(measure);
     return () => cancelAnimationFrame(frame);
-  }, [anchor, instance, needsTap, bringIntoView]);
+  }, [anchor, instance, needsTap, step.anyInstance, reduced]);
 
   /*
     The tap the step is waiting for.
@@ -414,20 +469,53 @@ export function GuidedTourOverlay({
    */
   const maxPanelH = Math.round(viewportH * metrics.maxViewportShare);
 
-  const panelAtTop = (() => {
-    if (!rect) return false;
-    /*
-      The effective height, not the measured one. Before the panel has been
-      measured the ceiling is the better guess, because it is the height the
-      panel is about to be clamped to anyway.
-    */
-    const h = Math.min(panelH || maxPanelH, maxPanelH);
-    const below = viewportH - (rect.top + rect.height);
-    const above = rect.top;
-    if (below >= h + GAP) return false;
-    if (above >= h + GAP) return true;
-    return above > below;
-  })();
+  /**
+   * The side, decided once per lesson instead of recomputed every frame.
+   *
+   * `rect` travels five hundred pixels during a single directed scroll — the
+   * Restore card starts at 974 in an 852 viewport and lands at 462 — and a
+   * side recomputed from it crosses the threshold mid-flight and swaps ends of
+   * the screen while the page is still moving. Latched, with hysteresis: see
+   * `settleSide`. Reset with the step, not with the rect.
+   */
+  const side = useRef<boolean | null>(null);
+  useLayoutEffect(() => {
+    side.current = null;
+  }, [step.id, anchor, instance]);
+
+  /**
+   * Where the panel already is, carried across lessons.
+   *
+   * A step's target does not exist for the first couple of hundred
+   * milliseconds — Restore's cards mounted 217ms after its lesson opened — and
+   * defaulting to the bottom in the meantime made the panel drop to the bottom
+   * of the screen and then jump back to the top the instant the card appeared.
+   * One teleport per lesson, on a screen that had not otherwise changed.
+   *
+   * While there is no target there is also nothing that could be covered, so
+   * the neutral choice is free — and the least surprising free choice is to
+   * leave the panel where the member is already looking. The walkthrough is
+   * one continuous surface; it should move when the lesson needs it to and
+   * not because a query has not come back yet.
+   */
+  const lastPlaced = useRef(false);
+
+  /*
+    The effective height, not the measured one. Before the panel has been
+    measured the ceiling is the better guess, because it is the height the
+    panel is about to be clamped to anyway.
+  */
+  const need = Math.min(panelH || maxPanelH, maxPanelH) + GAP;
+  const panelAtTop = rect
+    ? (side.current = settleSide(side.current, {
+        above: rect.top,
+        below: viewportH - (rect.top + rect.height),
+        need,
+      }))
+    : lastPlaced.current;
+  useLayoutEffect(() => {
+    lastPlaced.current = panelAtTop;
+  }, [panelAtTop]);
 
   /**
    * The one rectangle the cutout and the halo both use.
@@ -540,6 +628,8 @@ export function GuidedTourOverlay({
           "absolute left-0 right-0 px-4 pointer-events-auto",
           panelAtTop ? "top-0 pt-[calc(env(safe-area-inset-top)+0.75rem)]" : "bottom-0 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]",
         )}
+        data-testid="tour-panel-dock"
+        data-tour-side={panelAtTop ? "top" : "bottom"}
       >
         <div
           ref={panelRef}
@@ -548,7 +638,9 @@ export function GuidedTourOverlay({
             "mx-auto w-full max-w-md rounded-2xl border border-[hsl(var(--gold))]/25",
             "bg-[hsl(var(--tour-panel))] backdrop-blur-xl outline-none",
             "shadow-[0_18px_50px_-12px_hsl(var(--tour-shadow))]",
-            "overflow-y-auto overscroll-contain",
+            /* A column, so the ceiling clips the reading and never the way
+               out. See the scrolling region below. */
+            "flex flex-col",
             metrics.padding,
             metrics.gap,
           )}
@@ -570,6 +662,20 @@ export function GuidedTourOverlay({
             </span>
           </div>
 
+          {/*
+            Only the reading scrolls.
+
+            The ceiling that stops a lesson covering the product it explains
+            also, applied to the whole panel, pushed the action row past the
+            bottom of it — on Restore the member was told "you don't have to do
+            it now" above a Continue button that had been clipped out of the
+            visible box. The QA driver could not find a hittable point for it
+            and the walkthrough could not be finished at three of four sizes.
+
+            So the title and the actions are pinned and the body is what gives.
+            A lesson may run long; the way forward is never below a fold.
+          */}
+          <div className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", metrics.gap)}>
           {/* Announced rather than merely rendered: the instruction is the
               content of this screen, and a member using VoiceOver gets the new
               step read to them the way a sighted member gets it swapped in. */}
@@ -584,6 +690,7 @@ export function GuidedTourOverlay({
           {step.choice === "appearance" && !waiting && <AtmosphereChoice />}
 
           <ObjectiveList objectives={objectives} expandable={metrics.expandableChecklist} />
+          </div>
 
           <div className="flex items-center justify-between gap-3 pt-1">
             <button

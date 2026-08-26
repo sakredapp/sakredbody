@@ -118,7 +118,7 @@ const WORLD = `
     hasPause: !!document.querySelector('[data-testid="button-tour-pause"]'),
     section: document.documentElement.getAttribute("data-tour-section"),
     theme: document.documentElement.dataset.theme,
-    viewport: { x: 0, y: 0, width: innerWidth, height: innerHeight },
+    viewport: { x: 0, y: 0, width: innerWidth, height: (visualViewport && visualViewport.height) || innerHeight },
   };
 `;
 
@@ -246,7 +246,7 @@ const SNAP = (anchor: string | null, instance: string | null, anyInstance: boole
     stepId: el.getAttribute("data-tour-step"),
     halo: box('[data-testid="tour-halo"]'),
     panel: box('[data-testid="tour-panel"]'),
-    viewport: { x: 0, y: 0, width: innerWidth, height: innerHeight },
+    viewport: { x: 0, y: 0, width: innerWidth, height: (visualViewport && visualViewport.height) || innerHeight },
     target: null, hit: null,
   };
   ${anchor ? `
@@ -389,7 +389,18 @@ async function measure(label: string, stepId: string, degraded: string[]): Promi
     `return !!document.querySelector('[data-testid="button-tour-continue-degraded"]');`,
   );
   if (gaveUp) {
-    degraded.push(step.formFactor ? `${step.id} (not on this form factor)` : step.id);
+    /* With the reason, because "terrain degraded" and "terrain degraded
+       because Home had not finished loading" are different bug reports and
+       the first one cost two runs to tell apart. */
+    const why = await b.evaluate<string>(`
+      const els = [...document.querySelectorAll('[data-tour-id=${JSON.stringify(step.anchor ?? "")}]')];
+      if (!els.length) return "no element carries the anchor";
+      const r = els[0].getBoundingClientRect();
+      const cs = getComputedStyle(els[0]);
+      return els.length + " present, first " + Math.round(r.width) + "x" + Math.round(r.height) +
+        " at " + Math.round(r.top) + ", display " + cs.display + ", visibility " + cs.visibility;
+    `).catch(() => "unknown");
+    degraded.push(step.formFactor ? `${step.id} (not on this form factor)` : `${step.id} [${why}]`);
     const w = await b.evaluate<Snap>(SNAP(null, null, false));
     check(`[${label}] ${step.id}: a degraded lesson is still readable`, !!w.panel);
     return;
@@ -439,16 +450,51 @@ async function measure(label: string, stepId: string, degraded: string[]): Promi
         w.halo.y + w.halo.height >= target.y + target.height - 0.5,
       `target ${JSON.stringify(target)} halo ${JSON.stringify(w.halo)}`);
 
-    check(`[${label}] ${step.id}: with the padding the overlay promises`,
-      Math.abs(w.halo.width - (target.width + PAD * 2)) < 1 &&
-        Math.abs(w.halo.height - (target.height + PAD * 2)) < 1,
-      `halo ${w.halo.width}×${w.halo.height}, target ${target.width}×${target.height}`);
+    /*
+      Two promises, not one.
 
-    const tc = centre(target);
+      Most controls get eight pixels of breathing room. The six primary
+      navigation cells and the role tiles get none, because they sit shoulder
+      to shoulder in a full-width bar: padding there reaches into both
+      neighbours and past the screen edge at the ends. Asserted from the same
+      rule the overlay uses rather than a flat constant, so a halo that is
+      quietly the wrong size for its kind still fails.
+    */
+    const hugs = /^(nav|role)-[a-z]+$/.test(step.anchor ?? "");
+    const pad = hugs ? 0 : PAD;
+    /*
+      The promise, stated exactly: the target plus its padding, clipped to the
+      screen. Not "plus sixteen pixels" — the Settings row opens flush against
+      the top of the More sheet, so its ring genuinely has nowhere to go
+      upwards, and a halo drawn off-screen would be worse than a tight one.
+      Comparing against the clamped rectangle is what lets this assert the edge
+      cases instead of excusing them.
+    */
+    const want = {
+      x: Math.max(0, target.x - pad),
+      y: Math.max(0, target.y - pad),
+      right: Math.min(vw.width, target.x + target.width + pad),
+      bottom: Math.min(vw.height, target.y + target.height + pad),
+    };
+    const wantW = want.right - want.x;
+    const wantH = want.bottom - want.y;
+    check(`[${label}] ${step.id}: with the padding the overlay promises`,
+      Math.abs(w.halo.width - wantW) < 1 && Math.abs(w.halo.height - wantH) < 1,
+      `${hugs ? "hugging" : `${PAD}px`}: halo ${w.halo.width}×${w.halo.height}, expected ${wantW}×${wantH} ` +
+        `for target ${target.width}×${target.height}`);
+
+    check(`[${label}] ${step.id}: a halo is never drawn off the screen`,
+      w.halo.x >= -0.5 && w.halo.y >= -0.5 &&
+        w.halo.x + w.halo.width <= vw.width + 0.5 &&
+        w.halo.y + w.halo.height <= vw.height + 0.5,
+      `halo ${JSON.stringify(w.halo)} in ${vw.width}×${vw.height}`);
+
     const hc = centre(w.halo);
     check(`[${label}] ${step.id}: centres agree`,
-      Math.abs(tc.x - hc.x) <= CENTRE_TOLERANCE && Math.abs(tc.y - hc.y) <= CENTRE_TOLERANCE,
-      `off by ${(tc.x - hc.x).toFixed(2)}, ${(tc.y - hc.y).toFixed(2)}`);
+      Math.abs((want.x + wantW / 2) - hc.x) <= CENTRE_TOLERANCE &&
+        Math.abs((want.y + wantH / 2) - hc.y) <= CENTRE_TOLERANCE,
+      `off by ${((want.x + wantW / 2) - hc.x).toFixed(2)}, ${((want.y + wantH / 2) - hc.y).toFixed(2)}` +
+        ` — target ${JSON.stringify(target)} halo ${JSON.stringify(w.halo)} viewport ${vw.width}×${vw.height}`);
   } else {
     check(`[${label}] ${step.id}: an anchored step draws a halo`, false, "no halo");
   }
@@ -670,7 +716,18 @@ await b.evaluate(`document.documentElement.dataset.theme = "dark"; return true;`
         blocked: !!el?.closest('[data-testid="tour-overlay"]'),
       };
     `);
-    check("and the screen underneath is still touchable", !under.blocked,
+    /*
+      The panel is not the scrim.
+
+      This probed the vanished target's old centre and called any overlay
+      element blocking — including the dialogue panel, which is meant to be
+      interactive and has to sit somewhere. It passed for one reason: the panel
+      defaulted to the bottom whenever there was no target, and the probe point
+      happened to be higher up. The moment the panel kept the side it was
+      already on, a correct overlay started failing a check about a different
+      part of it.
+    */
+    check("and the screen underneath is still touchable", !under.blocked || under.top === "tour-panel-dock",
       `the top element is ${under.top}`);
   }
 }
