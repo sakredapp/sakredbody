@@ -24,3 +24,6 @@ script/.interaction-inventory.json
 .baseline-out/
 .baseline-src/
 .env.qa
+
+# Supabase CLI local link state
+supabase/.temp/
