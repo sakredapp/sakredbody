@@ -131,6 +131,15 @@ export type TourStep = {
   /** Named for the quest log, which lists phases rather than every step. */
   objective?: string;
   /**
+   * How much of the screen this lesson may take.
+   *
+   * Optional because it is derived from the step's own shape — see
+   * `lessonWeight`. Set it only where the structure cannot tell: a lesson that
+   * happens inside a sheet the member is actively working in looks, from here,
+   * exactly like any other anchored lesson.
+   */
+  weight?: import("./weight.js").LessonWeight;
+  /**
    * Where the rehearsal's write barrier opens and closes.
    *
    * Scoped to these two steps rather than to the whole walkthrough on purpose.

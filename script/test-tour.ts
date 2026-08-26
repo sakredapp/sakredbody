@@ -548,9 +548,58 @@ check(
   "an offscreen target is brought into view before it is pointed at",
   /scrollIntoView\(\{\s*block: "center"/.test(overlay),
 );
+/*
+  Placement is a fit test, not a fraction of the screen.
+
+  This used to assert `viewportH * 0.58` — the rule that asked where the target
+  was and never how tall the panel is. It has been replaced by a measurement:
+  does the panel fit above, does it fit below, and it is clamped by the
+  lesson's weight so a long line cannot grow into the product underneath.
+  Asserting the constant would now pin the exact heuristic that put the Restore
+  panel over the practices it was pointing at.
+*/
 check(
   "the panel moves out of the way when the target is low on the screen",
-  /panelAtTop/.test(overlay) && /viewportH \* 0\.58/.test(overlay),
+  /panelAtTop/.test(overlay) && /const below = viewportH - \(rect\.top \+ rect\.height\)/.test(overlay),
+);
+check(
+  "and decides by whether it fits, using its own measured height",
+  /below >= h \+ GAP/.test(overlay) && /above >= h \+ GAP/.test(overlay),
+);
+/*
+  The keyboard changes the usable height and never fires a resize on window.
+  Measuring against innerHeight is how a panel "below the target" ends up
+  behind the keyboard on the Add Movement lesson.
+*/
+check(
+  "the usable height comes from the visual viewport, not the window",
+  /visualViewport/.test(overlay) && /vv\.addEventListener\("resize"/.test(overlay),
+);
+/*
+  The four screenshots that made this pass necessary were all one defect: the
+  teaching panel taking more room than the lesson needed and covering what it
+  was teaching.
+*/
+check(
+  "a lesson's weight caps how much of the screen it may take",
+  /maxViewportShare/.test(overlay) || /maxPanelH/.test(overlay),
+);
+check(
+  "and the cap is enforced as a real height, not hoped for",
+  /style=\{\{ maxHeight: maxPanelH \}\}/.test(overlay),
+);
+/*
+  Edge nav targets. Home ran off the left of a real iPhone and More off the
+  right, because 8px of breathing room around a cell flush to the viewport is
+  drawn off screen.
+*/
+check(
+  "the halo is one clamped rectangle shared by the cutout and the ring",
+  /const halo = rect/.test(overlay) && /Math\.min\(viewportW/.test(overlay),
+);
+check(
+  "and nav targets are hugged rather than padded outward",
+  /padFor/.test(overlay) && /nav-\|role-/.test(overlay),
 );
 check(
   "and both positions clear the home indicator and the gesture area",

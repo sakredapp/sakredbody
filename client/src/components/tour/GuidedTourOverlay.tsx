@@ -47,6 +47,7 @@ import { AtmosphereChoice } from "@/components/tour/AtmosphereChoice";
 import { usePrefersReducedMotion } from "@/hooks/use-reduced-motion";
 import { cn } from "@/lib/utils";
 import { track } from "@/lib/track";
+import { lessonWeight, PANEL, veilFor } from "@/lib/tour/weight";
 
 type Rect = { top: number; left: number; width: number; height: number };
 
@@ -61,6 +62,31 @@ const SAME = (a: Rect | null, b: Rect | null) =>
 
 /** Breathing room around the cutout so the halo doesn't clip the control. */
 const PAD = 8;
+
+/**
+ * How much room a target of this kind wants around it.
+ *
+ * ── The screenshots this exists because of ────────────────────────────────
+ *
+ * On a real iPhone the Home halo ran off the left edge and the More halo ran
+ * off the right. Both are nav cells sitting flush against the viewport, and a
+ * uniform 8px of "breathing room" has nowhere to go: it is drawn outside the
+ * screen, so the rounded corner the design intends is simply missing, and the
+ * spotlight reads as approximate rather than deliberate.
+ *
+ * The nav row is also gapless — the cells abut — so any outward padding on one
+ * item overlaps its neighbours and the halo starts to look like it means two
+ * destinations at once.
+ *
+ * So a nav target is hugged exactly. The cell already carries its own generous
+ * padding around the icon and label; that *is* the breathing room, and the
+ * halo tracing its bounds is what makes it look chosen rather than
+ * approximated. Everything else keeps the 8px it was designed with.
+ */
+function padFor(anchor: string | undefined): number {
+  if (!anchor) return PAD;
+  return /^(nav-|role-)/.test(anchor) ? 0 : PAD;
+}
 
 /**
  * Below this, a press on a freshly-mounted tutorial control is the tail of the
@@ -310,7 +336,43 @@ export function GuidedTourOverlay({
    * knows. When neither side fits, the roomier one is the least bad answer and
    * the halo still says which control is meant.
    */
-  const viewportH = typeof window === "undefined" ? 0 : window.innerHeight;
+  /**
+   * The height the member can actually see, not the height of the window.
+   *
+   * `innerHeight` does not move when the keyboard comes up, so on the Add
+   * Movement lesson every placement decision was made against a viewport
+   * roughly twice the size of the one on screen — which is how a panel
+   * "below the target" ends up behind the keyboard. `visualViewport` is the
+   * only thing that knows, and it changes without a resize event, so it is
+   * subscribed to rather than read once.
+   */
+  const [viewportH, setViewportH] = useState(
+    typeof window === "undefined" ? 0 : (window.visualViewport?.height ?? window.innerHeight),
+  );
+  useEffect(() => {
+    const vv = typeof window === "undefined" ? null : window.visualViewport;
+    if (!vv) return;
+    const read = () => setViewportH(vv.height);
+    read();
+    vv.addEventListener("resize", read);
+    vv.addEventListener("scroll", read);
+    return () => {
+      vv.removeEventListener("resize", read);
+      vv.removeEventListener("scroll", read);
+    };
+  }, []);
+
+  /**
+   * How much of the screen this lesson may take, and how dark the rest goes.
+   *
+   * One decision, made once, applied to padding, to the checklist, to the
+   * height ceiling and to the veil — which is the point. Four screenshots
+   * showed four lessons covering the thing they were teaching, and patching
+   * them one at a time would have produced four different panels.
+   */
+  const weight = lessonWeight(step);
+  const metrics = PANEL[weight];
+  const veil = veilFor(weight);
   const [panelH, setPanelH] = useState(0);
   useLayoutEffect(() => {
     const el = panelRef.current;
@@ -323,15 +385,56 @@ export function GuidedTourOverlay({
   }, [step.id]);
 
   const GAP = 16;
+
+  /**
+   * The tallest this panel may be on this screen.
+   *
+   * Applied as a real max-height with the body scrolling inside it, rather
+   * than as a hope about how the copy wraps. A lesson that overruns simply
+   * scrolls; it never grows into the product it is explaining.
+   */
+  const maxPanelH = Math.round(viewportH * metrics.maxViewportShare);
+
   const panelAtTop = (() => {
     if (!rect) return false;
-    if (!panelH) return rect.top + rect.height > viewportH * 0.58;
+    /*
+      The effective height, not the measured one. Before the panel has been
+      measured the ceiling is the better guess, because it is the height the
+      panel is about to be clamped to anyway.
+    */
+    const h = Math.min(panelH || maxPanelH, maxPanelH);
     const below = viewportH - (rect.top + rect.height);
     const above = rect.top;
-    if (below >= panelH + GAP) return false;
-    if (above >= panelH + GAP) return true;
+    if (below >= h + GAP) return false;
+    if (above >= h + GAP) return true;
     return above > below;
   })();
+
+  /**
+   * The one rectangle the cutout and the halo both use.
+   *
+   * They were computed separately from `rect ± PAD`, which meant any clamping
+   * had to be applied identically in five places or the hole and the ring
+   * would disagree — and a ring that does not sit on its hole is the most
+   * obviously broken thing a spotlight can do.
+   *
+   * Clamped to the visible viewport, so an edge target's halo stays on screen
+   * instead of being drawn past it. The clamp moves the *drawing* only: the
+   * real control keeps its own bounds and its own tap target, which is the
+   * line this must not cross — a halo is a description of where to press, and
+   * shrinking the press area to flatter the description would be backwards.
+   */
+  const pad = padFor(step.anchor);
+  const viewportW = typeof window === "undefined" ? 0 : window.innerWidth;
+  const halo = rect
+    ? (() => {
+        const left = Math.max(0, rect.left - pad);
+        const top = Math.max(0, rect.top - pad);
+        const right = Math.min(viewportW || rect.left + rect.width + pad, rect.left + rect.width + pad);
+        const bottom = Math.min(viewportH || rect.top + rect.height + pad, rect.top + rect.height + pad);
+        return { top, left, width: Math.max(0, right - left), height: Math.max(0, bottom - top) };
+      })()
+    : null;
 
   const body = (
     <div
@@ -358,25 +461,17 @@ export function GuidedTourOverlay({
       data-tour-step={step.id}
     >
       {/* ── The scrim, in four pieces ────────────────────────────────────── */}
-      {rect ? (
+      {rect && halo ? (
         <>
-          <Scrim style={{ top: 0, left: 0, right: 0, height: Math.max(0, rect.top - PAD) }} />
-          <Scrim style={{ top: rect.top + rect.height + PAD, left: 0, right: 0, bottom: 0 }} />
+          <Scrim veil={veil} style={{ top: 0, left: 0, right: 0, height: halo.top }} />
+          <Scrim veil={veil} style={{ top: halo.top + halo.height, left: 0, right: 0, bottom: 0 }} />
           <Scrim
-            style={{
-              top: Math.max(0, rect.top - PAD),
-              left: 0,
-              width: Math.max(0, rect.left - PAD),
-              height: rect.height + PAD * 2,
-            }}
+            veil={veil}
+            style={{ top: halo.top, left: 0, width: halo.left, height: halo.height }}
           />
           <Scrim
-            style={{
-              top: Math.max(0, rect.top - PAD),
-              left: rect.left + rect.width + PAD,
-              right: 0,
-              height: rect.height + PAD * 2,
-            }}
+            veil={veil}
+            style={{ top: halo.top, left: halo.left + halo.width, right: 0, height: halo.height }}
           />
           {/* Decoration only. Never intercepts the tap it is drawing around. */}
           <div
@@ -391,10 +486,10 @@ export function GuidedTourOverlay({
               !reduced && "tour-pulse",
             )}
             style={{
-              top: rect.top - PAD,
-              left: rect.left - PAD,
-              width: rect.width + PAD * 2,
-              height: rect.height + PAD * 2,
+              top: halo.top,
+              left: halo.left,
+              width: halo.width,
+              height: halo.height,
             }}
           />
         </>
@@ -416,7 +511,7 @@ export function GuidedTourOverlay({
           tour sees the result, and the moment a rect is known the blocking
           rectangles come back.
         */
-        <Scrim style={{ inset: 0 }} blocking={false} />
+        <Scrim veil={veil} style={{ inset: 0 }} blocking={false} />
       )}
 
       {/* ── The dialogue panel ───────────────────────────────────────────── */}
@@ -434,8 +529,13 @@ export function GuidedTourOverlay({
             "mx-auto w-full max-w-md rounded-2xl border border-[hsl(var(--gold))]/25",
             "bg-[hsl(var(--tour-panel))] backdrop-blur-xl outline-none",
             "shadow-[0_18px_50px_-12px_hsl(var(--tour-shadow))]",
-            "px-5 py-4 space-y-3",
+            "overflow-y-auto overscroll-contain",
+            metrics.padding,
+            metrics.gap,
           )}
+          /* The ceiling, enforced rather than hoped for. See `maxPanelH`. */
+          style={{ maxHeight: maxPanelH }}
+          data-tour-weight={weight}
           data-testid="tour-panel"
         >
           <div className="flex items-baseline justify-between gap-3">
@@ -464,7 +564,7 @@ export function GuidedTourOverlay({
 
           {step.choice === "appearance" && !waiting && <AtmosphereChoice />}
 
-          <ObjectiveList objectives={objectives} />
+          <ObjectiveList objectives={objectives} expandable={metrics.expandableChecklist} />
 
           <div className="flex items-center justify-between gap-3 pt-1">
             <button
@@ -554,6 +654,15 @@ export function GuidedTourOverlay({
 function Scrim({
   style,
   /**
+   * How dark this piece goes, 0–1.
+   *
+   * A teaching veil and a modal scrim are not the same object. On a workspace
+   * lesson — the movement picker, the composer — the member is being asked to
+   * *use* the surface underneath, and the shipped build dimmed it to near
+   * black while doing so. See `veilFor`.
+   */
+  veil = 1,
+  /**
    * Whether this piece is one of the four that surround a located target.
    *
    * False only for the no-target fallback, which dims the screen without
@@ -565,6 +674,7 @@ function Scrim({
 }: {
   style: React.CSSProperties;
   blocking?: boolean;
+  veil?: number;
 }) {
   return (
     <div
@@ -573,7 +683,7 @@ function Scrim({
         "absolute bg-[hsl(var(--tour-scrim))] transition-opacity duration-200",
         blocking ? "pointer-events-auto" : "pointer-events-none",
       )}
-      style={style}
+      style={{ ...style, opacity: veil }}
       // Swallowed rather than ignored, so a stray tap does nothing at all
       // instead of reaching a control the state machine is not expecting.
       onPointerDown={blocking ? (e) => e.preventDefault() : undefined}
@@ -588,9 +698,33 @@ function Scrim({
  * and roughly when — the single most common reason people abandon a tutorial is
  * not knowing how much of it there is.
  */
-function ObjectiveList({ objectives }: { objectives: Objective[] }) {
+function ObjectiveList({
+  objectives,
+  /**
+   * Whether the seven items may be opened here.
+   *
+   * On the Body Map lesson the expanded checklist was the largest object on a
+   * screen whose entire subject is a map. The count is the orientation a
+   * member actually uses mid-lesson; the list is a thing to read afterwards.
+   */
+  expandable = true,
+}: {
+  objectives: Objective[];
+  expandable?: boolean;
+}) {
   if (objectives.length === 0) return null;
   const done = objectives.filter((o) => o.done).length;
+
+  if (!expandable) {
+    return (
+      <p
+        className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground/70"
+        data-testid="tour-objectives"
+      >
+        Learning Sakred · {done} / {objectives.length}
+      </p>
+    );
+  }
 
   return (
     <details className="group" data-testid="tour-objectives">

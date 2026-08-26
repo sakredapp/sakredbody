@@ -112,6 +112,7 @@ export const SAKRED_INTRO: GuidedTour = {
     },
     {
       id: "restore-practice",
+      weight: "workspace",
       objective: "Visit Restore",
       section: "restore",
       anchor: "restore-practice",
@@ -142,6 +143,7 @@ export const SAKRED_INTRO: GuidedTour = {
     },
     {
       id: "build-today",
+      weight: "workspace",
       objective: "Learn Build",
       section: "build",
       anchor: "build-today",
@@ -170,6 +172,7 @@ export const SAKRED_INTRO: GuidedTour = {
     // ── Inside the workout ───────────────────────────────────────────────
     {
       id: "add-exercise",
+      weight: "workspace",
       objective: "Learn Build",
       anchor: "workout-add-exercise",
       title: "Add what you're doing",
@@ -180,6 +183,7 @@ export const SAKRED_INTRO: GuidedTour = {
     },
     {
       id: "set-row",
+      weight: "workspace",
       objective: "Learn Build",
       anchor: "workout-set-row",
       title: "Weight and reps",
@@ -189,6 +193,7 @@ export const SAKRED_INTRO: GuidedTour = {
     },
     {
       id: "rpe",
+      weight: "workspace",
       objective: "Learn Build",
       anchor: "workout-rpe",
       title: "How hard it felt",
@@ -201,6 +206,7 @@ export const SAKRED_INTRO: GuidedTour = {
     },
     {
       id: "set-style",
+      weight: "workspace",
       objective: "Learn Build",
       anchor: "workout-set-style",
       optional: true,
@@ -212,6 +218,7 @@ export const SAKRED_INTRO: GuidedTour = {
     },
     {
       id: "last-time",
+      weight: "workspace",
       objective: "Learn Build",
       anchor: "workout-last-time",
       optional: true,
@@ -225,6 +232,7 @@ export const SAKRED_INTRO: GuidedTour = {
     },
     {
       id: "close-workout",
+      weight: "workspace",
       objective: "Learn Build",
       anchor: "workout-close",
       rehearsal: "end",
@@ -248,6 +256,7 @@ export const SAKRED_INTRO: GuidedTour = {
     },
     {
       id: "body-map",
+      weight: "workspace",
       objective: "Open the Body Map",
       section: "body",
       anchor: "body-map",
@@ -260,6 +269,7 @@ export const SAKRED_INTRO: GuidedTour = {
     },
     {
       id: "body-territory",
+      weight: "workspace",
       objective: "Open the Body Map",
       section: "body",
       anchor: "body-territory",
@@ -282,6 +292,7 @@ export const SAKRED_INTRO: GuidedTour = {
     },
     {
       id: "room-feed",
+      weight: "workspace",
       objective: "Find Room",
       section: "community",
       anchor: "room-feed",
