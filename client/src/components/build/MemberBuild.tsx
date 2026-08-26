@@ -295,7 +295,7 @@ export function MemberBuild({
 
       <ModalityPrompt />
 
-      <RecentSessions />
+      <RecentSessions preview={3} />
 
       {/*
         The week above is everything, unfiltered, and stays that way — it is
@@ -303,7 +303,7 @@ export function MemberBuild({
         specifically, which is the one a member goes looking for when they want
         to know whether the last month added up to anything.
       */}
-      <RecentSessions days={30} lens="build" title="Your Build history" />
+      <RecentSessions days={30} lens="build" title="Your Build history" preview={0} />
 
       {/*
         Under the history rather than beside it. A progress photograph is a

@@ -451,7 +451,7 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
         people, and a seven-day window shows an empty panel to somebody who has
         been perfectly consistent.
       */}
-      <RecentSessions days={30} lens="restore" title="Your Restore history" />
+      <RecentSessions days={30} lens="restore" title="Your Restore history" preview={0} />
 
       {/* ── Restoring is something you do, not only something you skip ── */}
       <Panel title="Movement that restores" data-testid="restore-movement">

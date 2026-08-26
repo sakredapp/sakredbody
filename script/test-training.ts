@@ -11,6 +11,12 @@
  */
 
 import {
+  WALL,
+  foldsAt,
+  summarise,
+  type SummarisableEntry,
+} from "../shared/models/history.js";
+import {
   estimateOneRepMax,
   totalLoadKg,
   volumeKg,
@@ -643,6 +649,64 @@ for (const field of ["durationSeconds", "distanceMeters", "activeCalories", "wor
   const parsed = workoutFeedbackSchema.safeParse({ response: "steady", [field]: 999 });
   check(`${field} is not writable through feedback`, parsed.success && !(field in parsed.data));
 }
+
+
+// ─── History, summarised rather than stacked ─────────────────────────────
+
+/*
+  Build shows this week unfiltered and then thirty days of training, so the
+  rows a member has just read reappear immediately underneath as the top of the
+  longer list. Neither panel is wrong — the week is everything, the history is
+  Build — but reading the same six activities twice on the way down one screen
+  is what it felt like, and it was thirty days of rows rendered because the API
+  had already returned them.
+*/
+const entry = (placement: SummarisableEntry["placement"], seconds: number | null): SummarisableEntry =>
+  ({ placement, seconds });
+
+check("a short list is shown, not folded behind a count", !foldsAt(3, 0));
+check("and so is one exactly at the floor", !foldsAt(WALL, 0));
+check("a wall of activity folds", foldsAt(WALL + 1, 0));
+check("a preview larger than the floor wins", !foldsAt(6, 8));
+check("a panel that asked for no folding never folds", !foldsAt(40, undefined));
+
+check(
+  "the summary counts what it is about to hide",
+  summarise([entry("build", 600), entry("build", 900)]).startsWith("2 sessions"),
+  summarise([entry("build", 600), entry("build", 900)]),
+);
+check("and says session, singular, when there is one", summarise([entry("build", 600)]).startsWith("1 session ") ||
+  summarise([entry("build", 600)]) === "1 session · 10m", summarise([entry("build", 600)]));
+check(
+  "a mixed window says how it was mixed",
+  summarise([entry("build", 600), entry("restore", 600)]).includes("1 Build · 1 Restore"),
+);
+/* `both` is genuinely both — a long walk is movement and it is restorative. */
+check(
+  "an activity that is both is counted on both sides",
+  summarise([entry("both", 600), entry("build", 600)]).includes("2 Build · 1 Restore"),
+);
+check(
+  "a window that is all one thing does not announce a split",
+  !summarise([entry("build", 600), entry("build", 600)]).includes("Build ·"),
+);
+
+/*
+  A Sakred session records no duration — nothing writes a start time — so a
+  window containing one cannot be totalled. Adding up the imported half and
+  presenting it as the week is the sort of number somebody plans around.
+*/
+check(
+  "time is reported when every entry can be counted",
+  summarise([entry("build", 1800), entry("build", 1800)]).includes("1h 0m"),
+  summarise([entry("build", 1800), entry("build", 1800)]),
+);
+check(
+  "and omitted entirely when one cannot",
+  summarise([entry("build", 1800), entry(null, null)]) === "2 sessions",
+  summarise([entry("build", 1800), entry(null, null)]),
+);
+check("under an hour reads in minutes", summarise([entry("build", 900)]).includes("15m"));
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

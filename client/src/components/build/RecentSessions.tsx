@@ -34,6 +34,7 @@
  * coach and a member reading the same session read the same sentence.
  */
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   isPracticeCategory,
@@ -49,6 +50,7 @@ import { useHealthSummary } from "@/hooks/use-health";
 import { Panel } from "@/components/portal/Panel";
 import { cn } from "@/lib/utils";
 import { formatLocalDateString, addDaysToString } from "@shared/utils/dates";
+import { foldsAt, summarise, type SummarisableEntry } from "@shared/models/history";
 
 type Session = {
   id: string;
@@ -60,7 +62,7 @@ type Session = {
 };
 
 /** One thing that happened, whoever recorded it. */
-type Entry = {
+type Entry = SummarisableEntry & {
   id: string;
   onDate: string;
   /** For ordering within a day. Sakred sessions have no start time; see below. */
@@ -68,7 +70,6 @@ type Entry = {
   title: string;
   lines: string[];
   source: string;
-  placement: WorkoutPlacement | null;
 };
 
 /** "Today", "Yesterday", then the weekday. Nobody needs a date for this week. */
@@ -142,11 +143,27 @@ export function RecentSessions({
   days = 7,
   lens = null,
   title,
+  preview,
 }: {
   days?: number;
   lens?: HistoryLens;
   /** Defaults to the honest description of the window being shown. */
   title?: string;
+  /**
+   * How many entries to show before the member asks for the rest.
+   *
+   * Build shows this week unfiltered and then thirty days of training, so the
+   * six rows a member has just read reappear immediately underneath as the top
+   * of the longer list. Neither panel is wrong — the week is everything, the
+   * history is Build — but reading the same six activities twice on the way
+   * down one screen is what it felt like, and it was thirty days of rows
+   * rendered because the API had already returned them.
+   *
+   * Summary first, then as much as was asked for. Undefined keeps the old
+   * behaviour of rendering everything, so a caller that wants a wall can still
+   * have one.
+   */
+  preview?: number;
 }) {
   const { data, isLoading } = useQuery<{ unit: WeightUnit; sessions: Session[] }>({
     queryKey: ["/api/training/sessions"],
@@ -191,6 +208,7 @@ export function RecentSessions({
       // several categories, and reducing it to one badge would be a claim the
       // data does not support.
       placement: null,
+      seconds: null,
     }));
 
   const imported: Entry[] = (health.data?.workouts ?? [])
@@ -206,6 +224,7 @@ export function RecentSessions({
         w.workoutType,
         (w.userOrientationOverride ?? null) as WorkoutPlacement | null,
       ),
+      seconds: w.durationSeconds ?? null,
     }));
 
   /*
@@ -226,9 +245,65 @@ export function RecentSessions({
   if (recent.length === 0) return null;
 
   return (
-    <Panel title={title ?? (days <= 7 ? "This week" : `The last ${days} days`)}>
+    <Sessions
+      title={title ?? (days <= 7 ? "This week" : `The last ${days} days`)}
+      entries={recent}
+      today={today}
+      preview={preview}
+    />
+  );
+}
+
+/**
+ * The rows, and what to say instead of all of them.
+ *
+ * Split out so the summary is derived from exactly the entries that would have
+ * been rendered — a count that disagrees with the list underneath it is worse
+ * than no count.
+ */
+function Sessions({
+  title,
+  entries,
+  today,
+  preview,
+}: {
+  title: string;
+  entries: Entry[];
+  today: string;
+  preview?: number;
+}) {
+  const [open, setOpen] = useState(false);
+  /*
+    A summary is worth reading in place of a wall, and silly in place of two
+    rows: "2 sessions — All 2" asks the member to press a button to see what
+    would have fit anyway. So collapsing has a floor as well as a preview.
+  */
+  const limited = foldsAt(entries.length, preview);
+  const shown = limited && !open ? entries.slice(0, preview) : entries;
+
+  return (
+    <Panel title={title}>
+      {limited && (
+        /*
+          What the window amounts to, before any of it. A member scanning down
+          Build wants "four sessions, mostly Build, about three hours" — the
+          rows are for when that raises a question.
+        */
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="mb-3 flex w-full items-center justify-between gap-3 text-left tap-clean"
+          data-testid={`sessions-summary-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`}
+        >
+          <span className="text-sm text-muted-foreground">{summarise(entries)}</span>
+          <span className="shrink-0 text-xs text-[hsl(var(--gold))]">
+            {open ? "Show less" : `All ${entries.length}`}
+          </span>
+        </button>
+      )}
       <div className="space-y-3">
-        {recent.map((e) => (
+        {shown.map((e) => (
           <div key={e.id} className="space-y-1" data-testid={`recent-session-${e.id}`}>
             <div className="flex items-baseline justify-between gap-2">
               <p className="text-sm truncate capitalize">{e.title}</p>
@@ -266,3 +341,5 @@ export function RecentSessions({
     </Panel>
   );
 }
+
+
