@@ -122,19 +122,54 @@ const look = async (): Promise<Look> => JSON.parse(await b.evaluate<string>(LOOK
 /* ── The flow ─────────────────────────────────────────────────────────── */
 
 await tap('[data-tour-id="nav-build"]');
-await b.waitFor(`document.documentElement.getAttribute("data-tour-section") === "build"`, "Build", 15_000);
+/*
+  Waited on Build's own content, not on the section attribute.
+
+  `AnimatePresence mode="wait"` does not mount the incoming section until the
+  outgoing one has finished leaving, so `data-tour-section` says "build" while
+  the screen is still Home — and this then looked for a start control among
+  Home's five pillars and reported that Build had none.
+*/
+await b.waitFor(
+  `!!document.querySelector('[data-tour-id="build-start-session"], [data-testid="button-start-session"]')`,
+  "Build's own content",
+  20_000,
+);
 
 /* An open session from an earlier run would start this mid-workout. */
-if (!(await tap('[data-testid="button-start-session"], [data-tour-id="build-start-session"]'))) {
-  check("a workout can be started", false, "no start control found");
+const started = await tap('[data-tour-id="build-start-session"], [data-testid="button-start-session"]');
+check("a workout can be started", started, "no reachable start control");
+if (!started) {
+  console.error("  what Build offered: " + (await b.evaluate<string>(`
+    return [...document.querySelectorAll("button")].slice(0, 24)
+      .map(e => (e.getAttribute("data-testid") || e.getAttribute("data-tour-id") || "-") + ":" + e.textContent.trim().slice(0, 24))
+      .join(" | ");`)));
 }
 await b.waitFor(`!!document.querySelector('[data-testid="workout-sheet"], [data-tour-id="workout-add-exercise"]')`, "the workout", 20_000);
 
 async function addMovement(which: number): Promise<boolean> {
   if (!(await tap('[data-tour-id="workout-add-exercise"], [data-testid="add-movement"]'))) return false;
-  await b.waitFor(`document.querySelectorAll('[data-testid^="pick-exercise-"]').length > 0`, "the picker", 15_000).catch(() => undefined);
+  /* The picker opens on groups; a movement is behind a group and a category. */
+  await b.waitFor(`!!document.querySelector('[data-testid="movement-search"]')`, "the picker", 15_000).catch(() => undefined);
+  await b.evaluate(`
+    const openFirst = (prefix) => {
+      const el = document.querySelector('[data-testid^="' + prefix + '"]');
+      if (el) { el.scrollIntoView({ block: "center" }); el.click(); return true; }
+      return false;
+    };
+    if (!document.querySelector('[data-testid^="movement-"][data-testid*="-"]')) return false;
+    openFirst("movement-group-");
+    return true;`);
+  await b.settle();
+  await b.evaluate(`
+    const c = document.querySelector('[data-testid^="movement-category-"]');
+    if (c) { c.scrollIntoView({ block: "center" }); c.click(); }
+    return true;`);
+  await b.settle();
+  await b.waitFor(`document.querySelectorAll('[data-testid^="movement-"]').length > 0`, "movements", 10_000).catch(() => undefined);
   return b.evaluate<boolean>(`
-    const all = [...document.querySelectorAll('[data-testid^="pick-exercise-"]')];
+    const all = [...document.querySelectorAll('[data-testid^="movement-"]')]
+      .filter(e => !/^movement-(search|group|category|show-all|create)/.test(e.getAttribute("data-testid")));
     const el = all[${which}];
     if (!el) return false;
     el.scrollIntoView({ block: "center" });
@@ -165,6 +200,12 @@ async function logSet(reps: number, weight: number): Promise<void> {
 
 const added = await addMovement(0);
 check("a movement can be added", added);
+if (!added) {
+  console.error("  the picker offered: " + (await b.evaluate<string>(`
+    return [...document.querySelectorAll("[data-testid]")]
+      .map(e => e.getAttribute("data-testid"))
+      .filter(t => /movement|exercise|picker/i.test(t)).slice(0, 30).join(" | ") || "(nothing)";`)));
+}
 if (added) {
   await b.waitFor(`document.querySelectorAll('[data-testid^="log-set-"]').length > 0`, "the entry row", 15_000).catch(() => undefined);
 
