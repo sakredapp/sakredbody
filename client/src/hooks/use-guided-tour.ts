@@ -281,7 +281,28 @@ export function useGuidedTour(
       section the app is already on is a no-op; reading a stale one is not.
     */
     const spec = restoreSpecFor(step);
-    requestStage({ section: spec.section, sheet: spec.sheet, workout: spec.workout });
+    const ask = () => requestStage({ section: spec.section, sheet: spec.sheet, workout: spec.workout });
+    ask();
+
+    /*
+      And once more if it did not take.
+
+      The first request is made the moment the lesson opens, which is a moment
+      the app may not be listening in: the dashboard subscribes after it
+      mounts, and a request made before that is held only briefly. One
+      unanswered request is why this still degraded on one viewport in three
+      after the staging was made unconditional.
+
+      Conditional on the section still being wrong, so it is a retry of
+      something that demonstrably failed rather than a second helping of
+      something that worked. Once, and then the lesson's own wait and degrade
+      behaviour takes over — a walkthrough that keeps hauling the screen back
+      is worse than one that admits it is lost.
+    */
+    const again = window.setTimeout(() => {
+      if (document.documentElement.getAttribute(TOUR_SECTION_ATTR) !== step.section) ask();
+    }, 1200);
+    return () => window.clearTimeout(again);
   }, [step?.id, step?.section]);
 
 
