@@ -63,7 +63,12 @@ import { WorkoutSheet, WorkoutSheetProvider } from "@/components/build/WorkoutSh
 import { RestoreTab } from "@/components/RestoreTab";
 import { SettingsTab } from "@/components/SettingsTab";
 import { useHealthAutoSync } from "@/hooks/use-health";
-import { publishTourSection } from "@/hooks/use-guided-tour";
+import {
+  publishSectionMounted,
+  publishSectionRequested,
+  publishSectionSettled,
+  unpublishSectionMounted,
+} from "@/hooks/use-guided-tour";
 import { HelpPortal } from "@/components/HelpPortal";
 import { onStageRequest } from "@/lib/tour/stage";
 import { TourHost } from "@/components/tour/TourHost";
@@ -76,7 +81,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, type ReactNode } from "react";
 import { useHasCoach } from "@/hooks/use-coaching";
 import { useUnreadCoachMessages } from "@/hooks/use-notifications";
 import { scheduleMorningNotice } from "@/lib/morningNotice";
@@ -172,6 +177,54 @@ function BookingRequestCard({ booking }: { booking: BookingRequest }) {
         <p className="text-xs text-muted-foreground">Requested {new Date(booking.createdAt!).toLocaleDateString()}</p>
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * One section of the portal, and the only thing that says which one is up.
+ *
+ * ── Why the parent cannot answer this ─────────────────────────────────────
+ *
+ * It used to. `publishTourSection(section)` ran off the dashboard's state, so
+ * the document announced a section at the moment it was *asked for*. But
+ * `AnimatePresence mode="wait"` deliberately does not mount the arriving
+ * screen until the leaving one has finished its exit — that pause is the
+ * whole point of the mode, it is what stops two screens overlapping — so for
+ * a fifth of a second the attribute named a screen that did not exist yet.
+ *
+ * A component can only be honest about itself. This one publishes on mount,
+ * withdraws on unmount, and marks the section settled when its entrance
+ * animation ends. Mid-transition the document says nothing, which is true.
+ *
+ * The thirteen call sites also stop repeating the same five animation props,
+ * which is how they stayed identical; the two that differ, differ in padding
+ * and say so.
+ */
+function Surface({
+  id,
+  pad = "py-6",
+  children,
+}: {
+  id: MemberSection;
+  pad?: string;
+  children: ReactNode;
+}) {
+  useLayoutEffect(() => {
+    publishSectionMounted(id);
+    return () => unpublishSectionMounted(id);
+  }, [id]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.2 }}
+      className={`${PORTAL_COLUMN} ${pad}`}
+      onAnimationComplete={() => publishSectionSettled(id)}
+    >
+      {children}
+    </motion.div>
   );
 }
 
@@ -280,8 +333,8 @@ export default function MemberDashboard() {
    * left running cannot be told the app is still on a section it has left.
    */
   useEffect(() => {
-    publishTourSection(section);
-    return () => publishTourSection(null);
+    publishSectionRequested(section);
+    return () => publishSectionRequested(null);
   }, [section]);
 
   /*
@@ -633,85 +686,43 @@ export default function MemberDashboard() {
       {/* ─── Content Area ─── */}
       <AnimatePresence mode="wait">
         {section === "home" && (
-          <motion.div
-            key="home"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className={`${PORTAL_COLUMN} py-6`}
-          >
+          <Surface key="home" id="home">
             <PillarHome firstName={user?.firstName} onOpen={openSection} />
-          </motion.div>
+          </Surface>
         )}
 
         {section === "help" && (
-          <motion.div
-            key="help"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className={`${PORTAL_COLUMN} py-6`}
-          >
+          <Surface key="help" id="help">
             <HelpPortal isCoach={user?.role === "coach" || user?.isAdmin === "true"} />
-          </motion.div>
+          </Surface>
         )}
 
         {section === "settings" && (
-          <motion.div
-            key="settings"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className={`${PORTAL_COLUMN} py-6`}
-          >
+          <Surface key="settings" id="settings">
             <SettingsTab
               weightUnit={user?.weightUnit}
               onLogout={() => logout()}
               onOpenHelp={() => setSection("help")}
             />
-          </motion.div>
+          </Surface>
         )}
 
         {/* Restore before Build, here as everywhere: you cannot load a terrain
             that cannot yet drain. */}
         {section === "restore" && (
-          <motion.div
-            key="restore"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className={`${PORTAL_COLUMN} py-6`}
-          >
+          <Surface key="restore" id="restore">
             <RestoreTab onOpen={setSection} />
-          </motion.div>
+          </Surface>
         )}
 
         {section === "build" && (
-          <motion.div
-            key="build"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className={`${PORTAL_COLUMN} py-6`}
-          >
+          <Surface key="build" id="build">
             <BuildTab onOpen={setSection} />
-          </motion.div>
+          </Surface>
         )}
 
         {section === "coaching" && (
-          <motion.div
-            key="coaching"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className={`${PORTAL_COLUMN} py-6`}
-          >
+          <Surface key="coaching" id="coaching">
             {coachingTab === "today" && (
               <TodayTab onOpenTrends={() => setCoachingTab("analytics")} />
             )}
@@ -725,96 +736,47 @@ export default function MemberDashboard() {
             {coachingTab === "catalog" && <CatalogSection />}
             {coachingTab === "analytics" && <AnalyticsTab />}
             {coachingTab === "coach" && <CoachChat />}
-          </motion.div>
+          </Surface>
         )}
 
         {section === "community" && (
-          <motion.div
-            key="community"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className={`${PORTAL_COLUMN} py-8`}
-          >
+          <Surface key="community" id="community" pad="py-8">
             <CommunityTab />
-          </motion.div>
+          </Surface>
         )}
 
         {section === "wins" && (
-          <motion.div
-            key="wins"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className={`${PORTAL_COLUMN} py-8`}
-          >
+          <Surface key="wins" id="wins" pad="py-8">
             <WinsTab />
-          </motion.div>
+          </Surface>
         )}
 
         {section === "apothecary" && (
-          <motion.div
-            key="apothecary"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className={`${PORTAL_COLUMN} py-8`}
-          >
+          <Surface key="apothecary" id="apothecary" pad="py-8">
             <ApothecaryTab />
-          </motion.div>
+          </Surface>
         )}
 
         {section === "body" && (
-          <motion.div
-            key="body"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className={`${PORTAL_COLUMN} py-8`}
-          >
+          <Surface key="body" id="body" pad="py-8">
             <BodyMap />
-          </motion.div>
+          </Surface>
         )}
 
         {section === "library" && (
-          <motion.div
-            key="library"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className={`${PORTAL_COLUMN} py-8`}
-          >
+          <Surface key="library" id="library" pad="py-8">
             <LibraryTab onOpenHelp={() => setSection("help")} />
-          </motion.div>
+          </Surface>
         )}
 
         {section === "masterclass" && (
-          <motion.div
-            key="masterclass"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className={`${PORTAL_COLUMN} py-6`}
-          >
+          <Surface key="masterclass" id="masterclass">
             <MasterclassTab />
-          </motion.div>
+          </Surface>
         )}
 
         {section === "retreat" && (
-          <motion.div
-            key="retreat"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className={`${PORTAL_COLUMN} py-8`}
-          >
+          <Surface key="retreat" id="retreat" pad="py-8">
 
         {retreatView === "masterminds" && <OfferingsTab />}
 
@@ -1158,7 +1120,7 @@ export default function MemberDashboard() {
           </div>
         )}
 
-          </motion.div>
+          </Surface>
         )}
       </AnimatePresence>
 

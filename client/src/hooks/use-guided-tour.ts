@@ -48,17 +48,91 @@ import { clearStage, requestStage } from "@/lib/tour/stage";
 import { queryClient } from "@/lib/queryClient";
 import type { GuidedTour, TourAnchor, TourProgress, TourWorld } from "@/lib/tour/types";
 
+/**
+ * ── Three things "which section are we on" can mean ───────────────────────
+ *
+ * They were one thing, and it was the wrong one. `data-tour-section` was
+ * written from the dashboard's `section` state — what the member *asked for*
+ * — while `AnimatePresence mode="wait"` holds the outgoing screen on stage
+ * until its exit animation finishes and only then mounts the incoming one.
+ * For those two hundred milliseconds the document said `build` and showed
+ * Home.
+ *
+ * Nothing user-facing broke. Three separate harnesses did: the presentation
+ * crawl fingerprinted eight surfaces as identical because it photographed the
+ * previous screen under the next screen's name; the empty-draft test looked
+ * for Build's start control among Home's pillars and reported Build had none;
+ * the screenshot pass caught the same lag a third time. Each was fixed
+ * locally, by teaching one more caller to wait for something else. That is
+ * the smell — the attribute was answering a question nobody was asking.
+ *
+ * So the vocabulary is now explicit, and the ambiguous name keeps the meaning
+ * every reader already assumed it had:
+ *
+ *   data-tour-section          what is MOUNTED — absent mid-transition,
+ *                              because mid-transition the honest answer is
+ *                              "nothing yet"
+ *   data-tour-section-wanted   what was REQUESTED, set the instant the member
+ *                              taps. The staging retry needs this: it has to
+ *                              know a section was asked for and hasn't
+ *                              arrived
+ *   data-tour-settled          the mounted section has finished animating in
+ *
+ * A harness that wants "the screen I can look at" waits on the first. One
+ * that wants "and it has stopped moving" adds the third. Neither has to know
+ * what a transition is, and no future caller has to rediscover this.
+ */
 export const TOUR_SECTION_ATTR = "data-tour-section";
+export const TOUR_WANTED_ATTR = "data-tour-section-wanted";
+export const TOUR_SETTLED_ATTR = "data-tour-settled";
 
 /** What a step that has not been measured yet has seen. */
 const EMPTY: ReadonlySet<TourAnchor> = new Set();
 
-/** Called by the dashboard when its section changes. One line, no props. */
-export function publishTourSection(section: string | null): void {
+function put(attr: string, value: string | null): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  if (section) root.setAttribute(TOUR_SECTION_ATTR, section);
-  else root.removeAttribute(TOUR_SECTION_ATTR);
+  if (value) root.setAttribute(attr, value);
+  else root.removeAttribute(attr);
+}
+
+/** What the member asked for, the instant they asked. */
+export function publishSectionRequested(section: string | null): void {
+  put(TOUR_WANTED_ATTR, section);
+  if (!section) {
+    put(TOUR_SECTION_ATTR, null);
+    put(TOUR_SETTLED_ATTR, null);
+  }
+}
+
+/**
+ * What is actually on screen. Called by the section itself, on mount.
+ *
+ * The clear-on-unmount is guarded: with `mode="wait"` the outgoing section
+ * unmounts before the incoming one mounts, so an unguarded cleanup is
+ * harmless — but the mode is a prop somebody can change, and under the other
+ * one the orders overlap and the leaving screen would erase the arriving
+ * screen's name on its way out. Only clear what is still yours.
+ */
+export function publishSectionMounted(section: string | null): void {
+  if (typeof document === "undefined") return;
+  if (section === null) return;
+  put(TOUR_SECTION_ATTR, section);
+  put(TOUR_SETTLED_ATTR, null);
+}
+
+export function unpublishSectionMounted(section: string): void {
+  if (typeof document === "undefined") return;
+  if (document.documentElement.getAttribute(TOUR_SECTION_ATTR) !== section) return;
+  put(TOUR_SECTION_ATTR, null);
+  put(TOUR_SETTLED_ATTR, null);
+}
+
+/** …and has stopped moving. */
+export function publishSectionSettled(section: string): void {
+  if (typeof document === "undefined") return;
+  if (document.documentElement.getAttribute(TOUR_SECTION_ATTR) !== section) return;
+  put(TOUR_SETTLED_ATTR, section);
 }
 
 /**

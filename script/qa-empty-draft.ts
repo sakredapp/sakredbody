@@ -158,10 +158,10 @@ await tap('[data-tour-id="nav-build"]');
 /*
   Waited on Build's own content, not on the section attribute.
 
-  `AnimatePresence mode="wait"` does not mount the incoming section until the
-  outgoing one has finished leaving, so `data-tour-section` says "build" while
-  the screen is still Home — and this then looked for a start control among
-  Home's five pillars and reported that Build had none.
+  The attribute is now trustworthy — it names what is mounted, not what was
+  requested — but "Build is on screen" and "Build has something to start" are
+  still two different facts, and this needs the second. The session query has
+  to answer before there is a control to tap.
 */
 await b.waitFor(
   `!!document.querySelector('[data-tour-id="build-start-session"], [data-testid="button-start-session"]')`,

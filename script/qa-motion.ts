@@ -179,7 +179,29 @@ for (const lesson of LESSONS) {
 
   if (held !== -1) {
     const tops = after.map((s) => s.targetTop).filter((t): t is number => t !== null);
-    const rest = tops[0];
+    /*
+      ── Where the mark is, and why it is not the first sample ──
+
+      This read `tops[0]`, and about one run in three it read a stale one: the
+      machine publishes `holding` from its animation-frame loop, but the hold
+      that corrects the last 48px of drift lands a frame or two later, and
+      SETTLE_GRACE_MS is 25ms — under a frame at 60Hz. So the mark was
+      sometimes taken at the position the target was still leaving, and the
+      four-and-a-half seconds it then spent perfectly still at its real
+      position were reported as "off its mark for 4835ms, by up to 48px".
+
+      A stationary target failing a stationary-target test is worse than no
+      test: it teaches you to re-run until green, which is exactly how a real
+      drift would get waved through. The instrumentation is what settled it —
+      phase=holding, scroll unchanged, top=462 at every one of those samples.
+
+      So the mark is where the target actually spent the window. A genuine
+      drift still fails: settling at A and moving permanently to B splits the
+      samples, and whichever stretch is shorter is time spent off the mark.
+    */
+    const residency = new Map<number, number>();
+    for (const t of tops) residency.set(t, (residency.get(t) ?? 0) + 1);
+    const rest = [...residency.entries()].sort((a, c) => c[1] - a[1])[0]?.[0] ?? tops[0];
     /*
       Measured as *how long* it is off, not merely whether it ever was.
 
@@ -192,18 +214,32 @@ for (const lesson of LESSONS) {
     let worst = 0;
     let since: number | null = null;
     let peak = 0;
+    /*
+      What the machine was doing at the worst moment, not only that it was bad.
+
+      This drifts about one run in three, always by 48px, and always on
+      restore-practice — content above the anchor whose height depends on data
+      that may or may not have arrived. "Off its mark by 48px" does not say
+      whether the hold fired and was refused, or never fired, or the machine
+      had already released; those are three different bugs and the difference
+      is one attribute the page is already publishing.
+    */
+    let atWorst = "";
     for (const s of after) {
       if (s.targetTop === null) continue;
       if (Math.abs(s.targetTop - rest) > DRIFT_ALLOWED) {
         since ??= s.t;
-        peak = Math.max(peak, Math.abs(s.targetTop - rest));
+        if (Math.abs(s.targetTop - rest) >= peak) {
+          peak = Math.abs(s.targetTop - rest);
+          atWorst = `phase=${s.phase ?? "-"} scroll=${s.scroll} scrolls=${s.scrolls} top=${s.targetTop}`;
+        }
         worst = Math.max(worst, s.t - since);
       } else since = null;
     }
     check(
       `${lesson.step}: the spotlighted control does not move after the lesson settles`,
       worst <= SETTLE_GRACE_MS,
-      `off its mark for ${worst}ms, by up to ${peak}px, over ${after[after.length - 1].t - after[0].t}ms`,
+      `off its mark for ${worst}ms, by up to ${peak}px, over ${after[after.length - 1].t - after[0].t}ms — at its worst ${atWorst}`,
     );
     check(
       `${lesson.step}: and comes to rest where it settled`,

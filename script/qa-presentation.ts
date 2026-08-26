@@ -337,7 +337,7 @@ async function openSection(id: string): Promise<boolean> {
     whole gesture is honest about that; waiting longer inside it was not,
     because the row genuinely was not there.
   */
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     if (attempt > 0) await closeSheets();
     if (!(await tap("nav-more"))) { lastTapFailure = `nav-more: ${lastTapFailure}`; continue; }
     if (process.env.SAKRED_CRAWL_DEBUG) {
@@ -403,7 +403,33 @@ async function openSection(id: string): Promise<boolean> {
       .catch(() => false);
     if (!reachable) { lastTapFailure = `the ${id} row never became reachable in the open sheet`; continue; }
 
-    if (await tap(`nav-more-${id}`)) return true;
+    if (!(await tap(`nav-more-${id}`))) { lastTapFailure = `nav-more-${id}: ${lastTapFailure}`; continue; }
+
+    /*
+      Tapped is not arrived.
+
+      This used to return true on a successful click and leave the settle loop
+      to discover, twenty-five seconds later, that the screen was still Home —
+      reported as "masterclass never settled", which points at the wrong
+      thing entirely. The row hit-tests to itself and the click lands; what
+      occasionally does not happen is the navigation, and a click swallowed by
+      a sheet still animating is indistinguishable from a click that worked
+      until you ask whether anything changed.
+
+      `data-tour-section-wanted` answers that immediately — it is set the
+      instant the member's tap reaches state, before any animation — so a
+      swallowed tap costs one more attempt instead of a section.
+    */
+    const took = await b
+      .waitFor(
+        `document.documentElement.getAttribute("data-tour-section-wanted") === ${JSON.stringify(id)}`,
+        `the tap on ${id} to register`,
+        3_000,
+      )
+      .then(() => true)
+      .catch(() => false);
+    if (took) return true;
+    lastTapFailure = `the ${id} row was tapped but the app never asked for it`;
   }
   return false;
 }
@@ -436,6 +462,16 @@ async function dismissTour(): Promise<void> {
  * samples a half-rendered screen finds nothing and reports it clean, which is
  * the failure mode this whole file is built to avoid.
  */
+/**
+ * What the last poll saw, so a timeout can say why rather than only that.
+ *
+ * A settle that gives up after twenty-five seconds and reports the section
+ * name is a check that has noticed something and declined to say what. This
+ * is the whole content of the fix it would otherwise take an afternoon to
+ * find.
+ */
+let lastSeen = "";
+
 async function settled(expect?: string, wasShowing?: string): Promise<boolean> {
   const deadline = Date.now() + 25_000;
   let last = "";
@@ -452,21 +488,25 @@ async function settled(expect?: string, wasShowing?: string): Promise<boolean> {
       `return (document.documentElement.getAttribute("data-tour-section") || "?") + "|" + document.body.innerText.trim().length;`,
     );
     /*
-      The section state changes before the content does.
+      `data-tour-section` now names the section that is MOUNTED, and is absent
+      while one is leaving — see the vocabulary note in use-guided-tour.ts. It
+      used to name the section that had been *requested*, which is why six
+      secondary sections and two primaries once fingerprinted identically:
+      this loop watched the attribute and the text length, both of which are
+      perfectly stable on the screen we were trying to leave.
 
-      `AnimatePresence mode="wait"` will not mount the incoming section until
-      the outgoing one has finished leaving, so `data-tour-section` says
-      "apothecary" while the screen is still Home — and a settle that watches
-      only the attribute and the text *length* is perfectly stable on the old
-      screen. Six secondary sections and two primaries fingerprinted
-      identically because of it, which is the same false-clean this file
-      exists to prevent, one level up again.
-
-      So the condition includes having stopped showing what we were showing.
+      `data-tour-settled` says the entrance animation has finished too. The
+      old defence — "and the body text is no longer what it was" — stays as a
+      second opinion, because a section that renders the same words as the one
+      before it is exactly the case a single signal would miss.
     */
+    const settled = await b.evaluate<string | null>(
+      `return document.documentElement.getAttribute("data-tour-settled");`,
+    );
     const body = await b.evaluate<string>(`return document.body.innerText.trim();`);
     const changed = wasShowing === undefined || fingerprint(body) !== wasShowing;
-    const onTarget = (!expect || now.startsWith(`${expect}|`)) && changed;
+    const onTarget = (!expect || (now.startsWith(`${expect}|`) && settled === expect)) && changed;
+    lastSeen = `mounted=${now.split("|")[0]} settled=${settled ?? "-"} text=${now.split("|")[1]} changed=${changed}`;
     if (onTarget && now === last && Number(now.split("|")[1]) > 0) {
       if (++repeats >= 2) return true;
     } else {
@@ -541,7 +581,7 @@ for (const theme of ["dark", "light"] as const) {
       counting it as clean is the lie the whole file exists to prevent.
     */
     if (!(await settled(id, before))) {
-      unsettled.push(surface);
+      unsettled.push(`${surface} [${lastSeen}]`);
       continue;
     }
     /*
