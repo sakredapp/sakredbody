@@ -42,6 +42,7 @@ import { useModalities } from "./Modalities";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { isTourActive } from "@/lib/tour/active";
 
 export type Movement = {
   id: string;
@@ -198,7 +199,19 @@ export function MovementPicker({
       <div className="relative shrink-0">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          autoFocus
+          /*
+            Not while a lesson is on screen.
+
+            Autofocus is right when a member opens this to find a movement —
+            they came here to type. It is wrong when the walkthrough opens it
+            to teach the picker: the keyboard takes half the phone, the
+            categories and the movement list go behind it, and the lesson asks
+            somebody to choose from a list they cannot see.
+
+            Tapping Search still opens the keyboard normally. The tour is
+            declining to summon it, not disabling it.
+          */
+          autoFocus={!isTourActive()}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={placeholder ?? "Search movements…"}

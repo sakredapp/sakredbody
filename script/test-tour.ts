@@ -601,6 +601,28 @@ check(
   "and nav targets are hugged rather than padded outward",
   /padFor/.test(overlay) && /nav-\|role-/.test(overlay),
 );
+/*
+  The keyboard. On the Add Movement lesson the picker autofocused its search
+  box, so the keyboard took half the phone and the movement list the lesson was
+  pointing at went behind it.
+*/
+{
+  const picker = readFileSync("client/src/components/build/MovementPicker.tsx", "utf8");
+  check(
+    "the picker does not summon the keyboard during a lesson",
+    /autoFocus=\{!isTourActive\(\)\}/.test(picker),
+  );
+  check(
+    "…and still does when a member opens it themselves",
+    !/autoFocus=\{false\}/.test(picker) && /isTourActive/.test(picker),
+  );
+  check(
+    "the overlay publishes that a lesson is on screen",
+    /setAttribute\("data-tour-active", "true"\)/.test(overlay) &&
+      /removeAttribute\("data-tour-active"\)/.test(overlay),
+  );
+}
+
 check(
   "and both positions clear the home indicator and the gesture area",
   /safe-area-inset-bottom/.test(overlay) && /safe-area-inset-top/.test(overlay),

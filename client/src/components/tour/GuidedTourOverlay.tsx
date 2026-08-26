@@ -313,6 +313,25 @@ export function GuidedTourOverlay({
     gets what they asked for immediately, because by then the control is older
     than the window.
   */
+  /**
+   * That a lesson is on screen, published where anything can read it.
+   *
+   * The movement picker autofocuses its search box, which is right when a
+   * member opens it to find a movement and wrong when the walkthrough opens it
+   * to teach one: the keyboard takes half the phone, the categories and the
+   * list go under it, and the lesson asks the member to choose from a list
+   * they cannot see.
+   *
+   * An attribute rather than a context because the picker is several trees
+   * away and inside a portal, and because the walkthrough must remain a thing
+   * the product does not have to know about in order to work.
+   */
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute("data-tour-active", "true");
+    return () => root.removeAttribute("data-tour-active");
+  }, []);
+
   const shownAt = useRef(performance.now());
   useEffect(() => {
     shownAt.current = performance.now();
