@@ -66,7 +66,14 @@ export function AtmosphereChoice() {
             aria-checked={selected}
             onClick={() => choose(value)}
             className={cn(
-              "rounded-xl border overflow-hidden text-left tap-clean transition-colors",
+              /*
+                A column, because a button centres its content by default and
+                these two do not have the same amount of it: at 430px "Night ·
+                Ink · Constellation" wraps and "Day · Oak · Celestial" does
+                not, so the shorter card's artwork was pushed 7.5px down the
+                frame and the two skies no longer lined up.
+              */
+              "flex flex-col rounded-xl border overflow-hidden text-left tap-clean transition-colors",
               selected
                 ? "border-[hsl(var(--gold))]/70"
                 : "border-border/50 hover:border-[hsl(var(--gold))]/40",
@@ -79,9 +86,22 @@ export function AtmosphereChoice() {
             <div className="px-3 py-2.5">
               <div className="flex items-center gap-1.5">
                 <Icon className="h-3.5 w-3.5 text-[hsl(var(--gold-text))]" aria-hidden="true" />
-                <span className="text-sm">{name}</span>
+                <span className="text-sm" data-testid={`atmosphere-${value}-name`}>
+                  {name}
+                </span>
               </div>
-              <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mt-0.5">
+              {/*
+                Two lines of room, kept whether or not this descriptor needs
+                them. Expressed in the descriptor's own type rather than in
+                pixels, so it stays two lines if the size ever changes.
+              */}
+              <div
+                className={cn(
+                  "text-[10px] uppercase tracking-[0.12em] text-muted-foreground mt-0.5",
+                  "leading-[1.5] min-h-[3em]",
+                )}
+                data-testid={`atmosphere-${value}-line`}
+              >
                 {line}
               </div>
             </div>
@@ -125,9 +145,16 @@ function Preview({ value }: { value: "dark" | "light" }) {
       {dark ? (
         <circle cx="78" cy="18" r="7" fill={halo} opacity="0.22" />
       ) : (
-        // Daylight gets a restrained solar arc rather than a disc — the same
-        // register as the etched linework, not a weather icon.
-        <path d="M64 20 A16 16 0 0 1 90 20" fill="none" stroke={halo} strokeWidth="1" opacity="0.5" />
+        /*
+          Daylight gets a restrained solar arc rather than a disc — the same
+          register as the etched linework, not a weather icon.
+
+          Struck across the same span the moon occupies (71 to 85, centred on
+          78), so the two marks sit in the same place in their skies. It used
+          to run to x=90 and read as drifting toward the corner next to a moon
+          that was comfortably inset.
+        */
+        <path d="M71 21 A11 11 0 0 1 85 21" fill="none" stroke={halo} strokeWidth="1" opacity="0.5" />
       )}
       {lines.map(([a, b], i) => (
         <line
