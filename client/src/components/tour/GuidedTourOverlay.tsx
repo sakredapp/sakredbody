@@ -448,6 +448,24 @@ export function GuidedTourOverlay({
   const metrics = PANEL[weight];
   const veil = veilFor(weight);
   const [panelH, setPanelH] = useState(0);
+  /**
+   * Whether the lesson has more text below the fold.
+   *
+   * A workspace lesson gets a quarter of the screen so it cannot cover the
+   * thing it explains, and the RPE lesson's copy does not fit in it — the
+   * member was shown a sentence that stopped mid-clause with nothing to
+   * suggest there was more. The panel had been silently scrollable since the
+   * ceiling landed; this is the part that says so.
+   */
+  const readingRef = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState(false);
+  useLayoutEffect(() => {
+    const reading = readingRef.current;
+    if (reading) {
+      setMore(reading.scrollHeight - reading.scrollTop - reading.clientHeight > 4);
+    }
+  }, [step.id, viewportH, waiting]);
+
   useLayoutEffect(() => {
     const el = panelRef.current;
     if (!el) return;
@@ -675,7 +693,14 @@ export function GuidedTourOverlay({
             So the title and the actions are pinned and the body is what gives.
             A lesson may run long; the way forward is never below a fold.
           */}
-          <div className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", metrics.gap)}>
+          <div
+            ref={readingRef}
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              setMore(el.scrollHeight - el.scrollTop - el.clientHeight > 4);
+            }}
+            className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", metrics.gap)}
+          >
           {/* Announced rather than merely rendered: the instruction is the
               content of this screen, and a member using VoiceOver gets the new
               step read to them the way a sighted member gets it swapped in. */}
@@ -691,6 +716,16 @@ export function GuidedTourOverlay({
 
           <ObjectiveList objectives={objectives} expandable={metrics.expandableChecklist} />
           </div>
+
+          {/* A hairline of the panel's own ground over the last line, so the
+              text fades rather than being guillotined by the action row. */}
+          {more && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none -mt-5 h-5 bg-gradient-to-t from-[hsl(var(--tour-panel))] to-transparent"
+              data-testid="tour-more-to-read"
+            />
+          )}
 
           <div className="flex items-center justify-between gap-3 pt-1">
             <button

@@ -521,9 +521,15 @@ check(
     "measurements record which step they describe",
     /stepId: step\.id/.test(hook) && /world\.stepId === step\.id/.test(hook),
   );
+  /*
+    Matched on the fields that carry the meaning — no anchors, no time waited —
+    rather than on the whole literal. The literal spelling broke when `loading`
+    was added to the world, on a change that did not touch this behaviour at
+    all, which is how a test ends up relaxed by whoever is in a hurry.
+  */
   check(
     "and a step is never resolved against another step's readings",
-    /measured \? world : \{ section: world\.section, present: EMPTY, seen: EMPTY, waitedMs: 0 \}/.test(hook),
+    /measured \? world : \{[^}]*present: EMPTY[^}]*seen: EMPTY[^}]*waitedMs: 0/.test(hook),
   );
   check(
     "nor completed from them",

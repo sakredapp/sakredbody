@@ -201,6 +201,21 @@ export type TourWorld = {
   seen: ReadonlySet<TourAnchor>;
   /** How long the current step has been waiting for its anchor, in ms. */
   waitedMs: number;
+  /**
+   * The application is still fetching something.
+   *
+   * A lesson gives up after nine seconds, which is the right bound for a
+   * target that is never coming and the wrong one for a screen that has not
+   * arrived yet. The terrain card renders nothing at all while its read is in
+   * flight — deliberately, because a grey block that becomes a sentence is
+   * worse than a sentence that arrives — so on a cold start against a slow
+   * connection the third lesson of the walkthrough degraded on a card that
+   * was about to appear.
+   *
+   * Distinguishing the two is not a matter of waiting longer. It is a matter
+   * of knowing whether anything is still coming, which the app already knows.
+   */
+  loading: boolean;
 };
 
 export type TourStatus = "idle" | "running" | "paused" | "complete";

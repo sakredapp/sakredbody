@@ -46,6 +46,30 @@ import { AUTO_START_ENABLED, REQUIRED_TOUR_VERSION } from "./rollout";
  */
 export const ANCHOR_TIMEOUT_MS = 9000;
 
+/**
+ * The outer bound, for an application that never stops fetching.
+ *
+ * `loading` extends a lesson's patience past `ANCHOR_TIMEOUT_MS` — waiting is
+ * right while the screen is still arriving — but an app stuck in a retry loop
+ * would extend it forever, and a member staring at a dimmed screen with no way
+ * on is the failure the timeout exists to prevent. So patience has an end even
+ * when the answer is "still loading".
+ */
+export const ANCHOR_PATIENCE_MS = 30_000;
+
+/**
+ * Whether a lesson is still entitled to wait.
+ *
+ * Two bounds rather than one raised number: nine seconds for an app that has
+ * finished and simply does not have this control, thirty for one that is
+ * demonstrably still fetching. Raising the single bound to thirty would make
+ * every genuine dead end thirty seconds long.
+ */
+function stillWaiting(world: TourWorld): boolean {
+  if (world.waitedMs < ANCHOR_TIMEOUT_MS) return true;
+  return world.loading && world.waitedMs < ANCHOR_PATIENCE_MS;
+}
+
 /** What the overlay should do about the current step, right now. */
 export type Resolution =
   /** The anchor is mounted. Spotlight it. */
@@ -65,14 +89,14 @@ export function resolve(step: TourStep, world: TourWorld): Resolution {
   // Wrong screen. Not a failure — a member can wander mid-step — so this waits
   // rather than degrading, and the panel tells them where to go back to.
   if (step.section && world.section !== null && world.section !== step.section) {
-    return world.waitedMs >= ANCHOR_TIMEOUT_MS
-      ? { kind: "degraded", step }
-      : { kind: "waiting", step, reason: "section" };
+    return stillWaiting(world)
+      ? { kind: "waiting", step, reason: "section" }
+      : { kind: "degraded", step };
   }
 
   if (!step.anchor) return { kind: "ready", step, anchor: null };
   if (world.present.has(step.anchor)) return { kind: "ready", step, anchor: step.anchor };
-  if (world.waitedMs < ANCHOR_TIMEOUT_MS) return { kind: "waiting", step, reason: "anchor" };
+  if (stillWaiting(world)) return { kind: "waiting", step, reason: "anchor" };
 
   /*
     The bound has passed. An optional step had nothing to teach today; a lesson

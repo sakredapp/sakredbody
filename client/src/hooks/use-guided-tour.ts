@@ -26,6 +26,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   type Resolution,
   type StartConditions,
@@ -131,6 +132,7 @@ export function useGuidedTour(
   const [world, setWorld] = useState<TourWorld & { stepId: string | null }>({
     section: null,
     present: new Set(),
+    loading: false,
     seen: new Set(),
     waitedMs: 0,
     stepId: null,
@@ -138,6 +140,29 @@ export function useGuidedTour(
 
   const tapped = useRef(false);
   const stepStartedAt = useRef(0);
+
+  /**
+   * How many reads the application has in flight, kept current without
+   * re-rendering the tour.
+   *
+   * `useIsFetching()` is the obvious call and the wrong one here: it
+   * re-renders its subscriber every time any query in the app starts or
+   * settles, and this hook drives the walkthrough for the whole session.
+   * Subscribing to the cache and writing a ref costs nothing per frame and
+   * nothing per fetch.
+   */
+  const queries = useQueryClient();
+  const fetching = useRef(0);
+  useEffect(() => {
+    const read = () => {
+      fetching.current = queries
+        .getQueryCache()
+        .getAll()
+        .filter((q) => q.state.fetchStatus === "fetching").length;
+    };
+    read();
+    return queries.getQueryCache().subscribe(read);
+  }, [queries]);
 
   /*
     Start once, and only once.
@@ -244,6 +269,13 @@ export function useGuidedTour(
         present,
         seen: new Set(seen),
         waitedMs: performance.now() - stepStartedAt.current,
+        /*
+          Read from a ref the query client keeps current rather than from a
+          hook here: this runs on every animation frame, and subscribing the
+          whole tour to every fetch in the app would re-render it at the rate
+          the app fetches.
+        */
+        loading: fetching.current > 0,
         stepId: step.id,
       });
       frame = requestAnimationFrame(tick);
@@ -375,7 +407,7 @@ export function useGuidedTour(
   const resolution = useMemo(
     () =>
       step
-        ? resolve(step, measured ? world : { section: world.section, present: EMPTY, seen: EMPTY, waitedMs: 0 })
+        ? resolve(step, measured ? world : { section: world.section, present: EMPTY, seen: EMPTY, waitedMs: 0, loading: world.loading })
         : null,
     [step, world, measured],
   );

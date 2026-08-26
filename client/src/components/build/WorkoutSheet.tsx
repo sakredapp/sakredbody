@@ -366,6 +366,25 @@ function SetRow({
  * turning every logged row into a panel of effort controls is how a training
  * log becomes a cockpit, and the member came here to lift.
  */
+/**
+ * The three things a member says *about* a set, once it has been measured.
+ *
+ * ── Why this stopped being four floating words ────────────────────────────
+ *
+ * `Working set · Warm-up · Drop set · Back-off · RPE [ ] · To failure` sat
+ * permanently under every entry row: six controls wrapping across a phone,
+ * four of which are one mutually exclusive choice pretending to be four
+ * independent ones. On a real iPhone they wrapped to three lines and the
+ * current state was a single word in gold among five in grey — findable if
+ * you already knew what you were looking at.
+ *
+ * A set style is one answer, so it is one control. It reads as a sentence
+ * about the set — its type, its effort, whether it ended at failure — with a
+ * label column, and it collapses to the answer once given.
+ *
+ * The stored values are untouched: `normal`, `warmup`, `dropset`, `backoff`.
+ * This is presentation, and the canonical vocabulary is not.
+ */
 function SetMeta({
   d,
   onChange,
@@ -375,30 +394,75 @@ function SetMeta({
   onChange: (p: Partial<Draft>) => void;
   testId: string;
 }) {
-  return (
-    <div
-      className="flex flex-wrap items-center gap-x-3 gap-y-1.5"
-      data-testid={testId}
-      data-tour-id="workout-set-style"
-      data-tour-instance={testId}
-    >
-      {SET_STYLES.map((s) => (
-        <button
-          key={s}
-          onClick={() => onChange({ style: s })}
-          aria-pressed={d.style === s}
-          className={cn(
-            "text-[11px] tap-clean transition-colors",
-            d.style === s ? "text-[hsl(var(--gold))]" : "text-muted-foreground/60",
-          )}
-          data-testid={`${testId}-style-${s}`}
-        >
-          {SET_STYLE_LABEL[s]}
-        </button>
-      ))}
+  const [choosing, setChoosing] = useState(false);
 
-      <label className="inline-flex items-center gap-1 text-[11px] text-muted-foreground/60">
-        RPE
+  return (
+    <div className="space-y-0.5" data-testid={testId}>
+      <Detail label="Type">
+        {/*
+          The lesson points here, at the control, rather than at a row of words
+          that had to stay on screen for the walkthrough's benefit.
+        */}
+        <button
+          type="button"
+          onClick={() => setChoosing((v) => !v)}
+          aria-expanded={choosing}
+          aria-label={`Set type: ${SET_STYLE_LABEL[d.style]}`}
+          className={cn(
+            "inline-flex min-h-[36px] items-center gap-1 rounded-lg px-2 -ml-2 text-xs tap-clean",
+            "transition-colors hover:bg-[hsl(var(--gold))]/5",
+            d.style === "normal" ? "text-muted-foreground" : "text-[hsl(var(--gold))]",
+          )}
+          data-testid={`${testId}-style`}
+          data-tour-id="workout-set-style"
+          data-tour-instance={testId}
+        >
+          {SET_STYLE_LABEL[d.style]}
+          <ChevronDown
+            className={cn("h-3 w-3 transition-transform", choosing && "rotate-180")}
+            aria-hidden="true"
+          />
+        </button>
+      </Detail>
+
+      {/*
+        Opened in place rather than in a popover. This lives inside a sheet
+        that scrolls and can have the keyboard over half of it; a floating
+        layer there is a z-index and a viewport problem for no gain, and an
+        inline group cannot be opened somewhere the member cannot reach.
+      */}
+      {choosing && (
+        <div
+          role="radiogroup"
+          aria-label="Set type"
+          className="flex flex-wrap gap-1.5 pb-1 pl-[4.25rem]"
+          data-testid={`${testId}-styles`}
+        >
+          {SET_STYLES.map((style) => (
+            <button
+              key={style}
+              type="button"
+              role="radio"
+              aria-checked={d.style === style}
+              onClick={() => {
+                onChange({ style });
+                setChoosing(false);
+              }}
+              className={cn(
+                "min-h-[36px] rounded-full border px-3 text-xs tap-clean transition-colors",
+                d.style === style
+                  ? "border-[hsl(var(--gold))]/50 bg-[hsl(var(--gold))]/10 text-[hsl(var(--gold))]"
+                  : "border-[hsl(var(--gold))]/15 text-muted-foreground hover:border-[hsl(var(--gold))]/35",
+              )}
+              data-testid={`${testId}-style-${style}`}
+            >
+              {SET_STYLE_LABEL[style]}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <Detail label="RPE">
         {/*
           The shared Input, not a bare one. Its type scale is what keeps iOS
           from zooming the viewport on focus, and a hand-rolled box here would
@@ -409,25 +473,61 @@ function SetMeta({
           inputMode="numeric"
           value={d.rpe}
           onChange={(e) => onChange({ rpe: e.target.value })}
-          className="h-7 w-12 px-1.5 text-center"
+          className="h-9 w-14 px-1.5 text-center"
+          placeholder="—"
           aria-label="RPE, 1 to 10"
           data-testid={`${testId}-rpe`}
           data-tour-id="workout-rpe"
           data-tour-instance={testId}
         />
-      </label>
+      </Detail>
 
-      <button
-        onClick={() => onChange({ toFailure: !d.toFailure })}
-        aria-pressed={d.toFailure}
-        className={cn(
-          "text-[11px] tap-clean transition-colors",
-          d.toFailure ? "text-[hsl(var(--gold))]" : "text-muted-foreground/60",
-        )}
-        data-testid={`${testId}-failure`}
-      >
-        To failure
-      </button>
+      <Detail label="Failure">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={d.toFailure}
+          onClick={() => onChange({ toFailure: !d.toFailure })}
+          aria-label="This set went to failure"
+          className={cn(
+            "inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-2 -ml-2 text-xs tap-clean",
+            "transition-colors hover:bg-[hsl(var(--gold))]/5",
+            d.toFailure ? "text-[hsl(var(--gold))]" : "text-muted-foreground",
+          )}
+          data-testid={`${testId}-failure`}
+        >
+          <span
+            aria-hidden="true"
+            className={cn(
+              "grid h-4 w-4 place-items-center rounded border transition-colors",
+              d.toFailure
+                ? "border-[hsl(var(--gold))]/60 bg-[hsl(var(--gold))]/15"
+                : "border-[hsl(var(--gold))]/25",
+            )}
+          >
+            {d.toFailure && <Check className="h-2.5 w-2.5" />}
+          </span>
+          {/* The row reads as a sentence — "Failure — Yes" — so the control
+              answers the label's question rather than restating it. */}
+          {d.toFailure ? "Yes" : "No"}
+        </button>
+      </Detail>
+    </div>
+  );
+}
+
+/**
+ * One line of the sentence: what is being said, and the answer.
+ *
+ * A fixed label column rather than a flowing row, so the three answers line up
+ * under each other and the eye finds "what is this set" without reading six
+ * words to work out which one is the heading.
+ */
+function Detail({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-[3.75rem] shrink-0 text-[11px] text-muted-foreground/60">{label}</span>
+      {children}
     </div>
   );
 }

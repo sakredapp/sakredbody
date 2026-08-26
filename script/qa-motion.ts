@@ -30,6 +30,23 @@ const BASE = process.env.SAKRED_QA_BASE ?? "http://127.0.0.1:5199";
 /** How far the spotlighted control may move after the lesson says it settled. */
 const DRIFT_ALLOWED = 4;
 
+/**
+ * How long it may be off that mark before it counts as a defect.
+ *
+ * One frame, generously. Content arriving above the target moves it and the
+ * hold answers on the next frame, so a single painted frame at the shifted
+ * position is the cost of noticing at all. Anything that survives a frame is a
+ * hold that did not fire.
+ *
+ * Measured in milliseconds and not in samples, which is a correction: this
+ * polls the page from the host and manages roughly eight readings per
+ * millisecond when the renderer is idle, so "thirty consecutive samples"
+ * sounded alarming and was under four milliseconds. A gate whose unit drifts
+ * with how busy the machine is will fail honestly-passing runs and pass
+ * genuinely broken ones.
+ */
+const SETTLE_GRACE_MS = 25;
+
 type Sample = {
   t: number;
   scroll: number;
@@ -127,6 +144,11 @@ for (const lesson of LESSONS) {
   await walking;
 
   const samples = await b.evaluate<Sample[]>(`return window.__motion.samples;`);
+  if (process.env.SAKRED_MOTION_DEBUG) {
+    const phases = [...new Set(samples.map((s) => `${s.step}:${s.phase}`))];
+    console.log(`    [debug] ${lesson.step}: ${samples.length} samples over ${samples[samples.length - 1].t}ms`);
+    console.log(`    [debug] phases: ${phases.join(" | ")}`);
+  }
   /*
     The lesson under test, holding — not merely "something is holding".
 
@@ -136,7 +158,18 @@ for (const lesson of LESSONS) {
     is true and is the tour doing its job.
   */
   const held = samples.findIndex((s) => s.step === lesson.step && s.phase?.startsWith("holding"));
-  const after = (held === -1 ? [] : samples.slice(held)).filter((s) => s.step === lesson.step);
+  /*
+    From a frame after the machine says it settled, not from the same instant.
+
+    The phase is published from the animation-frame loop and the panel's side
+    from a React render, so at the exact sample where the phase turns to
+    `holding` the DOM can still carry the side chosen for the previous frame.
+    Reading the settled position from there measured a stale value and then
+    reported the correct one as a change of mind.
+  */
+  const window_ = (held === -1 ? [] : samples.slice(held)).filter((s) => s.step === lesson.step);
+  const from = window_.findIndex((s) => s.t >= window_[0]?.t + SETTLE_GRACE_MS);
+  const after = from === -1 ? window_ : window_.slice(from);
 
   // ── Negative control: did this run observe anything worth asserting? ────
   const mine = samples.filter((s) => s.step === lesson.step);
@@ -157,19 +190,20 @@ for (const lesson of LESSONS) {
       different thing: it is a hold that did not fire, and that is the defect.
     */
     let worst = 0;
-    let run = 0;
+    let since: number | null = null;
     let peak = 0;
-    for (const t of tops) {
-      if (Math.abs(t - rest) > DRIFT_ALLOWED) {
-        run += 1;
-        peak = Math.max(peak, Math.abs(t - rest));
-        worst = Math.max(worst, run);
-      } else run = 0;
+    for (const s of after) {
+      if (s.targetTop === null) continue;
+      if (Math.abs(s.targetTop - rest) > DRIFT_ALLOWED) {
+        since ??= s.t;
+        peak = Math.max(peak, Math.abs(s.targetTop - rest));
+        worst = Math.max(worst, s.t - since);
+      } else since = null;
     }
     check(
       `${lesson.step}: the spotlighted control does not move after the lesson settles`,
-      worst <= 1,
-      `off its mark for ${worst} consecutive frames, by up to ${peak}px, across ${after.length}`,
+      worst <= SETTLE_GRACE_MS,
+      `off its mark for ${worst}ms, by up to ${peak}px, over ${after[after.length - 1].t - after[0].t}ms`,
     );
     check(
       `${lesson.step}: and comes to rest where it settled`,
@@ -177,11 +211,25 @@ for (const lesson of LESSONS) {
       `settled at ${rest}, ended at ${tops[tops.length - 1]}`,
     );
 
-    const sides = [...new Set(after.map((s) => s.side).filter(Boolean))];
+    /*
+      A side is a rendered state, so it is measured the same way: how long the
+      panel spent somewhere other than where it settled. A single frame on the
+      other side while a rect is re-measured is not the panel changing its
+      mind; a sustained one is.
+    */
+    const settledSide = after[0].side;
+    let elsewhere = 0;
+    let left: number | null = null;
+    for (const s of after) {
+      if (s.side && s.side !== settledSide) {
+        left ??= s.t;
+        elsewhere = Math.max(elsewhere, s.t - left);
+      } else left = null;
+    }
     check(
       `${lesson.step}: the panel does not change sides after the lesson settles`,
-      sides.length <= 1,
-      `sides after settling: ${sides.join(" → ")}`,
+      elsewhere <= SETTLE_GRACE_MS,
+      `settled ${settledSide}, spent ${elsewhere}ms on the other side`,
     );
 
     const spent = Math.max(...mine.map((s) => s.scrolls));
