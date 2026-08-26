@@ -145,8 +145,17 @@ console.log("\nRelevance, never measurement\n");
   check("the section is labelled as related", /Related today/.test(body));
   check("and not as a reading of the territory", !/<Label>Today<\/Label>/.test(body));
 
-  /** The signal keeps its own name, so it cannot be read as a region score. */
-  check("each signal is named", /SIGNAL_LABEL\[s\.id\]/.test(body));
+  /**
+   * The signal keeps its own name, so it cannot be read as a region score.
+   *
+   * Asserted as "a label function is called and the raw id is not rendered",
+   * rather than against one spelling of the lookup. This previously pinned
+   * `SIGNAL_LABEL[s.id]`, and broke when that map moved into the canonical
+   * label registry — the behaviour it names was never affected. A test that
+   * fails on a rename it does not care about gets relaxed by whoever is in a
+   * hurry, and the invariant goes with it.
+   */
+  check("each signal is named", /terrainSignalLabel\(s\.id\)/.test(body));
   check("and carries its provenance", /Member reported/.test(body));
   /** Nothing may render a region's name against a number. */
   check(

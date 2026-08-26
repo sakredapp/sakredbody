@@ -47,11 +47,7 @@ import { BODY_REGION_NAMES, BODY_REGION_ORDER, type BodyRegionKey } from "@share
 import { TERRAIN_SIGNALS } from "@shared/models/terrainSignals";
 import { cn } from "@/lib/utils";
 import { SectionHeading } from "@/components/portal/Panel";
-
-const SIGNAL_LABEL = Object.fromEntries(TERRAIN_SIGNALS.map((s) => [s.id, s.label])) as Record<
-  string,
-  string
->;
+import { terrainSignalLabel } from "@shared/models/labels";
 
 // ─── The axis ──────────────────────────────────────────────────────────────
 
@@ -185,7 +181,7 @@ function RegionDetail({
                 className="flex items-baseline gap-3"
                 data-testid={`region-signal-${s.id}`}
               >
-                <span className="text-sm w-32 shrink-0">{SIGNAL_LABEL[s.id] ?? s.id}</span>
+                <span className="text-sm w-32 shrink-0">{terrainSignalLabel(s.id)}</span>
                 <span className="text-sm tabular-nums">{s.value}/5</span>
                 <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/60">
                   Member reported

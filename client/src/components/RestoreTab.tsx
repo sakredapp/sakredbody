@@ -40,7 +40,8 @@ import { Panel, SectionHeading } from "@/components/portal/Panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useHealthConnection, useHealthSummary } from "@/hooks/use-health";
-import { EXERCISE_CATEGORIES, CATEGORY_LOAD, activityLabel } from "@shared/models/training";
+import { EXERCISE_CATEGORIES, CATEGORY_LOAD } from "@shared/models/training";
+import { categoryLabel, healthActivityLabel } from "@shared/models/labels";
 import { HabitPanel } from "@/components/habits/HabitPanel";
 import { TerrainCheckin } from "@/components/habits/TerrainCheckin";
 import type { MemberSection } from "@/components/MemberNav";
@@ -138,7 +139,12 @@ function MovementBehindTheReading({ movement }: { movement: MovementEntry[] }) {
    */
   const line = (m: MovementEntry) => {
     const fallback = m.categories?.[0] ?? m.category;
-    const name = activityLabel(m.activity) ?? CATEGORY_LABEL.get(fallback) ?? fallback;
+    /*
+      Never the raw category as a last resort — `fallback` is an id like
+      `full_body`, and printing it is the exact defect this registry exists
+      to end. "Movement" is vague and true; the id is precise and wrong.
+    */
+    const name = healthActivityLabel(m.activity) ?? categoryLabel(fallback) ?? "Movement";
     return `${name} · ${whenShort(m.onDate)}`;
   };
 

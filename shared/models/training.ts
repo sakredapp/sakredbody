@@ -733,14 +733,17 @@ const ACTIVITY_LABEL: Readonly<Record<string, string>> = {
   high_intensity: "HIIT",
 };
 
-export function activityLabel(workoutType: string | null | undefined): string | null {
-  if (!workoutType) return null;
-  const key = workoutType.trim().toLowerCase();
-  if (!key) return null;
-  const known = ACTIVITY_LABEL[key];
-  if (known) return known;
-  const words = key.replace(/[_-]+/g, " ").trim();
-  return words.charAt(0).toUpperCase() + words.slice(1);
+/**
+ * Retired. Use `healthActivityLabel` in shared/models/labels.ts.
+ *
+ * This title-cased whatever it was given, which turned the HealthKit enum case
+ * `functionalstrengthtraining` into "Functionalstrengthtraining" on a member's
+ * phone. Kept as a thrower rather than deleted so that any reintroduced call
+ * site fails loudly at the moment it runs instead of shipping the same string
+ * again.
+ */
+export function activityLabel(): never {
+  throw new Error("activityLabel is retired — use healthActivityLabel from shared/models/labels.js");
 }
 
 export function externalActivityCategory(workoutType: string | null | undefined): string | null {

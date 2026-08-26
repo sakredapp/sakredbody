@@ -27,8 +27,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { WORKOUT_FOCUSES } from "@shared/models/health";
-import { activityLabel } from "@shared/models/training";
+
 import { cn } from "@/lib/utils";
+import { categoryLabel, healthActivityLabel, WORKOUT_FOCUS_LABEL } from "@shared/models/labels";
 
 type Candidate = {
   id: string;
@@ -37,12 +38,6 @@ type Candidate = {
   durationSeconds: number | null;
   sourceApp: string | null;
   category: string | null;
-};
-
-const FOCUS_LABEL: Record<string, string> = {
-  chest: "Chest", back: "Back", legs: "Legs", shoulders: "Shoulders",
-  arms: "Arms", core: "Core", full_body: "Full body",
-  conditioning: "Conditioning", other: "Other",
 };
 
 const ORIENTATIONS = [
@@ -145,7 +140,12 @@ function Answer({ w }: { w: Candidate }) {
     return () => clearTimeout(t);
   }, [done, qc]);
 
-  const name = activityLabel(w.workoutType ?? "") || w.workoutType || "A session";
+  /*
+    No `|| w.workoutType`. That fallback is how "Functionalstrengthtraining"
+    reached a member's phone: an unrecognised identifier was printed verbatim
+    rather than admitted to. "A session" is true about every workout.
+  */
+  const name = healthActivityLabel(w.workoutType) ?? "A session";
 
   /** The whole card becomes the receipt. Nothing else is left to press. */
   if (done) {
@@ -178,10 +178,21 @@ function Answer({ w }: { w: Candidate }) {
         </p>
       </div>
 
-      {/* Sakred's reading, stated as Sakred's — never as the member's. */}
-      {w.category && (
+      {/*
+        Sakred's reading, stated as Sakred's — never as the member's.
+
+        Through `categoryLabel`, which is the whole point: this line rendered
+        `{w.category}` and put "Sakred reads this as full_body." on a member's
+        phone. The label map was three lines above it at the time.
+
+        Null when the category is one the registry does not know, and then the
+        sentence is not shown at all. A reading Sakred cannot put into words is
+        not a reading worth claiming out loud.
+      */}
+      {categoryLabel(w.category) && (
         <p className="text-xs text-muted-foreground">
-          Sakred reads this as <span className="text-foreground">{w.category}</span>.
+          Sakred reads this as{" "}
+          <span className="text-foreground">{categoryLabel(w.category)}</span>.
         </p>
       )}
 
@@ -222,7 +233,7 @@ function Answer({ w }: { w: Candidate }) {
             <div className="flex flex-wrap gap-2">
               {WORKOUT_FOCUSES.map((f) => (
                 <Chip key={f} on={focus === f} onClick={() => setFocus(focus === f ? null : f)}>
-                  {FOCUS_LABEL[f] ?? f}
+                  {WORKOUT_FOCUS_LABEL[f]}
                 </Chip>
               ))}
             </div>

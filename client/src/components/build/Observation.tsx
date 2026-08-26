@@ -25,6 +25,11 @@ import { useState } from "react";
 import { OBSERVATION_QUALITIES, OBSERVATION_SIDES } from "@shared/models/training";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import {
+  OBSERVATION_QUALITY_LABEL,
+  OBSERVATION_SIDE_LABEL,
+} from "@shared/models/labels";
+import type { ObservationQuality, ObservationSide } from "@shared/models/training";
 
 export type Observation = {
   id?: string;
@@ -34,26 +39,10 @@ export type Observation = {
   side: string | null;
 };
 
-/** What each word means, said once, where the member is choosing. */
-export const QUALITY_LABEL: Record<string, string> = {
-  good: "Felt good",
-  tight: "Tight or restricted",
-  weak: "Weak connection",
-  discomfort: "Discomfort",
-  unstable: "Unstable",
-  other: "Something else",
-};
-
-const SIDE_LABEL: Record<string, string> = {
-  left: "Left",
-  right: "Right",
-  both: "Both",
-};
-
 /** The one-word summary a row shows when something has already been said. */
 export function observationSummary(o: Observation): string {
-  const word = o.quality ? QUALITY_LABEL[o.quality] ?? o.quality : null;
-  const side = o.side ? SIDE_LABEL[o.side] : null;
+  const word = o.quality ? OBSERVATION_QUALITY_LABEL[o.quality as ObservationQuality] : null;
+  const side = o.side ? OBSERVATION_SIDE_LABEL[o.side as ObservationSide] : null;
   if (word && side) return `${word} · ${side.toLowerCase()}`;
   if (word) return word;
   return "Noted";
@@ -118,7 +107,7 @@ export function ObservationForm({
         <div className="flex flex-wrap gap-2">
           {OBSERVATION_QUALITIES.map((q) => (
             <Chip key={q} on={quality === q} onClick={() => setQuality(quality === q ? null : q)}>
-              {QUALITY_LABEL[q] ?? q}
+              {OBSERVATION_QUALITY_LABEL[q]}
             </Chip>
           ))}
         </div>
@@ -133,7 +122,7 @@ export function ObservationForm({
             <div className="flex flex-wrap gap-2">
               {OBSERVATION_SIDES.map((s) => (
                 <Chip key={s} on={side === s} onClick={() => setSide(side === s ? null : s)}>
-                  {SIDE_LABEL[s]}
+                  {OBSERVATION_SIDE_LABEL[s]}
                 </Chip>
               ))}
             </div>

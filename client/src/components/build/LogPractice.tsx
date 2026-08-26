@@ -39,19 +39,14 @@ import { Input } from "@/components/ui/input";
 import { SakredDate } from "@/components/portal/DatePicker";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { WORKOUT_FOCUSES } from "@shared/models/health";
-import { activityLabel } from "@shared/models/training";
+
 import { MovementPicker, type Movement } from "./MovementPicker";
 import { cn } from "@/lib/utils";
+import { healthActivityLabel, WORKOUT_FOCUS_LABEL } from "@shared/models/labels";
 import { formatLocalDateString, addDaysToString } from "@shared/utils/dates";
 
 /** The lengths classes and sessions actually come in. */
 const COMMON_MINUTES = [15, 20, 30, 45, 60, 75, 90];
-
-const FOCUS_LABEL: Record<string, string> = {
-  chest: "Chest", back: "Back", legs: "Legs", shoulders: "Shoulders",
-  arms: "Arms", core: "Core", full_body: "Full body",
-  conditioning: "Conditioning", other: "Other",
-};
 
 /** A local YYYY-MM-DD, N days back. Never UTC — the member's day is theirs. */
 function dayBack(n: number): string {
@@ -234,7 +229,7 @@ export function LogPractice({
    * a day is unusual and not impossible, and the member is the one who knows.
    */
   if (clash) {
-    const found = activityLabel(clash.workoutType ?? "") || clash.workoutType || "a workout";
+    const found = healthActivityLabel(clash.workoutType) ?? "a workout";
     const mins = clash.durationSeconds ? Math.round(clash.durationSeconds / 60) : null;
     return (
       <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -277,7 +272,7 @@ export function LogPractice({
                     )}
                     data-testid={`clash-focus-${f}`}
                   >
-                    {FOCUS_LABEL[f] ?? f}
+                    {WORKOUT_FOCUS_LABEL[f]}
                   </button>
                 ))}
               </div>
