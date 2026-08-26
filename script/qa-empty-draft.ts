@@ -19,8 +19,30 @@
  * field on the movement being worked on is fine — that is the point of it —
  * but a numbered row with empty boxes under a movement you have moved on from
  * says "you are not done here", and it is wrong.
+ *
+ * ── The selectors, and why they are spelled out ───────────────────────────
+ *
+ * The first draft of this probe looked for `[data-testid^="log-set-"]` and
+ * treated each hit as a row. `log-set-<movement>` is the *commit button* — a
+ * `<button>` with no inputs inside it — so "every input in this row is empty"
+ * was `[].every(…)`, which is `true`, on an element that could never have
+ * held a value. A probe like that reports the defect it is looking for on a
+ * correct screen, and reports nothing at all on a broken one.
+ *
+ * The entry row is `[data-tour-id="workout-set-row"]`, and it carries
+ * `data-tour-instance` naming which row it is: `log-set-<movement>` while
+ * entering, `save-set-<set>` while correcting one already logged. Only the
+ * first is a draft; the second is a member editing history, and counting it
+ * would be counting the wrong thing.
  */
 import { Browser } from "./cdp.js";
+
+/*
+  Everything under `movement-` in the picker that is not a movement. The rows
+  themselves are `movement-<slug>` — `movement-barbell-bench-press`, not a
+  UUID, which is what an earlier version of this waited fifteen seconds for.
+*/
+const NOT_A_MOVEMENT = String.raw`/^movement-(search|show-all|create|group-|category-)/`;
 
 const BASE = process.env.SAKRED_QA_BASE ?? "http://127.0.0.1:5199";
 
@@ -28,6 +50,7 @@ const failures: string[] = [];
 const notes: string[] = [];
 const check = (name: string, ok: boolean, detail = "") => {
   if (!ok) failures.push(detail ? `${name} — ${detail}` : name);
+  else notes.push(`✓ ${name}`);
 };
 
 const b = new Browser();
@@ -85,39 +108,49 @@ await b
   .waitFor(`!document.querySelector('[data-testid="tour-overlay"]')`, "the walkthrough to close", 8_000)
   .catch(() => undefined);
 
-/**
- * What a member would count as a set under this movement.
- *
- * Deliberately generous about what looks like one: a logged row, and any
- * numbered row carrying empty number boxes. The second is the thing under
- * test, and defining it narrowly would be defining the defect away.
- */
-const LOOK = `
-  const groups = [];
-  for (const el of document.querySelectorAll('[data-testid^="log-set-"]')) {
-    groups.push(el.getAttribute("data-testid").replace("log-set-", ""));
-  }
-  const logged = [...document.querySelectorAll('[data-testid^="logged-set-"]')].length;
-  const openRows = [...document.querySelectorAll('[data-testid^="log-set-"]')].map((el) => {
-    const inputs = [...el.querySelectorAll("input")];
-    return {
-      movement: el.getAttribute("data-testid").replace("log-set-", ""),
-      empty: inputs.every((i) => !i.value),
-      inputs: inputs.length,
-    };
-  });
-  const addButtons = [...document.querySelectorAll('[data-testid^="add-set-"]')]
-    .map((e) => e.getAttribute("data-testid").replace("add-set-", ""));
-  return JSON.stringify({ logged, openRows, addButtons, groups });
-`;
+/* ── What the member can see under each movement ──────────────────────── */
 
-type Look = {
+type Seen = {
+  id: string;
+  name: string;
   logged: number;
-  openRows: { movement: string; empty: boolean; inputs: number }[];
-  addButtons: string[];
-  groups: string[];
+  /** An entry row for *this* movement — not an edit-in-place on a logged set. */
+  draft: boolean;
+  /**
+   * …with at least one measure still empty, so it reads as a set in progress.
+   *
+   * Not "every box is empty". The weight deliberately carries to the next set
+   * — it is usually the same weight — so a stranded draft row shows `135` and
+   * an empty reps box. That is exactly the row the complaint describes, and an
+   * all-boxes-empty test walks straight past it: with the defect planted on
+   * purpose to check this harness could see it, that assertion passed.
+   */
+  unfilled: boolean;
+  boxes: number;
+  addSet: boolean;
 };
-const look = async (): Promise<Look> => JSON.parse(await b.evaluate<string>(LOOK)) as Look;
+
+const LOOK = `
+  const out = [];
+  for (const el of document.querySelectorAll('[data-testid^="workout-movement-"]')) {
+    const id = el.getAttribute("data-testid").replace("workout-movement-", "");
+    const row = el.querySelector('[data-tour-id="workout-set-row"][data-tour-instance^="log-set-"]');
+    const boxes = row ? [...row.querySelectorAll("input")] : [];
+    out.push({
+      id,
+      name: (el.querySelector("p") || { textContent: "" }).textContent.trim().slice(0, 28),
+      logged: el.querySelectorAll('[data-testid^="logged-set-"]').length,
+      draft: !!row,
+      unfilled: !!row && boxes.length > 0 && boxes.some((i) => !i.value),
+      boxes: boxes.length,
+      addSet: !!el.querySelector('[data-testid^="add-set-"]'),
+    });
+  }
+  return JSON.stringify(out);
+`;
+const look = async (): Promise<Seen[]> => JSON.parse(await b.evaluate<string>(LOOK)) as Seen[];
+const say = (s: Seen[]) =>
+  s.map((m) => `${m.name}: ${m.logged} logged${m.draft ? `, draft(${m.boxes} boxes, ${m.unfilled ? "unfilled" : "complete"})` : ""}${m.addSet ? ", +Add set" : ""}`).join(" · ");
 
 /* ── The flow ─────────────────────────────────────────────────────────── */
 
@@ -136,7 +169,6 @@ await b.waitFor(
   20_000,
 );
 
-/* An open session from an earlier run would start this mid-workout. */
 const started = await tap('[data-tour-id="build-start-session"], [data-testid="button-start-session"]');
 check("a workout can be started", started, "no reachable start control");
 if (!started) {
@@ -145,112 +177,193 @@ if (!started) {
       .map(e => (e.getAttribute("data-testid") || e.getAttribute("data-tour-id") || "-") + ":" + e.textContent.trim().slice(0, 24))
       .join(" | ");`)));
 }
-await b.waitFor(`!!document.querySelector('[data-testid="workout-sheet"], [data-tour-id="workout-add-exercise"]')`, "the workout", 20_000);
+/*
+  One run out of five so far has arrived here and found no workout sheet after
+  twenty seconds. I have not reproduced it and will not name a cause I cannot
+  show, so this says what was on screen instead of failing mute — the next
+  occurrence should identify itself rather than needing this same afternoon
+  spent on it again.
+*/
+try {
+  await b.waitFor(
+    `!!document.querySelector('[data-testid="workout-sheet"], [data-tour-id="workout-add-exercise"]')`,
+    "the workout",
+    20_000,
+  );
+} catch (e) {
+  console.error("  no workout sheet. what was on screen: " + (await b.evaluate<string>(`
+    return "path=" + location.pathname
+      + " section=" + document.documentElement.getAttribute("data-tour-section")
+      + " tour=" + !!document.querySelector('[data-testid="tour-overlay"]')
+      + " buttons=" + [...document.querySelectorAll("button")].slice(0, 16)
+          .map(e => (e.getAttribute("data-testid") || "-") + ":" + e.textContent.trim().slice(0, 18)).join(",");`)));
+  throw e;
+}
 
-async function addMovement(which: number): Promise<boolean> {
-  if (!(await tap('[data-tour-id="workout-add-exercise"], [data-testid="add-movement"]'))) return false;
-  /* The picker opens on groups; a movement is behind a group and a category. */
-  await b.waitFor(`!!document.querySelector('[data-testid="movement-search"]')`, "the picker", 15_000).catch(() => undefined);
+/**
+ * Add a movement by searching for it, the way a member does.
+ *
+ * Not by picking the first row in the list: with no group or category chosen
+ * the picker narrows to "what you said you do", and a QA account that has
+ * said it does nothing gets an empty list. The earlier run read that as "the
+ * picker offers no movements" when what it meant was "this member has no
+ * stated modalities". Typing bypasses the narrowing, and is also the gesture
+ * the complaint describes.
+ */
+async function addMovement(name: string): Promise<string | null> {
+  const before = (await look()).map((m) => m.id);
+  if (!(await tap('[data-tour-id="workout-add-exercise"], [data-testid="add-movement"], [data-testid^="next-exercise-"]'))) return null;
+  await b.waitFor(`!!document.querySelector('[data-testid="movement-search"]')`, "the picker", 15_000);
   await b.evaluate(`
-    const openFirst = (prefix) => {
-      const el = document.querySelector('[data-testid^="' + prefix + '"]');
-      if (el) { el.scrollIntoView({ block: "center" }); el.click(); return true; }
-      return false;
-    };
-    if (!document.querySelector('[data-testid^="movement-"][data-testid*="-"]')) return false;
-    openFirst("movement-group-");
+    const el = document.querySelector('[data-testid="movement-search"]');
+    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), "value").set.call(el, ${JSON.stringify(name)});
+    el.dispatchEvent(new Event("input", { bubbles: true }));
     return true;`);
   await b.settle();
-  await b.evaluate(`
-    const c = document.querySelector('[data-testid^="movement-category-"]');
-    if (c) { c.scrollIntoView({ block: "center" }); c.click(); }
-    return true;`);
-  await b.settle();
-  await b.waitFor(`document.querySelectorAll('[data-testid^="movement-"]').length > 0`, "movements", 10_000).catch(() => undefined);
-  return b.evaluate<boolean>(`
-    const all = [...document.querySelectorAll('[data-testid^="movement-"]')]
-      .filter(e => !/^movement-(search|group|category|show-all|create)/.test(e.getAttribute("data-testid")));
-    const el = all[${which}];
+  await b.waitFor(
+    `[...document.querySelectorAll('[data-testid^="movement-"]')].some(e => !${NOT_A_MOVEMENT}.test(e.getAttribute("data-testid")))`,
+    `a result for "${name}"`,
+    15_000,
+  );
+  const picked = await b.evaluate<boolean>(`
+    const rows = [...document.querySelectorAll('[data-testid^="movement-"]')]
+      .filter(e => !${NOT_A_MOVEMENT}.test(e.getAttribute("data-testid")));
+    const exact = rows.find(e => e.textContent.trim().toLowerCase().startsWith(${JSON.stringify(name.toLowerCase())}));
+    const el = exact || rows[0];
     if (!el) return false;
     el.scrollIntoView({ block: "center" });
     el.click();
     return true;`);
+  if (!picked) return null;
+  await b.waitFor(
+    `document.querySelectorAll('[data-testid^="workout-movement-"]').length > ${before.length}`,
+    `${name} to land in the workout`,
+    15_000,
+  );
+  const now = await look();
+  return now.map((m) => m.id).find((id) => !before.includes(id)) ?? null;
 }
 
-async function logSet(reps: number, weight: number): Promise<void> {
-  await b.evaluate(`
+/**
+ * Fill one movement's entry row and press its own commit button.
+ *
+ * Opening the row first when it is closed is not harness convenience — it is
+ * the product's behaviour and half the answer to the complaint. A committed
+ * set closes the row, so a second set is asked for with `+ Add set`. The
+ * first version of this assumed the row stayed open, failed to find it, and
+ * would have been read as "the second set won't log".
+ */
+async function logSet(id: string, weight: number, reps: number): Promise<void> {
+  const open = await b.evaluate<boolean>(
+    `return !!document.querySelector('[data-tour-id="workout-set-row"][data-tour-instance="log-set-${id}"]');`,
+  );
+  if (!open) {
+    await tap(`[data-testid="add-set-${id}"]`);
+    await b
+      .waitFor(
+        `!!document.querySelector('[data-tour-id="workout-set-row"][data-tour-instance="log-set-${id}"]')`,
+        "the entry row to reopen",
+        8_000,
+      )
+      .catch(() => undefined);
+  }
+  const ok = await b.evaluate<boolean>(`
     const set = (el, v) => {
       Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), "value").set.call(el, v);
       el.dispatchEvent(new Event("input", { bubbles: true }));
     };
-    const row = document.querySelector('[data-testid^="log-set-"]');
-    const inputs = [...row.querySelectorAll("input")];
-    if (inputs.length > 1) { set(inputs[0], "${weight}"); set(inputs[1], "${reps}"); }
-    else set(inputs[0], "${reps}");
+    const row = document.querySelector('[data-tour-id="workout-set-row"][data-tour-instance="log-set-${id}"]');
+    if (!row) return false;
+    const boxes = [...row.querySelectorAll("input")];
+    if (boxes.length > 1) { set(boxes[0], "${weight}"); set(boxes[1], "${reps}"); }
+    else if (boxes.length === 1) { set(boxes[0], "${reps}"); }
+    else return false;
     return true;`);
+  if (!ok) { failures.push(`could not reach the entry row for ${id}`); return; }
   await b.settle();
-  await b.evaluate(`
-    const row = document.querySelector('[data-testid^="log-set-"]');
-    const commit = row.parentElement.querySelector('button[aria-label], button');
-    (row.querySelector("button") || commit).click();
-    return true;`);
-  await b.settle();
-  await b.settle();
+  const sets = await b.evaluate<number>(`return document.querySelectorAll('[data-testid^="logged-set-"]').length;`);
+  await tap(`[data-testid="log-set-${id}"]`);
+  await b
+    .waitFor(`document.querySelectorAll('[data-testid^="logged-set-"]').length > ${sets}`, "the set to land", 15_000)
+    .catch(() => failures.push(`the set did not commit on ${id}`));
 }
 
-const added = await addMovement(0);
-check("a movement can be added", added);
-if (!added) {
-  console.error("  the picker offered: " + (await b.evaluate<string>(`
-    return [...document.querySelectorAll("[data-testid]")]
-      .map(e => e.getAttribute("data-testid"))
-      .filter(t => /movement|exercise|picker/i.test(t)).slice(0, 30).join(" | ") || "(nothing)";`)));
-}
-if (added) {
-  await b.waitFor(`document.querySelectorAll('[data-testid^="log-set-"]').length > 0`, "the entry row", 15_000).catch(() => undefined);
+const A = await addMovement("Barbell Bench Press");
+check("a movement can be added", A !== null);
+
+if (A) {
+  await b.waitFor(
+    `!!document.querySelector('[data-tour-id="workout-set-row"][data-tour-instance="log-set-${A}"]')`,
+    "the entry row",
+    15_000,
+  ).catch(() => undefined);
 
   const fresh = await look();
-  check("a movement with nothing under it opens its entry row", fresh.openRows.length >= 1,
-    JSON.stringify(fresh));
+  check(
+    "a movement with nothing under it opens its entry row",
+    fresh.find((m) => m.id === A)?.draft === true,
+    say(fresh),
+  );
 
-  await logSet(8, 100);
-  await logSet(6, 100);
+  await logSet(A, 135, 8);
+  await logSet(A, 135, 6);
   const after = await look();
-  notes.push(`after two sets: ${after.logged} logged, ${after.openRows.length} open row(s), add-set on [${after.addButtons.join(",")}]`);
+  notes.push(`after two sets — ${say(after)}`);
 
+  const a2 = after.find((m) => m.id === A);
+  check("both sets are logged", a2?.logged === 2, say(after));
   check(
     "logging a set closes the entry row rather than leaving an empty one behind",
-    after.openRows.filter((r) => r.empty).length === 0,
-    JSON.stringify(after.openRows),
+    a2?.draft === false,
+    say(after),
   );
-  check("and offers Add set instead", after.addButtons.length >= 1, JSON.stringify(after.addButtons));
+  check("and offers Add set instead", a2?.addSet === true, say(after));
 
   /* Now the flow the complaint describes: move on, and look back. */
-  const second = await addMovement(1);
-  check("a second movement can be added", second);
-  if (second) {
+  const B = await addMovement("Back Squat");
+  check("a second movement can be added", B !== null);
+  if (B) {
     await b.settle();
     const both = await look();
-    notes.push(`with a second movement: ${both.logged} logged, open rows ${JSON.stringify(both.openRows)}`);
+    notes.push(`with a second movement — ${say(both)}`);
+
     /*
       The movement being worked on may keep its ready field — that is what it
       is for. The one left behind may not.
     */
-    const stale = both.openRows.filter((r) => r.empty && r.movement !== both.openRows[both.openRows.length - 1]?.movement);
     check(
-      "a movement you have moved on from shows no empty set row",
-      stale.length === 0,
-      `${JSON.stringify(stale)} — full state ${JSON.stringify(both.openRows)}`,
+      "a movement you have moved on from shows no unfinished set row",
+      both.find((m) => m.id === A)?.unfilled !== true,
+      say(both),
     );
     check(
       "at most one movement is being entered at a time",
-      both.openRows.filter((r) => r.empty).length <= 1,
-      JSON.stringify(both.openRows),
+      both.filter((m) => m.draft).length <= 1,
+      say(both),
+    );
+    check(
+      "and it is the one just added",
+      both.find((m) => m.draft)?.id === B,
+      say(both),
+    );
+
+    /* Scroll back to A the way a member would, and look again. */
+    await b.evaluate(`
+      const el = document.querySelector('[data-testid="workout-movement-${A}"]');
+      if (el) el.scrollIntoView({ block: "center" });
+      return true;`);
+    await b.settle();
+    const back = await look();
+    check(
+      "and it still looks finished when you scroll back to it",
+      back.find((m) => m.id === A)?.unfilled !== true && back.find((m) => m.id === A)?.logged === 2,
+      say(back),
     );
   }
 
   /* Leave nothing running for the next harness. */
   await tap('[data-testid="button-discard-session"], [data-testid="discard-session"]');
+  await b.settle();
   await tap('[data-testid="confirm-discard"]');
 }
 

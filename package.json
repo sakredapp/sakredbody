@@ -31,7 +31,8 @@
     "qa:motion": "tsx script/qa-motion.ts",
     "qa:walkthrough": "tsx script/qa-walkthrough.ts",
     "qa:atmosphere": "tsx script/qa-atmosphere-geometry.ts",
-    "qa:presentation": "tsx script/qa-presentation.ts"
+    "qa:presentation": "tsx script/qa-presentation.ts",
+    "qa:empty-draft": "tsx script/qa-empty-draft.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.116.0",
