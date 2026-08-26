@@ -239,6 +239,52 @@ export function useGuidedTour(
 
   const step = index === null ? null : tour.steps[index] ?? null;
 
+  /**
+   * Put the app where *this* lesson happens, on the way in.
+   *
+   * ── The nine seconds nobody could explain ─────────────────────────────
+   *
+   * Staging ran once, when the tour started, from the first step's spec — and
+   * `welcome` declares no section, so it staged nothing at all. A member who
+   * replayed the walkthrough from anywhere other than Home therefore watched
+   * the first two lessons over whatever screen they were already on, and the
+   * third — "Your terrain", which does declare `section: "home"` — sat waiting
+   * for a card that was never going to mount, and gave up.
+   *
+   * Measured rather than reasoned about: the harness reported "no element
+   * carries the anchor after 23.3s, 0 request(s) in flight, section coaching".
+   * Nothing was slow. The tour was on the wrong screen and had no way to say
+   * so, and the endpoint behind that card answers in 900ms.
+   *
+   * ── On the way in, and only then ──────────────────────────────────────
+   *
+   * Keyed on the step, so a member who wanders off mid-lesson is not dragged
+   * back — the panel already tells them where to return to, and hauling the
+   * screen out from under somebody is a worse answer than asking. This is the
+   * same policy resume has always had, applied to every step rather than only
+   * to the first.
+   *
+   * A lesson that *teaches* navigation declares no section of its own — "tap
+   * Restore" is satisfied by arriving, not by being taken there — so those are
+   * untouched by this and still have to be walked.
+   */
+  useEffect(() => {
+    if (!step?.section) return;
+    /*
+      Asked unconditionally, not only when the published section disagrees.
+
+      Skipping the request when the attribute already matched looked like a
+      free optimisation and was a race: the dashboard publishes its section
+      after it mounts, so a lesson entered during that window read the old
+      value, decided it was already in the right place, and never asked. That
+      left one viewport in three degrading on `section coaching`. Setting a
+      section the app is already on is a no-op; reading a stale one is not.
+    */
+    const spec = restoreSpecFor(step);
+    requestStage({ section: spec.section, sheet: spec.sheet, workout: spec.workout });
+  }, [step?.id, step?.section]);
+
+
   /*
     The world, once per frame.
 
@@ -278,6 +324,15 @@ export function useGuidedTour(
         loading: fetching.current > 0,
         stepId: step.id,
       });
+      /*
+        Published so a degraded lesson can be explained rather than guessed at.
+        "terrain degraded" and "terrain degraded after 9.2s with nothing in
+        flight and the anchor absent" are different bug reports, and telling
+        them apart from outside cost two full harness runs.
+      */
+      const root = document.documentElement;
+      root.setAttribute("data-tour-waited", String(Math.round((performance.now() - stepStartedAt.current) / 100) / 10));
+      root.setAttribute("data-tour-loading", fetching.current > 0 ? String(fetching.current) : "0");
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);

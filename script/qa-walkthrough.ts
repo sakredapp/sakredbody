@@ -393,8 +393,12 @@ async function measure(label: string, stepId: string, degraded: string[]): Promi
        because Home had not finished loading" are different bug reports and
        the first one cost two runs to tell apart. */
     const why = await b.evaluate<string>(`
+      const root = document.documentElement;
+      const clock = " after " + root.getAttribute("data-tour-waited") + "s, " +
+        root.getAttribute("data-tour-loading") + " request(s) in flight, section " +
+        root.getAttribute("data-tour-section");
       const els = [...document.querySelectorAll('[data-tour-id=${JSON.stringify(step.anchor ?? "")}]')];
-      if (!els.length) return "no element carries the anchor";
+      if (!els.length) return "no element carries the anchor" + clock;
       const r = els[0].getBoundingClientRect();
       const cs = getComputedStyle(els[0]);
       return els.length + " present, first " + Math.round(r.width) + "x" + Math.round(r.height) +
@@ -405,6 +409,24 @@ async function measure(label: string, stepId: string, degraded: string[]): Promi
     check(`[${label}] ${step.id}: a degraded lesson is still readable`, !!w.panel);
     return;
   }
+  /*
+    Measured once the spotlight has stopped moving.
+
+    The halo is drawn from React state and the target is read live, so while
+    the walkthrough is still bringing its subject into view — or holding it
+    against content arriving above it — the two disagree by a frame's worth of
+    movement. That presented as "centres agree — off by 0.00, -2.00", which is
+    a two-pixel lag being reported as a geometry defect.
+  */
+  await b
+    .waitFor(
+      `["holding", "released"].some(p => (document.documentElement.getAttribute("data-tour-motion") || "").startsWith(p))
+       || !document.documentElement.getAttribute("data-tour-motion")`,
+      "the spotlight to settle",
+      6_000,
+    )
+    .catch(() => undefined);
+  await b.settle();
   const w = await b.evaluate<Snap>(SNAP(step.anchor ?? null, null, many));
   if (!w.mounted) {
     check(`[${label}] ${step.id}: the overlay is still mounted`, false);

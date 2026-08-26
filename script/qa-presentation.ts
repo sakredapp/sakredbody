@@ -294,26 +294,133 @@ async function tap(id: string): Promise<boolean> {
   return true;
 }
 
+/**
+ * Leave no sheet open behind us.
+ *
+ * The More sheet is how every secondary section is reached, and it does not
+ * always close on its own — a row that navigates underneath can leave it
+ * sitting there, and the crawl's next tap on More then lands on the sheet it
+ * already has open. That presented as "covered by more-sheet", "covered by
+ * svg", "covered by H2" — seven sections unreachable for one reason wearing
+ * seven different names.
+ *
+ * Escape rather than a click on the backdrop: a backdrop click is a coordinate
+ * and coordinates are what got us here.
+ */
+async function closeSheets(): Promise<void> {
+  const open = () =>
+    b.evaluate<boolean>(
+      `return [...document.querySelectorAll('[data-tour-id="more-sheet"], [role="dialog"]')]
+         .some(e => e.getBoundingClientRect().height > 0);`,
+    );
+  for (let attempt = 0; attempt < 4 && (await open()); attempt++) {
+    await b.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+    await b.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+    await b.settle();
+    await b.settle();
+  }
+}
+
 /** Land on a section, from wherever the crawl currently is. */
 async function openSection(id: string): Promise<boolean> {
+  await closeSheets();
   if ((PRIMARY as readonly string[]).includes(id)) return tap(`nav-${id}`);
-  if (!(await tap("nav-more"))) return false;
+
   /*
-    Wait for the row to have a size, not for the sheet to exist. Radix keeps
-    the content mounted at zero size while closed, so "the element is present"
-    is true before the sheet has opened and a tap at that moment lands on
-    whatever is underneath it.
+    Twice if need be.
+
+    Opening the sheet is a two-step gesture and the first step is not reliable
+    from every starting point: the first secondary section of a run opened
+    fine and every one after it failed with "all instances unsized or off
+    screen" — the sheet had been asked to open and had not finished, or had
+    opened and closed again behind the row we were waiting for. Retrying the
+    whole gesture is honest about that; waiting longer inside it was not,
+    because the row genuinely was not there.
   */
-  try {
-    await b.waitFor(
-      `!![...document.querySelectorAll('[data-tour-id="nav-more-${id}"]')].find(e => e.getBoundingClientRect().height > 0)`,
-      `the ${id} row`,
-      8_000,
-    );
-  } catch {
-    return false;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) await closeSheets();
+    if (!(await tap("nav-more"))) { lastTapFailure = `nav-more: ${lastTapFailure}`; continue; }
+    if (process.env.SAKRED_CRAWL_DEBUG) {
+      console.log("    [debug] just after tapping More: " + (await b.evaluate<string>(`
+        return "sheets=" + document.querySelectorAll('[data-tour-id="more-sheet"]').length +
+          " dialogs=" + document.querySelectorAll('[role="dialog"]').length +
+          " rows=" + document.querySelectorAll('[data-tour-id^="nav-more-"]').length +
+          " overlay=" + !!document.querySelector('[data-testid="tour-overlay"]') +
+          " body=" + JSON.stringify(document.body.innerText.trim().slice(0, 60));`)));
+    }
+
+    /* The sheet itself, before its contents. Radix keeps the content mounted
+       at zero size while closed, so "the row exists" is true before the sheet
+       has opened and a tap at that moment lands on whatever is underneath. */
+    /* An expression, not a statement. `waitFor` wraps what it is given in
+       `return (…)`, so a trailing semicolon here is a syntax error that looks
+       exactly like a sheet that never opened — six seconds of it, every time. */
+    const opened = await b
+      .waitFor(
+        `[...document.querySelectorAll('[data-tour-id="more-sheet"]')].some(e => e.getBoundingClientRect().height > 100)`,
+        "the More sheet",
+        6_000,
+      )
+      .then(() => true)
+      .catch(() => false);
+    if (!opened) {
+      lastTapFailure = await b.evaluate<string>(`
+        const sheets = [...document.querySelectorAll('[data-tour-id="more-sheet"]')];
+        const dialogs = [...document.querySelectorAll('[role="dialog"]')];
+        return "the More sheet never opened at " + innerWidth + "x" + innerHeight + " — " + sheets.length + " sheet(s) at [" +
+          sheets.map(e => Math.round(e.getBoundingClientRect().height)).join(",") + "], " +
+          dialogs.length + " dialog(s) at [" +
+          dialogs.map(e => (e.getAttribute("data-testid") || e.getAttribute("data-tour-id") || "?") + ":" +
+            Math.round(e.getBoundingClientRect().height)).join(",") + "]";`);
+      continue;
+    }
+
+    /*
+      Wait for the row to be reachable, rather than for a moment to pass.
+
+      The sheet animates up from nothing, so its rows are mounted and sized
+      zero, then sized and below the fold, then finally where a finger could
+      reach them. Two settles after the sheet passed 100px caught it mid-rise:
+      "all instances unsized or off screen" for six sections, which reads like
+      a layout problem and was a timing one. Measured on the settled sheet,
+      every row sits between y=372 and y=852 at 393×852 and every one of them
+      hit-tests to itself — there was nothing wrong with the sheet.
+    */
+    const reachable = await b
+      .waitFor(
+        `[...document.querySelectorAll('[data-tour-id="nav-more-${id}"]')].some(e => {
+           const r = e.getBoundingClientRect();
+           if (!r.width || !r.height) return false;
+           const x = r.x + r.width / 2, y = r.y + r.height / 2;
+           if (y < 0 || y > innerHeight || x < 0 || x > innerWidth) return false;
+           const hit = document.elementFromPoint(x, y);
+           return !!hit && (hit === e || e.contains(hit) || hit.contains(e));
+         })`,
+        `the ${id} row`,
+        8_000,
+      )
+      .then(() => true)
+      .catch(() => false);
+    if (!reachable) { lastTapFailure = `the ${id} row never became reachable in the open sheet`; continue; }
+
+    if (await tap(`nav-more-${id}`)) return true;
   }
-  return tap(`nav-more-${id}`);
+  return false;
+}
+
+/** Put the walkthrough away if it is running. Idempotent; safe when it is not. */
+async function dismissTour(): Promise<void> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const at = await b.evaluate<{ x: number; y: number } | null>(`
+      const el = document.querySelector('[data-testid="button-tour-pause"]');
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) return null;
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };`);
+    if (!at) return;
+    await b.clickAt(at.x, at.y);
+    await b.settle();
+  }
 }
 
 /**
@@ -329,7 +436,7 @@ async function openSection(id: string): Promise<boolean> {
  * samples a half-rendered screen finds nothing and reports it clean, which is
  * the failure mode this whole file is built to avoid.
  */
-async function settled(expect?: string): Promise<boolean> {
+async function settled(expect?: string, wasShowing?: string): Promise<boolean> {
   const deadline = Date.now() + 25_000;
   let last = "";
   let repeats = 0;
@@ -344,7 +451,22 @@ async function settled(expect?: string): Promise<boolean> {
     const now = await b.evaluate<string>(
       `return (document.documentElement.getAttribute("data-tour-section") || "?") + "|" + document.body.innerText.trim().length;`,
     );
-    const onTarget = !expect || now.startsWith(`${expect}|`);
+    /*
+      The section state changes before the content does.
+
+      `AnimatePresence mode="wait"` will not mount the incoming section until
+      the outgoing one has finished leaving, so `data-tour-section` says
+      "apothecary" while the screen is still Home — and a settle that watches
+      only the attribute and the text *length* is perfectly stable on the old
+      screen. Six secondary sections and two primaries fingerprinted
+      identically because of it, which is the same false-clean this file
+      exists to prevent, one level up again.
+
+      So the condition includes having stopped showing what we were showing.
+    */
+    const body = await b.evaluate<string>(`return document.body.innerText.trim();`);
+    const changed = wasShowing === undefined || fingerprint(body) !== wasShowing;
+    const onTarget = (!expect || now.startsWith(`${expect}|`)) && changed;
     if (onTarget && now === last && Number(now.split("|")[1]) > 0) {
       if (++repeats >= 2) return true;
     } else {
@@ -367,16 +489,50 @@ const unsettled: string[] = [];
 
 const SECTIONS = [...PRIMARY, ...SECONDARY];
 
+/** Prove the scan can fail before believing that it did not. */
+const SELFTEST = process.env.SAKRED_CRAWL_SELFTEST === "1";
+
+/*
+  Called, which it was not.
+
+  `login()` was defined here and never invoked, so every run crawled the login
+  page: twelve sections, each reported unreachable or — in an earlier shape of
+  this file, before the reachability check existed — reported clean. A crawl
+  that never gets past the front door finds no machine values anywhere, which
+  is indistinguishable from a product that has none.
+*/
+await login();
+
+/*
+  And the walkthrough put away first.
+
+  It auto-starts for an account that has not finished it, and its scrim blocks
+  every tap the crawl makes. Dismissed the way a member dismisses it rather
+  than by forging a completion record, so the crawl inspects the same app
+  anybody else gets.
+*/
+await dismissTour();
+
 for (const theme of ["dark", "light"] as const) {
   await b.goto(`${BASE}/member`);
   await settled("home");
+  await dismissTour();
   await b.evaluate(`document.documentElement.setAttribute("data-theme", ${JSON.stringify(theme)}); return true;`);
 
   for (const id of SECTIONS) {
+    /* What the screen was before the tap, so "it changed" is a fact and not a
+       hope about animation timing. */
+    const before = fingerprint(await b.evaluate<string>(`return document.body.innerText.trim();`));
     const reached = await openSection(id);
     const surface = `${id} (${theme})`;
     if (!reached) {
-      unreachable.push(`${surface} [${lastTapFailure}]`);
+      /* With what the page actually was at that moment. "no such anchor"
+         without it sent two runs looking for a covered control when the
+         portal had not rendered at all. */
+      const where = await b.evaluate<string>(`
+        return location.pathname + " · " + document.querySelectorAll("[data-tour-id]").length + " anchors · " +
+          JSON.stringify(document.body.innerText.trim().slice(0, 120));`).catch(() => "unknown");
+      unreachable.push(`${surface} [${lastTapFailure}] at ${where}`);
       continue;
     }
     /*
@@ -384,9 +540,40 @@ for (const theme of ["dark", "light"] as const) {
       unsettled screen is a screen this crawl did not actually inspect, and
       counting it as clean is the lie the whole file exists to prevent.
     */
-    if (!(await settled(id))) {
+    if (!(await settled(id, before))) {
       unsettled.push(surface);
       continue;
+    }
+    /*
+      The negative control, run as part of the real crawl rather than beside
+      it.
+
+      This file has reported "clean across eighteen surfaces" three separate
+      times while reading the login page, reading shared chrome, and reading
+      the previous section. A clean result is only worth anything if a dirty
+      one would have been caught on the same pass, through the same collector,
+      on a real surface — so one surface gets a machine value planted in it
+      and the run fails if the scan does not find exactly that.
+    */
+    const planted = SELFTEST && surface === `home (dark)`;
+    if (planted) {
+      await b.evaluate(`
+        const p = document.createElement("p");
+        p.textContent = "Sakred reads this as full_body.";
+        p.setAttribute("data-testid", "crawl-selftest");
+        document.body.appendChild(p);
+        return true;`);
+    }
+    if (planted) {
+      const probe = JSON.parse(await b.evaluate<string>(COLLECT)) as Seen[];
+      const caught = inspect(surface, probe).filter((l) => l.token === "full_body");
+      check("the scanner catches a machine value planted in a real surface", caught.length === 1,
+        `found ${caught.length}`);
+      /* Removed before the real scan, and the surface still goes on to be
+         crawled and to return home — a control that derails the run it is
+         controlling is not a control. */
+      await b.evaluate(`document.querySelector('[data-testid="crawl-selftest"]')?.remove(); return true;`);
+      await b.settle();
     }
     const seen = JSON.parse(await b.evaluate<string>(COLLECT)) as Seen[];
     visited.push(surface);
@@ -426,10 +613,17 @@ check("every section settled", unsettled.length === 0, unsettled.join(", "));
 {
   const dark = Array.from(fingerprints.entries()).filter(([k]) => k.includes("(dark)"));
   const distinct = new Set(dark.map(([, v]) => v));
+  /* Named, because "6 distinct of 11" does not say which five screens the
+     crawl was actually reading, and that is the whole question. */
+  const byPrint = new Map<string, string[]>();
+  for (const [surface, print] of dark) {
+    byPrint.set(print, [...(byPrint.get(print) ?? []), surface.replace(" (dark)", "")]);
+  }
+  const collisions = [...byPrint.values()].filter((names) => names.length > 1);
   check(
     "each section rendered something different",
     distinct.size >= Math.ceil(dark.length * 0.6),
-    `${distinct.size} distinct of ${dark.length} sections — the rest resolved to the same screen`,
+    `${distinct.size} distinct of ${dark.length} — same screen: ${collisions.map((n) => n.join("=")).join(", ")}`,
   );
   const empty = dark.filter(([, v]) => Number(v.split(":")[0]) < 40).map(([k]) => k);
   check("no section rendered an empty page", empty.length === 0, empty.join(", "));

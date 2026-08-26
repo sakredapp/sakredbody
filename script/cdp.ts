@@ -209,16 +209,39 @@ export class Browser {
    * would make every geometry assertion pass vacuously.
    */
   async evaluate<T = unknown>(expression: string): Promise<T> {
-    const res = await this.send("Runtime.evaluate", {
-      expression: `(() => { ${expression} })()`,
-      returnByValue: true,
-      awaitPromise: true,
-    });
-    if (res.exceptionDetails) {
-      const e = res.exceptionDetails;
-      throw new Error(`page threw: ${e.exception?.description ?? e.text}`);
+    /*
+      Retried once across a navigation.
+
+      A tap can start a navigation the caller did not know was coming — a row
+      that turns out to be a route, a session that expired into /login — and
+      the next `Runtime.evaluate` lands in the middle of it. Chrome answers
+      "Inspected target navigated or closed", which is not a page error and
+      not a harness bug: it is a question asked of a document that no longer
+      exists. Asking the new one is the correct behaviour, and it is a much
+      smaller surprise than a crawl abandoning itself two thirds of the way
+      through with a stack trace about a WebSocket.
+    */
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const res = await this.send("Runtime.evaluate", {
+          /* `async`, so a probe can await inside the page. The wrapper is a
+             function either way and `awaitPromise` below unwraps the result,
+             so nothing that worked before behaves differently. */
+          expression: `(async () => { ${expression} })()`,
+          returnByValue: true,
+          awaitPromise: true,
+        });
+        if (res.exceptionDetails) {
+          const e = res.exceptionDetails;
+          throw new Error(`page threw: ${e.exception?.description ?? e.text}`);
+        }
+        return res.result.value as T;
+      } catch (err) {
+        const message = (err as Error).message;
+        if (attempt > 0 || !/navigated or closed|Execution context was destroyed/.test(message)) throw err;
+        await new Promise((r) => setTimeout(r, 250));
+      }
     }
-    return res.result.value as T;
   }
 
   async goto(url: string): Promise<void> {

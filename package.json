@@ -30,7 +30,8 @@
     "qa:serve": "script/qa-serve.sh",
     "qa:motion": "tsx script/qa-motion.ts",
     "qa:walkthrough": "tsx script/qa-walkthrough.ts",
-    "qa:atmosphere": "tsx script/qa-atmosphere-geometry.ts"
+    "qa:atmosphere": "tsx script/qa-atmosphere-geometry.ts",
+    "qa:presentation": "tsx script/qa-presentation.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.116.0",
