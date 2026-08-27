@@ -71,6 +71,40 @@ const signIn = await b.evaluate<{ x: number; y: number }>(
 await b.clickAt(signIn.x, signIn.y);
 await b.waitFor("location.pathname === '/member'", "the portal", 25_000);
 
+/**
+ * Every workout an earlier run left open, discarded.
+ *
+ * This file opens a workout and does not always close it, and an open workout
+ * changes what Build offers: `one-open-workout` means the screen shows Resume
+ * where this harness taps Start, so the sheet never comes and the failure
+ * reads as "no workout sheet". It was an unexplained flake for weeks, and the
+ * explanation was that the previous run of this file caused it.
+ *
+ * Through the same DELETE the Build screen uses for a blocking session, so
+ * this exercises the route rather than reaching past it into the database.
+ */
+async function discardOpenWorkouts(): Promise<number> {
+  return await b.evaluate<number>(`
+    const res = await fetch("/api/training/sessions/open", { credentials: "include" });
+    if (!res.ok) return 0;
+    const body = await res.json();
+    const open = Array.isArray(body) ? body : body.session ? [body.session] : body.sessions ?? [];
+    let gone = 0;
+    for (const s of open) {
+      if (!s || !s.id) continue;
+      const del = await fetch("/api/training/sessions/" + s.id, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (del.ok) gone++;
+    }
+    return gone;
+  `);
+}
+
+const discarded = await discardOpenWorkouts();
+if (discarded) console.log(`  discarded ${discarded} workout(s) left open by an earlier run`);
+
 /** Tap whatever is reachable, hit-tested, by testid or tour id. */
 async function tap(selector: string): Promise<boolean> {
   const at = await b.evaluate<{ x: number; y: number } | null>(`
