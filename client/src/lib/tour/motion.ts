@@ -62,7 +62,22 @@ export const MAX_DIRECTED = 3;
  */
 export const HOLD_LIMIT = 240;
 
-/** Scroll offsets are fractional on some devices. Below this is not a move. */
+/**
+ * Scroll offsets are fractional on some devices. Below this is not a move.
+ *
+ * Applied to the whole stillness window rather than to one frame at a time,
+ * and the difference is a defect. A smooth scroll does not stop; it
+ * decelerates, and its last hundred milliseconds move about a pixel a frame.
+ * Compared frame to frame that is "unchanged" three times running, so the
+ * machine called it landed with travel still to come — and the travel that
+ * came was then the only thing that could have moved the page, which is the
+ * definition of the member taking over.
+ *
+ * Measured on the real Restore transition: 606, 607, 608, 609, 610 → held at
+ * 610 → 611 → released:momentum at 898ms, with nobody touching anything, and
+ * the card then drifted 52px out from under its halo with nothing left to
+ * correct it. Across the window those five frames are four pixels, not one.
+ */
 const EPSILON = 1;
 
 export type MotionPhase =
@@ -79,7 +94,13 @@ export type MotionState = {
   phase: MotionPhase;
   /** Consecutive frames the scroll offset has been unchanged. */
   still: number;
-  /** The last offset seen, to notice stillness. */
+  /**
+   * The offset the current stillness run started from.
+   *
+   * Not the previous frame's offset. Stillness is measured against where the
+   * run began, so a deceleration that creeps a pixel per frame accumulates
+   * instead of resetting the comparison each time. See EPSILON.
+   */
   seen: number | null;
   /**
    * Where the scroller should be if nobody but the hold has touched it.
@@ -154,9 +175,11 @@ export function nextMotion(
   state: MotionState,
   reading: MotionReading,
 ): { state: MotionState; command: MotionCommand } {
-  const still =
-    state.seen !== null && Math.abs(reading.scroll - state.seen) <= EPSILON ? state.still + 1 : 0;
-  const base: MotionState = { ...state, still, seen: reading.scroll };
+  /* Against the start of the run, not against the frame before — a creeping
+     deceleration is one move, not a sequence of non-moves. */
+  const held = state.seen !== null && Math.abs(reading.scroll - state.seen) <= EPSILON;
+  const still = held ? state.still + 1 : 0;
+  const base: MotionState = { ...state, still, seen: held ? state.seen : reading.scroll };
 
   /* The member's own scrolling ends the tour's claim on the page, in every
      phase. Not "for this frame" — for the rest of the lesson. */

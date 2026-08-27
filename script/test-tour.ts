@@ -1158,6 +1158,102 @@ check(
   check("and it is held once the page stops", landed.state.phase === "holding", landed.state.phase);
 }
 
+/**
+ * A smooth scroll does not stop. It decelerates.
+ *
+ * The tail of one moves about a pixel a frame for its last hundred
+ * milliseconds. Compared frame to frame that reads as "unchanged" — within
+ * EPSILON — three times running, so the machine called it landed with travel
+ * still to come, and the travel that came was then the only thing that could
+ * have moved the page. Released as `momentum`, with nobody touching anything.
+ *
+ * Measured on the real Restore transition at 393x852: held at 610, released
+ * at 611, 898ms in, and the card then drifted 52px out from under its own
+ * halo with the tour gone quiet. This is that sequence.
+ */
+{
+  const creep = [606, 607, 608, 609, 610].map((scroll) =>
+    frame({ targetDoc: 1073, scroll, visible: true }),
+  );
+  const arrive = [
+    frame({ targetDoc: 1073, scroll: 0 }),
+    frame({ targetDoc: 1073, scroll: 66 }),
+    ...creep,
+  ];
+  const mid = replayMotion(arrive);
+  check(
+    "a decelerating scroll is not mistaken for a stopped one",
+    mid.state.phase === "directing",
+    `${mid.state.phase}:${mid.state.reason}`,
+  );
+
+  /* And the pixel it still had to travel is not the member. */
+  const tail = replayMotion([...arrive, frame({ targetDoc: 1073, scroll: 611, visible: true })]);
+  check(
+    "so its last pixel is not read as the member taking over",
+    tail.state.reason !== "momentum",
+    `${tail.state.phase}:${tail.state.reason}`,
+  );
+
+  /* Once it genuinely stops, it holds — and then absorbs the content that
+     arrives above it, which is the whole point of holding at all. */
+  const stopped = replayMotion([
+    ...arrive,
+    ...Array.from({ length: STILL_FRAMES + 1 }, () =>
+      frame({ targetDoc: 1073, scroll: 611, visible: true }),
+    ),
+  ]);
+  check("and a scroll that has stopped is held", stopped.state.phase === "holding", stopped.state.phase);
+
+  const shifted = replayMotion([
+    ...arrive,
+    ...Array.from({ length: STILL_FRAMES + 1 }, () =>
+      frame({ targetDoc: 1073, scroll: 611, visible: true }),
+    ),
+    frame({ targetDoc: 1121, scroll: 611, visible: true }),
+  ]);
+  const answer = shifted.commands.at(-1);
+  check(
+    "and the content that arrives above it is answered, not watched",
+    answer?.do === "hold" && answer.by === 48,
+    JSON.stringify(shifted.commands),
+  );
+}
+
+/**
+ * The member still wins, and a real gesture must still end the hold.
+ *
+ * Measuring stillness across the window rather than frame to frame is what
+ * fixes the deceleration above. It must not also make the machine deaf: a
+ * page that is held and then moved by a hand is exactly the reading the
+ * `momentum` branch exists for.
+ */
+{
+  const settled = [
+    frame({ targetDoc: 1073, scroll: 0 }),
+    frame({ targetDoc: 1073, scroll: 611, visible: true }),
+    ...Array.from({ length: STILL_FRAMES + 1 }, () =>
+      frame({ targetDoc: 1073, scroll: 611, visible: true }),
+    ),
+  ];
+  const flicked = replayMotion([...settled, frame({ targetDoc: 1000, scroll: 684, visible: true })]);
+  check(
+    "a page that moves under a settled hold still releases",
+    flicked.state.phase === "released" && flicked.state.reason === "momentum",
+    `${flicked.state.phase}:${flicked.state.reason}`,
+  );
+
+  const touched = replayMotion([
+    ...settled,
+    frame({ targetDoc: 1073, scroll: 611, visible: true, memberMoved: true }),
+  ]);
+  check(
+    "and a gesture releases it whatever the offset did",
+    touched.state.phase === "released" && touched.state.reason === "member",
+    `${touched.state.phase}:${touched.state.reason}`,
+  );
+}
+
 // ─── Motion: which side the panel takes ──────────────────────────────────
 
 check(
