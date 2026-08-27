@@ -33,8 +33,24 @@ if [ ! -f android/keystore.properties ]; then
   exit 1
 fi
 
-echo "› building web client"
-npm run build:client >/dev/null
+# Rebuilding the client here is what broke the iOS/Android pair.
+#
+# Cut iOS first and its archive consumes one build; then this script makes
+# another and Android ships that. Two web applications from one SHA — it
+# happened on the first archive of build 34, whose bundle carried four asset
+# names that were nowhere in dist.
+#
+# The client is reproducible now, so a rebuild would produce the same bytes,
+# and the parity check below proves it rather than assuming it. Set
+# SAKRED_SKIP_CLIENT_BUILD=1 when the pair is being cut from one build that
+# has already been made — script/release-pair.sh does.
+if [ "${SAKRED_SKIP_CLIENT_BUILD:-0}" = "1" ]; then
+  echo "› using the client build already in dist/"
+  [ -d dist/public ] || { echo "  …except there isn't one. Run npm run build first." >&2; exit 1; }
+else
+  echo "› building web client"
+  npm run build:client >/dev/null
+fi
 
 echo "› syncing native project"
 npx cap sync android >/dev/null
@@ -54,6 +70,12 @@ node script/normalise-native-paths.mjs
 # And refuse to go further if anything still escapes. A release artifact that
 # depends on this machine's neighbouring directory must not be uploadable.
 node script/normalise-native-paths.mjs --check
+
+# And refuse to build a shell whose web payload is not the one in dist. This
+# is the check that makes "one commit, one application" a property of the
+# release rather than a habit of whoever cut it.
+echo "› checking the web payload against dist"
+node script/native-parity.mjs
 
 echo "› assembling signed bundle"
 (cd android && ./gradlew bundleRelease --no-daemon -q)

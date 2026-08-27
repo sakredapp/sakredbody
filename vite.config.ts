@@ -28,10 +28,48 @@ function gitSha(): string {
   }
 }
 
+/**
+ * When this bundle was built — as the commit's own date, not the clock.
+ *
+ * ── Why not `new Date()` ──────────────────────────────────────────────────
+ *
+ * It was, and it made the client irreproducible. This string lands in
+ * MemberDashboard, so a second build of an unchanged tree gives that chunk a
+ * new hash, which renames it, which changes every chunk that imports it, which
+ * changes the entry, which changes everything. Measured: two builds three
+ * seconds apart shared 11 of 56 filenames, and 54 of 55 chunks were
+ * byte-identical once the hashes were normalised out. One timestamp moved the
+ * whole graph.
+ *
+ * That is not cosmetic. `build-aab.sh` rebuilds the client, so an iOS sync
+ * followed by an Android build produced a release pair from one commit
+ * carrying two separately built applications. Semantically the same and
+ * provably neither: nothing downstream could show they matched.
+ *
+ * The commit's own date answers the same question — "what is this phone
+ * running" — is stable for a given SHA, and cannot drift from the SHA printed
+ * beside it. `SOURCE_DATE_EPOCH` is honoured first, which is the convention
+ * for exactly this, so a CI that sets it stays reproducible too.
+ *
+ * The fallback is a constant rather than the clock. A build with no git and no
+ * epoch should say it does not know, not quietly reintroduce the defect.
+ */
+function builtAt(): string {
+  const epoch = process.env.SOURCE_DATE_EPOCH;
+  if (epoch && /^\d+$/.test(epoch)) return new Date(Number(epoch) * 1000).toISOString();
+  try {
+    return new Date(
+      execSync("git log -1 --format=%cI", { encoding: "utf8" }).trim(),
+    ).toISOString();
+  } catch {
+    return "unknown";
+  }
+}
+
 export default defineConfig({
   define: {
     __BUILD_SHA__: JSON.stringify(gitSha()),
-    __BUILT_AT__: JSON.stringify(new Date().toISOString()),
+    __BUILT_AT__: JSON.stringify(builtAt()),
   },
   plugins: [
     react(),
