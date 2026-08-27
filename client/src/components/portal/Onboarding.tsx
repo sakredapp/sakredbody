@@ -6,6 +6,7 @@
  *   photo          a face instead of two letters
  *   health         Apple Health / Health Connect
  *   notifications  the morning brief, and how much of it
+ *   goals          what they are working toward, if anything
  *   widget         how to put it on the home screen
  *
  * Intake is first on purpose. It is the only step that changes what the app
@@ -20,6 +21,13 @@
  * member has to find it in Settings, which means they never will.
  *
  * So every step here is the sentence before the sheet, not the sheet.
+ *
+ * Goals is the exception to that pattern and sits second to last for it. It
+ * asks for nothing the system needs permission to do — it is the one step that
+ * is purely the member telling Sakred something — so it comes after the app
+ * has earned a little trust rather than before. Widget is last because it is
+ * an instruction rather than a question: the last thing anybody is *asked* is
+ * what they are working toward.
  *
  * A member can leave at any point and nothing is lost: each answer is recorded
  * as it is given, and what they skipped is asked again in a fortnight.
@@ -138,9 +146,9 @@ function remember(userId: string, kind: "done" | "snoozed"): void {
   }
 }
 
-type Step = "intake" | "photo" | "health" | "notifications" | "widget";
+type Step = "intake" | "photo" | "health" | "notifications" | "goals" | "widget";
 
-export function Onboarding() {
+export function Onboarding({ onOpenGoals }: { onOpenGoals?: () => void } = {}) {
   const { available, platform, connect } = useHealthSync();
   const status = useHealthStatus();
   const isLoading = status.isLoading;
@@ -333,7 +341,7 @@ export function Onboarding() {
     setNoticeDepth(next);
     answers.current.notice = next;
     if (next === "off") {
-      setStep("widget");
+      setStep("goals");
       return;
     }
     setNotifyBusy(true);
@@ -345,7 +353,7 @@ export function Onboarding() {
     // off, and the audit should say so.
     answers.current.notice = granted ? next : "off";
     setNotifyBusy(false);
-    setStep("widget");
+    setStep("goals");
   };
 
   return (
@@ -540,10 +548,62 @@ export function Onboarding() {
 
             <Button
               variant="ghost"
-              onClick={() => setStep("widget")}
+              onClick={() => setStep("goals")}
               className="text-muted-foreground"
             >
               Skip
+            </Button>
+          </>
+        )}
+
+        {step === "goals" && (
+          <>
+            <DialogHeader>
+              <StarMark seed="goals" className="h-11 w-11 mb-2" />
+              <DialogTitle className="font-display text-xl">
+                What are you working toward?
+              </DialogTitle>
+              <DialogDescription className="text-sm leading-relaxed">
+                A clear target gives Sakred more context for what you're building capacity for.
+                You can add one later, or never.
+              </DialogDescription>
+            </DialogHeader>
+
+            {/*
+              Examples rather than a blank field with a placeholder.
+
+              Asked cold, almost everybody writes "get fitter" — which is the
+              one answer nothing can ever measure and nothing can ever show
+              progress against. Three specific goals do the teaching that a
+              hint text cannot: they say what shape of thing this is for.
+            */}
+            <ul className="text-sm text-muted-foreground space-y-1 py-1">
+              <li>Run a six-minute mile</li>
+              <li>15 pull-ups</li>
+              <li>Complete 60 minutes of yoga</li>
+            </ul>
+
+            <Button
+              onClick={() => {
+                setStep("widget");
+                onOpenGoals?.();
+              }}
+              data-testid="onboarding-goals"
+            >
+              Add a goal
+            </Button>
+            {/*
+              Skip is a real answer here, not a way out. Plenty of people train
+              without a nameable target, and a goal invented to get past a
+              modal is a goal that will sit on their screen unmet forever.
+            */}
+            <Button
+              variant="ghost"
+              onClick={() => setStep("widget")}
+              className="text-muted-foreground"
+              data-testid="onboarding-goals-skip"
+            >
+              Skip for now
             </Button>
           </>
         )}

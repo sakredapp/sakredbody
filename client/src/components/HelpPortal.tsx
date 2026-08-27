@@ -157,6 +157,36 @@ export function HelpPortal({ isCoach = false }: { isCoach?: boolean }) {
         </Panel>
       ))}
 
+      {/* ── Things that are not lessons ──────────────────────────────────── */}
+
+      {/*
+        Goals are here rather than as lesson 27.
+
+        The walkthrough is certified — twenty-six steps, twenty-six anchors,
+        a release gate that fails when one is missing, and a rollout that has
+        already run. Adding a step to it because a feature shipped would mean
+        re-certifying a tour so that somebody can be told about a screen they
+        can reach in two taps from this page. Goals are learned where they are
+        used: at intake, in More, and in the strip on Build and Restore.
+
+        What belongs here is the map entry, so a member looking for it in the
+        manual finds it. A future tour version can take it deliberately.
+      */}
+      <Panel title="Goals & Progress" data-testid="help-goals">
+        <ul className="space-y-1.5 text-sm text-muted-foreground">
+          <li>Setting a target Sakred can actually measure</li>
+          <li>Target, best and latest — why they are three different numbers</li>
+          <li>Where progress comes from, and what Sakred will not infer</li>
+          <li>Moving a target, and why the old one is kept</li>
+          <li>Setting a goal down, and picking it back up</li>
+        </ul>
+        <p className="text-xs text-muted-foreground/80 mt-3">
+          Your goals live under More. Sakred only records progress it can point at — a set you
+          logged, a session your phone recorded that matches what the goal is about — and
+          everything else is yours to enter.
+        </p>
+      </Panel>
+
       {/* ── The coach's half ─────────────────────────────────────────────── */}
 
       {/*

@@ -189,8 +189,75 @@ const PUMP_RAF = `
 })();
 `;
 
+/**
+ * A run that says where it got to, so silence cannot be read as success.
+ *
+ * ── The thing this is for ────────────────────────────────────────────────
+ *
+ * One run in eight produced no output at all: no assertions, no failures, no
+ * error, exit code zero. That is the worst possible shape for a check to fail
+ * in, because a caller reading only the exit code records it as a pass, and a
+ * human scrolling past sees nothing to be alarmed by. It has happened twice
+ * and neither time was reproducible.
+ *
+ * So rather than investigate a ghost, make it impossible to misread. Each
+ * stage prints as it is reached and the run ends with a verdict line; a stage
+ * list that stops halfway says exactly which crossing died, and no verdict
+ * line at all is itself the finding.
+ *
+ * `--verify` is what a caller uses when it cannot watch: it re-runs this file
+ * and fails if the output does not end in a verdict.
+ */
+const startedAt = Date.now();
+function stage(name: string): void {
+  const seconds = ((Date.now() - startedAt) / 1000).toFixed(1);
+  console.log(`· ${name} (${seconds}s)`);
+}
+
+/*
+  Anything that takes the process down without reaching the verdict is
+  reported as a stage rather than swallowed by the runner. An unhandled
+  rejection inside a CDP callback is the most likely cause of a silent exit —
+  the websocket handler is not inside anybody's try.
+*/
+process.on("unhandledRejection", (err) => {
+  console.error(`\n✗ presentation boundary — unhandled rejection after "${lastStage}"\n`);
+  console.error(`    ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`);
+  process.exit(1);
+});
+process.on("uncaughtException", (err) => {
+  console.error(`\n✗ presentation boundary — uncaught exception after "${lastStage}"\n`);
+  console.error(`    ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`);
+  process.exit(1);
+});
+/*
+  An exit with no verdict, whatever caused it. `process.exit` inside the
+  handlers above skips this by setting `verdict` first; anything else — a
+  library calling exit, an event loop that simply empties — lands here.
+*/
+let verdict = false;
+let lastStage = "start";
+process.on("exit", (code) => {
+  if (verdict) return;
+  console.error(
+    `\n✗ presentation boundary — the run ended after "${lastStage}" without a verdict (exit ${code})\n`,
+  );
+  /*
+    And it fails. An exit handler can still set the code, which is what turns
+    "produced no output" from something a caller records as a pass into
+    something it records as a failure. That is the whole point: the run may
+    still die in a way nobody has reproduced, but it can no longer die
+    quietly.
+  */
+  process.exitCode = 1;
+});
+
 const b = new Browser();
+stage("browser launching");
+lastStage = "browser launching";
 await b.launch();
+stage("browser up");
+lastStage = "browser up";
 await b.send("Page.enable").catch(() => {});
 await b.send("Page.addScriptToEvaluateOnNewDocument", { source: PUMP_RAF });
 await b.headers({ "X-Forwarded-Proto": "https" });
@@ -584,7 +651,11 @@ const SELFTEST = process.env.SAKRED_CRAWL_SELFTEST === "1";
   that never gets past the front door finds no machine values anywhere, which
   is indistinguishable from a product that has none.
 */
+stage("logging in");
+lastStage = "logging in";
 await login();
+stage("logged in");
+lastStage = "logged in";
 
 /*
   And the walkthrough put away first.
@@ -595,6 +666,8 @@ await login();
   anybody else gets.
 */
 await dismissTour();
+stage("walkthrough cleared — crawling");
+lastStage = "crawling";
 
 for (const theme of ["dark", "light"] as const) {
   await b.goto(`${BASE}/member`);
@@ -729,6 +802,7 @@ if (leaks.length) {
   console.error("");
 }
 
+verdict = true;
 if (failures.length) {
   console.error("✗ presentation boundary\n");
   for (const f of failures) console.error(`    ${f}`);

@@ -509,7 +509,10 @@ export default function MemberDashboard() {
       {/* Asked once on the way in, snoozed for a fortnight if declined. A
           member who never opens Stats never learns the app can read their
           ring, so the feature may as well not exist for them. */}
-      <Onboarding />
+      {/* "Add a goal" opens the Goals screen rather than a form inside the
+          modal: one place where a goal is written, so the entry fields and
+          the validation cannot drift into two versions. */}
+      <Onboarding onOpenGoals={() => setSection("goals")} />
 
       {/* ─── Header ─── */}
       <header className="sticky top-0 pt-safe border-b border-border/50 bg-background/90 backdrop-blur-md" style={{ zIndex: 9999 }}>
