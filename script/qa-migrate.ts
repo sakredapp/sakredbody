@@ -51,18 +51,51 @@ try {
   process.exit(1);
 }
 
-/** What is actually there now. Never what the statement said it did. */
-const { rows } = await client.query(`
-  SELECT t.tablename,
-         t.rowsecurity,
-         (SELECT count(*) FROM pg_policies p WHERE p.tablename = t.tablename) AS policies,
-         (SELECT count(*) FROM information_schema.columns c WHERE c.table_name = t.tablename) AS columns,
-         (SELECT count(*) FROM pg_indexes i WHERE i.tablename = t.tablename) AS indexes
-    FROM pg_tables t
-   WHERE t.schemaname = 'public'
-     AND t.tablename LIKE 'recommendation%'
-   ORDER BY t.tablename
-`);
+/**
+ * What is actually there now. Never what the statement said it did.
+ *
+ * The tables this file names, rather than a pattern.
+ *
+ * This was `tablename LIKE 'recommendation%'`, which was correct for the one
+ * migration it was written alongside and silently correct for no other: run
+ * against the goals migration it printed the recommendation tables and said
+ * nothing at all about the four that had just been created. A verification
+ * step that reports on the wrong tables is worse than none, because the output
+ * looks like a check that passed.
+ */
+const named = [
+  ...new Set([
+    ...Array.from(sql.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/gi)).map((m) => m[1]),
+    ...Array.from(sql.matchAll(/ALTER TABLE (?:IF EXISTS )?(\w+)/gi)).map((m) => m[1]),
+  ]),
+];
+if (named.length === 0) {
+  console.error("\n✗ nothing to verify — this file names no table to look at\n");
+  await client.end();
+  process.exit(1);
+}
+
+const { rows } = await client.query(
+  `SELECT t.tablename,
+          t.rowsecurity,
+          (SELECT count(*) FROM pg_policies p WHERE p.tablename = t.tablename) AS policies,
+          (SELECT count(*) FROM information_schema.columns c WHERE c.table_name = t.tablename) AS columns,
+          (SELECT count(*) FROM pg_indexes i WHERE i.tablename = t.tablename) AS indexes
+     FROM pg_tables t
+    WHERE t.schemaname = 'public'
+      AND t.tablename = ANY($1::text[])
+    ORDER BY t.tablename`,
+  [named],
+);
 console.table(rows);
+
+/* A table the file creates and the database does not have is the failure this
+   whole step exists for, and it is silent in a row count. */
+const missing = named.filter((t) => !rows.some((r) => r.tablename === t));
+if (missing.length) {
+  console.error(`\n✗ named but not present afterwards: ${missing.join(", ")}\n`);
+  await client.end();
+  process.exit(1);
+}
 
 await client.end();

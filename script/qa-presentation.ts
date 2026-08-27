@@ -50,6 +50,7 @@
  */
 
 import { Browser } from "./cdp.js";
+import { Portal, PRIMARY_SECTIONS } from "./portal.js";
 import { SET_STYLES, EXERCISE_CATEGORIES } from "../shared/models/training.js";
 import { WORKOUT_FOCUSES } from "../shared/models/health.js";
 import { LOAD_CLASSES } from "../shared/models/loadClass.js";
@@ -261,28 +262,20 @@ lastStage = "browser up";
 await b.send("Page.enable").catch(() => {});
 await b.send("Page.addScriptToEvaluateOnNewDocument", { source: PUMP_RAF });
 await b.headers({ "X-Forwarded-Proto": "https" });
+await b.viewport(393, 852);
 
-async function login(): Promise<void> {
-  await b.viewport(393, 852);
-  await b.goto(`${BASE}/login`);
-  await b.waitFor("document.querySelectorAll('input').length >= 2", "the login form", 25_000);
-  await b.evaluate(`
-    const set = (el, v) => {
-      Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), "value").set.call(el, v);
-      el.dispatchEvent(new Event("input", { bubbles: true }));
-    };
-    const [e, p] = document.querySelectorAll("input");
-    set(e, "qa.member@sakred.local"); set(p, ${JSON.stringify(PASSWORD)});
-    return true;
-  `);
-  await b.settle();
-  const at = await b.evaluate<{ x: number; y: number }>(`
-    const q = [...document.querySelectorAll("button")].find(x => x.textContent.trim() === "Sign In").getBoundingClientRect();
-    return { x: q.x + q.width / 2, y: q.y + q.height / 2 };
-  `);
-  await b.clickAt(at.x, at.y);
-  await b.waitFor("location.pathname === '/member'", "the portal", 25_000);
-}
+/*
+  Logging in, closing sheets and opening a section live in script/portal.ts.
+
+  Every one of them was written here first and learned the hard way — the
+  zero-size sheet, the scrim that swallowed five sections, the tap that landed
+  and navigated nothing — and then written a second time in the next harness
+  that needed them. Three harnesses is where a shared boundary stops being an
+  abstraction and starts being the thing the section-readiness attributes were
+  introduced for.
+*/
+const portal = new Portal(b, BASE);
+
 
 /**
  * Every section of the member portal, and how a member gets to one.
@@ -298,7 +291,7 @@ async function login(): Promise<void> {
  * itself under the scanner, which matters — a sheet is precisely the kind of
  * surface nobody screenshots.
  */
-const PRIMARY = ["home", "restore", "build", "community", "body"] as const;
+const PRIMARY = PRIMARY_SECTIONS;
 const SECONDARY = [
   "goals",
   "retreat", "apothecary", "library", "masterclass", "wins", "help", "settings",
@@ -322,24 +315,6 @@ const SECONDARY = [
  * difference, and without it a covered control looks identical to a control
  * that was tapped and did nothing.
  */
-const SIZED = (id: string) => `
-  const els = [...document.querySelectorAll('[data-tour-id="${id}"]')];
-  let why = "";
-  for (const el of els) {
-    const r = el.getBoundingClientRect();
-    if (r.width === 0 || r.height === 0) continue;
-    const x = r.x + r.width / 2, y = r.y + r.height / 2;
-    if (y < 0 || y > innerHeight || x < 0 || x > innerWidth) continue;
-    const hit = document.elementFromPoint(x, y);
-    if (!hit) { why = "nothing at the point"; continue; }
-    if (hit !== el && !el.contains(hit) && !hit.contains(el)) {
-      why = "covered by " + (hit.getAttribute("data-testid") || hit.getAttribute("data-tour-id") || hit.tagName);
-      continue;
-    }
-    return { x, y, why: "" };
-  }
-  return { x: -1, y: -1, why: why || (els.length ? "all instances unsized or off screen" : "no such anchor") };
-`;
 
 /** djb2 — a cheap identity for "did this screen change at all". */
 function fingerprint(text: string): string {
@@ -349,18 +324,8 @@ function fingerprint(text: string): string {
 }
 
 /** Why a tap could not be made, for the last failure. Reported, not guessed at. */
-let lastTapFailure = "";
 
-async function tap(id: string): Promise<boolean> {
-  const at = await b.evaluate<{ x: number; y: number; why: string }>(SIZED(id));
-  if (!at || at.x < 0) {
-    lastTapFailure = `${id}: ${at?.why ?? "no result"}`;
-    return false;
-  }
-  await b.clickAt(at.x, at.y);
-  await b.settle();
-  return true;
-}
+
 
 /**
  * Leave no sheet open behind us.
@@ -375,180 +340,10 @@ async function tap(id: string): Promise<boolean> {
  * Escape rather than a click on the backdrop: a backdrop click is a coordinate
  * and coordinates are what got us here.
  */
-async function closeSheets(): Promise<void> {
-  const open = () =>
-    b.evaluate<boolean>(
-      `return [...document.querySelectorAll('[data-tour-id="more-sheet"], [role="dialog"]')]
-         .some(e => e.getBoundingClientRect().height > 0);`,
-    );
-  for (let attempt = 0; attempt < 4 && (await open()); attempt++) {
-    await b.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
-    await b.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
-    await b.settle();
-    await b.settle();
-  }
-}
 
 /** Land on a section, from wherever the crawl currently is. */
-async function openSection(id: string): Promise<boolean> {
-  await closeSheets();
-  if ((PRIMARY as readonly string[]).includes(id)) return tap(`nav-${id}`);
-
-  /*
-    Twice if need be.
-
-    Opening the sheet is a two-step gesture and the first step is not reliable
-    from every starting point: the first secondary section of a run opened
-    fine and every one after it failed with "all instances unsized or off
-    screen" — the sheet had been asked to open and had not finished, or had
-    opened and closed again behind the row we were waiting for. Retrying the
-    whole gesture is honest about that; waiting longer inside it was not,
-    because the row genuinely was not there.
-  */
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt > 0) await closeSheets();
-    if (!(await tap("nav-more"))) { lastTapFailure = `nav-more: ${lastTapFailure}`; continue; }
-    if (process.env.SAKRED_CRAWL_DEBUG) {
-      console.log("    [debug] just after tapping More: " + (await b.evaluate<string>(`
-        return "sheets=" + document.querySelectorAll('[data-tour-id="more-sheet"]').length +
-          " dialogs=" + document.querySelectorAll('[role="dialog"]').length +
-          " rows=" + document.querySelectorAll('[data-tour-id^="nav-more-"]').length +
-          " overlay=" + !!document.querySelector('[data-testid="tour-overlay"]') +
-          " body=" + JSON.stringify(document.body.innerText.trim().slice(0, 60));`)));
-    }
-
-    /* The sheet itself, before its contents. Radix keeps the content mounted
-       at zero size while closed, so "the row exists" is true before the sheet
-       has opened and a tap at that moment lands on whatever is underneath. */
-    /* An expression, not a statement. `waitFor` wraps what it is given in
-       `return (…)`, so a trailing semicolon here is a syntax error that looks
-       exactly like a sheet that never opened — six seconds of it, every time. */
-    const opened = await b
-      .waitFor(
-        `[...document.querySelectorAll('[data-tour-id="more-sheet"]')].some(e => e.getBoundingClientRect().height > 100)`,
-        "the More sheet",
-        6_000,
-      )
-      .then(() => true)
-      .catch(() => false);
-    if (!opened) {
-      lastTapFailure = await b.evaluate<string>(`
-        const sheets = [...document.querySelectorAll('[data-tour-id="more-sheet"]')];
-        const dialogs = [...document.querySelectorAll('[role="dialog"]')];
-        return "the More sheet never opened at " + innerWidth + "x" + innerHeight + " — " + sheets.length + " sheet(s) at [" +
-          sheets.map(e => Math.round(e.getBoundingClientRect().height)).join(",") + "], " +
-          dialogs.length + " dialog(s) at [" +
-          dialogs.map(e => (e.getAttribute("data-testid") || e.getAttribute("data-tour-id") || "?") + ":" +
-            Math.round(e.getBoundingClientRect().height)).join(",") + "]";`);
-      continue;
-    }
-
-    /*
-      Wait for the row to be reachable, rather than for a moment to pass.
-
-      The sheet animates up from nothing, so its rows are mounted and sized
-      zero, then sized and below the fold, then finally where a finger could
-      reach them. Two settles after the sheet passed 100px caught it mid-rise:
-      "all instances unsized or off screen" for six sections, which reads like
-      a layout problem and was a timing one. Measured on the settled sheet,
-      every row sits between y=372 and y=852 at 393×852 and every one of them
-      hit-tests to itself — there was nothing wrong with the sheet.
-    */
-    const reachable = await b
-      .waitFor(
-        `[...document.querySelectorAll('[data-tour-id="nav-more-${id}"]')].some(e => {
-           const r = e.getBoundingClientRect();
-           if (!r.width || !r.height) return false;
-           const x = r.x + r.width / 2, y = r.y + r.height / 2;
-           if (y < 0 || y > innerHeight || x < 0 || x > innerWidth) return false;
-           const hit = document.elementFromPoint(x, y);
-           return !!hit && (hit === e || e.contains(hit) || hit.contains(e));
-         })`,
-        `the ${id} row`,
-        8_000,
-      )
-      .then(() => true)
-      .catch(() => false);
-    if (!reachable) { lastTapFailure = `the ${id} row never became reachable in the open sheet`; continue; }
-
-    if (!(await tap(`nav-more-${id}`))) { lastTapFailure = `nav-more-${id}: ${lastTapFailure}`; continue; }
-
-    /*
-      Tapped is not arrived.
-
-      This used to return true on a successful click and leave the settle loop
-      to discover, twenty-five seconds later, that the screen was still Home —
-      reported as "masterclass never settled", which points at the wrong
-      thing entirely. The row hit-tests to itself and the click lands; what
-      occasionally does not happen is the navigation, and a click swallowed by
-      a sheet still animating is indistinguishable from a click that worked
-      until you ask whether anything changed.
-
-      `data-tour-section-wanted` answers that immediately — it is set the
-      instant the member's tap reaches state, before any animation — so a
-      swallowed tap costs one more attempt instead of a section.
-    */
-    const took = await b
-      .waitFor(
-        `document.documentElement.getAttribute("data-tour-section-wanted") === ${JSON.stringify(id)}`,
-        `the tap on ${id} to register`,
-        3_000,
-      )
-      .then(() => true)
-      .catch(() => false);
-    if (took) return true;
-
-    /*
-      Which half failed: the delivery, or the handler.
-
-      A coordinate click is a press and a release at one point, and if the
-      layout shifts between them the browser dispatches the click on the
-      common ancestor instead — the sheet, which does nothing. That is
-      indistinguishable from a row whose handler is broken until you dispatch
-      one directly and see whether the app moves. So this asks, and says.
-
-      Only after the real gesture has been given its chance. A harness that
-      reaches for a synthetic click first stops testing the thing a finger
-      does.
-    */
-    const bySynthetic = await b.evaluate<boolean>(`
-      const el = document.querySelector('[data-tour-id="nav-more-${id}"]');
-      if (!el) return false;
-      el.click();
-      return true;`);
-    const landed = bySynthetic
-      ? await b
-          .waitFor(
-            `document.documentElement.getAttribute("data-tour-section-wanted") === ${JSON.stringify(id)}`,
-            `the synthetic tap on ${id}`,
-            3_000,
-          )
-          .then(() => true)
-          .catch(() => false)
-      : false;
-    if (landed) {
-      swallowed.push(id);
-      return true;
-    }
-    lastTapFailure = `the ${id} row was tapped but the app never asked for it`;
-  }
-  return false;
-}
 
 /** Put the walkthrough away if it is running. Idempotent; safe when it is not. */
-async function dismissTour(): Promise<void> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const at = await b.evaluate<{ x: number; y: number } | null>(`
-      const el = document.querySelector('[data-testid="button-tour-pause"]');
-      if (!el) return null;
-      const r = el.getBoundingClientRect();
-      if (!r.width || !r.height) return null;
-      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };`);
-    if (!at) return;
-    await b.clickAt(at.x, at.y);
-    await b.settle();
-  }
-}
 
 /**
  * Wait for the screen to stop changing, rather than for a fixed moment.
@@ -630,7 +425,7 @@ const fingerprints = new Map<string, string>();
  * is broken" and "this harness lost a click", and the second one still costs
  * a member a tap.
  */
-const swallowed: string[] = [];
+
 
 /** Sections the crawl could not get to. Reported, never silently skipped. */
 const unreachable: string[] = [];
@@ -653,7 +448,7 @@ const SELFTEST = process.env.SAKRED_CRAWL_SELFTEST === "1";
 */
 stage("logging in");
 lastStage = "logging in";
-await login();
+await portal.login();
 stage("logged in");
 lastStage = "logged in";
 
@@ -665,21 +460,21 @@ lastStage = "logged in";
   than by forging a completion record, so the crawl inspects the same app
   anybody else gets.
 */
-await dismissTour();
+await portal.dismissTour();
 stage("walkthrough cleared — crawling");
 lastStage = "crawling";
 
 for (const theme of ["dark", "light"] as const) {
   await b.goto(`${BASE}/member`);
   await settled("home");
-  await dismissTour();
+  await portal.dismissTour();
   await b.evaluate(`document.documentElement.setAttribute("data-theme", ${JSON.stringify(theme)}); return true;`);
 
   for (const id of SECTIONS) {
     /* What the screen was before the tap, so "it changed" is a fact and not a
        hope about animation timing. */
     const before = fingerprint(await b.evaluate<string>(`return document.body.innerText.trim();`));
-    const reached = await openSection(id);
+    const reached = await portal.openSection(id);
     const surface = `${id} (${theme})`;
     if (!reached) {
       /* With what the page actually was at that moment. "no such anchor"
@@ -688,7 +483,7 @@ for (const theme of ["dark", "light"] as const) {
       const where = await b.evaluate<string>(`
         return location.pathname + " · " + document.querySelectorAll("[data-tour-id]").length + " anchors · " +
           JSON.stringify(document.body.innerText.trim().slice(0, 120));`).catch(() => "unknown");
-      unreachable.push(`${surface} [${lastTapFailure}] at ${where}`);
+      unreachable.push(`${surface} [${portal.lastFailure}] at ${where}`);
       continue;
     }
     /*
@@ -745,7 +540,7 @@ for (const theme of ["dark", "light"] as const) {
     fingerprints.set(surface, fingerprint(seen.map((x) => x.text).join("|")));
     all.push(...inspect(surface, seen));
     /* Back to a known place, so the next tap is not made from inside a sheet. */
-    await tap("nav-home");
+    await portal.tap("nav-home");
   }
 }
 
@@ -759,8 +554,8 @@ const leaks = Array.from(unique.values());
 
 console.log(`  crawled ${visited.length} surfaces of a possible ${SECTIONS.length * 2}\n`);
 check("every section was reachable", unreachable.length === 0, unreachable.join(", "));
-if (swallowed.length) {
-  console.error(`    ! a real tap went nowhere on: ${swallowed.join(", ")} — the row's handler is fine, the click was not delivered`);
+if (portal.swallowed.length) {
+  console.error(`    ! a real tap went nowhere on: ${portal.swallowed.join(", ")} — the row's handler is fine, the click was not delivered`);
 }
 check("every section settled", unsettled.length === 0, unsettled.join(", "));
 
