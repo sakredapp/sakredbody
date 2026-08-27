@@ -25,6 +25,48 @@ const portal = new Portal(b, BASE);
 await portal.login();
 await portal.dismissTour();
 
+/**
+ * Every goal an earlier run of this file left behind, archived.
+ *
+ * The unique title was supposed to make reruns safe, and it made the *reads*
+ * safe — each run still found its own card. What it could not fix is the
+ * Build strip, which shows three goals and then "and 1 more": after the
+ * fourth run this file's own goal was the one being counted rather than
+ * shown, and the assertion failed on a working strip.
+ *
+ * So the harness cleans up after itself rather than relying on a QA database
+ * nobody resets. Archived, not deleted: it is the same route a member uses,
+ * so this exercises something instead of reaching around it.
+ */
+async function archiveLeftovers(): Promise<number> {
+  return await b.evaluate<number>(`
+    const res = await fetch("/api/goals", { credentials: "include" });
+    if (!res.ok) return 0;
+    const goals = await res.json();
+    const mine = (Array.isArray(goals) ? goals : goals.goals ?? [])
+      .filter((g) => typeof g.title === "string" && g.title.startsWith("Six-minute mile "));
+    for (const g of mine) {
+      await fetch("/api/goals/" + g.id, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "archived" }),
+      });
+    }
+    return mine.length;
+  `);
+}
+
+/*
+  Before anything is on screen. Sweeping after the goals list had rendered
+  left the UI holding four archived cards and pushed the add-goal control
+  below the fold, where a tap cannot reach it — the harness broke itself in
+  exactly the way it was written to stop the database breaking it.
+*/
+const swept = await archiveLeftovers();
+if (swept) notes.push(`archived ${swept} goal${swept === 1 ? "" : "s"} left by an earlier run`);
+
+
 const tap = (selector: string) => portal.tapSelector(selector);
 const type = (selector: string, value: string) => portal.type(selector, value);
 
@@ -264,6 +306,11 @@ check(
   !onBuild.includes("6:28") && !onBuild.includes("6:41"),
   onBuild.slice(0, 160),
 );
+
+/* And leave none behind either. Same sweep, so a run that failed halfway
+   through is cleaned up by the next one rather than accumulating. */
+const left = await archiveLeftovers();
+check("the harness cleans up after itself", left > 0, `nothing to archive — the goal was not created?`);
 
 await b.close();
 
