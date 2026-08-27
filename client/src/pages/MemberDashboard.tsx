@@ -515,7 +515,7 @@ export default function MemberDashboard() {
       <Onboarding onOpenGoals={() => setSection("goals")} />
 
       {/* ─── Header ─── */}
-      <header className="sticky top-0 pt-safe border-b border-border/50 bg-background/90 backdrop-blur-md" style={{ zIndex: 9999 }}>
+      <header className="sticky top-0 pt-safe border-b border-border/50 bg-background/90 backdrop-blur-md" style={{ zIndex: 9999 }} data-tour-chrome="top">
         <div className={`${PORTAL_COLUMN} h-16 flex items-center justify-between gap-4`}>
           <Link href="/" className="flex items-center gap-2" data-testid="link-home-dashboard">
             <img src={sakredLogo} alt="Sakred Body" className="h-9 w-9 object-contain" />

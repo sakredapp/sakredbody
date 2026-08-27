@@ -174,6 +174,73 @@ export function chooseCandidate(
   return { ok: true, index: pick.i, scrollNeeded: !pick.c.fullyVisible };
 }
 
+/**
+ * The part of the viewport a member can actually read and press.
+ *
+ * The app keeps chrome on top of its own scrolling content — a sticky header,
+ * a fixed bottom navigation — and those pixels belong to the viewport as far
+ * as `getBoundingClientRect` is concerned. A control sitting under the
+ * navigation is therefore inside the viewport, entirely, and unreachable.
+ *
+ * That is not hypothetical: at 430x932 the rehearsal's "Start this session"
+ * resolved at 872..904 with the navigation occupying 882..932. The tour
+ * declared it visible, never scrolled — offset 0 of a possible 1295 — and
+ * asked the member to press a button whose centre point belongs to the
+ * Restore tab. The comment on `fullyVisible` had described exactly this
+ * failure for months; the arithmetic underneath it was still the raw
+ * viewport.
+ *
+ * A general rule rather than a nudge for one screen size: whatever marks
+ * itself as persistent chrome is taken off the usable box, at every size.
+ */
+export type Insets = { top: number; bottom: number };
+
+/**
+ * Whether a rect is wholly inside the usable box.
+ *
+ * `isChrome` is the exemption that keeps this from being a trap. The bottom
+ * navigation is itself a tour target — `nav-more`, `nav-restore` — and it can
+ * never be inside a box defined by subtracting itself, so a lesson pointing
+ * at it would scroll three times and give up. Chrome is judged against the
+ * raw viewport, which for a fixed bar is the only question worth asking.
+ */
+export function fullyUsable(
+  rect: { top: number; bottom: number; left: number; right: number },
+  viewport: { width: number; height: number },
+  insets: Insets,
+  isChrome: boolean,
+): boolean {
+  const top = isChrome ? 0 : insets.top;
+  const bottom = viewport.height - (isChrome ? 0 : insets.bottom);
+  return rect.top >= top && rect.left >= 0 && rect.bottom <= bottom && rect.right <= viewport.width;
+}
+
+/**
+ * Measure the chrome that is currently on screen.
+ *
+ * Read from the DOM rather than from a constant, because the bar is `pb-safe`
+ * and its height depends on the device's home indicator, and because the
+ * header is on some screens and not others. Elements declare themselves with
+ * `data-tour-chrome`; nothing is inferred from `position: fixed`, which the
+ * walkthrough's own panel also is and which must not count.
+ */
+export function chromeInsets(): Insets {
+  if (typeof document === "undefined" || typeof window === "undefined") {
+    return { top: 0, bottom: 0 };
+  }
+  const vh = window.innerHeight;
+  let top = 0;
+  let bottom = 0;
+  for (const el of Array.from(document.querySelectorAll("[data-tour-chrome]"))) {
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) continue;
+    const where = el.getAttribute("data-tour-chrome");
+    if (where === "top") top = Math.max(top, Math.min(r.bottom, vh));
+    else if (where === "bottom") bottom = Math.max(bottom, Math.max(0, vh - r.top));
+  }
+  return { top, bottom };
+}
+
 // ── The DOM half ─────────────────────────────────────────────────────────
 
 /**
@@ -190,6 +257,8 @@ export function describe(el: Element): Candidate {
   const rect = el.getBoundingClientRect();
   const vh = typeof window === "undefined" ? 0 : window.innerHeight;
   const vw = typeof window === "undefined" ? 0 : window.innerWidth;
+  const insets = chromeInsets();
+  const isChrome = !!el.closest("[data-tour-chrome]");
 
   const ariaDisabled = el.getAttribute("aria-disabled") === "true";
   const nativelyDisabled = (el as HTMLButtonElement).disabled === true;
@@ -222,7 +291,7 @@ export function describe(el: Element): Candidate {
     height: rect.height,
     interactive: !nativelyDisabled && !ariaDisabled && !inert,
     inViewport: rect.bottom > 0 && rect.top < vh && rect.right > 0 && rect.left < vw,
-    fullyVisible: rect.top >= 0 && rect.left >= 0 && rect.bottom <= vh && rect.right <= vw,
+    fullyVisible: fullyUsable(rect, { width: vw, height: vh }, insets, isChrome),
     visibleArea:
       rect.width > 0 && rect.height > 0
         ? (Math.max(0, Math.min(rect.bottom, vh) - Math.max(rect.top, 0)) *

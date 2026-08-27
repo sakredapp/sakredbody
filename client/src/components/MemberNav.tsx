@@ -456,6 +456,10 @@ export function MemberBottomNav({
         "pb-safe",
       )}
       aria-label="Sections"
+      /* Persistent chrome: the walkthrough subtracts this from the box it
+         calls visible, so a lesson never points at something underneath it.
+         See `chromeInsets` in lib/tour/resolveTarget.ts. */
+      data-tour-chrome="bottom"
     >
       <div className="flex items-stretch">
         {PRIMARY.map(({ id, label, icon: Icon, section: target }) => {

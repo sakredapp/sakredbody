@@ -1418,6 +1418,7 @@ export default function CoachingDashboard() {
       {/* Header */}
       <header
         className="sticky top-0 border-b border-border/50 bg-background/90 backdrop-blur-md"
+        data-tour-chrome="top"
         style={{ zIndex: 9999 }}
       >
         <div className="container max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">

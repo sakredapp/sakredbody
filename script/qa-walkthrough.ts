@@ -266,6 +266,38 @@ const SNAP = (anchor: string | null, instance: string | null, anyInstance: boole
       top: top ? (top.getAttribute("data-testid") ?? top.getAttribute("data-tour-id") ?? top.tagName) : "none",
       reaches: !!top?.closest('[data-tour-id=${JSON.stringify(anchor)}]'),
     };
+    /*
+      How much of the control the app's own chrome is sitting on top of.
+
+      Hit-tested across the rect rather than measured as an intersection.
+      Geometry alone says a sheet overlapping the navigation is obstructed by
+      it, when the sheet is painted above and the member can press every row —
+      the first version of this reported the workout's close button and the
+      Settings row as covered, and both are perfectly usable.
+
+      What matters is which element is on top at each point. Sampled rather
+      than centred, because the centre being reachable and the bottom edge
+      being under the bar are different failures and the second one is a
+      lesson pointing at something half-there.
+    */
+    const N = 5;
+    let blocked = 0;
+    let over = "";
+    for (let i = 0; i < N; i++) {
+      for (let j = 0; j < N; j++) {
+        const px = r.x + (r.width * (i + 0.5)) / N;
+        const py = r.y + (r.height * (j + 0.5)) / N;
+        if (px < 0 || py < 0 || px > innerWidth || py > innerHeight) { blocked++; over = over || "off screen"; continue; }
+        const at = document.elementFromPoint(px, py);
+        if (!at || at === chosen || chosen.contains(at) || at.contains(chosen)) continue;
+        const chrome = at.closest("[data-tour-chrome]");
+        if (chrome && !chrome.contains(chosen)) {
+          blocked++;
+          over = chrome.getAttribute("data-tour-chrome") || "chrome";
+        }
+      }
+    }
+    out.chrome = { blocked, of: N * N, where: over };
   }
   ` : ""}
   return out;
@@ -279,6 +311,7 @@ type Snap = {
   viewport: Rect;
   target: { total: number; visible: number; matching: number; rect: Rect | null } | null;
   hit: { top: string; reaches: boolean } | null;
+  chrome?: { blocked: number; of: number; where: string };
 };
 
 async function restartTour(): Promise<void> {
@@ -554,6 +587,23 @@ async function measure(label: string, stepId: string, degraded: string[]): Promi
   */
   check(`[${label}] ${step.id}: a finger reaches the target`, w.hit?.reaches === true,
     `the top element at the target's centre is ${w.hit?.top ?? "nothing"}`);
+
+  /*
+    And no part of it is under the header or the bar.
+
+    The hit test above asks about one point. This asks about the whole rect,
+    because the two fail differently and only one of them is fixable by
+    scrolling: a control whose centre is reachable but whose bottom edge is
+    beneath the navigation is a lesson pointing at something half-there, and
+    a control entirely beneath it is a lesson pointing at nothing.
+
+    Measured at 430x932 before this existed: Start at 872..904, the bar at
+    882..932, the page never scrolled, and the centre point belonged to the
+    Restore tab.
+  */
+  check(`[${label}] ${step.id}: no part of the target is under the app's own chrome`,
+    (w.chrome?.blocked ?? 0) === 0,
+    `${w.chrome?.blocked} of ${w.chrome?.of} sampled points are beneath the ${w.chrome?.where}`);
 }
 
 /*

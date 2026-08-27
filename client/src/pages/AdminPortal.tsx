@@ -1577,7 +1577,7 @@ export default function AdminPortal() {
       <PortalBackdrop variant="desk" />
 
       {/* Header */}
-      <header className="sticky top-0 border-b border-border/50 bg-background/80 backdrop-blur-md" style={{ zIndex: 9999 }}>
+      <header className="sticky top-0 border-b border-border/50 bg-background/80 backdrop-blur-md" style={{ zIndex: 9999 }} data-tour-chrome="top">
         <div className="container max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link href="/" className="font-display text-xl tracking-tight">Sakred Body</Link>

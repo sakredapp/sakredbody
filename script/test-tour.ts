@@ -60,6 +60,7 @@ import {
   type MotionReading,
   type MotionState,
 } from "../client/src/lib/tour/motion.js";
+import { fullyUsable, type Insets } from "../client/src/lib/tour/resolveTarget.js";
 import type { GuidedTour, TourAnchor, TourProgress, TourWorld } from "../client/src/lib/tour/types.js";
 
 let passed = 0;
@@ -1251,6 +1252,57 @@ check(
     "and a gesture releases it whatever the offset did",
     touched.state.phase === "released" && touched.state.reason === "member",
     `${touched.state.phase}:${touched.state.reason}`,
+  );
+}
+
+/**
+ * A control under the navigation bar is not visible.
+ *
+ * Measured at 430x932: the rehearsal's Start button resolved at 872..904 with
+ * the bottom navigation occupying 882..932. Inside the viewport entirely, so
+ * the tour never scrolled — offset 0 of a possible 1295 — and the point it
+ * asked the member to press resolved to the Restore tab.
+ *
+ * The rule is one rule at every size, which is why these check the arithmetic
+ * rather than one screen.
+ */
+{
+  const vp = { width: 430, height: 932 };
+  const nav: Insets = { top: 0, bottom: 50 };
+  const start = { top: 872, bottom: 904, left: 16, right: 414 };
+
+  check(
+    "a control under the bottom bar is not fully visible",
+    !fullyUsable(start, vp, nav, false),
+  );
+  check(
+    "and the same control clear of it is",
+    fullyUsable({ ...start, top: 800, bottom: 832 }, vp, nav, false),
+  );
+  check(
+    "a control under a sticky header is not either",
+    !fullyUsable({ top: 20, bottom: 60, left: 16, right: 414 }, vp, { top: 72, bottom: 50 }, false),
+  );
+
+  /*
+    The exemption that keeps this from being a trap. The bar is itself a tour
+    target — nav-more, nav-restore — and can never be inside a box defined by
+    subtracting itself, so without this a lesson pointing at it would spend
+    all three directed scrolls and release as `spent`.
+  */
+  check(
+    "but the bar itself is judged against the whole viewport",
+    fullyUsable({ top: 882, bottom: 932, left: 0, right: 430 }, vp, nav, true),
+  );
+  check(
+    "and it is still off screen when it is off screen",
+    !fullyUsable({ top: 940, bottom: 990, left: 0, right: 430 }, vp, nav, true),
+  );
+
+  /* With no chrome on screen the rule is the plain viewport, unchanged. */
+  check(
+    "a screen with no chrome behaves exactly as before",
+    fullyUsable(start, vp, { top: 0, bottom: 0 }, false),
   );
 }
 
