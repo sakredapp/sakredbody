@@ -54,9 +54,18 @@ export type HealthSummary = {
   metrics: string[];
 };
 
-export function useHealthSummary(days = 30) {
+/**
+ * `enabled` so a collapsed panel can decline to ask.
+ *
+ * The Restore and Build histories fold to one sentence, and that sentence is
+ * counted by the server — so the thirty days of imported workouts behind it
+ * are a fetch nobody has asked to look at yet. Default true: every existing
+ * caller wants the reading immediately, and a card that shows sleep has to.
+ */
+export function useHealthSummary(days = 30, enabled = true) {
   const query = useQuery<HealthSummary>({
     queryKey: [`/api/health/summary?days=${days}`],
+    enabled,
   });
   // Marked from the hook rather than from inside a queryFn, because the
   // question being timed is when the *screen* asked and when the screen could

@@ -533,7 +533,10 @@ export function MemberBottomNav({
                   <button
                     onClick={() => onChange(d.section!)}
                     className={rowClass(section === d.section)}
-                    data-testid={`nav-more-`}
+                    /* Interpolated. This was a template literal with nothing in
+                       it, so every row in the sheet answered to the same name
+                       and `nav-more-` picked whichever one was first. */
+                    data-testid={`nav-more-${d.id}`}
                     data-tour-id={`nav-more-${d.id}`}
                   >
                     <RowBody d={d} active={section === d.section} />
@@ -564,7 +567,7 @@ export function MemberBottomNav({
                       <Link
                         href={d.href!}
                         className={rowClass(false)}
-                        data-testid={`nav-more-`}
+                        data-testid={`role-${d.id}`}
                         /*
                           `role-`, not `nav-more-`, because that is what the
                           anchor means: the way to a workspace somebody holds.

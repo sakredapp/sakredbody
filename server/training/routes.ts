@@ -65,6 +65,7 @@ import {
   type WeightUnit,
   EXERCISE_CATEGORIES,
   isPracticeCategory,
+  effectivePlacement,
   summariseSession,
   CATALOGUE_FETCH_LIMIT,
   coachingMessages,
@@ -107,6 +108,8 @@ import {
   RESPONSE_WINDOW_DAYS,
 } from "../../shared/models/trainingResponse.js";
 import { addDaysToString } from "../../shared/utils/dates.js";
+import { mergeTallies, sakredLens, tally, type Tally } from "../../shared/models/history.js";
+import type { WorkoutPlacement } from "../../shared/models/training.js";
 import { track, trackError } from "../telemetry/index.js";
 
 function param(req: Request, name: string): string {
@@ -433,6 +436,94 @@ async function sessionHistory(userId: string) {
         .map((x) => ({ ...x, weight: out(x.weightKg, unit) })),
     })),
   };
+}
+
+/**
+ * What a window of history amounts to, counted rather than downloaded.
+ *
+ * ── Why the collapsed panel has its own read ──────────────────────────────
+ *
+ * Build and Restore each show a folded history: one sentence, and "View full
+ * history" underneath. The fold was doing its visual job while the client
+ * still fetched sixty sessions with every set inside them and then declined to
+ * render most of them — hiding a wall is not the same as not building one,
+ * and on a phone on a train it is the fetch that costs, not the DOM.
+ *
+ * So a collapsed panel asks this instead. It reads categories, not measures:
+ * enough to know a session was Restore, and nothing about how much anybody
+ * lifted. The full history is fetched when somebody actually opens it.
+ *
+ * `since` comes from the client rather than being computed here, because the
+ * window is the member's calendar and this process runs in UTC. That bug has
+ * been fixed once already in the component this serves — after 20:00 in
+ * Toronto, `toISOString()` is tomorrow, and a session somebody had just
+ * finished came back labelled "Yesterday".
+ */
+async function sessionTally(userId: string, since: string, lens: "build" | "restore" | null) {
+  const [sessions, workouts] = await Promise.all([
+    db
+      .select({ id: workoutSessions.id })
+      .from(workoutSessions)
+      .where(
+        and(
+          eq(workoutSessions.userId, userId),
+          gte(workoutSessions.onDate, since),
+          sql`${workoutSessions.finishedAt} is not null`,
+        ),
+      ),
+    db
+      .select({
+        workoutType: healthWorkouts.workoutType,
+        durationSeconds: healthWorkouts.durationSeconds,
+        userOrientationOverride: healthWorkouts.userOrientationOverride,
+      })
+      .from(healthWorkouts)
+      .where(and(eq(healthWorkouts.userId, userId), gte(healthWorkouts.onDate, since))),
+  ]);
+
+  const ids = sessions.map((s) => s.id);
+  const categories = ids.length
+    ? await db
+        .select({ sessionId: workoutSets.sessionId, category: exercises.category })
+        .from(workoutSets)
+        .innerJoin(exercises, eq(workoutSets.exerciseId, exercises.id))
+        .where(inArray(workoutSets.sessionId, ids))
+    : [];
+
+  const bySession = new Map<string, string[]>();
+  for (const row of categories) {
+    const list = bySession.get(row.sessionId);
+    if (list) list.push(row.category);
+    else bySession.set(row.sessionId, [row.category]);
+  }
+
+  /*
+    A session with no sets is not history yet — somebody is in the middle of it
+    or abandoned it — which is the same rule the list applies, and the reason
+    this counts `bySession` rather than `sessions`.
+  */
+  const logged: { placement: WorkoutPlacement | null; seconds: number | null }[] = [];
+  for (const cats of Array.from(bySession.values())) {
+    const has = sakredLens(cats, isPracticeCategory);
+    if (lens === "restore" && !has.restore) continue;
+    if (lens === "build" && !has.build) continue;
+    /* Null placement for the same reason the list gives one: a Sakred session
+       can span several categories and a single badge would overclaim. */
+    logged.push({ placement: null, seconds: null });
+  }
+
+  const imported = workouts
+    .map((w) => ({
+      placement: effectivePlacement(
+        w.workoutType,
+        (w.userOrientationOverride ?? null) as WorkoutPlacement | null,
+      ),
+      seconds: w.durationSeconds ?? null,
+    }))
+    .filter((e) => (lens ? e.placement === lens || e.placement === "both" : true));
+
+  const merged: Tally = mergeTallies(tally(logged), tally(imported));
+  return merged;
 }
 
 /**
@@ -1663,6 +1754,22 @@ export function registerTrainingRoutes(app: Express) {
           concerns,
         },
       });
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
+  /** The same window, counted. See `sessionTally`. */
+  app.get("/api/training/sessions/tally", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      const since = String(req.query.since ?? "");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(since)) {
+        return res.status(400).json({ message: "since must be a calendar date" });
+      }
+      const raw = String(req.query.lens ?? "");
+      const lens = raw === "build" || raw === "restore" ? raw : null;
+      res.json(await sessionTally(userId, since, lens));
     } catch (err) {
       fail(res, err);
     }

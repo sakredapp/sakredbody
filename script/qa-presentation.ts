@@ -429,6 +429,39 @@ async function openSection(id: string): Promise<boolean> {
       .then(() => true)
       .catch(() => false);
     if (took) return true;
+
+    /*
+      Which half failed: the delivery, or the handler.
+
+      A coordinate click is a press and a release at one point, and if the
+      layout shifts between them the browser dispatches the click on the
+      common ancestor instead — the sheet, which does nothing. That is
+      indistinguishable from a row whose handler is broken until you dispatch
+      one directly and see whether the app moves. So this asks, and says.
+
+      Only after the real gesture has been given its chance. A harness that
+      reaches for a synthetic click first stops testing the thing a finger
+      does.
+    */
+    const bySynthetic = await b.evaluate<boolean>(`
+      const el = document.querySelector('[data-tour-id="nav-more-${id}"]');
+      if (!el) return false;
+      el.click();
+      return true;`);
+    const landed = bySynthetic
+      ? await b
+          .waitFor(
+            `document.documentElement.getAttribute("data-tour-section-wanted") === ${JSON.stringify(id)}`,
+            `the synthetic tap on ${id}`,
+            3_000,
+          )
+          .then(() => true)
+          .catch(() => false)
+      : false;
+    if (landed) {
+      swallowed.push(id);
+      return true;
+    }
     lastTapFailure = `the ${id} row was tapped but the app never asked for it`;
   }
   return false;
@@ -522,6 +555,15 @@ const all: Leak[] = [];
 const visited: string[] = [];
 /** What each surface actually rendered, so "clean" cannot mean "never loaded". */
 const fingerprints = new Map<string, string>();
+/**
+ * Rows whose coordinate click went nowhere but whose handler worked.
+ *
+ * Reported rather than swallowed: it is the difference between "this control
+ * is broken" and "this harness lost a click", and the second one still costs
+ * a member a tap.
+ */
+const swallowed: string[] = [];
+
 /** Sections the crawl could not get to. Reported, never silently skipped. */
 const unreachable: string[] = [];
 /** Sections that never stopped changing. Also reported, never sampled anyway. */
@@ -643,6 +685,9 @@ const leaks = Array.from(unique.values());
 
 console.log(`  crawled ${visited.length} surfaces of a possible ${SECTIONS.length * 2}\n`);
 check("every section was reachable", unreachable.length === 0, unreachable.join(", "));
+if (swallowed.length) {
+  console.error(`    ! a real tap went nowhere on: ${swallowed.join(", ")} — the row's handler is fine, the click was not delivered`);
+}
 check("every section settled", unsettled.length === 0, unsettled.join(", "));
 
 /*

@@ -13,7 +13,11 @@
 import {
   WALL,
   foldsAt,
+  mergeTallies,
+  sakredLens,
   summarise,
+  summariseTally,
+  tally,
   type SummarisableEntry,
 } from "../shared/models/history.js";
 import {
@@ -663,6 +667,71 @@ for (const field of ["durationSeconds", "distanceMeters", "activeCalories", "wor
 */
 const entry = (placement: SummarisableEntry["placement"], seconds: number | null): SummarisableEntry =>
   ({ placement, seconds });
+
+/*
+  ── The folded panel and the open one must say the same thing ─────────────
+
+  They no longer read the same data. A folded panel gets its sentence from a
+  server that counted the window in SQL; an open one derives it from the rows
+  it fetched. That is the whole point — the fold is a read now, not a
+  `display: none` — and it is also exactly how two implementations of one
+  sentence start disagreeing. So the sentence-builder is single, and these pin
+  the seam: whatever the server sends must produce, through the same builder,
+  the sentence the rows would have produced.
+*/
+check(
+  "counting a window and listing it produce the same sentence",
+  summariseTally(tally([entry("build", 600), entry("restore", 900)])) ===
+    summarise([entry("build", 600), entry("restore", 900)]),
+);
+check(
+  "a tally counts both sides of an activity that is both",
+  tally([entry("both", 600), entry("build", 600)]).build === 2 &&
+    tally([entry("both", 600), entry("build", 600)]).restore === 1,
+);
+check(
+  "a window holding one uncountable entry is uncountable",
+  tally([entry("build", 600), entry("build", null)]).seconds === null,
+);
+
+/*
+  Merged because a window has two halves that are counted separately — the
+  sessions the member logged and the workouts their phone imported — and the
+  server reads them from different tables.
+*/
+check(
+  "merging two halves of a window adds them up",
+  mergeTallies(tally([entry("build", 600)]), tally([entry("restore", 900)])).count === 2,
+);
+check(
+  "and one uncountable half makes the whole window uncountable",
+  mergeTallies(tally([entry("build", null)]), tally([entry("restore", 900)])).seconds === null,
+);
+/* An empty half has nothing to be uncertain about, and must not poison a half
+   that is perfectly countable — the Restore panel of somebody who has logged
+   no Sakred practice at all is exactly this case. */
+check(
+  "but an empty half does not",
+  mergeTallies(tally([]), tally([entry("restore", 900)])).seconds === 900,
+);
+
+/* Categories only. The server judges a folded window's lens without reading a
+   single weight or rep, which is what makes the folded read cheap. */
+const practice = (c: string) => c === "breath" || c === "mobility";
+check(
+  "a session of practice categories is Restore",
+  sakredLens(["breath", "mobility"], practice).restore &&
+    !sakredLens(["breath", "mobility"], practice).build,
+);
+check(
+  "a session with load in it is Build",
+  sakredLens(["legs"], practice).build && !sakredLens(["legs"], practice).restore,
+);
+check(
+  "and a session that was both appears in both",
+  sakredLens(["breath", "legs"], practice).build &&
+    sakredLens(["breath", "legs"], practice).restore,
+);
 
 check("a short list is shown, not folded behind a count", !foldsAt(3, 0));
 check("and so is one exactly at the floor", !foldsAt(WALL, 0));

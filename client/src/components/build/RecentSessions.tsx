@@ -50,7 +50,14 @@ import { useHealthSummary } from "@/hooks/use-health";
 import { Panel } from "@/components/portal/Panel";
 import { cn } from "@/lib/utils";
 import { formatLocalDateString, addDaysToString } from "@shared/utils/dates";
-import { foldsAt, summarise, type SummarisableEntry } from "@shared/models/history";
+import {
+  foldsAt,
+  sakredLens,
+  summarise,
+  summariseTally,
+  type SummarisableEntry,
+  type Tally,
+} from "@shared/models/history";
 
 type Session = {
   id: string;
@@ -129,15 +136,9 @@ const PLACEMENT_TONE: Record<WorkoutPlacement, string> = {
  */
 export type HistoryLens = "restore" | "build" | null;
 
-function sakredLens(sets: Session["sets"]): { restore: boolean; build: boolean } {
-  let restore = false;
-  let build = false;
-  for (const set of sets) {
-    if (isPracticeCategory(set.category)) restore = true;
-    else build = true;
-  }
-  return { restore, build };
-}
+/* The judgement itself lives in `shared/models/history.ts`, because the server
+   counts a folded window with the same rule and the two have to agree about
+   what a Restore session is. */
 
 export function RecentSessions({
   days = 7,
@@ -165,15 +166,7 @@ export function RecentSessions({
    */
   preview?: number;
 }) {
-  const { data, isLoading } = useQuery<{ unit: WeightUnit; sessions: Session[] }>({
-    queryKey: ["/api/training/sessions"],
-    staleTime: 60_000,
-  });
-  // Already fetched by the Health card on Stats, so on most navigations this
-  // is a cache read rather than a second request.
-  const health = useHealthSummary(30);
-
-  if (isLoading || !data) return null;
+  const [open, setOpen] = useState(false);
 
   // The member's own date, which is what `onDate` is written against. This read
   // `toISOString()`, which is the UTC date and not anybody's calendar: after
@@ -183,6 +176,64 @@ export function RecentSessions({
   const today = formatLocalDateString();
   const cutoff = addDaysToString(today, -days);
 
+  /*
+    ── Folded is a read, not a `display: none` ───────────────────────────────
+
+    A panel that shows no rows until you ask for them used to fetch sixty
+    sessions with every set inside them, plus thirty days of imported
+    workouts, and then render four of them. Hiding a wall is not the same as
+    not building one: on a phone the fetch is the cost, not the DOM.
+
+    So a folded panel asks the server to count the window instead — categories,
+    no measures — and the rows are fetched when somebody opens them. `preview`
+    undefined means a caller that wants everything listed, and it still gets
+    everything, immediately.
+  */
+  /*
+    The count decides whether folding is even appropriate, and the count is the
+    cheap read — so it comes first and the rows follow only if they are wanted.
+
+    Without this the fold ignored its own floor. `foldsAt` exists because "2
+    sessions — All 2" asks somebody to press a button to see what would have
+    fit anyway, and a panel that folds before it knows how much it is folding
+    does exactly that. Below the floor this costs one small round trip before
+    the rows; a member with three sessions is not the one this saves.
+  */
+  const summaryQuery = useQuery<Tally>({
+    queryKey: [`/api/training/sessions/tally?since=${cutoff}&lens=${lens ?? ""}`],
+    staleTime: 60_000,
+    enabled: preview === 0 && !open,
+  });
+  const counted = summaryQuery.data;
+  const folded = preview === 0 && !open && (counted === undefined || foldsAt(counted.count, preview));
+
+  const { data, isLoading } = useQuery<{ unit: WeightUnit; sessions: Session[] }>({
+    queryKey: ["/api/training/sessions"],
+    staleTime: 60_000,
+    enabled: !folded,
+  });
+  // Already fetched by the Health card on Stats, so on most navigations this
+  // is a cache read rather than a second request.
+  const health = useHealthSummary(30, !folded);
+
+  if (folded) {
+    /* Nothing in the window is nothing to fold, and a panel that appears only
+       to say "0 sessions" is noise on a screen that is otherwise about
+       today — the listed path returns null for an empty window too. */
+    const t = counted;
+    if (!t || t.count === 0) return null;
+    return (
+      <Folded
+        title={title ?? (days <= 7 ? "This week" : `The last ${days} days`)}
+        summary={summariseTally(t)}
+        count={t.count}
+        onOpen={() => setOpen(true)}
+      />
+    );
+  }
+
+  if (isLoading || !data) return null;
+
   // An unfinished session is one somebody is in the middle of, or abandoned.
   // Either way it is not history yet, and showing it as a completed day is a
   // small lie the rest of the screen would inherit.
@@ -190,7 +241,7 @@ export function RecentSessions({
     .filter((s) => s.finishedAt && s.onDate >= cutoff && s.sets.length > 0)
     .filter((s) => {
       if (!lens) return true;
-      const has = sakredLens(s.sets);
+      const has = sakredLens(s.sets.map((x) => x.category), isPracticeCategory);
       return lens === "restore" ? has.restore : has.build;
     })
     .map((s) => ({
@@ -238,9 +289,17 @@ export function RecentSessions({
     ? imported.filter((e) => e.placement === lens || e.placement === "both")
     : imported;
 
-  const recent = [...logged, ...importedInLens]
-    .sort((a, b) => b.at - a.at)
-    .slice(0, lens ? 20 : 12);
+  /*
+    No cap.
+
+    This used to keep the newest twenty, which was the right defence when the
+    only alternative was a wall. Folding is that defence now, and the cap has
+    become a liability: the summary above the list is counted by the server
+    over the whole window, so a member with twenty-five Restore entries would
+    read "25 sessions" above a list of twenty. A count that disagrees with the
+    list under it is worse than no count.
+  */
+  const recent = [...logged, ...importedInLens].sort((a, b) => b.at - a.at);
 
   if (recent.length === 0) return null;
 
@@ -250,7 +309,43 @@ export function RecentSessions({
       entries={recent}
       today={today}
       preview={preview}
+      open={open}
+      onToggle={() => setOpen((v) => !v)}
     />
+  );
+}
+
+/**
+ * The window before anybody has asked to see inside it.
+ *
+ * Deliberately the same two elements as the summary row on an expanded panel —
+ * a sentence and a way in — so opening one does not feel like arriving
+ * somewhere else.
+ */
+function Folded({
+  title,
+  summary,
+  count,
+  onOpen,
+}: {
+  title: string;
+  summary: string;
+  count: number;
+  onOpen: () => void;
+}) {
+  return (
+    <Panel title={title}>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-expanded={false}
+        className="flex w-full items-center justify-between gap-3 text-left tap-clean"
+        data-testid={`sessions-summary-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`}
+      >
+        <span className="text-sm text-muted-foreground">{summary}</span>
+        <span className="shrink-0 text-xs text-[hsl(var(--gold))]">{`All ${count}`}</span>
+      </button>
+    </Panel>
   );
 }
 
@@ -266,13 +361,16 @@ function Sessions({
   entries,
   today,
   preview,
+  open,
+  onToggle,
 }: {
   title: string;
   entries: Entry[];
   today: string;
   preview?: number;
+  open: boolean;
+  onToggle: () => void;
 }) {
-  const [open, setOpen] = useState(false);
   /*
     A summary is worth reading in place of a wall, and silly in place of two
     rows: "2 sessions — All 2" asks the member to press a button to see what
@@ -291,7 +389,7 @@ function Sessions({
         */
         <button
           type="button"
-          onClick={() => setOpen((v) => !v)}
+          onClick={onToggle}
           aria-expanded={open}
           className="mb-3 flex w-full items-center justify-between gap-3 text-left tap-clean"
           data-testid={`sessions-summary-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`}

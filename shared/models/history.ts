@@ -47,30 +47,101 @@ export function foldsAt(count: number, preview: number | undefined): boolean {
 }
 
 /**
+ * A window reduced to the four numbers a sentence about it needs.
+ *
+ * ── Why this is a type and not a loop inside the component ────────────────
+ *
+ * Because it now arrives two ways. A collapsed panel gets it from the server,
+ * counted in SQL over a window it never downloads; an expanded one derives it
+ * from the rows it already has. Those must produce the same sentence — a
+ * summary that says "9 sessions" above a list of eleven is worse than no
+ * summary, and that is exactly what two implementations drift into.
+ *
+ * So there is one sentence-builder, and both paths hand it one of these.
+ */
+export type Tally = {
+  count: number;
+  /** `both` counts on both sides — a long walk is movement and it is rest. */
+  build: number;
+  restore: number;
+  /**
+   * Total duration, or null when any entry in the window has none.
+   *
+   * Null rather than a partial sum. A Sakred session records no start time, so
+   * a window holding one cannot be totalled — and totalling the imported half
+   * and presenting it as the week is the sort of number somebody plans around.
+   */
+  seconds: number | null;
+};
+
+export function tally(entries: readonly SummarisableEntry[]): Tally {
+  return {
+    count: entries.length,
+    build: entries.filter((e) => e.placement === "build" || e.placement === "both").length,
+    restore: entries.filter((e) => e.placement === "restore" || e.placement === "both").length,
+    seconds: entries.every((e) => e.seconds != null)
+      ? entries.reduce((total, e) => total + (e.seconds ?? 0), 0)
+      : null,
+  };
+}
+
+/** Two windows of the same period — the logged half and the imported half. */
+export function mergeTallies(a: Tally, b: Tally): Tally {
+  return {
+    count: a.count + b.count,
+    build: a.build + b.build,
+    restore: a.restore + b.restore,
+    /* One uncountable half makes the whole uncountable, and an empty half
+       cannot make a countable one uncountable. */
+    seconds:
+      (a.seconds === null && a.count > 0) || (b.seconds === null && b.count > 0)
+        ? null
+        : (a.seconds ?? 0) + (b.seconds ?? 0),
+  };
+}
+
+/**
  * The window in one sentence.
  *
  * Counts and time, and nothing that grades anybody. "Four sessions · 3h 10m"
  * is a fact; a percentage of a target would be an opinion this panel has not
  * been given the standing to hold.
  */
-export function summarise(entries: readonly SummarisableEntry[]): string {
-  const parts: string[] = [`${entries.length} ${entries.length === 1 ? "session" : "sessions"}`];
-
-  /* `both` is genuinely both — a long walk is movement and it is restorative —
-     so it is counted on both sides rather than assigned to one. */
-  const build = entries.filter((e) => e.placement === "build" || e.placement === "both").length;
-  const restore = entries.filter((e) => e.placement === "restore" || e.placement === "both").length;
-  if (build && restore) parts.push(`${build} Build · ${restore} Restore`);
-
-  /*
-    Only when every entry can be counted. Totalling the imported half of a
-    window and presenting it as the week is the sort of number somebody plans
-    around.
-  */
-  if (entries.every((e) => e.seconds != null)) {
-    const mins = Math.round(entries.reduce((total, e) => total + (e.seconds ?? 0), 0) / 60);
+export function summariseTally(t: Tally): string {
+  const parts: string[] = [`${t.count} ${t.count === 1 ? "session" : "sessions"}`];
+  if (t.build && t.restore) parts.push(`${t.build} Build · ${t.restore} Restore`);
+  if (t.seconds !== null && t.count > 0) {
+    const mins = Math.round(t.seconds / 60);
     if (mins >= 1) parts.push(mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`);
   }
-
   return parts.join(" · ");
+}
+
+export function summarise(entries: readonly SummarisableEntry[]): string {
+  return summariseTally(tally(entries));
+}
+
+/**
+ * Which side of the product a logged session belongs to, from its categories.
+ *
+ * An imported workout carries a placement already. A Sakred session does not,
+ * deliberately: one session can span several categories and a single badge
+ * would be a claim the data does not support. So it is judged by its sets —
+ * all practice categories means Restore, anything with load means Build, and a
+ * session with both appears in both, because it genuinely was both.
+ *
+ * Shared because the server counts a collapsed window and the client lists an
+ * expanded one, and they have to agree about what a Restore session is.
+ */
+export function sakredLens(
+  categories: readonly string[],
+  isPractice: (category: string) => boolean,
+): { restore: boolean; build: boolean } {
+  let restore = false;
+  let build = false;
+  for (const category of categories) {
+    if (isPractice(category)) restore = true;
+    else build = true;
+  }
+  return { restore, build };
 }
