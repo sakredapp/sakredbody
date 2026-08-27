@@ -44,6 +44,7 @@ import { BodyMap } from "@/components/BodyMap";
 import { OfferingsTab } from "@/components/OfferingsTab";
 import { CommunityTab } from "@/components/CommunityTab";
 import { WinsTab } from "@/components/WinsTab";
+import { GoalsTab } from "@/components/goals/GoalsTab";
 import { SubNav } from "@/components/SubNav";
 import {
   MemberTopNav,
@@ -742,6 +743,12 @@ export default function MemberDashboard() {
         {section === "community" && (
           <Surface key="community" id="community" pad="py-8">
             <CommunityTab />
+          </Surface>
+        )}
+
+        {section === "goals" && (
+          <Surface key="goals" id="goals" pad="py-8">
+            <GoalsTab weightUnit={user?.weightUnit === "kg" ? "kg" : "lb"} />
           </Surface>
         )}
 

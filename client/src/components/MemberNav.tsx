@@ -30,6 +30,7 @@ import {
   Home as HomeIcon,
   Dumbbell,
   Sun,
+  Target,
   Users,
   UserCog,
   ShieldCheck,
@@ -62,6 +63,7 @@ import { onStageRequest } from "@/lib/tour/stage";
 
 export type MemberSection =
   | "home"
+  | "goals"
   | "coaching"
   | "restore"
   | "build"
@@ -217,6 +219,12 @@ export const SECONDARY: Destination[] = [
     address, not a claim — nothing may gate this destination on a coaching
     relationship. See `useSecondary`.
   */
+  /*
+    Above Your Plan, because a goal is the member's and a plan is somebody
+    else's idea about how to get there. Most members have no coach and
+    therefore no plan; every member can have a direction.
+  */
+  { id: "goals", label: "Your Goals", icon: Target, note: "What you're building toward", section: "goals" },
   { id: "coaching", label: "Your Plan", icon: Sun, note: "What you're working on now", section: "coaching" },
   { id: "retreat", label: "What's On", icon: CalendarDays, note: "Retreats, masterminds and talks", section: "retreat" },
   /**

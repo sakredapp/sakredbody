@@ -233,6 +233,7 @@ async function login(): Promise<void> {
  */
 const PRIMARY = ["home", "restore", "build", "community", "body"] as const;
 const SECONDARY = [
+  "goals",
   "retreat", "apothecary", "library", "masterclass", "wins", "help", "settings",
 ] as const;
 
