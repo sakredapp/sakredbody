@@ -411,7 +411,7 @@ function SetMeta({
           className={cn(
             "inline-flex min-h-[36px] items-center gap-1 rounded-lg px-2 -ml-2 text-xs tap-clean",
             "transition-colors hover:bg-[hsl(var(--gold))]/5",
-            d.style === "normal" ? "text-muted-foreground" : "text-[hsl(var(--gold))]",
+            d.style === "normal" ? "text-muted-foreground" : "text-gold",
           )}
           data-testid={`${testId}-style`}
           data-tour-id="workout-set-style"
@@ -451,7 +451,7 @@ function SetMeta({
               className={cn(
                 "min-h-[36px] rounded-full border px-3 text-xs tap-clean transition-colors",
                 d.style === style
-                  ? "border-[hsl(var(--gold))]/50 bg-[hsl(var(--gold))]/10 text-[hsl(var(--gold))]"
+                  ? "border-[hsl(var(--gold))]/50 bg-[hsl(var(--gold))]/10 text-gold"
                   : "border-[hsl(var(--gold))]/15 text-muted-foreground hover:border-[hsl(var(--gold))]/35",
               )}
               data-testid={`${testId}-style-${style}`}
@@ -492,7 +492,7 @@ function SetMeta({
           className={cn(
             "inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-2 -ml-2 text-xs tap-clean",
             "transition-colors hover:bg-[hsl(var(--gold))]/5",
-            d.toFailure ? "text-[hsl(var(--gold))]" : "text-muted-foreground",
+            d.toFailure ? "text-gold" : "text-muted-foreground",
           )}
           data-testid={`${testId}-failure`}
         >
@@ -1050,7 +1050,7 @@ function Sheet() {
             data-testid="review-all-good"
           >
             <span className="inline-flex items-center gap-2">
-              {allGood && <Check className="h-3.5 w-3.5 text-[hsl(var(--gold))]" />}
+              {allGood && <Check className="h-3.5 w-3.5 text-gold" />}
               No — it all felt good
             </span>
           </button>
@@ -1276,7 +1276,7 @@ function Sheet() {
                   */}
                   {partners.length > 0 && (
                     <span
-                      className="text-[10px] text-[hsl(var(--gold))] shrink-0 truncate"
+                      className="text-[10px] text-gold shrink-0 truncate"
                       data-testid={`superset-${m.id}`}
                     >
                       superset · {partners.map((p) => p.movement.name).join(", ")}
@@ -1300,7 +1300,7 @@ function Sheet() {
                     className={cn(
                       "h-3.5 w-3.5",
                       observationFor(m.id)
-                        ? "text-[hsl(var(--gold))]"
+                        ? "text-gold"
                         : "text-muted-foreground/50",
                     )}
                   />
@@ -1441,7 +1441,7 @@ function Sheet() {
                   </div>
                   <button
                     onClick={() => useLast(g, prior)}
-                    className="shrink-0 text-[11px] text-[hsl(var(--gold))] tap-clean"
+                    className="shrink-0 text-[11px] text-gold tap-clean"
                     data-testid={`use-last-${m.id}`}
                   >
                     Use last
@@ -1537,7 +1537,7 @@ function Sheet() {
                         <span className="text-muted-foreground text-xs"> · {aside}</span>
                       )}
                     </span>
-                    <Check className="h-3.5 w-3.5 text-[hsl(var(--gold))] shrink-0" />
+                    <Check className="h-3.5 w-3.5 text-gold shrink-0" />
                   </button>
                 );
               })}
@@ -1576,7 +1576,7 @@ function Sheet() {
                 <div className="flex items-center gap-4 pl-6">
                   <button
                     onClick={() => setEntering((prev) => ({ ...prev, [m.id]: true }))}
-                    className="text-xs text-[hsl(var(--gold))] tap-clean inline-flex items-center gap-1"
+                    className="text-xs text-gold tap-clean inline-flex items-center gap-1"
                     data-testid={`add-set-${m.id}`}
                   >
                     <Plus className="h-3 w-3" />
@@ -1617,7 +1617,7 @@ function Sheet() {
                 : "border-border",
             )}
           >
-            {shareWithCoach && <Check className="h-3 w-3 text-[hsl(var(--gold))]" />}
+            {shareWithCoach && <Check className="h-3 w-3 text-gold" />}
           </span>
           <span className="text-xs text-muted-foreground">
             <Send className="h-3 w-3 inline mr-1" />
@@ -1710,7 +1710,7 @@ function Logged() {
           </div>
 
           {done.shared ? (
-            <p className="text-sm text-[hsl(var(--gold))]">It's in the room.</p>
+            <p className="text-sm text-gold">It's in the room.</p>
           ) : composing ? (
             /*
               The words and the picture, once they have said they want to

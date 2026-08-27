@@ -67,7 +67,7 @@ function Choice<T extends string | number>({
           className={cn(
             "tap-clean rounded-md border px-2.5 py-1.5 text-xs transition-colors",
             o.id === value
-              ? "border-[hsl(var(--gold))]/40 bg-[hsl(var(--gold))]/10 text-[hsl(var(--gold))]"
+              ? "border-[hsl(var(--gold))]/40 bg-[hsl(var(--gold))]/10 text-gold"
               : "border-[hsl(var(--gold))]/12 text-muted-foreground hover:text-foreground",
           )}
         >

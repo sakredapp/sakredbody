@@ -374,7 +374,7 @@ function RowBody({ d, active }: { d: Destination; active: boolean }) {
       <Icon
         className={cn(
           "h-5 w-5 shrink-0",
-          active ? "text-[hsl(var(--gold))]" : "text-muted-foreground",
+          active ? "text-gold" : "text-muted-foreground",
         )}
       />
       {/* `min-w-0` so a long label truncates instead of pushing the badge and
@@ -385,7 +385,7 @@ function RowBody({ d, active }: { d: Destination; active: boolean }) {
       </span>
       {badge > 0 && (
         <span
-          className="shrink-0 min-w-5 h-5 px-1.5 rounded-full bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))] text-xs inline-flex items-center justify-center tabular-nums"
+          className="shrink-0 min-w-5 h-5 px-1.5 rounded-full bg-[hsl(var(--gold))]/15 text-gold text-xs inline-flex items-center justify-center tabular-nums"
           data-testid={`nav-more-${d.id}-badge`}
         >
           {badge > 99 ? "99+" : badge}
@@ -468,7 +468,7 @@ export function MemberBottomNav({
               className={cn(
                 "flex-1 flex flex-col items-center justify-center gap-1 py-2 tap tap-clean",
                 "transition-colors",
-                active ? "text-[hsl(var(--gold))]" : "text-muted-foreground",
+                active ? "text-gold" : "text-muted-foreground",
               )}
               data-testid={`nav-`}
               // Named separately from the test id on purpose: renaming a test id is a
@@ -496,7 +496,7 @@ export function MemberBottomNav({
               className={cn(
                 "flex-1 flex flex-col items-center justify-center gap-1 py-2 tap tap-clean",
                 "transition-colors",
-                inMore ? "text-[hsl(var(--gold))]" : "text-muted-foreground",
+                inMore ? "text-gold" : "text-muted-foreground",
               )}
               data-testid="nav-more"
               data-tour-id="nav-more"
@@ -694,7 +694,7 @@ export function MemberTopNav({
             >
               {label}
               {(badge ?? 0) > 0 && (
-                <span className="ml-1.5 text-xs text-[hsl(var(--gold))] tabular-nums">
+                <span className="ml-1.5 text-xs text-gold tabular-nums">
                   {badge! > 99 ? "99+" : badge}
                 </span>
               )}

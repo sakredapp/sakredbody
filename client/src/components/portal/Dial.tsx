@@ -97,7 +97,7 @@ export function Dial({
 
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span
-          className="font-display leading-none text-[hsl(var(--gold-light))]"
+          className="font-display leading-none text-gold-light"
           style={{ fontSize: size * 0.28 }}
         >
           {label ?? `${Math.round(safe * 100)}`}

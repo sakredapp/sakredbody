@@ -186,7 +186,7 @@ function Reader({ ebookId, onBack }: { ebookId: string; onBack: () => void }) {
                 s.locked
                   ? "text-muted-foreground/50 cursor-default"
                   : sectionId === s.id
-                    ? "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))]"
+                    ? "bg-[hsl(var(--gold))]/15 text-gold"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
               )}
               data-testid={`library-section-${s.id}`}
@@ -234,7 +234,7 @@ function Reader({ ebookId, onBack }: { ebookId: string; onBack: () => void }) {
                       {/* The handoff. This is why guides and protocols are paired. */}
                       {pairedRoutine && (
                         <div className="pt-4">
-                          <p className="text-xs uppercase tracking-widest text-[hsl(var(--gold))] mb-3">
+                          <p className="text-xs uppercase tracking-widest text-gold mb-3">
                             Now do it
                           </p>
                           <div className="flex items-center gap-4 flex-wrap">

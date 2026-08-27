@@ -105,7 +105,7 @@ export function HealthSettings() {
       {/* ── Health ─────────────────────────────────────────────────────────── */}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <HeartPulse className="h-3.5 w-3.5 text-[hsl(var(--gold))]" />
+          <HeartPulse className="h-3.5 w-3.5 text-gold" />
           <p className="text-xs uppercase tracking-widest text-muted-foreground">
             {storeName}
           </p>
@@ -212,7 +212,7 @@ export function HealthSettings() {
       {/* ── Morning notification ───────────────────────────────────────────── */}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <Bell className="h-3.5 w-3.5 text-[hsl(var(--gold))]" />
+          <Bell className="h-3.5 w-3.5 text-gold" />
           <p className="text-xs uppercase tracking-widest text-muted-foreground">
             Morning notification
           </p>
@@ -234,7 +234,7 @@ export function HealthSettings() {
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm">{option.title}</span>
-                {depth === option.key && <Check className="h-3.5 w-3.5 text-[hsl(var(--gold))]" />}
+                {depth === option.key && <Check className="h-3.5 w-3.5 text-gold" />}
               </div>
               {option.example && (
                 <p className="text-[11px] text-muted-foreground mt-1 leading-snug">
@@ -260,7 +260,7 @@ export function HealthSettings() {
       {/* ── Widget ─────────────────────────────────────────────────────────── */}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <LayoutGrid className="h-3.5 w-3.5 text-[hsl(var(--gold))]" />
+          <LayoutGrid className="h-3.5 w-3.5 text-gold" />
           <p className="text-xs uppercase tracking-widest text-muted-foreground">Home screen</p>
         </div>
         {/* Instructions, not a button — neither platform lets an app add its

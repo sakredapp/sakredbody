@@ -122,7 +122,7 @@ function MetricTile({ days, metric }: { days: DaySeries[]; metric: keyof typeof 
           className={cn(
             "flex items-center gap-1 text-[10px] mt-0.5",
             better === null && "text-muted-foreground",
-            better === true && "text-[hsl(var(--gold))]",
+            better === true && "text-gold",
             better === false && "text-destructive",
           )}
         >

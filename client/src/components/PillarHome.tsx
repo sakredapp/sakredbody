@@ -321,12 +321,12 @@ function Door({
           <p className="text-[11px] leading-snug text-[hsl(var(--ink-foreground)/0.55)] mt-0.5 line-clamp-1">
             {pillar.blurb}
           </p>
-          {fact && <p className="text-[11px] text-[hsl(var(--gold))] mt-1">{fact}</p>}
+          {fact && <p className="text-[11px] text-gold mt-1">{fact}</p>}
         </div>
 
         {open && pillar.lead && (
           <span className="shrink-0 h-7 w-7 rounded-full border border-[hsl(var(--gold))]/40 grid place-items-center group-hover:border-[hsl(var(--gold))] transition-colors">
-            <ChevronRight className="h-3.5 w-3.5 text-[hsl(var(--gold))]" />
+            <ChevronRight className="h-3.5 w-3.5 text-gold" />
           </span>
         )}
       </div>

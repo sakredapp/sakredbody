@@ -80,7 +80,7 @@ export default function VerifyEmailPage() {
         {state !== "working" && (
           <Link
             href={state === "signin" ? "/login" : "/coach"}
-            className="inline-block text-sm text-[hsl(var(--gold))]"
+            className="inline-block text-sm text-gold"
             data-testid="link-verify-continue"
           >
             {state === "signin" ? "Sign in" : "Back to Sakred"}

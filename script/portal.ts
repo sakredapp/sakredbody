@@ -36,6 +36,22 @@ export const QA_PASSWORD = process.env.SAKRED_QA_PASSWORD ?? "SakredQA!2026";
 export const PRIMARY_SECTIONS = ["home", "restore", "build", "community", "body"] as const;
 
 /**
+ * Everything else a member can open from More, and Goals.
+ *
+ * Here rather than in one harness because two now walk it: the presentation
+ * crawl looking for machine values on screen, and the contrast harness asking
+ * whether the text can be read on the ground behind it. A section added to one
+ * list and not the other is a screen that gets checked for one of those and
+ * not the other, which is the kind of gap nobody notices until it ships.
+ */
+export const SECONDARY_SECTIONS = [
+  "goals",
+  "retreat", "apothecary", "library", "masterclass", "wins", "help", "settings",
+] as const;
+
+export const ALL_SECTIONS = [...PRIMARY_SECTIONS, ...SECONDARY_SECTIONS] as const;
+
+/**
  * The element that would actually receive a tap on this anchor.
  *
  * Returns why not, rather than null, because "the tap did not happen" and "the
@@ -242,6 +258,32 @@ export class Portal {
    * Escape rather than a click on the backdrop: a backdrop click is a
    * coordinate, and coordinates are what got us here.
    */
+  /**
+   * Wait until the screen has stopped arriving.
+   *
+   * `awaitSection` answers when the section is mounted and its enter animation
+   * has finished, which is the earliest a tap can land — and several tabs are
+   * still fetching at that moment. Reading then finds a nav bar and nothing
+   * else, and a harness that measures an empty screen reports it clean.
+   *
+   * Two identical samples rather than one, because a screen that is painting
+   * in stages passes through moments of stillness between them.
+   */
+  async settleText(timeoutMs = 8_000): Promise<number> {
+    const read = `return document.body.innerText.trim().length;`;
+    let last = -1;
+    let same = 0;
+    const until = Date.now() + timeoutMs;
+    while (Date.now() < until) {
+      const now = await this.b.evaluate<number>(read);
+      same = now === last ? same + 1 : 0;
+      last = now;
+      if (same >= 2 && now > 0) return now;
+      await this.b.settle();
+    }
+    return last;
+  }
+
   async closeSheets(): Promise<void> {
     const open = () =>
       this.b.evaluate<boolean>(

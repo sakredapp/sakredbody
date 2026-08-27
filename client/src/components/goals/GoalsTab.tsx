@@ -131,7 +131,7 @@ function GoalCard({
             the whole of the rule: the app has observed a number, and only the
             member can say the goal is done.
           */
-          <span className="shrink-0 rounded-full border border-[hsl(var(--gold))]/30 px-2 py-0.5 text-[10px] uppercase tracking-widest text-[hsl(var(--gold))]">
+          <span className="shrink-0 rounded-full border border-[hsl(var(--gold))]/30 px-2 py-0.5 text-[10px] uppercase tracking-widest text-gold">
             Target reached
           </span>
         )}
@@ -198,7 +198,7 @@ function AddGoal({
               className={cn(
                 "tap-clean rounded-md border px-2.5 py-1.5 text-xs transition-colors",
                 m === measurement
-                  ? "border-[hsl(var(--gold))]/40 bg-[hsl(var(--gold))]/10 text-[hsl(var(--gold))]"
+                  ? "border-[hsl(var(--gold))]/40 bg-[hsl(var(--gold))]/10 text-gold"
                   : "border-[hsl(var(--gold))]/12 text-muted-foreground hover:text-foreground",
               )}
             >
@@ -269,7 +269,7 @@ export function GoalsTab({ weightUnit }: { weightUnit?: "kg" | "lb" | null }) {
         */
         <Panel data-testid="goals-empty">
           <div className="py-2 text-center">
-            <Target className="mx-auto mb-3 h-5 w-5 text-[hsl(var(--gold))]/50" />
+            <Target className="mx-auto mb-3 h-5 w-5 text-gold/50" />
             <p className="text-sm text-muted-foreground">
               A clear target gives Sakred more context for what you're building capacity for.
             </p>
@@ -324,7 +324,7 @@ export function GoalsTab({ weightUnit }: { weightUnit?: "kg" | "lb" | null }) {
         type="button"
         onClick={() => setAdding(true)}
         data-testid="goal-add"
-        className="tap-clean flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[hsl(var(--gold))]/20 py-3 text-sm text-[hsl(var(--gold))] transition-colors hover:border-[hsl(var(--gold))]/40"
+        className="tap-clean flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[hsl(var(--gold))]/20 py-3 text-sm text-gold transition-colors hover:border-[hsl(var(--gold))]/40"
       >
         <Plus className="h-4 w-4" />
         Add goal

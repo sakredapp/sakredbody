@@ -911,7 +911,7 @@ function MemberSnapshotPanel({ userId }: { userId: string }) {
         onClick={() => setExpanded(!expanded)}
       >
         <div className="flex items-center gap-3 min-w-0">
-          <Activity className="w-4 h-4 text-[hsl(var(--gold))] shrink-0" />
+          <Activity className="w-4 h-4 text-gold shrink-0" />
           <span className="text-sm font-medium truncate">
             {snap.activeRoutine?.routineName || "No active routine"}
           </span>
@@ -964,7 +964,7 @@ function MemberSnapshotPanel({ userId }: { userId: string }) {
                 {snap.today.habits.map((h, i) => (
                   <div key={i} className="flex items-center gap-2 text-xs">
                     <CheckCircle className={`w-3.5 h-3.5 shrink-0 ${
-                      h.completed ? "text-emerald-500" : "text-muted-foreground/40"
+                      h.completed ? "text-rise" : "text-muted-foreground/40"
                     }`} />
                     <span className={h.completed ? "line-through text-muted-foreground" : ""}>{h.title}</span>
                     <Badge variant="outline" className="ml-auto text-[9px] px-1 py-0 h-4">{h.cadence}</Badge>

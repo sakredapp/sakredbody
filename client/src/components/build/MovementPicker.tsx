@@ -247,7 +247,7 @@ export function MovementPicker({
                 className={cn(
                   "shrink-0 rounded-full border px-3 py-1.5 text-xs tap-clean transition-colors",
                   on
-                    ? "border-[hsl(var(--gold))]/50 bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))]"
+                    ? "border-[hsl(var(--gold))]/50 bg-[hsl(var(--gold))]/15 text-gold"
                     : "border-border/60 text-muted-foreground hover:text-foreground",
                 )}
                 data-testid={`movement-group-${g.id}`}
@@ -270,7 +270,7 @@ export function MovementPicker({
                   className={cn(
                     "shrink-0 rounded-full px-2.5 py-1 text-[11px] tap-clean transition-colors",
                     on
-                      ? "bg-[hsl(var(--gold))]/20 text-[hsl(var(--gold))]"
+                      ? "bg-[hsl(var(--gold))]/20 text-gold"
                       : "text-muted-foreground hover:text-foreground",
                   )}
                   data-testid={`movement-category-${c.id}`}
@@ -320,7 +320,7 @@ export function MovementPicker({
                       </p>
                     </div>
                     {on ? (
-                      <Check className="h-4 w-4 text-[hsl(var(--gold))] shrink-0" />
+                      <Check className="h-4 w-4 text-gold shrink-0" />
                     ) : (
                       <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
                     )}

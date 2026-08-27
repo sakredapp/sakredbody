@@ -131,7 +131,7 @@ function HabitRow({
         <div
           className={cn(
             "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border",
-            done ? "border-[hsl(var(--gold))] text-[hsl(var(--gold))]" : "border-muted-foreground/25",
+            done ? "border-[hsl(var(--gold))] text-gold" : "border-muted-foreground/25",
           )}
           aria-hidden
         >
@@ -153,7 +153,7 @@ function HabitRow({
           )}
         </div>
         <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-          <span className={cn(done && "text-[hsl(var(--gold))]/80")}>{h.progressLabel}</span>
+          <span className={cn(done && "text-gold/80")}>{h.progressLabel}</span>
           {h.expected === "off" && <span>· {h.scheduleLabel}</span>}
           {h.expected === "open" && <span>· {h.scheduleLabel}</span>}
           {/* Said plainly, because a zero that means "your phone didn't tell

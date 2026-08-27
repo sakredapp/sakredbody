@@ -302,7 +302,10 @@ console.log("\nWritten where it happens, read where it matters\n");
 
   /** During the workout, not only afterwards. */
   check("every movement can be noted on", /data-testid=\{`note-movement-/.test(sheet));
-  check("and the icon says whether one exists", /observationFor\(m\.id\)\s*\?\s*"text-\[hsl\(var\(--gold\)\)\]"/.test(sheet));
+  // `text-gold`, not `text-[hsl(var(--gold))]`. Same colour at night and
+  // bronze by day — gold as type resolves `--gold-text`, and a 56%-lightness
+  // gold on limestone is 1.6:1.
+  check("and the icon says whether one exists", /observationFor\(m\.id\)\s*\?\s*"text-gold"/.test(sheet));
 
   /** Finish is a question before it is a commit. */
   check("finishing opens the response loop", /onClick=\{\(\) => setReviewing\(true\)\}/.test(sheet));

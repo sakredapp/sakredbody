@@ -109,7 +109,7 @@ function NoteCard({ row }: { row: NoteRow }) {
       <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{note.body}</p>
 
       {note.invitation && (
-        <p className="text-sm text-[hsl(var(--gold))] leading-relaxed">{note.invitation}</p>
+        <p className="text-sm text-gold leading-relaxed">{note.invitation}</p>
       )}
 
       {note.flagNote && !showFlag && (
@@ -241,7 +241,7 @@ export function DailyNotesAdmin() {
               className={cn(
                 "px-3 py-1.5 text-sm rounded-md whitespace-nowrap transition-colors",
                 filter === f.key
-                  ? "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))] font-medium"
+                  ? "bg-[hsl(var(--gold))]/15 text-gold font-medium"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
               )}
               data-testid={`filter-notes-${f.key}`}

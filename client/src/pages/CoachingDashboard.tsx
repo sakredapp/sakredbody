@@ -377,7 +377,7 @@ function TodayHabits() {
           return (
             <div key={section.key} className="space-y-2">
               <div className="flex items-baseline gap-2">
-                <h4 className="text-[11px] uppercase tracking-[0.18em] text-[hsl(var(--gold))]">
+                <h4 className="text-[11px] uppercase tracking-[0.18em] text-gold">
                   {section.label}
                 </h4>
                 <span className="text-[11px] text-muted-foreground/60">
@@ -570,7 +570,7 @@ export function JourneyMap() {
                   </div>
 
                   <span
-                    className={`text-[10px] mt-1 ${day.isToday ? "font-bold text-[hsl(var(--gold))]" : "text-muted-foreground"}`}
+                    className={`text-[10px] mt-1 ${day.isToday ? "font-bold text-gold" : "text-muted-foreground"}`}
                   >
                     {day.dayOfWeek}
                   </span>
@@ -801,7 +801,7 @@ export function RoutinesTab() {
                         {primary.icon && <span className="text-lg">{primary.icon}</span>}
                         <h4 className="font-display text-base">{baseName}</h4>
                         {primary.isFeatured && (
-                          <Badge className="bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))] text-[10px]">
+                          <Badge className="bg-[hsl(var(--gold))]/15 text-gold text-[10px]">
                             Featured
                           </Badge>
                         )}
@@ -820,7 +820,7 @@ export function RoutinesTab() {
                       <Calendar className="w-3 h-3" /> {primary.durationDays} days
                     </span>
                     {primary.tier === "premium" && (
-                      <Badge className="bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))] text-[10px]">
+                      <Badge className="bg-[hsl(var(--gold))]/15 text-gold text-[10px]">
                         Premium
                       </Badge>
                     )}
@@ -1457,7 +1457,7 @@ export default function CoachingDashboard() {
                 onClick={() => setTab(id)}
                 className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-md whitespace-nowrap transition-colors ${
                   tab === id
-                    ? "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))] font-medium"
+                    ? "bg-[hsl(var(--gold))]/15 text-gold font-medium"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 }`}
               >

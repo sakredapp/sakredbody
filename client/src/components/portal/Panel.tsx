@@ -63,7 +63,7 @@ export function Panel({
           {action && (
             <button
               onClick={onAction}
-              className="flex items-center gap-0.5 text-xs text-[hsl(var(--gold))] hover:text-[hsl(var(--gold-light))] transition-colors tap-clean shrink-0"
+              className="flex items-center gap-0.5 text-xs text-gold hover:text-gold-light transition-colors tap-clean shrink-0"
             >
               {action}
               <ChevronRight className="h-3.5 w-3.5" />
@@ -115,7 +115,7 @@ export function StatTile({
         <p
           className={cn(
             "text-[11px] mt-0.5",
-            tone === "up" && "text-emerald-400/80",
+            tone === "up" && "text-rise/80",
             tone === "down" && "text-destructive/80",
             tone === "neutral" && "text-muted-foreground",
           )}

@@ -138,7 +138,7 @@ export function RecommendationFeedback({
           className={cn(
             "h-7 w-7 grid place-items-center rounded-full tap-clean transition-colors",
             verdict === "helpful"
-              ? "text-[hsl(var(--gold))] bg-[hsl(var(--gold))]/10"
+              ? "text-gold bg-[hsl(var(--gold))]/10"
               : "text-muted-foreground/60 hover:text-foreground",
           )}
         >

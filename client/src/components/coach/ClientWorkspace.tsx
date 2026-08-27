@@ -69,7 +69,7 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 const PLACEMENT_TONE: Record<WorkoutPlacement, string> = {
-  build: "text-[hsl(var(--gold))]",
+  build: "text-gold",
   restore: "text-[hsl(var(--element-water))]",
   both: "text-muted-foreground",
 };
@@ -197,7 +197,7 @@ function WeekBalance({ build, restore, days }: { build: number; restore: number;
   return (
     <div className="grid grid-cols-2 gap-4">
       <div>
-        <p className="text-[10px] uppercase tracking-widest text-[hsl(var(--gold))]">Build</p>
+        <p className="text-[10px] uppercase tracking-widest text-gold">Build</p>
         <p className="text-lg mt-0.5">{build}</p>
         <p className="text-[11px] text-muted-foreground">
           demanding {build === 1 ? "session" : "sessions"}
@@ -875,7 +875,7 @@ export function ClientWorkspace({
             className={cn(
               "px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-colors tap-clean",
               tab === t.id
-                ? "bg-[hsl(var(--gold))]/12 text-[hsl(var(--gold))]"
+                ? "bg-[hsl(var(--gold))]/12 text-gold"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >

@@ -23,7 +23,7 @@ import type { HealthWorkout } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
 const PLACEMENT_TONE: Record<WorkoutPlacement, string> = {
-  build: "text-[hsl(var(--gold))]",
+  build: "text-gold",
   restore: "text-[hsl(var(--element-water))]",
   both: "text-muted-foreground",
 };

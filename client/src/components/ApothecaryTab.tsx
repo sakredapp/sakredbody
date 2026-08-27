@@ -123,7 +123,7 @@ function ProductRow({ product, note, essential, checked, onToggle, onOpen }: Row
                 name: product.name,
               })
             }
-            className="text-xs text-[hsl(var(--gold))] hover:underline inline-flex items-center gap-1"
+            className="text-xs text-gold hover:underline inline-flex items-center gap-1"
             data-testid={`apothecary-link-${product.id}`}
           >
             Source
@@ -167,7 +167,7 @@ function ProductDialog({
 
               {product.whyThisOne && (
                 <div>
-                  <p className="text-xs uppercase tracking-widest text-[hsl(var(--gold))] mb-2">
+                  <p className="text-xs uppercase tracking-widest text-gold mb-2">
                     Why this one
                   </p>
                   <p className="leading-relaxed text-muted-foreground">{product.whyThisOne}</p>
@@ -176,7 +176,7 @@ function ProductDialog({
 
               {product.sourcingNotes && (
                 <div>
-                  <p className="text-xs uppercase tracking-widest text-[hsl(var(--gold))] mb-2">
+                  <p className="text-xs uppercase tracking-widest text-gold mb-2">
                     Sourcing
                   </p>
                   <p className="leading-relaxed text-muted-foreground">{product.sourcingNotes}</p>
@@ -308,7 +308,7 @@ export function ApothecaryTab() {
 
                 {supply.data.phases.map(({ phase, items }) => (
                   <div key={phase}>
-                    <p className="text-xs uppercase tracking-widest text-[hsl(var(--gold))] mb-1">
+                    <p className="text-xs uppercase tracking-widest text-gold mb-1">
                       {PHASE_LABEL[phase]}
                     </p>
                     {items.map((item: SupplyItem) => (
@@ -362,7 +362,7 @@ export function ApothecaryTab() {
                   className={cn(
                     "px-3 py-1.5 text-xs rounded-full whitespace-nowrap transition-colors border",
                     category === c
-                      ? "border-[hsl(var(--gold))]/50 bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))]"
+                      ? "border-[hsl(var(--gold))]/50 bg-[hsl(var(--gold))]/15 text-gold"
                       : "border-border/60 text-muted-foreground hover:text-foreground",
                   )}
                   data-testid={`apothecary-category-${c}`}

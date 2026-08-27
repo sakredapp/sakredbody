@@ -97,7 +97,7 @@ function facts(w: HealthWorkout): string[] {
 }
 
 const PLACEMENT_TONE: Record<WorkoutPlacement, string> = {
-  build: "text-[hsl(var(--gold))]",
+  build: "text-gold",
   restore: "text-[hsl(var(--element-water))]",
   both: "text-muted-foreground",
 };

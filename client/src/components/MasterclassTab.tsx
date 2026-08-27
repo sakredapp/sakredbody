@@ -171,7 +171,7 @@ function CategoryPill({
           isSelected
             ? "bg-foreground text-background font-medium"
             : isSubscribed
-              ? "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))] border border-[hsl(var(--gold))]/30"
+              ? "bg-[hsl(var(--gold))]/15 text-gold border border-[hsl(var(--gold))]/30"
               : "bg-muted text-muted-foreground hover:bg-muted/80"
         }`}
       >
@@ -187,7 +187,7 @@ function CategoryPill({
         title={isSubscribed ? "Unfollow" : "Follow"}
       >
         {isSubscribed ? (
-          <BookmarkCheck className="w-3.5 h-3.5 text-[hsl(var(--gold))]" />
+          <BookmarkCheck className="w-3.5 h-3.5 text-gold" />
         ) : (
           <BookmarkPlus className="w-3.5 h-3.5 text-muted-foreground" />
         )}
@@ -385,7 +385,7 @@ export function MasterclassTab() {
               className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition-all duration-200 shrink-0 flex items-center gap-1 ${
                 showSubscribed
                   ? "bg-foreground text-background font-medium"
-                  : "bg-[hsl(var(--gold))]/10 text-[hsl(var(--gold))] hover:bg-[hsl(var(--gold))]/20"
+                  : "bg-[hsl(var(--gold))]/10 text-gold hover:bg-[hsl(var(--gold))]/20"
               }`}
             >
               Following

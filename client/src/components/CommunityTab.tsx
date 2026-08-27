@@ -365,7 +365,7 @@ function MessageBody({
             {onReply && (
               <button
                 onClick={onReply}
-                className="text-xs text-muted-foreground/60 hover:text-[hsl(var(--gold))]"
+                className="text-xs text-muted-foreground/60 hover:text-gold"
                 data-testid="button-reply"
               >
                 Reply
@@ -375,7 +375,7 @@ function MessageBody({
             {onOpenThread && message.replyCount > 0 && (
               <button
                 onClick={onOpenThread}
-                className="text-xs text-[hsl(var(--gold))] hover:underline inline-flex items-center gap-1"
+                className="text-xs text-gold hover:underline inline-flex items-center gap-1"
                 data-testid="button-open-thread"
               >
                 <MessageSquare className="h-3 w-3" />
@@ -878,7 +878,7 @@ export function CommunityTab() {
                 className={cn(
                   "px-3 py-1.5 text-sm rounded-md whitespace-nowrap transition-colors",
                   c.id === channel.id
-                    ? "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))] font-medium"
+                    ? "bg-[hsl(var(--gold))]/15 text-gold font-medium"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                 )}
                 data-testid={`community-channel-${c.slug}`}

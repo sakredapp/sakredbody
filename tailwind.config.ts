@@ -109,6 +109,27 @@ export default {
         // both themes, because the fill under it is the same in both.
         onfill: "hsl(var(--on-fill) / <alpha-value>)",
       },
+      /*
+        Gold as type resolves a different token from gold as a fill.
+
+        `--gold` is 39 48% 56% in both atmospheres — a fill, and the same fill
+        in both. `--gold-text` is that at night and bronze by day, because a
+        56%-lightness gold on limestone is 1.6:1 and gone. Splitting them here
+        rather than at every call site means `bg-gold` and `text-gold` can keep
+        one name and still mean the two different things they have always
+        meant.
+      */
+      textColor: {
+        // Themed, unlike the emerald-400 and amber-400 they replaced.
+        rise: "hsl(var(--rise) / <alpha-value>)",
+        caution: "hsl(var(--caution) / <alpha-value>)",
+        gold: {
+          DEFAULT: "hsl(var(--gold-text) / <alpha-value>)",
+          light: "hsl(var(--gold-light) / <alpha-value>)",
+          dark: "hsl(var(--gold-dark) / <alpha-value>)",
+          foreground: "hsl(var(--gold-foreground) / <alpha-value>)",
+        },
+      },
       fontFamily: {
         sans: ["var(--font-sans)"],
         serif: ["var(--font-serif)"],

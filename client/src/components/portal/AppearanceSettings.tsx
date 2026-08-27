@@ -53,7 +53,7 @@ export function AppearanceSettings() {
               className={cn(
                 "flex flex-col items-center gap-1.5 rounded-lg px-2 py-3 text-sm transition-colors tap-clean",
                 selected
-                  ? "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold-text))]"
+                  ? "bg-[hsl(var(--gold))]/15 text-gold"
                   : "text-muted-foreground hover:text-foreground",
               )}
               data-testid={`button-appearance-${value}`}

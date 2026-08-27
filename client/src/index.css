@@ -148,6 +148,19 @@
   /* Walnut, not black. A pure-black scrim on parchment reads as a hole. */
   --scrim: 28 14% 22% / 0.55;
 
+  /*
+    The two readings a number can carry, when neither is failure.
+
+    `--destructive` already existed and was already themed, so "down" on a
+    trend was written as `text-destructive/80` and "up" was written as
+    `text-emerald-400/80` — one token and one literal, side by side in the
+    same cn() call. The literal is emerald-400 exactly, which on ink is fine
+    and on limestone is 1.6:1. These are the same hues, given a daylight value
+    and a name that says what they mean rather than which crayon they are.
+  */
+  --rise: 160 70% 26%;
+  --caution: 35 90% 28%;
+
   /* Fixed in both atmospheres — see above. */
   --gold-foreground: 0 0% 100%;
   --on-fill: 0 0% 100%;
@@ -246,6 +259,26 @@
   --gold: 39 48% 56%;
   --gold-light: 42 70% 76%;
   --gold-dark: 42 38% 47%;
+  /*
+    Gold as type, at night — which Dark never declared.
+
+    `:root` sets `--gold-text` to bronze so gold can carry type on cream, and
+    `[data-theme="dark"]` inherited it. Every `.text-gold` in the portal was
+    therefore rendering `39 56% 34%` on `30 10% 10%` ink: 2.1:1, which is not
+    a design decision anybody made, it is the daylight value arriving on the
+    wrong ground because nothing overrode it. The screens that wanted gold
+    type wrote `text-[hsl(var(--gold))]` instead and looked right, which is
+    why it went unnoticed — two ways to say gold, one of them broken.
+
+    This is the value those screens were already using, so converting them
+    onto `text-gold` changes nothing at night and gives them bronze by day.
+  */
+  --gold-text: 39 48% 56%;
+
+  /* emerald-400 and amber-400, to the digit — what the literals they replaced
+     already were, so nothing moves at night. */
+  --rise: 160 64% 52%;
+  --caution: 43 96% 56%;
 
   /*
     Lifted and sunk, at night.
@@ -412,12 +445,13 @@
     text-wrap: balance;
   }
 
-  .text-gold {
-    color: hsl(var(--gold-text));
-  }
-  .text-gold-light {
-    color: hsl(var(--gold-light));
-  }
+  /*
+    `.text-gold` and `.text-gold-light` used to be written out here. They are
+    `textColor.gold` in tailwind.config.ts now — same tokens, and `text-gold/70`
+    resolves, which the hand-written pair silently ignored. That silence is
+    what put a hundred and fifty-seven `text-[hsl(var(--gold))]/60` in the
+    codebase: the modifier had to go somewhere it worked.
+  */
   .bg-gold {
     background-color: hsl(var(--gold));
   }

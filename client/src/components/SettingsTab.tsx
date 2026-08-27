@@ -227,7 +227,7 @@ export function SettingsTab({
                 className={cn(
                   "px-4 py-1.5 rounded-full text-sm transition-colors tap-clean",
                   unit === u
-                    ? "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))]"
+                    ? "bg-[hsl(var(--gold))]/15 text-gold"
                     : "text-muted-foreground hover:text-foreground",
                 )}
                 data-testid={`button-unit-${u}`}

@@ -779,7 +779,7 @@ export function GuidedTourOverlay({
                   "rounded-full px-5 py-2 text-sm tap-clean transition-colors",
                   degraded
                     ? "bg-muted text-muted-foreground hover:bg-muted/80"
-                    : "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold-text))] hover:bg-[hsl(var(--gold))]/25",
+                    : "bg-[hsl(var(--gold))]/15 text-gold hover:bg-[hsl(var(--gold))]/25",
                 )}
                 data-testid={degraded ? "button-tour-continue-degraded" : "button-tour-continue"}
                 data-tour-degraded={degraded ? "true" : undefined}

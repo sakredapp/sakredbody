@@ -404,7 +404,7 @@ export function CommunityAdmin() {
                       </Badge>
                     )}
                     {c.isPrivate && (
-                      <Badge variant="outline" className="text-[10px] gap-1 border-[hsl(var(--gold))]/40 text-[hsl(var(--gold))]">
+                      <Badge variant="outline" className="text-[10px] gap-1 border-[hsl(var(--gold))]/40 text-gold">
                         <UserPlus className="h-2.5 w-2.5" /> invite only
                       </Badge>
                     )}

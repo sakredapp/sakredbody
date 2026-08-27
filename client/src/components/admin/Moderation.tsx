@@ -127,7 +127,7 @@ export function ModerationAdmin() {
             <Panel key={r.id} data-testid={`report-${r.id}`}>
               <div className="space-y-3">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Flag className="h-3.5 w-3.5 text-[hsl(var(--gold))]" />
+                  <Flag className="h-3.5 w-3.5 text-gold" />
                   <span className="text-sm">
                     {REPORT_REASON_LABELS[r.reason as ReportReason] ?? r.reason}
                   </span>

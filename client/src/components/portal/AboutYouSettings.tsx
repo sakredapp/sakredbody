@@ -97,7 +97,7 @@ export function AboutYouSettings() {
       />
 
       {saved && (
-        <p className="text-[11px] text-[hsl(var(--gold))] flex items-center gap-1">
+        <p className="text-[11px] text-gold flex items-center gap-1">
           <Check className="h-3 w-3" /> Saved.
         </p>
       )}
@@ -120,7 +120,7 @@ export function AboutYouSettings() {
               value == null ? null : (
                 <div key={String(label)} className="flex items-baseline justify-between gap-2">
                   <span className="text-muted-foreground">{label}</span>
-                  <span className="font-display text-base text-[hsl(var(--gold))]">{value}</span>
+                  <span className="font-display text-base text-gold">{value}</span>
                 </div>
               ),
             )}

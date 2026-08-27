@@ -199,9 +199,9 @@ export function SakredDate({
                   className={cn(
                     "grid h-9 place-items-center rounded-md text-sm tap-clean transition-colors",
                     isSelected
-                      ? "bg-[hsl(var(--gold))]/20 text-[hsl(var(--gold))]"
+                      ? "bg-[hsl(var(--gold))]/20 text-gold"
                       : isToday
-                        ? "text-[hsl(var(--gold))]"
+                        ? "text-gold"
                         : "text-foreground",
                     "disabled:text-muted-foreground/25 disabled:cursor-default",
                   )}

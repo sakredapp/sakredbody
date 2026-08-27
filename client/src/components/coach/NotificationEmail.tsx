@@ -110,7 +110,7 @@ export function NotificationEmail() {
 
       <div className="mt-3 space-y-1" data-testid="text-notification-destination">
         {awaiting && (
-          <p className="text-[11px] text-[hsl(var(--gold))]">
+          <p className="text-[11px] text-gold">
             Pending verification: {d.override}
           </p>
         )}

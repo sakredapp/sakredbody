@@ -169,8 +169,8 @@ function Option({
             className={cn(
               "text-[10px] uppercase tracking-widest",
               suggestion.side === "restore"
-                ? "text-[hsl(var(--gold))]/70"
-                : "text-[hsl(var(--gold))]",
+                ? "text-gold/70"
+                : "text-gold",
             )}
           >
             {suggestion.side === "restore" ? "Restore" : "Build"}
@@ -183,7 +183,7 @@ function Option({
         </div>
 
         <p className="font-display text-base mt-1 leading-snug">{suggestion.headline}</p>
-        <p className="text-xs text-[hsl(var(--gold))]/80 mt-0.5">{suggestion.label}</p>
+        <p className="text-xs text-gold/80 mt-0.5">{suggestion.label}</p>
         {showBecause && suggestion.because && (
           <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">
             {suggestion.because}
@@ -198,7 +198,7 @@ function Option({
           where the option is, and on most cards it is simply absent.
         */}
         {suggestion.goalNote && (
-          <p className="text-[11px] text-[hsl(var(--gold))]/70 mt-1 leading-snug">
+          <p className="text-[11px] text-gold/70 mt-1 leading-snug">
             {suggestion.goalNote}
           </p>
         )}
@@ -282,7 +282,7 @@ function Sky({ moon, season, sky }: { moon: MoonGuidance | null; season: SeasonG
           <p className="font-display text-base leading-snug">{lead.title}</p>
           <p className="text-[11px] text-muted-foreground mt-1 leading-snug">{lead.detail}</p>
           {/* The vocabulary, underneath, for whoever wants it. */}
-          <p className="text-[10px] uppercase tracking-widest text-[hsl(var(--gold))]/60 mt-2">
+          <p className="text-[10px] uppercase tracking-widest text-gold/60 mt-2">
             {sky}
           </p>
           {moon && season && (
@@ -312,14 +312,14 @@ export function RelatingCard({ note }: { note: RelationalGuidance }) {
       data-testid="relating-card"
     >
       <div className="flex items-start gap-3">
-        <Sparkles className="h-4 w-4 text-[hsl(var(--gold))] mt-0.5 shrink-0" />
+        <Sparkles className="h-4 w-4 text-gold mt-0.5 shrink-0" />
         <div className="min-w-0 flex-1">
           <p className="font-display text-base leading-snug">{note.title}</p>
           <p className="text-[11px] text-muted-foreground mt-1 leading-snug">{note.detail}</p>
           {open && (
             <div className="mt-3 space-y-2">
               <p className="text-xs leading-snug">{note.goodMove}</p>
-              <p className="text-xs text-[hsl(var(--gold))]/80 leading-snug">
+              <p className="text-xs text-gold/80 leading-snug">
                 Worth asking yourself: {note.worthAsking}
               </p>
               <p className="text-[11px] text-muted-foreground leading-snug">{note.dontAssume}</p>
@@ -331,7 +331,7 @@ export function RelatingCard({ note }: { note: RelationalGuidance }) {
         </div>
         <ChevronRight
           className={cn(
-            "h-4 w-4 text-[hsl(var(--gold))]/50 shrink-0 transition-transform",
+            "h-4 w-4 text-gold/50 shrink-0 transition-transform",
             open && "rotate-90",
           )}
         />
@@ -411,7 +411,7 @@ export function TodayRead({
         {!data.checkedIn && onCheckIn && (
           <button
             onClick={onCheckIn}
-            className="shrink-0 text-[11px] rounded-full border border-[hsl(var(--gold))]/30 px-3 py-1 text-[hsl(var(--gold))] tap-clean"
+            className="shrink-0 text-[11px] rounded-full border border-[hsl(var(--gold))]/30 px-3 py-1 text-gold tap-clean"
             data-testid="today-checkin"
           >
             Check in

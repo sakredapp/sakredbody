@@ -670,7 +670,7 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
                     </div>
 
                     {lift.note && (
-                      <p className="text-xs text-[hsl(var(--gold))]">{lift.note}</p>
+                      <p className="text-xs text-gold">{lift.note}</p>
                     )}
 
                     {/* Said plainly rather than shown as a zero: a member's
@@ -745,7 +745,7 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
                               </span>
                             ) : (
                               <span className="h-8 w-8 rounded-full bg-[hsl(var(--gold))]/20 grid place-items-center">
-                                <Check className="h-4 w-4 text-[hsl(var(--gold))]" strokeWidth={3} />
+                                <Check className="h-4 w-4 text-gold" strokeWidth={3} />
                               </span>
                             )
                           ) : (
@@ -820,7 +820,7 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
                               ],
                             })
                           }
-                          className="w-full text-xs text-[hsl(var(--gold))] py-2 inline-flex items-center justify-center gap-1 tap-clean"
+                          className="w-full text-xs text-gold py-2 inline-flex items-center justify-center gap-1 tap-clean"
                           data-testid={`button-add-set-${lift.exerciseId}`}
                         >
                           <Plus className="h-3 w-3" />

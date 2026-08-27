@@ -168,7 +168,7 @@ export function Sparkline({
               key={points[i].label + i}
               className={cn(
                 "text-[10px] uppercase tracking-widest whitespace-nowrap",
-                i === last ? "text-[hsl(var(--gold))]" : "text-muted-foreground/60",
+                i === last ? "text-gold" : "text-muted-foreground/60",
               )}
             >
               {points[i].label}

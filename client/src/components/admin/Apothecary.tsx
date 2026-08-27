@@ -259,7 +259,7 @@ export function ApothecaryAdmin({ enabled }: { enabled: boolean }) {
               >
                 <div className="flex items-center gap-2">
                   <span className="text-sm truncate">{p.name}</span>
-                  {p.isFeatured && <Star className="w-3 h-3 shrink-0 text-[hsl(var(--gold))]" />}
+                  {p.isFeatured && <Star className="w-3 h-3 shrink-0 text-gold" />}
                 </div>
                 <span className="text-xs text-muted-foreground">{p.category}</span>
               </button>
@@ -365,7 +365,7 @@ export function ApothecaryAdmin({ enabled }: { enabled: boolean }) {
           {!creating && selected && (
             <>
               <div className="border-t border-border/50 pt-6">
-                <h4 className="text-sm uppercase tracking-widest text-[hsl(var(--gold))] mb-4">
+                <h4 className="text-sm uppercase tracking-widest text-gold mb-4">
                   Where to buy it
                 </h4>
 
@@ -404,7 +404,7 @@ export function ApothecaryAdmin({ enabled }: { enabled: boolean }) {
               </div>
 
               <div className="border-t border-border/50 pt-6">
-                <h4 className="text-sm uppercase tracking-widest text-[hsl(var(--gold))] mb-4">
+                <h4 className="text-sm uppercase tracking-widest text-gold mb-4">
                   Attach to a protocol
                 </h4>
 
@@ -574,7 +574,7 @@ function GuidanceLinks({
                     <span className="text-xs flex-1 truncate">{l.name}</span>
                     {l.note && (
                       <span
-                        className="text-[10px] text-[hsl(var(--gold))]/70 truncate"
+                        className="text-[10px] text-gold/70 truncate"
                         title="Shown to members under this product"
                       >
                         “{l.note}”

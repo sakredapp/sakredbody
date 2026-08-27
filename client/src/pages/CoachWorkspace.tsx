@@ -77,7 +77,7 @@ export default function CoachWorkspacePage() {
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <div className="text-center space-y-3">
           <p className="text-sm text-muted-foreground">Sign in to continue.</p>
-          <Link href="/login" className="text-sm text-[hsl(var(--gold))]">
+          <Link href="/login" className="text-sm text-gold">
             Sign in
           </Link>
         </div>
@@ -98,7 +98,7 @@ export default function CoachWorkspacePage() {
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <div className="text-center space-y-3">
           <p className="text-sm">This area is for Sakred coaches.</p>
-          <Link href="/member" className="text-sm text-[hsl(var(--gold))]">
+          <Link href="/member" className="text-sm text-gold">
             Back to Sakred
           </Link>
         </div>

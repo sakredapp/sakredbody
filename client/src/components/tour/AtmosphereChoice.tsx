@@ -85,7 +85,7 @@ export function AtmosphereChoice() {
             <Preview value={value} />
             <div className="px-3 py-2.5">
               <div className="flex items-center gap-1.5">
-                <Icon className="h-3.5 w-3.5 text-[hsl(var(--gold-text))]" aria-hidden="true" />
+                <Icon className="h-3.5 w-3.5 text-gold" aria-hidden="true" />
                 <span className="text-sm" data-testid={`atmosphere-${value}-name`}>
                   {name}
                 </span>

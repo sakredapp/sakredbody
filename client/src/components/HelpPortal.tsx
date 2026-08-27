@@ -96,7 +96,7 @@ export function HelpPortal({ isCoach = false }: { isCoach?: boolean }) {
             <button
               type="button"
               onClick={() => play(paused.stepId)}
-              className="inline-flex items-center gap-2 rounded-full bg-[hsl(var(--gold))]/15 px-4 py-2 text-sm text-[hsl(var(--gold-text))] tap-clean hover:bg-[hsl(var(--gold))]/25 transition-colors"
+              className="inline-flex items-center gap-2 rounded-full bg-[hsl(var(--gold))]/15 px-4 py-2 text-sm text-gold tap-clean hover:bg-[hsl(var(--gold))]/25 transition-colors"
               data-testid="button-help-resume"
             >
               <Play className="h-4 w-4" aria-hidden="true" />
@@ -111,7 +111,7 @@ export function HelpPortal({ isCoach = false }: { isCoach?: boolean }) {
               "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm tap-clean transition-colors",
               paused
                 ? "border border-border/60 text-muted-foreground hover:text-foreground"
-                : "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold-text))] hover:bg-[hsl(var(--gold))]/25",
+                : "bg-[hsl(var(--gold))]/15 text-gold hover:bg-[hsl(var(--gold))]/25",
             )}
             data-testid="button-help-replay"
           >
@@ -141,7 +141,7 @@ export function HelpPortal({ isCoach = false }: { isCoach?: boolean }) {
           <ul className="space-y-1.5 mb-3">
             {chapter.lessons.map((lesson) => (
               <li key={lesson.id} className="flex items-baseline gap-2 text-sm text-muted-foreground">
-                <span aria-hidden="true" className="text-[hsl(var(--gold))]/50">·</span>
+                <span aria-hidden="true" className="text-gold/50">·</span>
                 <span>{lesson.title}</span>
               </li>
             ))}

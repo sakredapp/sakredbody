@@ -151,7 +151,7 @@ export function MovementHistory({
                         </span>
                       )}
                       {set.toFailure && (
-                        <span className="text-[10px] uppercase tracking-wide text-[hsl(var(--gold))]/80">
+                        <span className="text-[10px] uppercase tracking-wide text-gold/80">
                           failure
                         </span>
                       )}

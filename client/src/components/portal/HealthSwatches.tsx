@@ -164,7 +164,7 @@ function Ring({ value, target }: { value: number; target: number }) {
           strokeDashoffset={C * (1 - drawn)}
         />
       </svg>
-      <span className="absolute inset-0 flex items-center justify-center font-display text-xs text-[hsl(var(--gold))]">
+      <span className="absolute inset-0 flex items-center justify-center font-display text-xs text-gold">
         {Math.round(ratio * 100)}%
       </span>
     </div>
@@ -189,8 +189,8 @@ function Trend({ tile }: { tile: Tile }) {
         trend.good === null
           ? "text-muted-foreground"
           : trend.good
-            ? "text-emerald-400/80"
-            : "text-amber-400/80",
+            ? "text-rise/80"
+            : "text-caution/80",
       )}
     >
       <Icon className="h-2.5 w-2.5" />
@@ -209,7 +209,7 @@ function TileBody({ tile }: { tile: Tile }) {
     </div>
   );
   const value = (
-    <div className="font-display text-lg text-[hsl(var(--gold))] leading-tight">
+    <div className="font-display text-lg text-gold leading-tight">
       {display.format(tile.value)}
     </div>
   );
@@ -222,7 +222,7 @@ function TileBody({ tile }: { tile: Tile }) {
             <div className="min-w-0">
               {label}
               <div className="mt-0.5 flex items-baseline gap-2">
-                <span className="font-display text-2xl text-[hsl(var(--gold))]">
+                <span className="font-display text-2xl text-gold">
                   {display.format(tile.value)}
                 </span>
                 <Trend tile={tile} />
@@ -414,7 +414,7 @@ export function HealthSwatches({ onOpenStats }: { onOpenStats?: () => void }) {
           {freshest ? `Your body · ${dayLabel(freshest, today)}` : "Your body, lately"}
         </p>
         {onOpenStats && (
-          <ChevronRight className="h-3.5 w-3.5 text-[hsl(var(--gold))] opacity-60 group-hover:opacity-100 transition-opacity" />
+          <ChevronRight className="h-3.5 w-3.5 text-gold opacity-60 group-hover:opacity-100 transition-opacity" />
         )}
       </button>
 

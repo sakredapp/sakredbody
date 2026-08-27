@@ -88,8 +88,8 @@ const ACTION_LABEL: Record<string, string> = {
 };
 
 const ACTION_TONE: Record<string, string> = {
-  add: "text-[hsl(var(--gold))]",
-  change: "text-[hsl(var(--gold))]",
+  add: "text-gold",
+  change: "text-gold",
   end: "text-muted-foreground",
   keep: "text-muted-foreground/60",
 };
@@ -167,7 +167,7 @@ function HabitPicker({
             className={cn(
               "px-2.5 py-1.5 rounded-lg text-xs transition-colors tap-clean",
               side === s
-                ? "bg-[hsl(var(--gold))]/12 text-[hsl(var(--gold))]"
+                ? "bg-[hsl(var(--gold))]/12 text-gold"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
@@ -614,7 +614,7 @@ export function PlanEditor({
         ) : (
           <button
             onClick={() => setPicking(true)}
-            className="flex items-center gap-1.5 text-xs text-[hsl(var(--gold))] hover:text-[hsl(var(--gold-light))] transition-colors tap-clean py-1"
+            className="flex items-center gap-1.5 text-xs text-gold hover:text-gold-light transition-colors tap-clean py-1"
             data-testid="plan-add-practice"
           >
             <Plus className="h-3.5 w-3.5" />

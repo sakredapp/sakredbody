@@ -120,8 +120,8 @@ export function CoachPlanCard({
         <button
           onClick={onOpen}
           className={cn(
-            "flex items-center gap-0.5 text-xs text-[hsl(var(--gold))]",
-            "hover:text-[hsl(var(--gold-light))] transition-colors tap-clean mt-3",
+            "flex items-center gap-0.5 text-xs text-gold",
+            "hover:text-gold-light transition-colors tap-clean mt-3",
           )}
           data-testid="coach-plan-open"
         >

@@ -534,7 +534,7 @@ export function Onboarding({ onOpenGoals }: { onOpenGoals?: () => void } = {}) {
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm">{option.title}</span>
                     {depth === option.key && (
-                      <Check className="h-3.5 w-3.5 text-[hsl(var(--gold))]" />
+                      <Check className="h-3.5 w-3.5 text-gold" />
                     )}
                   </div>
                   {option.example && (

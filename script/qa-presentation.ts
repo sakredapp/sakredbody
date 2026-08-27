@@ -50,7 +50,7 @@
  */
 
 import { Browser } from "./cdp.js";
-import { Portal, PRIMARY_SECTIONS } from "./portal.js";
+import { Portal, PRIMARY_SECTIONS, SECONDARY_SECTIONS } from "./portal.js";
 import { SET_STYLES, EXERCISE_CATEGORIES } from "../shared/models/training.js";
 import { WORKOUT_FOCUSES } from "../shared/models/health.js";
 import { LOAD_CLASSES } from "../shared/models/loadClass.js";
@@ -292,10 +292,7 @@ const portal = new Portal(b, BASE);
  * surface nobody screenshots.
  */
 const PRIMARY = PRIMARY_SECTIONS;
-const SECONDARY = [
-  "goals",
-  "retreat", "apothecary", "library", "masterclass", "wins", "help", "settings",
-] as const;
+const SECONDARY = SECONDARY_SECTIONS;
 
 /**
  * The first instance of an anchor that is actually on screen.

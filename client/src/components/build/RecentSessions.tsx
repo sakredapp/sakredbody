@@ -107,7 +107,7 @@ function importedSource(w: HealthWorkout): string {
 }
 
 const PLACEMENT_TONE: Record<WorkoutPlacement, string> = {
-  build: "text-[hsl(var(--gold))]",
+  build: "text-gold",
   restore: "text-[hsl(var(--element-water))]",
   both: "text-muted-foreground",
 };
@@ -343,7 +343,7 @@ function Folded({
         data-testid={`sessions-summary-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`}
       >
         <span className="text-sm text-muted-foreground">{summary}</span>
-        <span className="shrink-0 text-xs text-[hsl(var(--gold))]">{`All ${count}`}</span>
+        <span className="shrink-0 text-xs text-gold">{`All ${count}`}</span>
       </button>
     </Panel>
   );
@@ -395,7 +395,7 @@ function Sessions({
           data-testid={`sessions-summary-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`}
         >
           <span className="text-sm text-muted-foreground">{summarise(entries)}</span>
-          <span className="shrink-0 text-xs text-[hsl(var(--gold))]">
+          <span className="shrink-0 text-xs text-gold">
             {open ? "Show less" : `All ${entries.length}`}
           </span>
         </button>

@@ -542,7 +542,7 @@ function Metric({
 }) {
   return (
     <div className="rounded-lg border border-[hsl(var(--gold))]/10 bg-well px-3 py-2.5">
-      <Icon className="h-3.5 w-3.5 text-[hsl(var(--gold))]" />
+      <Icon className="h-3.5 w-3.5 text-gold" />
       <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1.5">{label}</p>
       {/* An unsynced metric says so rather than showing a dash that reads as
           zero — three of these in a row with dashes looks like a broken screen. */}

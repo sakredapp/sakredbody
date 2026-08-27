@@ -203,7 +203,7 @@ export function MetricDetail({
                 <p
                   className={cn(
                     "text-sm mt-1",
-                    better === true && "text-[hsl(var(--gold))]",
+                    better === true && "text-gold",
                     better === false && "text-destructive",
                   )}
                 >
@@ -234,7 +234,7 @@ export function MetricDetail({
             */}
             {tonight && (
               <div className="rounded-xl border border-[hsl(var(--gold))]/25 p-3 space-y-1.5">
-                <p className="text-[10px] uppercase tracking-widest text-[hsl(var(--gold))]/70">
+                <p className="text-[10px] uppercase tracking-widest text-gold/70">
                   Tonight
                 </p>
                 <p className="font-display text-2xl">
@@ -245,7 +245,7 @@ export function MetricDetail({
                   nights, against your usual {display.format(baseline ?? 0)}. A long night makes
                   most of that back.
                 </p>
-                <p className="text-xs text-[hsl(var(--gold))]/85 leading-snug">
+                <p className="text-xs text-gold/85 leading-snug">
                   Attention and judgement are the first things short sleep takes, and the first
                   things that come back once you catch up.
                 </p>
@@ -264,14 +264,14 @@ export function MetricDetail({
               <div className="rounded-xl border border-[hsl(var(--gold))]/20 p-3 space-y-1.5">
                 <p className="text-sm font-medium leading-snug">{advice.title}</p>
                 <p className="text-[11px] text-muted-foreground leading-snug">{advice.body}</p>
-                <p className="text-xs text-[hsl(var(--gold))]/85 leading-snug">{advice.tip}</p>
+                <p className="text-xs text-gold/85 leading-snug">{advice.tip}</p>
 
                 {/* The herbal half of the practice, where there is a real
                     traditional answer to this reading. Named preparations and
                     how they are used — never a dose, never a claim to treat. */}
                 {advice.remedy && (
                   <div className="pt-2 mt-1 border-t border-[hsl(var(--gold))]/15 space-y-1">
-                    <p className="text-[10px] uppercase tracking-widest text-[hsl(var(--gold))]/70">
+                    <p className="text-[10px] uppercase tracking-widest text-gold/70">
                       {advice.remedy.title}
                     </p>
                     <p className="text-[11px] text-muted-foreground leading-snug">
@@ -291,7 +291,7 @@ export function MetricDetail({
             */}
             {support.length > 0 && (
               <div className="space-y-2">
-                <p className="text-[10px] uppercase tracking-widest text-[hsl(var(--gold))]/70">
+                <p className="text-[10px] uppercase tracking-widest text-gold/70">
                   Try tonight
                 </p>
                 {support.map((p) => (
@@ -377,7 +377,7 @@ function SupportCard({
       <p className="text-[11px] text-muted-foreground leading-snug">{primitive.why}</p>
 
       {primitive.cautions && (
-        <p className="text-[11px] text-amber-400/80 leading-snug">{primitive.cautions}</p>
+        <p className="text-[11px] text-caution/80 leading-snug">{primitive.cautions}</p>
       )}
 
       {/*
@@ -405,7 +405,7 @@ function SupportCard({
               href={link.url}
               target="_blank"
               rel="noreferrer noopener"
-              className="text-[10px] uppercase tracking-widest text-[hsl(var(--gold))] shrink-0 tap-clean"
+              className="text-[10px] uppercase tracking-widest text-gold shrink-0 tap-clean"
             >
               {link.linkLabel ?? "Get it"}
             </a>
@@ -415,7 +415,7 @@ function SupportCard({
 
       <button
         onClick={() => setOpen((v) => !v)}
-        className="text-[11px] text-[hsl(var(--gold))]/70 tap-clean"
+        className="text-[11px] text-gold/70 tap-clean"
       >
         {open ? "Less" : "Why this works"}
       </button>

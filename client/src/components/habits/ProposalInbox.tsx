@@ -32,7 +32,7 @@ export function ProposalInbox({ emphasis }: { emphasis: "yin" | "yang" }) {
           className="rounded-lg border border-[hsl(var(--gold))]/30 bg-[hsl(var(--gold))]/[0.05] px-3 py-2.5"
           data-testid={`proposal-${p.id}`}
         >
-          <p className="text-[10px] uppercase tracking-wider text-[hsl(var(--gold))]/80">
+          <p className="text-[10px] uppercase tracking-wider text-gold/80">
             Your coach suggests
           </p>
           <p className="mt-0.5 text-sm">{p.title}</p>

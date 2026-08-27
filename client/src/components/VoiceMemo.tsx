@@ -110,7 +110,7 @@ export function VoiceRecorderControl({
   if (held) {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-[hsl(var(--gold))]/25 px-3 py-2">
-        <AudioLines className="h-4 w-4 text-[hsl(var(--gold))] shrink-0" />
+        <AudioLines className="h-4 w-4 text-gold shrink-0" />
         <span className="text-sm flex-1">
           Recorded · {formatDuration(held.durationSeconds)}
         </span>
@@ -219,7 +219,7 @@ export function VoiceMemoPlayer({
         <a
           href={url}
           download
-          className="text-xs text-[hsl(var(--gold))] hover:underline ml-auto shrink-0"
+          className="text-xs text-gold hover:underline ml-auto shrink-0"
         >
           Download
         </a>

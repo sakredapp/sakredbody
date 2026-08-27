@@ -97,7 +97,7 @@ export function NotificationPrompt({
       data-testid="notification-prompt"
     >
       <div className="flex items-start gap-3">
-        <Bell className="w-4 h-4 mt-0.5 text-[hsl(var(--gold))] shrink-0" />
+        <Bell className="w-4 h-4 mt-0.5 text-gold shrink-0" />
         <div className="space-y-1">
           <p className="text-sm font-medium">{copy.title}</p>
           <p className="text-sm text-muted-foreground leading-relaxed">{copy.body}</p>

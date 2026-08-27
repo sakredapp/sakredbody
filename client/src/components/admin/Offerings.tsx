@@ -706,7 +706,7 @@ export function OfferingsAdmin() {
                     </span>
                   )}
                   {(o.counts.applied ?? 0) > 0 && (
-                    <span className="text-[hsl(var(--gold))] inline-flex items-center gap-1">
+                    <span className="text-gold inline-flex items-center gap-1">
                       <Users className="h-3 w-3" /> {o.counts.applied} waiting
                     </span>
                   )}

@@ -95,7 +95,7 @@ function GuidanceBody({ g }: { g: RelationalGuidance }) {
       <p className="font-display text-base leading-snug">{g.title}</p>
       <p className="text-[11px] text-muted-foreground leading-snug">{g.detail}</p>
       <p className="text-xs leading-snug">{g.goodMove}</p>
-      <p className="text-xs text-[hsl(var(--gold))]/80 leading-snug">
+      <p className="text-xs text-gold/80 leading-snug">
         Worth asking: “{g.worthAsking}”
       </p>
       <p className="text-[11px] text-muted-foreground leading-snug">{g.dontAssume}</p>
@@ -105,7 +105,7 @@ function GuidanceBody({ g }: { g: RelationalGuidance }) {
       {g.physiology && (
         <button
           onClick={() => setDeep((v) => !v)}
-          className="text-[11px] text-[hsl(var(--gold))]/70 tap-clean"
+          className="text-[11px] text-gold/70 tap-clean"
         >
           {deep ? "Less" : "What's actually happening"}
         </button>
@@ -168,7 +168,7 @@ function TheirRhythm({ subject }: { subject: RhythmSubjectView }) {
         {/* The phase name, hedged by the server according to how it was
             arrived at, and simply absent when it wasn't. */}
         {subject.phaseLabel && (
-          <p className="text-[10px] text-[hsl(var(--gold))]/70">{subject.phaseLabel}</p>
+          <p className="text-[10px] text-gold/70">{subject.phaseLabel}</p>
         )}
       </div>
 
@@ -208,7 +208,7 @@ function TheirRhythm({ subject }: { subject: RhythmSubjectView }) {
               className={cn(
                 "text-[11px] rounded-full px-3 py-1 tap-clean border",
                 subject.contexts.includes(c.id)
-                  ? "border-[hsl(var(--gold))]/50 text-[hsl(var(--gold))]"
+                  ? "border-[hsl(var(--gold))]/50 text-gold"
                   : "border-border/50 hover:border-[hsl(var(--gold))]/40",
               )}
             >
@@ -246,7 +246,7 @@ function MyRhythm({ subject }: { subject: RhythmSubjectView }) {
       <div className="flex items-baseline justify-between gap-2">
         <p className="text-[10px] uppercase tracking-widest text-muted-foreground">My rhythm</p>
         {subject.phaseLabel && (
-          <p className="text-[10px] text-[hsl(var(--gold))]/70">
+          <p className="text-[10px] text-gold/70">
             {subject.phaseLabel}
             {subject.cycleDay ? ` · day ${subject.cycleDay}` : ""}
           </p>
@@ -257,7 +257,7 @@ function MyRhythm({ subject }: { subject: RhythmSubjectView }) {
         <>
           <p className="font-display text-base leading-snug">{subject.guide.goodMove}</p>
           <p className="text-[11px] text-muted-foreground leading-snug">{subject.guide.summary}</p>
-          <p className="text-xs text-[hsl(var(--gold))]/80 leading-snug">
+          <p className="text-xs text-gold/80 leading-snug">
             {subject.guide.worthAsking}
           </p>
         </>
@@ -351,7 +351,7 @@ function OwnRhythm() {
           <p className="text-xs font-medium leading-snug">{note.title}</p>
           <p className="text-[11px] text-muted-foreground leading-snug">{note.detail}</p>
           <p className="text-xs leading-snug">{note.goodMove}</p>
-          <p className="text-xs text-[hsl(var(--gold))]/80 leading-snug">
+          <p className="text-xs text-gold/80 leading-snug">
             Worth asking: “{note.worthAsking}”
           </p>
           <p className="text-[11px] text-muted-foreground leading-snug">{note.dontAssume}</p>
@@ -426,7 +426,7 @@ function AddSubject({
                 className={cn(
                   "flex-1 rounded-lg border px-3 py-2 text-sm tap-clean",
                   relation === "self"
-                    ? "border-[hsl(var(--gold))] text-[hsl(var(--gold))]"
+                    ? "border-[hsl(var(--gold))] text-gold"
                     : "border-border/50",
                 )}
               >
@@ -438,7 +438,7 @@ function AddSubject({
               className={cn(
                 "flex-1 rounded-lg border px-3 py-2 text-sm tap-clean",
                 relation === "partner"
-                  ? "border-[hsl(var(--gold))] text-[hsl(var(--gold))]"
+                  ? "border-[hsl(var(--gold))] text-gold"
                   : "border-border/50",
               )}
             >
@@ -478,7 +478,7 @@ function AddSubject({
                   className={cn(
                     "flex-1 rounded-lg border px-2 py-2 text-xs tap-clean",
                     sex === o.v
-                      ? "border-[hsl(var(--gold))] text-[hsl(var(--gold))]"
+                      ? "border-[hsl(var(--gold))] text-gold"
                       : "border-border/50",
                   )}
                 >
@@ -544,7 +544,7 @@ export function RhythmSection() {
         data-testid="rhythm-add"
       >
         <div className="flex items-center gap-2">
-          <Plus className="h-4 w-4 text-[hsl(var(--gold))]" />
+          <Plus className="h-4 w-4 text-gold" />
           <div className="min-w-0 flex-1">
             <p className="text-sm">
               {data.subjects.length ? "Add someone else" : "Understand your rhythm"}
@@ -555,7 +555,7 @@ export function RhythmSection() {
                 : "Yours, or somebody you're close to. Private to you."}
             </p>
           </div>
-          <ChevronRight className="h-4 w-4 text-[hsl(var(--gold))]/50" />
+          <ChevronRight className="h-4 w-4 text-gold/50" />
         </div>
       </button>
 

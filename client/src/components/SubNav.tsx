@@ -108,7 +108,7 @@ export function SubNav<T extends string>({
                 "inline-flex items-center gap-1.5 px-3.5 text-sm rounded-md whitespace-nowrap",
                 "min-h-[44px] tap-clean transition-colors",
                 value === id
-                  ? "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))] font-medium"
+                  ? "bg-[hsl(var(--gold))]/15 text-gold font-medium"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
               )}
               data-testid={`subnav-${id}`}

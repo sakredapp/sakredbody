@@ -242,11 +242,11 @@ export function TodaysBuild({
             className="w-full text-left rounded-xl border border-[hsl(var(--gold))]/25 px-3 py-2.5 tap-clean"
             data-testid="build-check-in"
           >
-            <p className="text-sm text-[hsl(var(--gold))]">{REPORT_INVITE.title}</p>
+            <p className="text-sm text-gold">{REPORT_INVITE.title}</p>
             <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
               {REPORT_INVITE.body}
             </p>
-            <span className="text-xs text-[hsl(var(--gold))] inline-flex items-center gap-1 mt-1.5">
+            <span className="text-xs text-gold inline-flex items-center gap-1 mt-1.5">
               {REPORT_INVITE.action}
               <ChevronRight className="h-3 w-3" />
             </span>

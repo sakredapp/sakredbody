@@ -121,7 +121,7 @@ export function TelemetryAdmin() {
               className={cn(
                 "px-3 py-1.5 text-sm rounded-md transition-colors",
                 days === d
-                  ? "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))] font-medium"
+                  ? "bg-[hsl(var(--gold))]/15 text-gold font-medium"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
               )}
               data-testid={`telemetry-window-${d}`}
@@ -135,7 +135,7 @@ export function TelemetryAdmin() {
       {/* ── The money ─────────────────────────────────────────────────────── */}
       <section className="space-y-3">
         <div className="flex items-center gap-2">
-          <ExternalLink className="h-4 w-4 text-[hsl(var(--gold))]" />
+          <ExternalLink className="h-4 w-4 text-gold" />
           <h3 className="text-sm font-medium">Buy clicks</h3>
           <InfoTip label="About buy clicks" title="Split by surface">
             The same click from a product page and from a protocol's supply list

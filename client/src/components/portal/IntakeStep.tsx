@@ -123,7 +123,7 @@ export function IntakeStep({
           </div>
           <div className="space-y-1">
             <span className="block text-[11px] text-muted-foreground">
-              Middle <em className="text-[hsl(var(--gold))] not-italic">— recommended</em>
+              Middle <em className="text-gold not-italic">— recommended</em>
             </span>
             <Input
               placeholder="Middle name"
@@ -164,7 +164,7 @@ export function IntakeStep({
                 "They" at a glance — which is a different sentence entirely.
                 The icon that used to sit here made it worse by pulling the eye
                 past the gap. */}
-            <p className="text-xs uppercase tracking-[0.18em] text-[hsl(var(--gold))]">
+            <p className="text-xs uppercase tracking-[0.18em] text-gold">
               The &ldquo;Y&rdquo; in your name
             </p>
             <p className="text-[11px] text-muted-foreground leading-snug">
@@ -190,7 +190,7 @@ export function IntakeStep({
                         className={cn(
                           "px-2.5 py-1 text-[11px] tap-clean transition-colors",
                           isVowel === vowel
-                            ? "bg-[hsl(var(--gold))]/20 text-[hsl(var(--gold))]"
+                            ? "bg-[hsl(var(--gold))]/20 text-gold"
                             : "text-muted-foreground",
                         )}
                         data-testid={`intake-y-${key}-${vowel ? "vowel" : "consonant"}`}

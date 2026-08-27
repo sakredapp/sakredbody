@@ -113,7 +113,7 @@ function Card({
       data-testid={testid}
     >
       <p className="text-xs text-foreground/90 leading-relaxed flex items-start gap-1.5">
-        <AlertTriangle className="h-3.5 w-3.5 text-[hsl(var(--gold))] shrink-0 mt-0.5" />
+        <AlertTriangle className="h-3.5 w-3.5 text-gold shrink-0 mt-0.5" />
         <span>{headline}</span>
       </p>
       {quote && (

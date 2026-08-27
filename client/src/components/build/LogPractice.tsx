@@ -355,7 +355,7 @@ export function LogPractice({
                         className={cn(
                           "rounded-full border px-3 py-1.5 text-xs tap-clean transition-colors",
                           onDate === iso
-                            ? "border-[hsl(var(--gold))]/50 bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))]"
+                            ? "border-[hsl(var(--gold))]/50 bg-[hsl(var(--gold))]/15 text-gold"
                             : "border-border/60 text-muted-foreground",
                         )}
                         data-testid={`past-day-${iso}`}
@@ -397,7 +397,7 @@ export function LogPractice({
                     className={cn(
                       "rounded-full border px-3 py-1.5 text-xs tap-clean transition-colors",
                       minutes === m
-                        ? "border-[hsl(var(--gold))]/50 bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))]"
+                        ? "border-[hsl(var(--gold))]/50 bg-[hsl(var(--gold))]/15 text-gold"
                         : "border-border/60 text-muted-foreground hover:text-foreground",
                     )}
                     data-testid={`practice-minutes-${m}`}
@@ -458,7 +458,7 @@ export function LogPractice({
                     <span
                       className={cn(
                         "block text-xs",
-                        rpe === e.rpe ? "text-[hsl(var(--gold))]" : "text-foreground",
+                        rpe === e.rpe ? "text-gold" : "text-foreground",
                       )}
                     >
                       {e.label}
@@ -500,7 +500,7 @@ export function LogPractice({
                     : "border-border",
                 )}
               >
-                {shareWithCoach && <Check className="h-3 w-3 text-[hsl(var(--gold))]" />}
+                {shareWithCoach && <Check className="h-3 w-3 text-gold" />}
               </span>
               <span className="text-xs">
                 <Send className="h-3 w-3 inline mr-1 text-muted-foreground" />

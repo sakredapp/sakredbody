@@ -240,7 +240,7 @@ function Card({ offering, onOpen }: { offering: OfferingCard; onOpen: () => void
         {/* Scarcity only when it's true. "12 seats left" on a webinar with
             unlimited capacity is noise that trains people to ignore it. */}
         {nearlyFull && (
-          <p className="text-xs text-[hsl(var(--gold))] inline-flex items-center gap-1.5">
+          <p className="text-xs text-gold inline-flex items-center gap-1.5">
             <Users className="h-3 w-3" />
             {offering.seatsRemaining} {offering.seatsRemaining === 1 ? "place" : "places"} left
           </p>
@@ -313,7 +313,7 @@ function SessionRow({
           href={session.meetingUrl}
           target="_blank"
           rel="noreferrer"
-          className="mt-2 inline-flex items-center gap-1.5 text-xs text-[hsl(var(--gold))] hover:underline"
+          className="mt-2 inline-flex items-center gap-1.5 text-xs text-gold hover:underline"
           data-testid="link-session-join"
         >
           <Video className="h-3 w-3" /> Join <ExternalLink className="h-3 w-3" />
@@ -646,7 +646,7 @@ export function OfferingsTab() {
             className={cn(
               "px-3 py-1.5 text-sm rounded-md whitespace-nowrap transition-colors",
               view === v.key
-                ? "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))] font-medium"
+                ? "bg-[hsl(var(--gold))]/15 text-gold font-medium"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
             )}
             data-testid={`offerings-view-${v.key}`}
@@ -685,7 +685,7 @@ export function OfferingsTab() {
                     className={cn(
                       "px-2.5 py-1 text-xs rounded-full whitespace-nowrap border transition-colors",
                       kind === null
-                        ? "border-[hsl(var(--gold))] text-[hsl(var(--gold))]"
+                        ? "border-[hsl(var(--gold))] text-gold"
                         : "border-border/60 text-muted-foreground",
                     )}
                   >
@@ -698,7 +698,7 @@ export function OfferingsTab() {
                       className={cn(
                         "px-2.5 py-1 text-xs rounded-full whitespace-nowrap border transition-colors",
                         kind === k
-                          ? "border-[hsl(var(--gold))] text-[hsl(var(--gold))]"
+                          ? "border-[hsl(var(--gold))] text-gold"
                           : "border-border/60 text-muted-foreground",
                       )}
                     >

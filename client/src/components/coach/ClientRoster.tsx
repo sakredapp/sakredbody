@@ -77,7 +77,7 @@ function sinceLabel(iso: string | null | undefined): string | null {
 
 const LEAN_TONE: Record<string, string> = {
   restore: "text-[hsl(var(--element-water))]",
-  build: "text-[hsl(var(--gold))]",
+  build: "text-gold",
   either: "text-muted-foreground",
   unknown: "text-muted-foreground/60",
 };
@@ -103,7 +103,7 @@ function ClientRow({ client, onOpen }: { client: ClientCard; onOpen: () => void 
             {/* One number. Not presence, not typing, not delivery receipts. */}
             {client.unread > 0 && (
               <span
-                className="shrink-0 rounded-full bg-[hsl(var(--gold))]/15 px-1.5 py-0.5 text-[10px] text-[hsl(var(--gold))]"
+                className="shrink-0 rounded-full bg-[hsl(var(--gold))]/15 px-1.5 py-0.5 text-[10px] text-gold"
                 data-testid={`client-unread-${client.id}`}
               >
                 {client.unread}
@@ -227,7 +227,7 @@ export function ClientRoster({
               className={cn(
                 "px-3 py-1.5 rounded-lg text-xs transition-colors tap-clean",
                 filter === f.id
-                  ? "bg-[hsl(var(--gold))]/12 text-[hsl(var(--gold))]"
+                  ? "bg-[hsl(var(--gold))]/12 text-gold"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >

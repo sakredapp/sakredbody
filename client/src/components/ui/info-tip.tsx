@@ -57,7 +57,7 @@ export function InfoTip({
           className={cn(
             "inline-flex items-center justify-center align-middle",
             "h-11 w-11 -m-3.5 shrink-0 tap-clean",
-            "text-muted-foreground/50 hover:text-[hsl(var(--gold))] transition-colors",
+            "text-muted-foreground/50 hover:text-gold transition-colors",
             "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[hsl(var(--gold))] rounded-full",
             className,
           )}

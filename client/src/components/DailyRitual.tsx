@@ -196,7 +196,7 @@ function ChartInvite({ depth }: { depth: number }) {
         className="text-left w-full border-t border-border/50 pt-6"
         data-testid="button-chart-invite"
       >
-        <p className="text-xs uppercase tracking-widest text-[hsl(var(--gold))] mb-2">
+        <p className="text-xs uppercase tracking-widest text-gold mb-2">
           Make this yours
         </p>
         <p className="text-sm text-muted-foreground">
@@ -219,7 +219,7 @@ function ChartInvite({ depth }: { depth: number }) {
       }}
       className="border-t border-border/50 pt-6 space-y-4"
     >
-      <p className="text-xs uppercase tracking-widest text-[hsl(var(--gold))]">
+      <p className="text-xs uppercase tracking-widest text-gold">
         Make this yours
       </p>
 
@@ -316,7 +316,7 @@ export function DailyRitual() {
                   {note.body}
                 </p>
                 {note.invitation && (
-                  <p className="text-sm text-[hsl(var(--gold-light))] leading-relaxed">
+                  <p className="text-sm text-gold-light leading-relaxed">
                     {note.invitation}
                   </p>
                 )}
@@ -339,7 +339,7 @@ export function DailyRitual() {
 
       {/* What the member says back. */}
       <div className="border-t border-border/50 pt-8 space-y-4">
-        <p className="text-xs uppercase tracking-widest text-[hsl(var(--gold))]">
+        <p className="text-xs uppercase tracking-widest text-gold">
           Your intention
         </p>
         <Intention

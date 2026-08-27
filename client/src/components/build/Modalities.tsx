@@ -95,7 +95,7 @@ export function ModalityChooser({
                 className={cn(
                   "rounded-full border px-3 py-1.5 text-xs tap-clean transition-colors inline-flex items-center gap-1.5",
                   on
-                    ? "border-[hsl(var(--gold))]/50 bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))]"
+                    ? "border-[hsl(var(--gold))]/50 bg-[hsl(var(--gold))]/15 text-gold"
                     : "border-border/60 text-muted-foreground hover:text-foreground",
                 )}
                 data-testid={`modality-${m.id}`}
