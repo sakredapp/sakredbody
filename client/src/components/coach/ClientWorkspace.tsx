@@ -54,6 +54,7 @@ import {
 import type { HealthWorkout } from "@shared/schema";
 import { CheckinRequests } from "@/components/coach/CheckinRequests";
 import { MovementAndProgress } from "@/components/coach/MovementAndProgress";
+import { ClientGoals } from "@/components/coach/ClientGoals";
 import { cn } from "@/lib/utils";
 
 type Tab = "overview" | "activity" | "movement" | "habits" | "plan" | "messages";
@@ -231,6 +232,16 @@ function Overview({ memberId, memberName }: { memberId: string; memberName: stri
 
   return (
     <div className="space-y-4">
+      {/*
+        Above the terrain read, because it is the question that frames the
+        rest. A coach opening a client wants to know what this person is
+        trying to do before they read what today can support — the second is
+        only interesting relative to the first.
+      */}
+      <Section title="What they're working toward" kind="member">
+        <ClientGoals memberId={memberId} unit="lb" />
+      </Section>
+
       <Section title="Terrain now" kind="sakred">
         {/*
           Not `hasBody`. The reading now composes what the member reported with

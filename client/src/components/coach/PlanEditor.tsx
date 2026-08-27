@@ -17,6 +17,7 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { formatMeasurement, type GoalTarget, type Measurement } from "@shared/models/goals";
 import { Plus, X, AlertTriangle, Info, Search } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -537,6 +538,23 @@ export function PlanEditor({
 
   return (
     <div className="space-y-4">
+      {/*
+        What the member is trying to accomplish, in front of the coach while
+        they write.
+
+        Read-only, and deliberately not a field on the plan. Requiring every
+        planned line to name a goal would turn a coach's judgement into a
+        filing exercise, and the filing would be fictional: the sleep window,
+        the breath practice and the walk somebody gets because they are
+        fraying are all real work that serves no goal at all. Health is not
+        only goal pursuit.
+
+        It is here so the two do not drift apart silently — a plan written
+        without ever seeing the member's own targets is how a coach and a
+        member end up in different conversations about the same body.
+      */}
+      <GoalsWhileWriting memberId={memberId} />
+
       <div className="space-y-2.5">
         <Input
           value={title}
@@ -654,6 +672,42 @@ export function PlanEditor({
           Discard
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The member's active goals, beside the plan being written.
+ *
+ * Silent when there are none — a coach writing a plan for somebody who has set
+ * no goals should not be shown an empty panel suggesting they ought to have.
+ */
+function GoalsWhileWriting({ memberId }: { memberId: string }) {
+  const { data } = useQuery<
+    { id: string; title: string; status: string; measurement: Measurement; target: GoalTarget }[]
+  >({
+    queryKey: [`/api/coach/clients/${memberId}/goals`],
+    staleTime: 60_000,
+  });
+
+  const active = (data ?? []).filter((g) => g.status === "active");
+  if (!active.length) return null;
+
+  return (
+    <div className="rounded-lg border border-[hsl(var(--gold))]/12 bg-background/30 px-3 py-2.5">
+      <p className="text-[10px] uppercase tracking-widest text-muted-foreground/70">
+        What they're working toward
+      </p>
+      <ul className="mt-1.5 space-y-0.5">
+        {active.map((g) => (
+          <li key={g.id} className="flex items-baseline justify-between gap-3 text-xs">
+            <span className="truncate text-foreground/90">{g.title}</span>
+            <span className="shrink-0 tabular-nums text-muted-foreground">
+              {formatMeasurement(g.measurement, g.target, "lb")}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
