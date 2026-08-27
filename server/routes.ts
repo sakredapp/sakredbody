@@ -34,6 +34,7 @@ import { registerMemberRoutes } from "./members/index.js";
 import { registerTrainingRoutes } from "./training/index.js";
 import { registerMemberWorkoutRoutes } from "./training/memberWorkouts.js";
 import { registerHealthRoutes } from "./health/index.js";
+import { registerGoalRoutes } from "./goals/index.js";
 import { registerTerrainRoutes } from "./terrain/index.js";
 import { registerHabitRoutes } from "./habits/index.js";
 import { registerModerationRoutes } from "./moderation/index.js";
@@ -517,6 +518,8 @@ export async function registerRoutes(
 
   // Health — what the phone measured. Read-only to us; the device owns it.
   registerHealthRoutes(app);
+
+  registerGoalRoutes(app);
 
   // Terrain — the two above, read together: what condition the body is in.
   registerTerrainRoutes(app);

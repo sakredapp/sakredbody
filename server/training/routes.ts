@@ -39,6 +39,7 @@ import { and, asc, desc, eq, gte, ilike, inArray, isNull, or, sql } from "drizzl
 import { z } from "zod";
 import { isAuthenticated } from "../auth/index.js";
 import { requireCoachOf } from "../coaching/relationships.js";
+import { noteSessionEvidence } from "../goals/store.js";
 import { storage } from "../storage.js";
 import {
   exercises,
@@ -1560,6 +1561,19 @@ export function registerTrainingRoutes(app: Express) {
       void sessionCategories(row.id)
         .then((categories) => markCompleted(userId, row.onDate, categories))
         .catch(() => {});
+      /*
+        And against what the member is trying to get to.
+
+        At finish rather than per set, because a set can be corrected or
+        deleted while the workout is open — recording thirteen pull-ups from a
+        number still being edited would leave a proof of something that never
+        happened. Best-effort for the same reason as the line above: the
+        session is saved whether or not the bookkeeping lands, and a goal that
+        misses one session is a goal a member can update by hand.
+      */
+      void noteSessionEvidence(userId, row.id, row.onDate, row.finishedAt ?? new Date()).catch(
+        (err) => trackError("goals.workout_evidence", err),
+      );
       res.json(row);
     } catch (err) {
       fail(res, err);

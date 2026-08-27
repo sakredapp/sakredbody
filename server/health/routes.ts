@@ -46,6 +46,8 @@ import { needsConfirmation, answeredToday, orderedForWrite } from "../../shared/
 import { externalActivityCategory } from "../../shared/models/training.js";
 import { todayInZone } from "../../shared/utils/dates.js";
 import { users } from "../../shared/models/auth.js";
+import { trackError } from "../telemetry/index.js";
+import { noteActivityEvidence } from "../goals/store.js";
 import {
   healthConnections,
   healthDays,
@@ -316,6 +318,37 @@ export function registerHealthRoutes(app: Express) {
               },
             });
           workoutsWritten += chunk.length;
+        }
+      }
+
+      /*
+        Imported sessions, offered to the member's goals.
+
+        After the write and before the connection is stamped, so a sync that
+        fails here still records what it read. Idempotent by construction: the
+        platform's own session id is the source reference and
+        `uq_goal_progress_source` refuses the second arrival, which matters
+        because the trailing re-read window means the same run is posted again
+        on most syncs for days.
+
+        `evidenceFromActivity` is what decides whether any of it counts, and
+        the answer is usually no.
+      */
+      if (cleanWorkouts.length) {
+        try {
+          await noteActivityEvidence(
+            userId,
+            cleanWorkouts.map((w) => ({
+              externalId: w.externalId,
+              workoutType: w.workoutType ?? null,
+              durationSeconds: w.durationSeconds ?? null,
+              distanceMeters: w.distanceMeters ?? null,
+              onDate: w.onDate,
+              startAt: new Date(w.startAt),
+            })),
+          );
+        } catch (err) {
+          trackError("goals.activity_evidence", err);
         }
       }
 

@@ -16,7 +16,7 @@
  * columns the migration creates are the columns the model writes.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import {
@@ -156,7 +156,26 @@ for (const type of RECOMMENDATION_TYPES) {
 // ─── 6. The migration creates what the model writes ───────────────────────
 
 {
-  const sql = read("supabase/2026-08-19-recommendation-events.sql");
+  /*
+    Every migration that touches the table, not only the one that created it.
+
+    A schema is the sum of its migrations, and this read one file — so the day
+    a column arrived by ALTER in a later migration, the check reported it
+    missing from a schema it is actually in. `plan_item_id` was that day.
+
+    Loose in one direction on purpose: a column name has to appear somewhere in
+    the SQL that mentions this table, rather than inside a statement proven to
+    target it. What the check is for is the failure that actually happens —
+    a column added to the Drizzle model and to no migration at all, which
+    compiles, passes every unit test and throws on the first insert in
+    production.
+  */
+  const sql = readdirSync(join(ROOT, "supabase"))
+    .filter((f) => f.endsWith(".sql"))
+    .map((f) => read(`supabase/${f}`))
+    .filter((text) => text.includes("recommendation_events"))
+    .join("\n");
+  check("the recommendation migrations were found", sql.includes("CREATE TABLE"));
 
   const columns = Object.values(recommendationEvents).flatMap((c: any) =>
     c && typeof c === "object" && "name" in c ? [String(c.name)] : [],
@@ -191,7 +210,21 @@ for (const type of RECOMMENDATION_TYPES) {
     FEEDBACK_REASONS.filter((r) => !sql.includes(`'${r}'`)).join(", "),
   );
 
-  check("both tables have RLS enabled", (sql.match(/ENABLE ROW LEVEL SECURITY/g) ?? []).length === 2);
+  /*
+    Named, not counted.
+
+    This counted ENABLE ROW LEVEL SECURITY and expected two, which was true of
+    one file and stopped being true the moment the corpus above included every
+    migration mentioning the table. Counting also never actually said *which*
+    two tables — a migration that enabled RLS on the same table twice would
+    have satisfied it.
+  */
+  for (const table of ["recommendation_events", "recommendation_feedback"]) {
+    check(
+      `${table} has RLS enabled`,
+      new RegExp(`ALTER TABLE\\s+${table}\\s+ENABLE ROW LEVEL SECURITY`).test(sql),
+    );
+  }
   check("the migration verifies itself rather than trusting", sql.includes("RAISE EXCEPTION"));
 }
 
