@@ -47,11 +47,45 @@ export type MetricPlan = {
   platforms?: HealthPlatform[];
 };
 
+/**
+ * Types we read on an iPhone and deliberately do not ask Health Connect for.
+ *
+ * Google Play rejected versionCode 59 under the minimum-scope rule: an app may
+ * request a Health Connect type only when a *current* feature needs it. Six
+ * were named — body fat, floors climbed, height, nutrition, total calories,
+ * VO2 max — and the honest answer for all six was that Sakred read them
+ * because it could, then rendered whatever came back. A tile is not a feature.
+ *
+ * Three more are here that Google did not name: body temperature, blood oxygen
+ * and respiratory rate. They fail the same test for the same reason, and the
+ * point of a minimum-scope audit is to answer the rule rather than the letter.
+ *
+ * What survives on Android is what something other than the health screen
+ * consumes: sleep, resting heart rate and HRV decide Terrain; exercise
+ * sessions, distance and active calories become training load and the day's
+ * movement; steps, water and mindfulness are habit targets a member sets; and
+ * weight is the bodyweight in a bodyweight-factor lift, so a pull-up counts as
+ * load rather than as zero.
+ *
+ * HealthKit is a separate grant reviewed by a separate store, so this changes
+ * nothing an iPhone member sees. An Android member has less optional context
+ * and, per `plansFor`, is simply never asked — which is not the same as being
+ * asked and refused, and reaches the same place: the metric is absent, and
+ * absent has always had to render as absent rather than as zero.
+ */
+const APPLE_ONLY: HealthPlatform[] = ["healthkit"];
+
 export const METRIC_PLANS: MetricPlan[] = [
   // ── Movement: totals over the day ──
   { dataType: "steps", metric: "steps", aggregation: "sum", accepts: ["count"] },
   { dataType: "distance", metric: "distanceMeters", aggregation: "sum", accepts: ["meter"] },
-  { dataType: "flightsClimbed", metric: "flightsClimbed", aggregation: "sum", accepts: ["count"] },
+  {
+    dataType: "flightsClimbed",
+    metric: "flightsClimbed",
+    aggregation: "sum",
+    accepts: ["count"],
+    platforms: APPLE_ONLY,
+  },
   {
     dataType: "exerciseTime",
     metric: "exerciseMinutes",
@@ -66,7 +100,13 @@ export const METRIC_PLANS: MetricPlan[] = [
     platforms: ["healthkit"],
   },
   { dataType: "calories", metric: "activeCalories", aggregation: "sum", accepts: ["kilocalorie"] },
-  { dataType: "totalCalories", metric: "totalCalories", aggregation: "sum", accepts: ["kilocalorie"] },
+  {
+    dataType: "totalCalories",
+    metric: "totalCalories",
+    aggregation: "sum",
+    accepts: ["kilocalorie"],
+    platforms: APPLE_ONLY,
+  },
 
   // ── Heart: a representative value, never a total ──
   {
@@ -81,12 +121,30 @@ export const METRIC_PLANS: MetricPlan[] = [
     aggregation: "average",
     accepts: ["millisecond"],
   },
-  { dataType: "vo2Max", metric: "vo2Max", aggregation: "average", accepts: ["mL/min/kg"] },
+  {
+    dataType: "vo2Max",
+    metric: "vo2Max",
+    aggregation: "average",
+    accepts: ["mL/min/kg"],
+    platforms: APPLE_ONLY,
+  },
 
   // ── Body ──
   { dataType: "weight", metric: "weightKg", aggregation: "average", accepts: ["kilogram"] },
-  { dataType: "bodyFat", metric: "bodyFatPercent", aggregation: "average", accepts: ["percent"] },
-  { dataType: "height", metric: "heightCm", aggregation: "max", accepts: ["centimeter"] },
+  {
+    dataType: "bodyFat",
+    metric: "bodyFatPercent",
+    aggregation: "average",
+    accepts: ["percent"],
+    platforms: APPLE_ONLY,
+  },
+  {
+    dataType: "height",
+    metric: "heightCm",
+    aggregation: "max",
+    accepts: ["centimeter"],
+    platforms: APPLE_ONLY,
+  },
 
   // ── Vitals ──
   {
@@ -94,6 +152,7 @@ export const METRIC_PLANS: MetricPlan[] = [
     metric: "respiratoryRate",
     aggregation: "average",
     accepts: ["count", "bpm"],
+    platforms: APPLE_ONLY,
   },
   {
     dataType: "oxygenSaturation",
@@ -110,6 +169,7 @@ export const METRIC_PLANS: MetricPlan[] = [
      * at or under 1 is a fraction with certainty.
      */
     convert: (v) => (v <= 1 ? v * 100 : v),
+    platforms: APPLE_ONLY,
   },
   {
     dataType: "bodyTemperature",
@@ -117,6 +177,7 @@ export const METRIC_PLANS: MetricPlan[] = [
     aggregation: "average",
     accepts: ["celsius", "fahrenheit"],
     convert: (v, unit) => (unit === "fahrenheit" ? (v - 32) * (5 / 9) : v),
+    platforms: APPLE_ONLY,
   },
 
   // ── Practice ──
@@ -134,6 +195,7 @@ export const METRIC_PLANS: MetricPlan[] = [
     metric: "dietaryCalories",
     aggregation: "sum",
     accepts: ["kilocalorie"],
+    platforms: APPLE_ONLY,
   },
 ];
 

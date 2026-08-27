@@ -3,23 +3,14 @@ package com.sakredbody.healthsync
 import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
-import androidx.health.connect.client.records.BodyFatRecord
-import androidx.health.connect.client.records.BodyTemperatureRecord
 import androidx.health.connect.client.records.DistanceRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
-import androidx.health.connect.client.records.FloorsClimbedRecord
 import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
-import androidx.health.connect.client.records.HeightRecord
 import androidx.health.connect.client.records.HydrationRecord
-import androidx.health.connect.client.records.NutritionRecord
-import androidx.health.connect.client.records.OxygenSaturationRecord
 import androidx.health.connect.client.records.Record
-import androidx.health.connect.client.records.RespiratoryRateRecord
 import androidx.health.connect.client.records.RestingHeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
-import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
-import androidx.health.connect.client.records.Vo2MaxRecord
 import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
@@ -106,9 +97,7 @@ class HealthReader(private val context: Context) {
     }
 
     private val averaged = setOf(
-        "restingHeartRate", "heartRateVariability", "vo2Max",
-        "weightKg", "bodyFatPercent", "respiratoryRate",
-        "oxygenSaturation", "bodyTemperatureC", "heightCm",
+        "restingHeartRate", "heartRateVariability", "weightKg",
     )
 
     private suspend fun <T : Record> read(
@@ -248,6 +237,21 @@ class HealthReader(private val context: Context) {
         }
     }
 
+    /**
+     * The daily metrics, for the types Android still asks for.
+     *
+     * Nine used to be read here that are not any more: floors, total calories,
+     * nutrition, VO2 max, body fat, height, respiratory rate, blood oxygen and
+     * body temperature. Play rejected versionCode 59 for requesting the first
+     * six under the minimum-scope rule, and the last three fail the same test —
+     * each was read, averaged and shown on the health screen, and consumed by
+     * nothing. See the block in android/app/src/main/AndroidManifest.xml.
+     *
+     * They are gone from the request set rather than merely unread. A
+     * permission the app holds and does not use is one we would still have to
+     * justify on the declaration form, and `read()` swallowing the refusal
+     * would have hidden the difference from us.
+     */
     suspend fun collect(start: Instant, end: Instant): List<Sample> {
         val client = HealthConnectClient.getOrCreate(context)
         val fold = Fold()
@@ -258,21 +262,11 @@ class HealthReader(private val context: Context) {
         read(client, DistanceRecord::class, start, end)
             .forEach { fold.add(localDate(it.startTime), "distanceMeters", it.distance.inMeters) }
 
-        read(client, FloorsClimbedRecord::class, start, end)
-            .forEach { fold.add(localDate(it.startTime), "flightsClimbed", it.floors) }
-
         read(client, ActiveCaloriesBurnedRecord::class, start, end)
             .forEach { fold.add(localDate(it.startTime), "activeCalories", it.energy.inKilocalories) }
 
-        read(client, TotalCaloriesBurnedRecord::class, start, end)
-            .forEach { fold.add(localDate(it.startTime), "totalCalories", it.energy.inKilocalories) }
-
         read(client, HydrationRecord::class, start, end)
             .forEach { fold.add(localDate(it.startTime), "waterMl", it.volume.inMilliliters) }
-
-        read(client, NutritionRecord::class, start, end).forEach { record ->
-            record.energy?.let { fold.add(localDate(record.startTime), "dietaryCalories", it.inKilocalories) }
-        }
 
         read(client, ExerciseSessionRecord::class, start, end).forEach {
             val minutes = (it.endTime.epochSecond - it.startTime.epochSecond) / 60.0
@@ -285,28 +279,8 @@ class HealthReader(private val context: Context) {
         read(client, HeartRateVariabilityRmssdRecord::class, start, end)
             .forEach { fold.add(localDate(it.time), "heartRateVariability", it.heartRateVariabilityMillis) }
 
-        read(client, Vo2MaxRecord::class, start, end)
-            .forEach { fold.add(localDate(it.time), "vo2Max", it.vo2MillilitersPerMinuteKilogram) }
-
         read(client, WeightRecord::class, start, end)
             .forEach { fold.add(localDate(it.time), "weightKg", it.weight.inKilograms) }
-
-        // Health Connect's Percentage is already 0–100, unlike HealthKit's
-        // fraction. The two platforms disagree and both call it a percentage.
-        read(client, BodyFatRecord::class, start, end)
-            .forEach { fold.add(localDate(it.time), "bodyFatPercent", it.percentage.value) }
-
-        read(client, HeightRecord::class, start, end)
-            .forEach { fold.add(localDate(it.time), "heightCm", it.height.inMeters * 100) }
-
-        read(client, RespiratoryRateRecord::class, start, end)
-            .forEach { fold.add(localDate(it.time), "respiratoryRate", it.rate) }
-
-        read(client, OxygenSaturationRecord::class, start, end)
-            .forEach { fold.add(localDate(it.time), "oxygenSaturation", it.percentage.value) }
-
-        read(client, BodyTemperatureRecord::class, start, end)
-            .forEach { fold.add(localDate(it.time), "bodyTemperatureC", it.temperature.inCelsius) }
 
         val samples = fold.result(averaged).toMutableList()
         samples.addAll(sleep(client, start, end))

@@ -402,7 +402,12 @@ for (const w of Array.from(new Set(declaredWrites))) {
 
 /** Reads we removed must be reads no plan asks for — and vice versa. */
 const removedReads = Array.from(
-  manifest.matchAll(/android\.permission\.health\.(READ_[A-Z_]+)"\s+tools:node="remove"/g)
+  // [A-Z0-9_] for the same reason as the writes above, and this one had the
+  // bug the note up there describes: with [A-Z_] this read READ_VO2_MAX as
+  // "READ_VO", found no plan by that name, and passed. Nine permissions were
+  // stripped for the Play minimum-scope fix and this check had an opinion
+  // about eight of them.
+  manifest.matchAll(/android\.permission\.health\.(READ_[A-Z0-9_]+)"\s+tools:node="remove"/g)
 ).map((m) => m[1]);
 const USED_BY_PLAN: Record<string, string> = {
   READ_STEPS: "steps",
@@ -423,12 +428,45 @@ const USED_BY_PLAN: Record<string, string> = {
   READ_FLOORS_CLIMBED: "flightsClimbed",
   READ_MINDFULNESS: "mindfulness",
 };
+/*
+  Against the Health Connect list, not both platforms'.
+
+  This compared with READ_TYPES — every plan on either store — which was the
+  same list until Play's minimum-scope rejection made the two platforms
+  genuinely differ. Nine types are now HealthKit-only, and asking "is it in
+  READ_TYPES" of a type we deliberately still read on an iPhone answers a
+  question about Apple with a manifest belonging to Google.
+*/
+const androidAsks = readTypesFor("healthconnect");
 for (const r of removedReads) {
   const dataType = USED_BY_PLAN[r];
   check(
     `${r} is removed and nothing reads it`,
-    !dataType || !READ_TYPES.includes(dataType),
-    `${r} was removed but ${dataType} is still requested`
+    !dataType || !androidAsks.includes(dataType),
+    `${r} was removed but ${dataType} is still requested on Android`
+  );
+}
+
+/*
+  And the other direction, which is the half that was missing.
+
+  Every check above is about a permission we took out. None of them notices a
+  permission we left in — and that is the shape of the rejection: not a
+  contradiction between two files, but a type sitting in the merged manifest
+  that no current feature needs. So: anything Android still asks Health
+  Connect for must be a plan that survives `plansFor("healthconnect")`, and
+  every plan that survives must not have been stripped from the manifest.
+*/
+const PERMISSION_FOR = Object.fromEntries(
+  Object.entries(USED_BY_PLAN).map(([permission, dataType]) => [dataType, permission])
+);
+for (const dataType of androidAsks) {
+  const permission = PERMISSION_FOR[dataType];
+  if (!permission) continue; // sleep and workouts, which map to no single row here
+  check(
+    `${dataType} is asked for on Android, so ${permission} must survive the merge`,
+    !removedReads.includes(permission),
+    `${dataType} is in the Android request set but ${permission} is removed from the manifest`
   );
 }
 

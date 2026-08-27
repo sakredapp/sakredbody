@@ -60,6 +60,44 @@
     <uses-permission android:name="android.permission.health.READ_BLOOD_GLUCOSE" tools:node="remove" />
     <uses-permission android:name="android.permission.health.READ_BASAL_BODY_TEMPERATURE" tools:node="remove" />
     <uses-permission android:name="android.permission.health.READ_BASAL_METABOLIC_RATE" tools:node="remove" />
+
+    <!-- 3. Reads we performed and could not justify.
+
+            Play rejected versionCode 59 under the minimum-scope rule and named
+            six: body fat, floors climbed, height, nutrition, total calories
+            burned, VO2 max. All six were read, folded into a daily value and
+            shown on the health screen if the member's device happened to
+            record them. That is the whole feature — we asked because we could,
+            and rendered whatever came back.
+
+            Body temperature, blood oxygen and respiratory rate are here too,
+            and Google did not name them. They are the same thing: a tile, and
+            nothing downstream. Removing only the six that were caught answers
+            the letter and leaves the rule for the next review to find.
+
+            What stays is what something other than the health screen consumes.
+            Sleep, resting heart rate and HRV decide Terrain. Exercise
+            sessions, distance and active calories become the day's movement
+            and its training load. Steps, hydration and mindfulness are targets
+            a member sets for themselves. Weight is the bodyweight in a
+            bodyweight-factor lift — without it a set of pull-ups carries no
+            load at all.
+
+            The client half of this is `APPLE_ONLY` in
+            client/src/lib/healthMetrics.ts, which keeps Health Connect from
+            being asked; HealthReader.kt no longer reads them in the
+            background. This block is what keeps the *permission* out of the
+            merged manifest, since the declarations come from
+            @capgo/capacitor-health and it declares every type it supports. -->
+    <uses-permission android:name="android.permission.health.READ_BODY_FAT" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_FLOORS_CLIMBED" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_HEIGHT" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_NUTRITION" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_VO2_MAX" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_BODY_TEMPERATURE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_OXYGEN_SATURATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_RESPIRATORY_RATE" tools:node="remove" />
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
