@@ -39,6 +39,8 @@
  * style call is what matters on both.
  */
 
+import { registerPlugin } from "@capacitor/core";
+
 import type { ResolvedAppearance } from "./appearance";
 import { hslTripletToHex } from "./themeInk";
 
@@ -85,11 +87,35 @@ function applyThemeColor(hex: string): void {
 }
 
 /**
+ * The half of the surround `@capacitor/status-bar` does not reach.
+ *
+ * On Android that is the navigation bar — the gesture pill, drawn onto a
+ * transparent bar from Android 15 in whatever contrast the system was last
+ * told, which in Light is a light pill on limestone. On iOS it is
+ * `overrideUserInterfaceStyle`, which is what the keyboard, the selection
+ * callout, the scroll indicators and the overscroll ground all follow; with
+ * no `UIUserInterfaceStyle` in Info.plist they follow the *system*, so a
+ * member in Light on a night-mode phone types into a black keyboard.
+ *
+ * App-local on both platforms — `android/app/src/main/java/com/sakredbody/app`
+ * and `ios/App/App` — because it is a handful of platform calls with nothing
+ * another app would install. Registered by hand in MainActivity; discovered
+ * through `CAPBridgedPlugin` on iOS.
+ */
+const SakredAppearance = registerPlugin<{
+  apply(options: { theme: ResolvedAppearance; ink?: string }): Promise<{
+    applied: boolean;
+    dark: boolean;
+  }>;
+}>("SakredAppearance");
+
+/**
  * Tell everything outside the WebView which atmosphere it is in.
  *
- * Safe to call on the web and safe to call repeatedly — the native half is a
- * dynamic import that fails quietly when the plugin isn't there, which is the
- * normal case in a browser.
+ * Safe to call on the web and safe to call repeatedly. The two native halves
+ * are attempted separately: the status bar failing is not a reason to leave
+ * the navigation bar and the keyboard on the previous appearance, which is
+ * the more visible of the two failures.
  */
 export async function applyNativeChrome(resolved: ResolvedAppearance): Promise<void> {
   const hex = currentInkHex();
@@ -109,5 +135,15 @@ export async function applyNativeChrome(resolved: ResolvedAppearance): Promise<v
   } catch {
     // Web, or the plugin is absent. The meta tag above is the whole of the
     // browser's status-bar story and it has already been set.
+  }
+
+  try {
+    // `ink` is passed rather than read natively for the same reason the hex
+    // above is read from CSS: the stylesheet is the one place the ground is
+    // decided, and a second copy in Kotlin is a seam waiting to happen.
+    await SakredAppearance.apply(hex ? { theme: resolved, ink: hex } : { theme: resolved });
+  } catch {
+    // Web, where `registerPlugin` returns a proxy that rejects. Nothing to do
+    // — a browser has no navigation bar and no UIKit.
   }
 }

@@ -1,20 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    The app has one appearance, and it is dark.
+    The launch is dark. The app, since Light shipped, is whatever the member
+    chose — and this file cannot know that, which is the whole shape of it.
 
     What was here was Capacitor's template: `AppTheme` on
     Theme.AppCompat.Light.DarkActionBar, and `AppTheme.NoActionBar` on
     DayNight with `android:background` set to @null. That is the right default
-    for an app that follows the system, and wrong for this one — there is no
-    light version of Sakred Body to follow the system *into*. On a phone in
-    light mode the window behind the WebView resolved to white, which showed
+    for an app that follows the system, and wrong for this one — a phone in
+    light mode resolved the window behind the WebView to white, which showed
     as a flash in the gap between the splash drawable being torn down and the
     web layer painting its first frame. Short, and the first thing anyone sees.
 
     So: a dark base, an explicit `windowBackground` of the same ink the web
     layer uses, and force-dark off — that last one because Android's automatic
     dark mode will otherwise invert a WebView it thinks is a light page, and it
-    guesses wrong on a canvas-heavy screen.
+    guesses wrong on a canvas-heavy screen. It still guesses wrong in Light,
+    where it would invert a page that is genuinely pale, so it stays off in
+    both.
+
+    The values here stay dark rather than gaining a `values-night` pair,
+    because the system's night setting is not the question — a member can pick
+    Light on a phone in night mode. The splash is ink for everyone by design,
+    and MainActivity repaints the window from the member's own stored choice
+    immediately after, which is the earliest moment that choice is knowable.
 -->
 <resources xmlns:tools="http://schemas.android.com/tools">
 

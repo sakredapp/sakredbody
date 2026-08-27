@@ -9,6 +9,11 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         window = UIWindow(windowScene: windowScene)
         window?.rootViewController = CAPBridgeViewController()
+        // Before makeKeyAndVisible, so the first frame is already in the
+        // member's atmosphere. Without this the window follows the system
+        // until the web layer has loaded far enough to say otherwise, and a
+        // member in Light on a night-mode phone watches it change under them.
+        window?.overrideUserInterfaceStyle = AppearancePlugin.storedStyle()
         window?.makeKeyAndVisible()
 
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)

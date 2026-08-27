@@ -328,6 +328,96 @@ check(
   /<AppearanceSettings \/>/.test(readFileSync("client/src/components/SettingsTab.tsx", "utf8")),
 );
 
+/*
+  ── The surround ─────────────────────────────────────────────────────────
+
+  Everything above concerns the document. These concern the strip of screen
+  around it, which is drawn by the operating system and has to be told
+  separately — and whose failures are the worst kind: nothing errors, and a
+  member loses the clock, or the gesture pill, or the keyboard.
+
+  Both native halves are read as source rather than exercised. A Kotlin call
+  and a UIKit window cannot be reached from here at all, so the choice is a
+  source assertion or nothing, and nothing is how the navigation bar stayed
+  unhandled through the whole first Light pass.
+*/
+const chrome = readFileSync("client/src/lib/nativeChrome.ts", "utf8");
+check(
+  "the surround is told on every appearance change, not only the status bar",
+  /SakredAppearance\.apply\(/.test(chrome),
+);
+check(
+  "and the status bar failing does not stop it",
+  // Two try blocks, not one. Sharing a catch means an older device that
+  // rejects setBackgroundColor leaves the navigation bar and the keyboard
+  // on the previous appearance — the more visible of the two failures.
+  (chrome.match(/\btry \{/g) ?? []).length >= 2,
+);
+check(
+  "and the ground it paints comes from the stylesheet",
+  /ink: hex/.test(chrome),
+);
+
+const androidPlugin = readFileSync(
+  "android/app/src/main/java/com/sakredbody/app/AppearancePlugin.java",
+  "utf8",
+);
+/*
+  The inversion, in the one place it is not already commented.
+  `setAppearanceLightNavigationBars(true)` means a light *bar*, therefore dark
+  icons — so Light theme takes `!dark`, and getting it backwards produces
+  precisely the invisible pill this exists to prevent.
+*/
+check(
+  "the navigation bar is given the contrast the theme needs",
+  /setAppearanceLightNavigationBars\(!dark\)/.test(androidPlugin),
+);
+check(
+  "and the choice survives to the next cold launch",
+  /putBoolean\(KEY_DARK, dark\)/.test(androidPlugin),
+);
+
+const mainActivity = readFileSync(
+  "android/app/src/main/java/com/sakredbody/app/MainActivity.java",
+  "utf8",
+);
+check("the plugin is registered", /registerPlugin\(AppearancePlugin\.class\)/.test(mainActivity));
+check(
+  "and an absent choice launches dark rather than light",
+  // The splash is ink and the app's default is dark. A first launch that
+  // read `false` here would tear the splash down into daylight.
+  /getBoolean\(AppearancePlugin\.KEY_DARK, true\)/.test(mainActivity),
+);
+
+/*
+  Comments stripped before comparing positions. The line above the call
+  explains that it has to come before makeKeyAndVisible, and naming it there
+  put the earlier match inside the prose — so the check failed on correct
+  code, which is the other half of the vacuous-check problem and just as
+  likely to get a guard deleted.
+*/
+const scene = readFileSync("ios/App/App/SceneDelegate.swift", "utf8")
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/\/\/.*$/gm, "");
+check(
+  "iOS is in the right appearance before its first frame",
+  scene.indexOf("overrideUserInterfaceStyle") > -1 &&
+    scene.indexOf("overrideUserInterfaceStyle") < scene.indexOf("makeKeyAndVisible"),
+);
+
+const iosPlugin = readFileSync("ios/App/App/AppearancePlugin.swift", "utf8");
+check(
+  "and every window follows, not only the one the plugin was called on",
+  /for window in windowScene\.windows/.test(iosPlugin),
+);
+check(
+  "and an unwritten preference is dark, not false",
+  // `bool(forKey:)` answers false for a key that was never written, which
+  // would put a first launch in Light on a phone that has chosen nothing.
+  /object\(forKey: defaultsKey\) as\? Bool/.test(iosPlugin) &&
+    !/UserDefaults\.standard\.bool\(forKey/.test(iosPlugin),
+);
+
 // ─── Result ──────────────────────────────────────────────────────────────
 
 if (failures.length) {
