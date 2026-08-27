@@ -37,6 +37,7 @@ import { RecentSessions } from "@/components/build/RecentSessions";
 import { TodayRead } from "@/components/TodayRead";
 import { RhythmSection } from "@/components/RhythmCards";
 import { Panel, SectionHeading } from "@/components/portal/Panel";
+import { GoalStrip } from "@/components/goals/GoalStrip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useHealthConnection, useHealthSummary } from "@/hooks/use-health";
@@ -321,6 +322,13 @@ export function RestoreTab({ onOpen }: { onOpen: (s: MemberSection) => void }) {
       />
 
       <TerrainCheckin />
+
+      {/* Direction, under the check-in and above the terrain read. Ordered
+          restore-first by the server, never filtered: somebody chasing a mile
+          time needs their hips to open and their sleep to hold, and hiding a
+          running goal here would say the two halves of a body are separate
+          systems. */}
+      <GoalStrip lens="restore" unit={unit} onOpen={() => onOpen("goals")} />
 
       {/* ── What the terrain is asking for ── */}
       <Panel title="Your terrain" data-testid="restore-terrain">

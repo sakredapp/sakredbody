@@ -3,6 +3,8 @@
  *
  *   GET /api/coach/clients                        my roster, and only mine
  *   GET /api/coach/clients/:memberId/overview     terrain now, plan, check-in
+ *   GET /api/coach/clients/:memberId/context      all of it, for sitting down
+ *   GET /api/coach/clients/:memberId/goals        what they're working toward
  *   GET /api/coach/clients/:memberId/activity     unified movement history
  *   GET /api/coach/clients/:memberId/habits       what they are actually on
  *   GET /api/coach/clients/:memberId/plan         the Coach's Plan, read-only
@@ -52,17 +54,21 @@ import {
 import {
   coachRelationships,
   coachingMessages,
-  wellnessRoutines,
   userRoutines,
 } from "../../shared/models/coaching.js";
 import { healthWorkouts } from "../../shared/models/health.js";
 import { trackedHabits, trackedHabitPhases } from "../../shared/models/trackedHabits.js";
-import { terrainCheckins } from "../../shared/models/terrainSignals.js";
 import { categoryOrientation } from "../../shared/models/training.js";
 import { requireCoachOf, clientsOf } from "./relationships.js";
 import { requireConversation } from "./conversation.js";
 import { threadFor } from "./messageRoutes.js";
-import { getActiveEnrollment, memberToday, settleRoutines } from "./enrollment.js";
+import { memberToday } from "./enrollment.js";
+import {
+  planFor,
+  latestCheckin,
+  buildRestore,
+  readCoachingContext,
+} from "./context.js";
 import { terrainFor, RECENT_DAYS } from "../terrain/read.js";
 import { recentMovement } from "../movement/history.js";
 import { resolveDay } from "../habits/resolve.js";
@@ -89,49 +95,6 @@ function fail(res: Response, where: string, err: unknown) {
 /** The member this request is about, already proven by `requireCoachOf`. */
 function memberIdOf(req: Request): string {
   return String((req.params as Record<string, unknown>).memberId ?? "");
-}
-
-/**
- * The plan a member is on, and who put them on it.
- *
- * ── On attribution ────────────────────────────────────────────────────────
- *
- * `assigned_by_user_id` is only populated on phases written since the column
- * existed, and nothing back-filled it — there was no coaching history to
- * recover, and inventing one would put a coach's name on work they did not do.
- * So `assignedBy` is null for older phases and the UI says nothing rather than
- * guessing.
- */
-async function planFor(memberId: string) {
-  // Settle first so a plan that ran out yesterday is not reported as running.
-  await settleRoutines(memberId);
-  const enrollment = await getActiveEnrollment(memberId);
-  if (!enrollment) return null;
-
-  const [routine] = await db
-    .select({ name: wellnessRoutines.name, description: wellnessRoutines.description })
-    .from(wellnessRoutines)
-    .where(eq(wellnessRoutines.id, enrollment.routineId));
-
-  const start = new Date(enrollment.startDate);
-  const end = new Date(enrollment.endDate);
-  const totalDays = Math.max(
-    1,
-    Math.round((end.getTime() - start.getTime()) / 86_400_000),
-  );
-  const currentDay = Math.min(
-    totalDays,
-    Math.max(1, Math.round((Date.now() - start.getTime()) / 86_400_000) + 1),
-  );
-
-  return {
-    name: routine?.name ?? null,
-    description: routine?.description ?? null,
-    intensity: enrollment.intensity,
-    startedAt: enrollment.startDate,
-    currentDay,
-    totalDays,
-  };
 }
 
 /**
@@ -187,38 +150,7 @@ async function phasesFor(memberId: string) {
   }));
 }
 
-/** The member's most recent subjective check-in, however old it is. */
-async function latestCheckin(memberId: string) {
-  const [row] = await db
-    .select()
-    .from(terrainCheckins)
-    .where(eq(terrainCheckins.userId, memberId))
-    .orderBy(desc(terrainCheckins.onDate))
-    .limit(1);
-  return row ?? null;
-}
 
-/**
- * How much the week asked of this body, and how much it gave back.
- *
- * Counted from the same `recentMovement` entries the terrain reading used, and
- * classified through the same `categoryOrientation`, so this can never disagree
- * with the sentence printed above it.
- *
- * Deliberately two counts and not a ratio. Restore and Build are complementary
- * capacities in this model, not opposing scores, and a single number invites a
- * coach to chase it.
- */
-function buildRestore(movement: { category: string }[]) {
-  let build = 0;
-  let restore = 0;
-  for (const m of movement) {
-    const o = categoryOrientation(m.category);
-    if (o === "yang" || o === "both") build++;
-    if (o === "yin" || o === "both") restore++;
-  }
-  return { build, restore, days: RECENT_DAYS };
-}
 
 export function registerCoachClientRoutes(app: Express): void {
   /**
@@ -505,6 +437,55 @@ export function registerCoachClientRoutes(app: Express): void {
         });
       } catch (err) {
         fail(res, "overview", err);
+      }
+    },
+  );
+
+  /**
+   * Everything about one member, at once — the coaching context.
+   *
+   * ── Why this exists next to /overview ────────────────────────────────────
+   *
+   * `/overview` answers "who needs me today" and is deliberately thin: a
+   * roster that shows ten metrics per member is a monitoring station. This
+   * answers the different question a coach has once they have decided to sit
+   * down with somebody — what are they trying to accomplish, what is their
+   * body showing now, what were we intending, what did they actually do, how
+   * did it land, and are they moving toward the target.
+   *
+   * Six answers that currently take six screens. None of it is new: every
+   * field comes from the reader that already owns it, and `readCoachingContext`
+   * composes rather than computing. See its header.
+   *
+   * ── Relationship only ───────────────────────────────────────────────────
+   *
+   * `requireCoachOf` admits an administrator standing in for a coach, which is
+   * right for the operational endpoints — the roster, the reviewed stamp. It
+   * is not right for this one. Goals are on this response, and a permission
+   * granted for running a coaching practice should not quietly deliver what
+   * somebody is trying to do with their body. A supervisor gets the same 404
+   * as a stranger, which is also what stops the refusal being a hint.
+   */
+  app.get(
+    "/api/coach/clients/:memberId/context",
+    isAuthenticated,
+    requireCoachOf("memberId"),
+    async (req: Request, res: Response) => {
+      try {
+        if (req.coachAccess !== "relationship") {
+          return res.status(404).json({ message: "No such member" });
+        }
+        const memberId = memberIdOf(req);
+
+        const [person] = await db.select(personColumns).from(users).where(eq(users.id, memberId));
+        if (!person) return res.status(404).json({ message: "No such member" });
+
+        const context = await readCoachingContext(memberId, {
+          days: Number(req.query.days) || undefined,
+        });
+        res.json({ member: { ...person, name: displayName(person) }, ...context });
+      } catch (err) {
+        fail(res, "context", err);
       }
     },
   );

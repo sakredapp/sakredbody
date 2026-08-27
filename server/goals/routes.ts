@@ -3,6 +3,7 @@
  *
  * Member:
  *   GET    /api/goals                     everything they hold, with latest and best
+ *   GET    /api/goals/brief               the short list Build and Restore show
  *   POST   /api/goals                     add one
  *   GET    /api/goals/:id                 one, with its whole history
  *   PATCH  /api/goals/:id                 title, emphasis, status, date, order
@@ -48,6 +49,7 @@ import {
   type Measurement,
 } from "../../shared/models/goals.js";
 import {
+  activeGoalsBrief,
   goalsFor,
   goalDetail,
   createGoal,
@@ -102,6 +104,38 @@ export function registerGoalRoutes(app: Express): void {
       const userId = actor(req);
       if (!userId) return res.status(401).json({ message: "Not authenticated" });
       res.json(await goalsFor(userId));
+    } catch {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  /**
+   * The compact list Build and Restore show beside everything else.
+   *
+   * A different query from `/api/goals` rather than that one with fields
+   * dropped: the point of a compact surface is that it costs less, and a read
+   * that fetched sixty observations per goal to render three titles would not.
+   *
+   * ── The lens is an ordering, not a filter ────────────────────────────────
+   *
+   * `?lens=build` puts the goals that belong to Build first and does not
+   * remove the others. Somebody chasing a mile time needs their hips to open
+   * and their sleep to hold, and a running goal hidden from Restore would say
+   * the two halves of a body are separate systems — which is the thing this
+   * product exists to argue against. Emphasis decides what leads.
+   */
+  app.get("/api/goals/brief", isAuthenticated, async (req, res) => {
+    try {
+      const userId = actor(req);
+      if (!userId) return res.status(401).json({ message: "Not authenticated" });
+
+      const raw = String(req.query.lens ?? "");
+      const lens = raw === "build" || raw === "restore" ? raw : null;
+      const goals = await activeGoalsBrief(userId);
+      if (!lens) return res.json(goals);
+
+      const rank = (emphasis: string) => (emphasis === lens ? 0 : emphasis === "both" ? 1 : 2);
+      res.json([...goals].sort((a, b) => rank(a.emphasis) - rank(b.emphasis)));
     } catch {
       res.status(500).json({ message: "Internal Server Error" });
     }

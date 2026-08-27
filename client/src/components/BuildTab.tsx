@@ -36,6 +36,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { InfoTip } from "@/components/ui/info-tip";
 import { SectionHeading, Panel, StatTile } from "@/components/portal/Panel";
 import { HabitPanel } from "@/components/habits/HabitPanel";
+import { GoalStrip } from "@/components/goals/GoalStrip";
 import { TodayRead } from "@/components/TodayRead";
 import { MemberBuild } from "@/components/build/MemberBuild";
 import { MovementHistory } from "@/components/build/MovementHistory";
@@ -438,6 +439,9 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
             }}
           />
         )}
+        {/* Same place as the prescribed branch below, so the screen does not
+            reorder itself the day a coach writes a session. */}
+        <GoalStrip lens="build" unit={unit} onOpen={onOpen ? () => onOpen("goals") : undefined} />
         <RecentBuild />
 
       {/* The lifestyle half of Build — protein, steps, sunlight. Separate from
@@ -535,6 +539,9 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
         sentence that is honest about the terrain it lands in.
       */}
       <TodaysBuild onCheckIn={onOpen ? () => onOpen("restore") : undefined} />
+      {/* Direction, under today's read and above the week. Titles and targets
+          only — the figures live on the Goals screen, where there is room. */}
+      <GoalStrip lens="build" unit={unit} onOpen={onOpen ? () => onOpen("goals") : undefined} />
       <RecentBuild />
 
       {/* The lifestyle half of Build — protein, steps, sunlight. Separate from
