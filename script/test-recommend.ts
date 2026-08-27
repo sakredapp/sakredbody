@@ -158,6 +158,127 @@ check("an unknown phase returns nothing rather than filler", moonGuidance("blood
 
 // ─── Report ────────────────────────────────────────────────────────────────
 
+// ─── Goals order the day. They never overrule it. ─────────────────────────
+
+/*
+  The critical negative first: a member with no goals gets exactly what they
+  got before goals existed.
+
+  Deep equality against the same call with the field absent, with an empty
+  array, and with a goal about categories that were never in contention. If
+  any of the three diverges then goals have changed the product for everybody,
+  which is not what was asked for and is not visible from any screen.
+*/
+{
+  const primed = readReadiness({
+    sleepMinutes: 480,
+    sleepBaselineMinutes: 450,
+    restingHeartRate: 50,
+    restingHeartRateBaseline: 54,
+  });
+  const recent = ["chest", "legs", "yoga"] as const;
+  const base = suggestToday({ read: primed, recentCategories: recent });
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+  check("no goals field is the same as before", same(base, base));
+  check(
+    "an empty goal list changes nothing",
+    same(base, suggestToday({ read: primed, recentCategories: recent, goals: [] })),
+  );
+  check(
+    "a goal about nothing in the catalogue changes nothing",
+    same(
+      base,
+      suggestToday({
+        read: primed,
+        recentCategories: recent,
+        goals: [{ id: "g1", categories: ["not_a_category"] }],
+      }),
+    ),
+  );
+  check("and none of it claims a goal", base.every((sug) => sug.goalIds.length === 0));
+  check(
+    "…or cites one",
+    base.every((sug) => !sug.codes.includes("goal_relevant")),
+  );
+
+  /*
+    Now one that should move something. `endurance` is what a running goal
+    resolves to, it is demanding, and a primed day has two slots asking for
+    exactly that.
+  */
+  const withGoal = suggestToday({
+    read: primed,
+    recentCategories: recent,
+    goals: [{ id: "g-mile", categories: ["endurance"] }],
+  });
+  const picked = withGoal.map((sug) => sug.category);
+  check("a running goal reaches the day", picked.includes("endurance"));
+
+  const chosen = withGoal.find((sug) => sug.category === "endurance");
+  check("and the choice says which goal", chosen?.goalIds.includes("g-mile") === true);
+  check("and cites it as a ground", chosen?.codes.includes("goal_relevant") === true);
+
+  /*
+    Claimed only where it did something. Every card that would have been
+    chosen anyway must carry no goal, or `Why this?` becomes a horoscope: a
+    member with a running goal would eventually see it credited for advice
+    that had nothing to do with running.
+  */
+  const unmoved = withGoal.filter((sug) => sug.category !== "endurance");
+  check(
+    "the cards the goal did not move claim nothing",
+    unmoved.every((sug) => sug.goalIds.length === 0 && !sug.codes.includes("goal_relevant")),
+  );
+}
+
+/*
+  And the one that matters: a goal cannot buy a hard session on a bad day.
+
+  Story B from the brief — a six-minute mile, a coach's interval plan, and
+  four hours of sleep. The goal and the plan both survive; what must not
+  happen is the day changing shape because of them.
+*/
+{
+  const wrecked = readReadiness({
+    sleepMinutes: 240,
+    sleepBaselineMinutes: 450,
+    restingHeartRate: 62,
+    restingHeartRateBaseline: 54,
+    terrainLean: -2,
+  });
+  const demanding = ["endurance", "explosive", "plyometric", "olympic"];
+  const goals = [{ id: "g-mile", categories: demanding }];
+
+  const offered = suggestToday({ read: wrecked, recentCategories: ["yoga"], goals });
+  check("a depleted day still offers three things", offered.length === 3);
+  check(
+    "and not one of them is demanding, goal or no goal",
+    offered.every((sug) => categoryLoad(sug.category).stress < 3),
+  );
+  check(
+    "the goal is not credited for a day it did not shape",
+    offered.every((sug) => !sug.codes.includes("goal_relevant")),
+  );
+
+  /*
+    Falsifiable rather than vacuous: the same goal on a day the body can
+    take it does reach the list. Without this, the assertion above would pass
+    just as happily if goals were wired to nothing at all.
+  */
+  const rested = readReadiness({
+    sleepMinutes: 480,
+    sleepBaselineMinutes: 450,
+    restingHeartRate: 50,
+    restingHeartRateBaseline: 54,
+  });
+  const onAGoodDay = suggestToday({ read: rested, recentCategories: ["yoga"], goals });
+  check(
+    "the same goal does reach a day that can carry it",
+    onAGoodDay.some((sug) => demanding.includes(sug.category)),
+  );
+}
+
 if (failures.length) {
   console.error(`\n✗ ${failures.length} failed:\n${failures.map((f) => `  - ${f}`).join("\n")}\n`);
   process.exit(1);

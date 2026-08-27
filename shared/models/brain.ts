@@ -89,9 +89,17 @@ export type EngineVersion = {
 export const DECISION_LOGIC: Readonly<Record<DecisionEngine, EngineVersion>> = {
   /** Reading the day, and the three options that come out of it. */
   today: {
-    version: "1.0.0",
+    /**
+     * 1.1.0 — goals participate in the ranking.
+     *
+     * Minor rather than major: nothing about the existing decision changed for
+     * a member with no goals, and the twin-winner comparison in `suggestToday`
+     * is what proves it. A member who acquires a goal gets a different ordering
+     * from this version onward, which is exactly what a version is for.
+     */
+    version: "1.1.0",
     modules: ["shared/models/recommend.ts"],
-    digest: "84eb5e0cab78d4c1",
+    digest: "d2ea4b39420218e8",
   },
   /** Restore or build, composed from measured and reported evidence. */
   terrain: {
@@ -186,6 +194,18 @@ export const REASON_CODES = [
   "no_signals",
   /** A learned personal pattern moved this up or down the list. */
   "personal_pattern",
+  /**
+   * One of the member's own goals is about this, and it changed the order.
+   *
+   * Recorded only where goal relevance actually moved the choice — see
+   * `suggestToday`. A member who has a running goal and was shown a mobility
+   * session for reasons entirely unrelated to it does not get this code, and
+   * `Why this?` therefore cannot claim their running goal was involved.
+   *
+   * It is a selection ground and never evidence about the day. What the goal
+   * is, and how close they are to it, stays in member_goals.
+   */
+  "goal_relevant",
 ] as const;
 
 export type ReasonCode = (typeof REASON_CODES)[number];

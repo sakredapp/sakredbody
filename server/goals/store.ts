@@ -33,7 +33,24 @@ import {
   type CanonicalActivity,
   type ProgressSource,
 } from "../../shared/models/goals.js";
-import { workoutSets } from "../../shared/models/training.js";
+import {
+  exercises,
+  externalActivityCategory,
+  workoutSets,
+} from "../../shared/models/training.js";
+import type { GoalRelevance } from "../../shared/models/recommend.js";
+
+/**
+ * What ranking needs, plus the member's own words for it.
+ *
+ * The title is carried alongside rather than inside `GoalRelevance` because
+ * the ranking must not be able to see it. A pure model with a title in hand is
+ * a pure model one careless afternoon away from matching on it, and matching a
+ * goal to a category by name is the failure this whole path is built to avoid.
+ * It is here so `Why this?` can say "supports your six-minute mile" without a
+ * second query.
+ */
+export type RelevantGoal = GoalRelevance & { title: string };
 
 /** How much history a goal's list view carries. Detail asks for all of it. */
 const RECENT_PROGRESS = 60;
@@ -500,4 +517,54 @@ export async function noteSessionEvidence(
     .from(workoutSets)
     .where(eq(workoutSets.sessionId, sessionId));
   return noteWorkoutEvidence(userId, onDate, observedAt, sets);
+}
+
+/**
+ * Active goals, reduced to the categories that serve them.
+ *
+ * This is the whole connection between a goal and a recommendation. A goal
+ * reaches the ranking as canonical category ids or it does not reach it at
+ * all — there is no title matching, no keyword search and no fuzzy anything,
+ * because "Bench Press" the goal matching "bench" the search term is how a
+ * mobility session ends up credited to somebody's powerlifting goal.
+ *
+ * Active only. A paused goal is one the member has set down, and a system that
+ * kept steering by it would be ignoring the clearest instruction they have
+ * given it.
+ *
+ * A goal about neither a movement nor an activity — "practise four times a
+ * week", a custom one — resolves to no categories and simply never
+ * participates. That is the honest outcome: nothing in the catalogue is
+ * specifically about it.
+ */
+export async function goalRelevance(userId: string): Promise<RelevantGoal[]> {
+  const goals = await db
+    .select({
+      id: memberGoals.id,
+      title: memberGoals.title,
+      exerciseId: memberGoals.exerciseId,
+      activityType: memberGoals.activityType,
+    })
+    .from(memberGoals)
+    .where(and(eq(memberGoals.userId, userId), eq(memberGoals.status, "active")));
+  if (!goals.length) return [];
+
+  const slugs = goals.map((g) => g.exerciseId).filter((id): id is string => !!id);
+  const catalogue = slugs.length
+    ? await db
+        .select({ id: exercises.id, category: exercises.category })
+        .from(exercises)
+        .where(inArray(exercises.id, slugs))
+    : [];
+  const categoryOf = new Map(catalogue.map((e) => [e.id, e.category]));
+
+  const out: RelevantGoal[] = [];
+  for (const goal of goals) {
+    const category = goal.exerciseId
+      ? (categoryOf.get(goal.exerciseId) ?? null)
+      : externalActivityCategory(goal.activityType);
+    if (!category) continue;
+    out.push({ id: goal.id, title: goal.title, categories: [category] });
+  }
+  return out;
 }

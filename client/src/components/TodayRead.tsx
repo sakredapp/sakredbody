@@ -69,7 +69,7 @@ export type TodayResponse = {
    * managed to record one. Optional for the same reason `terrain` is — a
    * bundled client outlives the deploy it was built against.
    */
-  suggestions: (Suggestion & Feedbackable)[];
+  suggestions: (Suggestion & Feedbackable & { goalNote?: string | null })[];
   moon: MoonGuidance | null;
   season: SeasonGuidance | null;
   sky: string | null;
@@ -140,7 +140,7 @@ function Option({
   onOpen,
   onDismiss,
 }: {
-  suggestion: Suggestion & Feedbackable;
+  suggestion: Suggestion & Feedbackable & { goalNote?: string | null };
   /**
    * Only the first card says why.
    *
@@ -150,7 +150,7 @@ function Option({
    * that, and the first version repeated it anyway.
    */
   showBecause: boolean;
-  onOpen: (s: Suggestion & Feedbackable) => void;
+  onOpen: (s: Suggestion & Feedbackable & { goalNote?: string | null }) => void;
   onDismiss: (category: string, scope: "today" | "forever") => void;
 }) {
   const [asking, setAsking] = useState(false);
@@ -187,6 +187,19 @@ function Option({
         {showBecause && suggestion.because && (
           <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">
             {suggestion.because}
+          </p>
+        )}
+        {/*
+          On the card and not once at the top, unlike `because`.
+
+          The reason is a fact about the day and reads as a stutter repeated
+          three times. This is a fact about *this option* — the server sends it
+          only where a goal actually changed which category won — so it belongs
+          where the option is, and on most cards it is simply absent.
+        */}
+        {suggestion.goalNote && (
+          <p className="text-[11px] text-[hsl(var(--gold))]/70 mt-1 leading-snug">
+            {suggestion.goalNote}
           </p>
         )}
       </button>

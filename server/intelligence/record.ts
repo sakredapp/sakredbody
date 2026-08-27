@@ -43,6 +43,7 @@ import {
   type ReasonCode,
   type Verdict,
 } from "../../shared/models/recommendation.js";
+import { recommendationGoals } from "../../shared/models/goals.js";
 
 /**
  * One recommendation, as the engine that made it describes it.
@@ -63,6 +64,16 @@ export type RecommendationDraft = {
   provenance?: Record<string, unknown>;
   /** True only when a learned personal pattern actually moved this. */
   patternInformed?: boolean;
+  /**
+   * The member's goals that actually moved this recommendation.
+   *
+   * Empty is the common case and the caller must keep it that way. This is
+   * what licenses `Why this?` to mention a goal, so a recommendation that
+   * would have been made anyway carries nothing here even when the member has
+   * a goal about the same thing. Handing this `activeGoals.map(g => g.id)`
+   * would turn provenance into a horoscope.
+   */
+  goalIds?: readonly string[];
 };
 
 /** How a draft is addressed once it has an id. */
@@ -153,6 +164,38 @@ export async function record(
         recommendationId: r.id,
         feedback: null,
       });
+    }
+
+    /*
+      Which goals participated, replaced rather than added to.
+
+      Same rule as `reason_codes` above: re-deriving in the afternoon produces
+      the afternoon's grounds, and a goal that mattered this morning and does
+      not now must stop being cited. Appending would make the set monotonic —
+      it would only ever grow across a day — and by evening a member would see
+      every goal they hold credited for everything they were shown.
+
+      Deleted for exactly the recommendations being written, so a row from
+      another surface or another day is untouched.
+    */
+    const goalEdges = drafts.flatMap((d) => {
+      const handle = out.get(handleKey(d.type, d.key));
+      if (!handle || !d.goalIds?.length) return [];
+      return d.goalIds.map((goalId) => ({
+        recommendationId: handle.recommendationId,
+        goalId,
+      }));
+    });
+    const touched = drafts
+      .map((d) => out.get(handleKey(d.type, d.key))?.recommendationId)
+      .filter((id): id is string => !!id);
+    if (touched.length) {
+      await db
+        .delete(recommendationGoals)
+        .where(inArray(recommendationGoals.recommendationId, touched));
+    }
+    if (goalEdges.length) {
+      await db.insert(recommendationGoals).values(goalEdges).onConflictDoNothing();
     }
 
     // Whatever they have already said about these.

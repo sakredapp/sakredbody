@@ -54,6 +54,8 @@ import {
 } from "../../shared/models/recommend.js";
 import { gatedLine } from "../../shared/models/buildToday.js";
 import { terrainFor } from "../terrain/read.js";
+import { goalRelevance } from "../goals/store.js";
+import type { RelevantGoal } from "../goals/store.js";
 import { record, withHandle, type RecommendationDraft } from "../intelligence/record.js";
 import { markDismissed } from "../intelligence/attribute.js";
 import { SELF_GUIDE, phaseLabel } from "../../shared/models/rhythm.js";
@@ -191,10 +193,22 @@ export function registerTodayRoutes(app: Express): void {
         }),
       );
 
+      /*
+        The member's own direction, as categories.
+
+        Fetched here rather than alongside the reads above because it is the
+        only one of them that is allowed to be empty and change nothing: a
+        member with no goals gets exactly the day they got before goals
+        existed, and `suggestToday` proves that with a twin ranking rather
+        than by being asked nicely.
+      */
+      const goals = await goalRelevance(userId);
+
       const suggestions = suggestToday({
         read,
         recentCategories: training.recentCategories,
         excluded,
+        goals,
       });
 
       // Midday UTC, matching almanacFor — the phase must not flip because a
@@ -236,6 +250,13 @@ export function registerTodayRoutes(app: Express): void {
         canonicalActionType: "exercise_category" as const,
         canonicalActionId: s.category,
         reasonCodes: s.codes,
+        /*
+          Only the goals that moved this one. `suggestToday` decides, by
+          comparing what the slot would have chosen with the goals taken out —
+          so a category that was already the best fit carries nothing here
+          even when the member has a goal about it.
+        */
+        goalIds: s.goalIds,
         provenance: {
           rank,
           side: s.side,
@@ -266,7 +287,20 @@ export function registerTodayRoutes(app: Express): void {
          */
         line: gatedLine(terrain.lean, readLine(read), read),
         /** Each option carries the id of the recommendation it *is*. */
-        suggestions: suggestions.map((s) => withHandle(recorded, "today_option", s.category, s)),
+        /*
+          The goal line, and only where a goal actually moved the choice.
+
+          `goalIds` is empty on any card `suggestToday` would have chosen
+          anyway, so a member with a running goal does not see it credited
+          under a mobility session. The member's own words for the goal, not
+          the category the engine matched on — "supports your six-minute mile"
+          is a sentence about them; "supports your endurance goal" is the
+          system describing its own index.
+        */
+        suggestions: suggestions.map((s) => ({
+          ...withHandle(recorded, "today_option", s.category, s),
+          goalNote: goalNote(goals, s.goalIds),
+        })),
         /**
          * The canonical state, passed through so Build can gate on it without
          * a second request — and so nothing downstream has to re-derive it.
@@ -603,4 +637,24 @@ export function registerTodayRoutes(app: Express): void {
       fail(res, "rhythm.eventDelete", err);
     }
   });
+}
+
+/**
+ * "Supports your six-minute mile", or nothing.
+ *
+ * Nothing is the usual answer and the important one. This is only ever called
+ * with the goals `suggestToday` reported as having moved the choice, and if
+ * that list is empty the card says nothing about goals at all — which is what
+ * keeps `Why this?` provenance rather than a story told afterwards.
+ */
+function goalNote(goals: readonly RelevantGoal[], goalIds: readonly string[]): string | null {
+  if (!goalIds.length) return null;
+  const titles = goalIds
+    .map((id) => goals.find((g) => g.id === id)?.title)
+    .filter((t): t is string => !!t);
+  if (!titles.length) return null;
+  // One is the case; two is possible and reads fine. Beyond that the sentence
+  // stops being a reason and becomes a list, so it stops.
+  const said = titles.length > 2 ? titles.slice(0, 2) : titles;
+  return `Supports ${said.join(" and ")}`;
 }

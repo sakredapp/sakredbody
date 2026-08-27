@@ -328,6 +328,32 @@ export type Suggestion = {
    * broke the tie. Recorded, never rendered — the member reads `because`.
    */
   codes: ReasonCode[];
+  /**
+   * The member's goals this category is about — and only when one of them
+   * actually changed the order.
+   *
+   * Empty is the common case and it is load-bearing. This is what
+   * `recommendation_goals` is written from and what licenses `Why this?` to
+   * say "supports your running goal", so a category that would have won
+   * anyway carries nothing here even when the member does have a running
+   * goal. Provenance, not a retrospective explanation.
+   */
+  goalIds: string[];
+};
+
+/**
+ * A goal, reduced to the only thing ranking needs: what it is about.
+ *
+ * `categories` is resolved by the caller from the goal's movement or activity,
+ * because the mapping needs the exercise catalogue and this module is pure. It
+ * is also the reason there is no title matching anywhere near this: a goal
+ * reaches the ranking as a set of canonical category ids or it does not reach
+ * it at all.
+ */
+export type GoalRelevance = {
+  id: string;
+  /** Canonical `EXERCISE_CATEGORIES` ids this goal is served by. */
+  categories: readonly string[];
 };
 
 export type SuggestionInput = {
@@ -336,6 +362,14 @@ export type SuggestionInput = {
   recentCategories?: readonly string[];
   /** Categories to never suggest — injuries, dislikes, no equipment. */
   excluded?: readonly string[];
+  /**
+   * The member's active goals, already resolved to categories.
+   *
+   * Active only. A paused goal is one somebody has set down, and a system that
+   * kept steering by it would be ignoring the clearest instruction the member
+   * has given. The caller filters; see `server/today`.
+   */
+  goals?: readonly GoalRelevance[];
 };
 
 /**
@@ -345,6 +379,22 @@ export type SuggestionInput = {
  * That is the point of the spread — see the note at the top on why one
  * recommendation is a command.
  */
+/**
+ * How much a goal is allowed to be worth.
+ *
+ * 1.4 on fit, and the number matters less than the operation. Multiplying is
+ * what keeps a goal subordinate to the read: a demanding category on a
+ * depleted day has already been cut to a fifth, so the lift takes it to 0.28
+ * of a fit — nowhere near the 1.0 a restorative option is sitting on. There is
+ * no value of this constant below about 5 that lets a goal win a day the body
+ * is not having, and there is no additive bonus that is safe, because nothing
+ * in an addition knows what it is being added to.
+ *
+ * Large enough to reorder the options the day already permits and to break a
+ * tie among equals. That is the whole job.
+ */
+const GOAL_LIFT = 1.4;
+
 const SLOTS: Readonly<Record<Readiness, readonly { want: Orientation; headline: string }[]>> = {
   depleted: [
     { want: "yin", headline: "Give the day back to yourself" },
@@ -388,8 +438,25 @@ function sideOf(orientation: Orientation): "restore" | "build" {
  * effort.
  */
 export function suggestToday(input: SuggestionInput): Suggestion[] {
-  const { read, recentCategories = [], excluded = [] } = input;
+  const { read, recentCategories = [], excluded = [], goals = [] } = input;
   const excludedSet = new Set(excluded);
+
+  /*
+    Which of the member's goals each category serves.
+
+    Built once rather than scanned per candidate per slot, and it is the only
+    connection between a goal and a recommendation anywhere in this file. No
+    titles, no keywords, no substring matching: a goal reaches the ranking as
+    canonical category ids or it does not reach it.
+  */
+  const goalsByCategory = new Map<string, string[]>();
+  for (const goal of goals) {
+    for (const category of goal.categories) {
+      const list = goalsByCategory.get(category) ?? [];
+      if (!list.includes(goal.id)) list.push(goal.id);
+      goalsByCategory.set(category, list);
+    }
+  }
 
   // Most recent first, so index doubles as "how long ago". Anything unseen
   // scores as maximally novel.
@@ -408,7 +475,23 @@ export function suggestToday(input: SuggestionInput): Suggestion[] {
   const taken = new Set<string>();
 
   for (const slot of SLOTS[read.level]) {
-    let best: { category: string; label: string; score: number; novelty: number } | null = null;
+    type Candidate = {
+      category: string;
+      label: string;
+      score: number;
+      novelty: number;
+      goalIds: string[];
+    };
+    let best: Candidate | null = null;
+    /*
+      The same contest, with the goals taken out.
+
+      Tracked in the same loop rather than by re-running the ranking, so the
+      two can never be scored by two slightly different copies of the rule.
+      Comparing the two winners at the end is what says whether a goal was the
+      reason for the choice or merely a passenger in it.
+    */
+    let plainBest: Candidate | null = null;
 
     for (const entry of pool) {
       const category = entry.id;
@@ -430,13 +513,47 @@ export function suggestToday(input: SuggestionInput): Suggestion[] {
       if (read.level === "depleted" && load.stress >= 3) fit *= 0.2;
 
       const novelty = noveltyOf(category);
-      const score = fit * 2 + novelty;
-      if (!best || score > best.score) best = { category, label: entry.label, score, novelty };
+      const plainScore = fit * 2 + novelty;
+
+      /*
+        A goal lifts fit. It does not add to the score.
+
+        This is the whole of "a goal is direction, not authority". The lift is
+        multiplicative on `fit`, exactly like the depleted penalty above and
+        applied after it, so the two compose the way they should: on a
+        depleted day a demanding category is already at a fifth of its fit,
+        and 0.2 × 1.4 is still nowhere near the 1.0 a restorative option is
+        sitting on. A goal cannot make a hard session win a day the body is
+        not having. What it can do is order the options the day already
+        permits, and break ties among equals — which is what a member means
+        when they say what they are working toward.
+
+        An additive bonus would have been simpler and is the version that
+        eventually ships a max effort to somebody on three hours of sleep,
+        because nothing in an addition knows what it is being added to.
+      */
+      const relevant = goalsByCategory.get(category) ?? [];
+      const score = relevant.length > 0 ? fit * GOAL_LIFT * 2 + novelty : plainScore;
+
+      if (!best || score > best.score) {
+        best = { category, label: entry.label, score, novelty, goalIds: relevant };
+      }
+      if (!plainBest || plainScore > plainBest.score) {
+        plainBest = { category, label: entry.label, score: plainScore, novelty, goalIds: [] };
+      }
     }
 
     if (!best) continue;
     taken.add(best.category);
     const orientation = categoryOrientation(best.category);
+    /*
+      Would this slot have chosen the same thing without the goals?
+
+      Re-run the ranking on `plainScore` — every candidate's score with the
+      lift removed — and compare the winner. Same category means the goal was
+      a passenger; different means it was the reason.
+    */
+    const moved = best.goalIds.length > 0 && plainBest?.category !== best.category;
     chosen.push({
       category: best.category,
       label: best.label,
@@ -463,8 +580,20 @@ export function suggestToday(input: SuggestionInput): Suggestion[] {
         "slot_fit" as const,
         ...(best.novelty >= 1 && recentCategories.length > 0 ? (["novelty_nudge"] as const) : []),
         ...(excluded.length > 0 ? (["category_excluded"] as const) : []),
+        ...(moved ? (["goal_relevant"] as const) : []),
         ...read.codes,
       ],
+      /*
+        Claimed only where the goal did something.
+
+        `moved` is the comparison against what this slot would have chosen with
+        no goals in play — so a category that was already the best fit carries
+        no goal here even when the member has one about it. Otherwise every
+        recommendation would eventually cite every goal, `Why this?` would
+        become a horoscope, and the one thing this column is for — telling a
+        real influence from a plausible story — would be gone.
+      */
+      goalIds: moved ? best.goalIds : [],
     });
   }
 
