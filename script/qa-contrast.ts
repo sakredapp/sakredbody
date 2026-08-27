@@ -147,12 +147,14 @@ for (const theme of ["dark", "light"] as const) {
   );
 
   for (const id of ALL_SECTIONS) {
+    const before = await b.evaluate<number>(`return document.body.innerText.trim().length;`);
     const opened = await portal.openSection(id);
     check(`${id} opens (${theme})`, opened);
     if (!opened) continue;
     await portal.awaitSection(id);
-    // Mounted is not rendered — several tabs are still fetching at that point.
-    await portal.settleText();
+    // Mounted is not rendered — several tabs are still fetching at that point,
+    // and an empty screen is as stable as a full one.
+    await portal.settleText(before);
     surfaces++;
 
     if (SELFTEST && theme === "light" && id === "home") {

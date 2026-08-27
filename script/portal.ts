@@ -269,7 +269,7 @@ export class Portal {
    * Two identical samples rather than one, because a screen that is painting
    * in stages passes through moments of stillness between them.
    */
-  async settleText(timeoutMs = 8_000): Promise<number> {
+  async settleText(unlike?: number, timeoutMs = 12_000): Promise<number> {
     const read = `return document.body.innerText.trim().length;`;
     let last = -1;
     let same = 0;
@@ -278,7 +278,14 @@ export class Portal {
       const now = await this.b.evaluate<number>(read);
       same = now === last ? same + 1 : 0;
       last = now;
-      if (same >= 2 && now > 0) return now;
+      /*
+        Stability alone is not arrival. A screen showing nothing but the nav
+        is perfectly stable, and two harnesses read one that way — reporting
+        seven runs of text on a tab that has a hundred. So the caller can say
+        what the screen looked like *before* it asked for this one, and the
+        wait continues until the answer is something else.
+      */
+      if (same >= 2 && now > 0 && now !== unlike) return now;
       await this.b.settle();
     }
     return last;
