@@ -46,7 +46,12 @@ class HealthSyncWorker(context: Context, params: WorkerParameters) :
             return@withContext Result.success()
         }
 
-        val overlapDays = prefs.getInt(KEY_OVERLAP, 7).coerceAtLeast(1)
+        // Upper bound as well as lower. We do not hold
+        // READ_HEALTH_DATA_HISTORY, and Health Connect throws rather than
+        // truncates on a read that reaches past thirty days — so a bad
+        // configure() value would not shorten this run's window, it would end
+        // it. The real value is seven.
+        val overlapDays = prefs.getInt(KEY_OVERLAP, 7).coerceIn(1, HISTORY_LIMIT_DAYS)
         val end = Instant.now()
         val start = end.minus(overlapDays.toLong(), ChronoUnit.DAYS)
 
@@ -212,6 +217,9 @@ class HealthSyncWorker(context: Context, params: WorkerParameters) :
         const val KEY_LAST_RUN = "lastRunAt"
         const val KEY_LAST_RESULT = "lastResult"
         const val WORK_NAME = "sakred-health-sync"
+
+        /** What Health Connect allows without READ_HEALTH_DATA_HISTORY. */
+        const val HISTORY_LIMIT_DAYS = 30
 
         /** Mirrors HEALTH_UNITS in shared/models/health.ts. */
         val UNITS = mapOf(

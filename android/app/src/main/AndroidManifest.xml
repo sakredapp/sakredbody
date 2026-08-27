@@ -10,15 +10,19 @@
     <!-- Health Connect.
          The permissions themselves, the com.google.android.apps.healthdata
          queries block and the rationale activity all come from the plugin's
-         own manifest and are merged in. Two things it cannot do for us:
+         own manifest and are merged in. What it cannot do for us is remove
+         what we do not use.
 
-         1. History. Without this permission Health Connect caps every read at
-            roughly the last 30 days, which would make an Android member's
-            first sync three months shorter than an iPhone member's for no
-            reason a member could ever see. -->
-    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY" />
+         History is deliberately NOT among what we ask for. Health Connect
+         reads back thirty days without READ_HEALTH_DATA_HISTORY, and nothing
+         in the product reads a member's health further than that: Terrain
+         baselines on 28 days, and every summary a member or a coach can open
+         asks for 30. Asking to reach past every surface we draw is the
+         excessive scope Play rejected 59 for, and "an iPhone member's first
+         sync goes deeper" is a parity argument, not a member-facing need.
+         client/src/lib/health.ts clamps the Android read to match.
 
-    <!-- 2. Removing what we do not use. The plugin declares read AND write for
+         Removing what we do not use. The plugin declares read AND write for
             every type it supports, so a merged manifest asks for 23 write
             permissions from an app that never writes, plus reads for blood
             pressure, blood glucose and basal metabolic rate that nothing in

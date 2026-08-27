@@ -29,13 +29,30 @@ import {
 /** Mirrors the server's constants; the server is authoritative and sends them. */
 const FALLBACK_OVERLAP_DAYS = 7;
 const FALLBACK_BACKFILL_DAYS = 90;
+/**
+ * How far back Health Connect will read without READ_HEALTH_DATA_HISTORY.
+ *
+ * We do not hold that permission. Nothing in the product reads a member's
+ * health beyond 28 days — Terrain's baseline is 28, every summary a member or
+ * a coach can open asks for 30 — so the permission would widen the ask past
+ * anything we display, which is the definition of the excessive scope Play
+ * rejected 59 for.
+ *
+ * The clamp is not cosmetic. Health Connect does not truncate a read that
+ * reaches further back than this: it throws. Every metric would land in the
+ * per-plan catch below, and a member's first sync would return nothing at all
+ * while reporting success. iOS has no equivalent limit and keeps the ninety.
+ */
+const HEALTH_CONNECT_HISTORY_DAYS = 30;
 /** One POST body. See the note on healthSyncSchema — a mobile network drops big ones. */
 const PAGE = 1_000;
 /**
  * Longer than the probe's deadline. A ninety-day aggregate read genuinely
  * takes time on a phone with years of history, and cutting it short would turn
  * a slow first sync into a permanent failure. Still finite: an unanswered read
- * must eventually become an error somebody can see.
+ * must eventually become an error somebody can see. Shared with the shorter
+ * Health Connect window: the ceiling is what a slow read needs, not what a
+ * typical one takes.
  */
 const READ_TIMEOUT_MS = 45_000;
 
@@ -457,6 +474,14 @@ export async function syncHealth(): Promise<SyncResult> {
     start.setDate(start.getDate() - overlapDays);
   } else {
     start.setDate(start.getDate() - backfillDays);
+  }
+  if (platform === "healthconnect") {
+    const floor = new Date(end);
+    floor.setDate(floor.getDate() - HEALTH_CONNECT_HISTORY_DAYS);
+    // Never earlier than the floor, whichever branch above set it — a stale
+    // watermark on a phone that has not synced in months would otherwise
+    // reach past it just as a first sync would.
+    if (start.getTime() < floor.getTime()) start.setTime(floor.getTime());
   }
   const startDate = start.toISOString();
   const endDate = end.toISOString();

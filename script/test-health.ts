@@ -365,15 +365,71 @@ check("a summed day of resting HR is rejected", 1_400 > HEALTH_RANGES.restingHea
 // ── 6. The permission surface ──────────────────────────────────────────────
 section("Native permission surface");
 
+/**
+ * Source with the comments taken out.
+ *
+ * Every "is this call still here" check below reads a file as text, and a
+ * commented-out call is still text. Block comments first, then line comments,
+ * so a `//` inside a `/* … *\/` is not mistaken for the start of one.
+ */
+function code(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+}
+
 const manifest = readFileSync("android/app/src/main/AndroidManifest.xml", "utf8");
 const strings = readFileSync("android/app/src/main/res/values/strings.xml", "utf8");
 const plist = readFileSync("ios/App/App/Info.plist", "utf8");
 const entitlements = readFileSync("ios/App/App/App.entitlements", "utf8");
 
 check("the manifest declares the tools namespace", manifest.includes("xmlns:tools="));
+/**
+ * History is the one Health Connect permission we could ask for and choose
+ * not to. Both halves are asserted together because either alone is a bug:
+ * the permission without the clamp is scope we do not display, and the clamp
+ * without the permission is fine — but the permission back without the clamp
+ * being removed too would be scope Play already rejected us for.
+ *
+ * The clamp is what makes the absence survivable. Health Connect throws on a
+ * read older than thirty days rather than truncating it, so a member's first
+ * sync would skip every metric and still report success.
+ */
 check(
-  "history access is requested, so Android is not capped at 30 days",
-  manifest.includes("android.permission.health.READ_HEALTH_DATA_HISTORY")
+  "history access is not requested",
+  !manifest.includes(
+    '<uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY"'
+  )
+);
+const healthLib = readFileSync("client/src/lib/health.ts", "utf8");
+const historyDays = Number(
+  /HEALTH_CONNECT_HISTORY_DAYS\s*=\s*(\d+)/.exec(healthLib)?.[1] ?? 0
+);
+check(
+  "the Android read is clamped to what it may read without it",
+  historyDays > 0 && historyDays <= 30,
+  `clamped at ${historyDays} days`
+);
+check(
+  "the clamp is applied to Health Connect and not to HealthKit",
+  /platform === "healthconnect"[\s\S]{0,400}HEALTH_CONNECT_HISTORY_DAYS/.test(healthLib)
+);
+/**
+ * And the clamp has to cover everything we read against, not just the
+ * baseline. A window the product reads past is a window that throws.
+ *
+ * Parsed from the files that define them rather than imported: server/terrain
+ * reaches a database on import, and a permission test that needs one would
+ * stop running.
+ */
+const BASELINE_DAYS = Number(
+  /BASELINE_DAYS\s*=\s*(\d+)/.exec(readFileSync("server/terrain/read.ts", "utf8"))?.[1] ?? 999
+);
+const SUMMARY_DAYS = Number(
+  /DEFAULT_SUMMARY_DAYS\s*=\s*(\d+)/.exec(readFileSync("server/health/routes.ts", "utf8"))?.[1] ?? 999
+);
+check(
+  "nothing reads a member's health further back than the clamp",
+  BASELINE_DAYS <= historyDays && SUMMARY_DAYS <= historyDays,
+  `baseline ${BASELINE_DAYS}, summary ${SUMMARY_DAYS}, clamp ${historyDays}`
 );
 
 /**
@@ -667,6 +723,42 @@ const pluginManifestAndroid = readFileSync(
 check(
   "Android asks for background read",
   pluginManifestAndroid.includes("android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND")
+);
+/**
+ * Asked for and used. A background permission on the declaration form with no
+ * scheduled job behind it is the same excessive-scope finding as an unused
+ * data type, and harder to spot.
+ */
+const worker = readFileSync(
+  "plugins/health-sync/android/src/main/java/com/sakredbody/healthsync/HealthSyncWorker.kt",
+  "utf8"
+);
+const androidPlugin = readFileSync(
+  "plugins/health-sync/android/src/main/java/com/sakredbody/healthsync/HealthSyncPlugin.kt",
+  "utf8"
+);
+check(
+  "a periodic job is enqueued for it",
+  androidPlugin.includes("enqueueUniquePeriodicWork") &&
+    androidPlugin.includes("PeriodicWorkRequestBuilder<HealthSyncWorker>")
+);
+check(
+  "the job reads health and posts it",
+  worker.includes("reader.collect(") && worker.includes("/api/health/sync")
+);
+check(
+  "the app turns it on after a member connects",
+  // Comments stripped first. Searching the raw file for the call passes on a
+  // file where somebody commented the call out, which is precisely the change
+  // this is here to catch.
+  code(readFileSync("client/src/hooks/use-health.ts", "utf8")).includes(
+    "await enableBackgroundSync()"
+  )
+);
+check(
+  "the background window is clamped like the foreground one",
+  /coerceIn\(1, HISTORY_LIMIT_DAYS\)/.test(worker) &&
+    /HISTORY_LIMIT_DAYS\s*=\s*30/.test(worker)
 );
 
 /**
