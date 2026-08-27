@@ -129,6 +129,17 @@ export const coachingPlanItems = pgTable(
     memberReason: text("member_reason"),
     coachNote: text("coach_note"),
 
+    /**
+     * The goal this line is in service of, if it is in service of one.
+     *
+     * Optional, and it stays optional. Health is not only goal pursuit — the
+     * sleep window, the breath practice and the walk a coach prescribes
+     * because somebody is fraying are all legitimate and serve no goal at all.
+     * Requiring every planned action to belong to one would turn a coach's
+     * judgement into a filing exercise, and the filing would be fictional.
+     */
+    goalId: uuid("goal_id"),
+
     orderIndex: integer("order_index").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

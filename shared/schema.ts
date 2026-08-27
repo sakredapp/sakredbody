@@ -25,6 +25,7 @@ export * from "./models/terrainSignals.js";
 export * from "./models/rhythmTracking.js";
 export * from "./models/suggestions.js";
 export * from "./models/recommendation.js";
+export * from "./models/goals.js";
 export * from "./models/apothecary.js";
 export * from "./models/profilePhotos.js";
 export * from "./models/media.js";

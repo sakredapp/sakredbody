@@ -187,6 +187,17 @@ export const recommendationEvents = pgTable(
     canonicalActionType: text("canonical_action_type"),
     canonicalActionId: text("canonical_action_id"),
 
+    /**
+     * The planned line this recommendation was made under, when there was one.
+     *
+     * One optional pointer, not a set: a recommendation is made under at most
+     * one active plan. It is what keeps plan, recommendation and actual three
+     * separate facts rather than one — a coach planned intervals, Sakred
+     * suggested reducing demand on the day, the member walked, and all three
+     * remain reconstructible afterwards. `coaching_plan_items.id`.
+     */
+    planItemId: uuid("plan_item_id"),
+
     // ── why ──────────────────────────────────────────────────────────────
     /** REASON_CODES, no values. See the header. */
     reasonCodes: jsonb("reason_codes").$type<ReasonCode[]>().notNull().default(sql`'[]'::jsonb`),
@@ -226,6 +237,7 @@ export const recommendationEvents = pgTable(
     index("idx_recommendation_user_date").on(t.userId, t.onDate),
     index("idx_recommendation_type_time").on(t.recommendationType, t.createdAt),
     index("idx_recommendation_action").on(t.canonicalActionType, t.canonicalActionId),
+    index("idx_recommendation_plan_item").on(t.planItemId),
   ],
 );
 
