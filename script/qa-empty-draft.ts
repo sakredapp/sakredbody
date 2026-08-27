@@ -178,12 +178,38 @@ if (!started) {
       .join(" | ");`)));
 }
 /*
-  One run out of five so far has arrived here and found no workout sheet after
-  twenty seconds. I have not reproduced it and will not name a cause I cannot
-  show, so this says what was on screen instead of failing mute — the next
-  occurrence should identify itself rather than needing this same afternoon
-  spent on it again.
+  ── Found, on the next occurrence ────────────────────────────────────────
+
+  This used to say "one run out of five arrives here and finds no workout
+  sheet; I have not reproduced it and will not name a cause I cannot show".
+  The diagnostic below is what named it.
+
+  A previous run of this harness had been killed partway through and left a
+  workout open. `one-open-workout` means the member cannot start a second, so
+  Build correctly offers to *resume* rather than to start, the tap finds no
+  start control, and twenty seconds later the sheet has still not appeared.
+  Intermittent while the stale session was same-day and reproducible once it
+  aged past midnight, which is exactly the shape of a flake nobody can catch.
+
+  So the precondition is now checked rather than assumed. It is not the
+  product's fault that this harness crashed yesterday, and a run that begins
+  by finishing its own mess is a run whose result means something.
 */
+{
+  const inProgress = await b.evaluate<boolean>(
+    `return !!document.querySelector('[data-testid="button-resume-session"], [data-tour-id="build-resume-session"]')
+       || /in progress/i.test(document.body.innerText);`,
+  );
+  if (inProgress) {
+    console.error(
+      "  a workout was already open before this run started — almost certainly left by an\n" +
+        "  earlier run of this harness that was killed partway through. `one-open-workout`\n" +
+        "  means no second one can be started, so Build is offering to resume. Finish or\n" +
+        "  discard it in QA and run again.",
+    );
+  }
+}
+
 try {
   await b.waitFor(
     `!!document.querySelector('[data-testid="workout-sheet"], [data-tour-id="workout-add-exercise"]')`,
