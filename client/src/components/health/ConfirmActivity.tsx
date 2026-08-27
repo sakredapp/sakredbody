@@ -200,7 +200,7 @@ function Answer({ w }: { w: Candidate }) {
         <div className="flex items-center gap-2">
           <Button
             size="sm"
-            className="bg-gold border-gold-border text-white"
+            className="bg-gold border-gold-border text-gold-foreground"
             disabled={save.isPending}
             onClick={() => save.mutate({ reviewed: true })}
             data-testid="button-confirm-activity"
@@ -254,7 +254,7 @@ function Answer({ w }: { w: Candidate }) {
           {/* Nothing is required. Saving with none of it set is still a review. */}
           <Button
             size="sm"
-            className="bg-gold border-gold-border text-white"
+            className="bg-gold border-gold-border text-gold-foreground"
             disabled={save.isPending}
             onClick={() =>
               save.mutate({

@@ -445,7 +445,7 @@ function RoutineFormDialog({
           </div>
           <div className="flex gap-2 justify-end">
             <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button onClick={() => onSubmit(form)} disabled={isPending || !form.name || !form.description} className="bg-gold text-white">
+            <Button onClick={() => onSubmit(form)} disabled={isPending || !form.name || !form.description} className="bg-gold text-gold-foreground">
               {isPending ? "Saving..." : "Save"}
             </Button>
           </div>
@@ -760,7 +760,7 @@ function HabitFormDialog({
           </div>
           <div className="flex gap-2 justify-end">
             <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button onClick={() => onSubmit(form)} disabled={isPending || !form.title} className="bg-gold text-white">
+            <Button onClick={() => onSubmit(form)} disabled={isPending || !form.title} className="bg-gold text-gold-foreground">
               {isPending ? "Saving..." : "Save"}
             </Button>
           </div>
@@ -1836,7 +1836,7 @@ export default function AdminPortal() {
               <div className="space-y-6">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div><h2 className="font-display text-2xl">Wellness Routines</h2><p className="text-sm text-muted-foreground">Manage routine programs.</p></div>
-                  <Button onClick={() => { setEditingRoutine(null); setRoutineDialogOpen(true); }} className="bg-gold text-white"><Plus className="w-4 h-4 mr-1" /> New Routine</Button>
+                  <Button onClick={() => { setEditingRoutine(null); setRoutineDialogOpen(true); }} className="bg-gold text-gold-foreground"><Plus className="w-4 h-4 mr-1" /> New Routine</Button>
                 </div>
                 {routinesLoading ? (
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-36 rounded-md" />)}</div>
@@ -1904,7 +1904,7 @@ export default function AdminPortal() {
                     <h2 className="font-display text-2xl">Habit Templates</h2>
                     <p className="text-sm text-muted-foreground">{selectedRoutineId ? `Showing habits for selected routine` : "Select a routine to view its habits."}</p>
                   </div>
-                  <Button onClick={() => { setEditingHabit(null); setHabitDialogOpen(true); }} className="bg-gold text-white"><Plus className="w-4 h-4 mr-1" /> New Habit</Button>
+                  <Button onClick={() => { setEditingHabit(null); setHabitDialogOpen(true); }} className="bg-gold text-gold-foreground"><Plus className="w-4 h-4 mr-1" /> New Habit</Button>
                 </div>
                 {routines && routines.length > 0 && (
                   <div className="flex gap-2 overflow-x-auto pb-1">
@@ -2206,7 +2206,7 @@ export default function AdminPortal() {
               <div className="space-y-6">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div><h2 className="font-display text-2xl">Masterclass Categories</h2><p className="text-sm text-muted-foreground">Folders users can follow. e.g. Building Muscle, Meditation, Nutrition.</p></div>
-                  <Button onClick={openAddMCCategory} className="bg-gold text-white"><Plus className="w-4 h-4 mr-1" /> New Category</Button>
+                  <Button onClick={openAddMCCategory} className="bg-gold text-gold-foreground"><Plus className="w-4 h-4 mr-1" /> New Category</Button>
                 </div>
                 {mcCategoriesQuery.isLoading ? (
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-28 rounded-md" />)}</div>
@@ -2253,7 +2253,7 @@ export default function AdminPortal() {
               <div className="space-y-6">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div><h2 className="font-display text-2xl">Masterclass Videos</h2><p className="text-sm text-muted-foreground">Manage individual video entries.</p></div>
-                  <Button onClick={openAddMCVideo} className="bg-gold text-white"><Plus className="w-4 h-4 mr-1" /> New Video</Button>
+                  <Button onClick={openAddMCVideo} className="bg-gold text-gold-foreground"><Plus className="w-4 h-4 mr-1" /> New Video</Button>
                 </div>
                 {mcVideosQuery.isLoading ? (
                   <div className="space-y-3">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 rounded-md" />)}</div>
@@ -2333,7 +2333,7 @@ export default function AdminPortal() {
             </div>
             <div className="space-y-2"><label className="text-sm font-medium">Image URL</label><Input value={partnerForm.imageUrl} onChange={(e) => setPartnerForm({ ...partnerForm, imageUrl: e.target.value })} placeholder="https://..." /></div>
             <div className="space-y-2"><label className="text-sm font-medium">Internal Notes</label><Textarea value={partnerForm.notes} onChange={(e) => setPartnerForm({ ...partnerForm, notes: e.target.value })} className="resize-none" /></div>
-            <Button onClick={handleSubmitPartner} disabled={createPartnerMut.isPending || updatePartnerMut.isPending} className="w-full bg-gold text-white">
+            <Button onClick={handleSubmitPartner} disabled={createPartnerMut.isPending || updatePartnerMut.isPending} className="w-full bg-gold text-gold-foreground">
               {(createPartnerMut.isPending || updatePartnerMut.isPending) ? "Saving..." : editingPartner ? "Update Partner" : "Add Partner"}
             </Button>
           </div>
@@ -2374,7 +2374,7 @@ export default function AdminPortal() {
               <div className="space-y-2"><label className="text-sm font-medium">Max Capacity</label><Input type="number" value={serviceForm.maxCapacity} onChange={(e) => setServiceForm({ ...serviceForm, maxCapacity: e.target.value })} /></div>
             </div>
             <div className="space-y-2"><label className="text-sm font-medium">Image URL</label><Input value={serviceForm.imageUrl} onChange={(e) => setServiceForm({ ...serviceForm, imageUrl: e.target.value })} /></div>
-            <Button onClick={handleSubmitService} disabled={createServiceMut.isPending || updateServiceMut.isPending} className="w-full bg-gold text-white">
+            <Button onClick={handleSubmitService} disabled={createServiceMut.isPending || updateServiceMut.isPending} className="w-full bg-gold text-gold-foreground">
               {(createServiceMut.isPending || updateServiceMut.isPending) ? "Saving..." : editingService ? "Update Service" : "Add Service"}
             </Button>
           </div>
@@ -2401,7 +2401,7 @@ export default function AdminPortal() {
               <input type="checkbox" checked={mcCategoryForm.active} onChange={(e) => setMcCategoryForm({ ...mcCategoryForm, active: e.target.checked })} className="rounded" />
               <label className="text-sm">Active (visible to members)</label>
             </div>
-            <Button onClick={handleSubmitMCCategory} disabled={createMCCategoryMut.isPending || updateMCCategoryMut.isPending} className="w-full bg-gold text-white">
+            <Button onClick={handleSubmitMCCategory} disabled={createMCCategoryMut.isPending || updateMCCategoryMut.isPending} className="w-full bg-gold text-gold-foreground">
               {(createMCCategoryMut.isPending || updateMCCategoryMut.isPending) ? "Saving..." : editingMCCategory ? "Update Category" : "Create Category"}
             </Button>
           </div>
@@ -2446,7 +2446,7 @@ export default function AdminPortal() {
                 </div>
               </div>
             </div>
-            <Button onClick={handleSubmitMCVideo} disabled={createMCVideoMut.isPending || updateMCVideoMut.isPending} className="w-full bg-gold text-white">
+            <Button onClick={handleSubmitMCVideo} disabled={createMCVideoMut.isPending || updateMCVideoMut.isPending} className="w-full bg-gold text-gold-foreground">
               {(createMCVideoMut.isPending || updateMCVideoMut.isPending) ? "Saving..." : editingMCVideo ? "Update Video" : "Add Video"}
             </Button>
           </div>

@@ -157,12 +157,12 @@ function Option({
 
   return (
     <div
-      className="relative rounded-xl border border-[hsl(var(--gold))]/12 bg-white/[0.03] overflow-hidden"
+      className="relative rounded-xl border border-[hsl(var(--gold))]/12 bg-raise overflow-hidden"
       data-testid={`suggestion-${suggestion.category}`}
     >
       <button
         onClick={() => onOpen(suggestion)}
-        className="w-full text-left p-4 pr-11 tap-clean hover:bg-white/[0.02] transition-colors"
+        className="w-full text-left p-4 pr-11 tap-clean bg-raise-hover-soft transition-colors"
       >
         <div className="flex items-center gap-2">
           <span
@@ -267,7 +267,7 @@ function Sky({ moon, season, sky }: { moon: MoonGuidance | null; season: SeasonG
 
   return (
     <div
-      className="rounded-xl border border-[hsl(var(--gold))]/12 bg-white/[0.03] p-4"
+      className="rounded-xl border border-[hsl(var(--gold))]/12 bg-raise p-4"
       data-testid="sky-card"
     >
       {/*
@@ -308,7 +308,7 @@ export function RelatingCard({ note }: { note: RelationalGuidance }) {
   return (
     <button
       onClick={() => setOpen((v) => !v)}
-      className="w-full text-left rounded-xl border border-[hsl(var(--gold))]/12 bg-white/[0.03] p-4 tap-clean"
+      className="w-full text-left rounded-xl border border-[hsl(var(--gold))]/12 bg-raise p-4 tap-clean"
       data-testid="relating-card"
     >
       <div className="flex items-start gap-3">

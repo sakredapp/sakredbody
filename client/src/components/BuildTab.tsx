@@ -625,7 +625,7 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
 
               {!active && !collision && (
                 <Button
-                  className="w-full mt-4 bg-gold border-gold-border text-white"
+                  className="w-full mt-4 bg-gold border-gold-border text-gold-foreground"
                   onClick={() => start.mutate(s.habitId)}
                   disabled={start.isPending}
                   data-testid="button-start-session"
@@ -835,7 +835,7 @@ export function BuildTab({ onOpen }: { onOpen?: (s: MemberSection) => void }) {
 
             {active && (
               <Button
-                className="w-full bg-gold border-gold-border text-white"
+                className="w-full bg-gold border-gold-border text-gold-foreground"
                 onClick={() => finish.mutate()}
                 disabled={finish.isPending}
                 data-testid="button-finish-session"

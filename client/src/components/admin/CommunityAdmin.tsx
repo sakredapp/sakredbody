@@ -252,7 +252,7 @@ function ChannelEditor({
         <Button
           onClick={onSave}
           disabled={!draft.name.trim() || !draft.slug.trim() || saving}
-          className="bg-gold border-gold-border text-white"
+          className="bg-gold border-gold-border text-gold-foreground"
           data-testid="button-save-channel"
         >
           {isNew ? "Create room" : "Save"}

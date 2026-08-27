@@ -98,9 +98,9 @@ function WinCard({ win, onShare }: { win: Win; onShare: (w: Win) => void }) {
         <div className="absolute inset-0 bg-gradient-to-t from-[hsl(var(--ink))] via-[hsl(var(--ink))]/50 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 p-4">
           <div className="h-px w-10 bg-[hsl(var(--gold))] mb-2.5" />
-          <h3 className="font-display text-xl leading-tight text-white">{win.title}</h3>
+          <h3 className="font-display text-xl leading-tight text-[hsl(var(--ink-foreground))]">{win.title}</h3>
           {win.subtitle && (
-            <p className="text-xs text-white/70 mt-1">{win.subtitle}</p>
+            <p className="text-xs text-[hsl(var(--ink-foreground)/0.7)] mt-1">{win.subtitle}</p>
           )}
         </div>
       </div>
@@ -200,7 +200,7 @@ function ShareDialog({ win, onClose }: { win: Win | null; onClose: () => void })
               <Button
                 onClick={() => share.mutate()}
                 disabled={share.isPending}
-                className="bg-gold border-gold-border text-white"
+                className="bg-gold border-gold-border text-gold-foreground"
                 data-testid="button-confirm-share"
               >
                 Post it

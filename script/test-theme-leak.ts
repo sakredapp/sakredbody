@@ -160,87 +160,77 @@ for (const file of themeable) {
   if (hits.length) found.set(file, hits.length);
 }
 
-/**
- * The ratchet.
- *
- * Recorded from a real measurement, not aspirational. Each of these is a file
- * the Dark tokenization pass has yet to reach. Lower a number when you fix
- * one; never raise one, and never add a key.
- */
-const BASELINE: Record<string, number> = {
-  "client/src/components/BuildTab.tsx": 2,
-  "client/src/components/CommunityTab.tsx": 1,
-  "client/src/components/MasterclassTab.tsx": 8,
-  "client/src/components/OfferingsTab.tsx": 1,
-  "client/src/components/PillarHome.tsx": 2,
-  "client/src/components/ReportDialog.tsx": 1,
-  "client/src/components/RestoreTab.tsx": 1,
-  "client/src/components/RhythmCards.tsx": 2,
-  "client/src/components/TerrainToday.tsx": 1,
-  "client/src/components/TodayRead.tsx": 4,
-  "client/src/components/VoiceMemo.tsx": 1,
-  "client/src/components/WinMoment.tsx": 3,
-  "client/src/components/WinsTab.tsx": 3,
-  "client/src/components/admin/CommunityAdmin.tsx": 1,
-  "client/src/components/admin/Energy.tsx": 2,
-  "client/src/components/admin/ExecutiveApplications.tsx": 1,
-  "client/src/components/admin/Hosts.tsx": 1,
-  "client/src/components/admin/Library.tsx": 1,
-  "client/src/components/admin/Offerings.tsx": 1,
-  "client/src/components/admin/Training.tsx": 1,
-  "client/src/components/build/MovementPicker.tsx": 1,
-  "client/src/components/build/WhyToday.tsx": 1,
-  "client/src/components/build/WorkoutInProgress.tsx": 1,
-  "client/src/components/build/WorkoutSheet.tsx": 2,
-  "client/src/components/coach/Conversation.tsx": 3,
-  "client/src/components/health/ConfirmActivity.tsx": 2,
-  "client/src/components/portal/HealthCard.tsx": 1,
-  "client/src/components/portal/HealthSwatches.tsx": 6,
-  "client/src/components/portal/TodayBody.tsx": 1,
-  "client/src/components/ui/avatar.tsx": 2,
-  "client/src/components/ui/dialog.tsx": 1,
-  "client/src/components/ui/sheet.tsx": 1,
-  "client/src/pages/AdminPortal.tsx": 10,
-  "client/src/pages/CoachingDashboard.tsx": 6,
-  "client/src/pages/MemberDashboard.tsx": 5,
-};
+/*
+  It reached zero.
 
-const appeared = [...found.keys()].filter((f) => !(f in BASELINE));
+  What was here was a per-file ratchet with 35 entries and 81 allowed
+  violations, and the note above it said that the day the count reached zero
+  this becomes an ordinary assertion. That day is today, so this is one.
+
+  Nothing was moved to the art allowlist to get here. The literals fell into
+  four kinds and each got a name for what it actually was:
+
+    a fixed pairing   `text-white` on `bg-gold`. Gold is 39 48% 56% in both
+                      themes, so the white was never a theme assumption — it
+                      only looked like one. Now `text-gold-foreground`.
+
+    a relative wash   `bg-white/[0.03]` meant "lifted off the ground" and
+                      `bg-black/20` meant "sunk into it". On ink those are a
+                      white wash and a black one; on limestone both are
+                      walnut. Now `bg-raise` and `bg-well`, which flip.
+
+    the ground itself `text-white` over a photo under a `--ink` gradient. The
+                      gradient already followed the theme; the text did not,
+                      so in Light it was white on limestone. Now
+                      `--ink-foreground`, the token the gradient's own ground
+                      is paired with.
+
+    a different       A video letterboxed for viewing, and a photo opened
+    surface           full-screen. Black in daylight too, the way every viewer
+                      on every platform does it. Now `bg-media` and
+                      `text-onfill` — still absolute, but named for the
+                      surface rather than for the colour, so the next reader
+                      can tell it apart from the three above.
+*/
+const dirty = [...found.entries()].map(([f, n]) => `${f} (${n})`);
 check(
-  "no portal component that was clean has picked up an absolute colour",
-  appeared.length === 0,
-  appeared.map((f) => `${f} (${found.get(f)})`).join(", "),
+  "no portal component carries an absolute colour",
+  dirty.length === 0,
+  dirty.join(", "),
 );
-
-const worsened = [...found.entries()]
-  .filter(([f, n]) => f in BASELINE && n > BASELINE[f])
-  .map(([f, n]) => `${f}: ${BASELINE[f]} → ${n}`);
-check("and no known one got worse", worsened.length === 0, worsened.join(", "));
 
 /*
-  The ratchet has to move in the other direction too. A fixed file whose entry
-  is left behind lets a future regression slip back in under cover of its own
-  stale allowance.
+  The guard only means anything while the vocabulary it replaced them with
+  still exists. A token deleted out of the stylesheet leaves every call site
+  resolving to nothing — no error, no build failure, and text with no colour,
+  which is the same silent failure by a different route.
 */
-const stale = Object.keys(BASELINE).filter((f) => !found.has(f));
+const css = readFileSync(resolve(ROOT, "client/src/index.css"), "utf8");
+const dark = css.slice(css.indexOf('[data-theme="dark"]'));
+const FLIPPING = ["--raise", "--raise-hover", "--raise-hover-soft", "--well", "--hairline", "--scrim"];
+const FIXED = ["--gold-foreground", "--on-fill", "--media-ground"];
+
+const missing = [...FLIPPING, ...FIXED].filter((t) => !css.includes(`${t}:`));
+check("every token the portal was converted onto is defined", missing.length === 0, missing.join(", "));
+
+const unflipped = FLIPPING.filter((t) => !dark.includes(`${t}:`));
 check(
-  "and every recorded allowance still corresponds to a real violation",
-  stale.length === 0,
-  `fixed — lower these to remove: ${stale.join(", ")}`,
+  "and the ones that mean something relative to the ground are redefined for it",
+  unflipped.length === 0,
+  `defined once, so they do not flip: ${unflipped.join(", ")}`,
 );
 
-const overcounted = [...found.entries()]
-  .filter(([f, n]) => f in BASELINE && n < BASELINE[f])
-  .map(([f, n]) => `${f}: ${BASELINE[f]} → ${n}`);
+/*
+  And the fixed three must NOT be redefined per theme. A `--gold-foreground`
+  that differs between the two would mean the pairing was a theme assumption
+  after all, and the name would be a lie rather than a record.
+*/
+const flipped = FIXED.filter((t) => dark.includes(`${t}:`));
 check(
-  "recorded counts match what is actually there",
-  overcounted.length === 0,
-  `improved, update the baseline: ${overcounted.join(", ")}`,
+  "and the ones that are fixed stay fixed",
+  flipped.length === 0,
+  `redefined for dark: ${flipped.join(", ")}`,
 );
-
-const total = [...found.values()].reduce((a, b) => a + b, 0);
-const allowed = Object.values(BASELINE).reduce((a, b) => a + b, 0);
-check(`the portal carries no more than ${allowed} absolute colours`, total <= allowed, `${total}`);
 
 /*
   Art is excluded by name, and the exclusion is only honest while the names
@@ -259,5 +249,5 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(
-  `✓ ${passed} theme leak assertions passed (${themeable.length} portal components, ${total} absolute colours remaining)`,
+  `✓ ${passed} theme leak assertions passed (${themeable.length} portal components, no absolute colours)`,
 );

@@ -527,7 +527,7 @@ function Detail({ id, onBack }: { id: string; onBack: () => void }) {
             <Button
               onClick={() => register.mutate()}
               disabled={register.isPending}
-              className="w-full bg-gold border-gold-border text-white"
+              className="w-full bg-gold border-gold-border text-gold-foreground"
               data-testid="button-register"
             >
               {o.registrationMode === "application"

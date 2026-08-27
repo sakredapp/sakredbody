@@ -171,7 +171,7 @@ export function ExecutiveApplications({ enabled }: { enabled: boolean }) {
                   className="w-full flex items-center gap-4 p-4 text-left hover-elevate"
                 >
                   <div
-                    className="h-11 w-11 rounded-full flex items-center justify-center text-sm font-medium text-white shrink-0"
+                    className="h-11 w-11 rounded-full flex items-center justify-center text-sm font-medium text-onfill shrink-0"
                     style={{ backgroundColor: scoreColor(a.fitScore) }}
                     title={`Fit score ${a.fitScore}`}
                   >

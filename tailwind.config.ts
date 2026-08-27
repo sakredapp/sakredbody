@@ -94,7 +94,20 @@ export default {
           DEFAULT: "hsl(var(--gold) / <alpha-value>)",
           light: "hsl(var(--gold-light) / <alpha-value>)",
           dark: "hsl(var(--gold-dark) / <alpha-value>)",
+          // What text on a gold fill is, in both atmospheres. `text-gold-
+          // foreground` was already written in MemberDashboard against no
+          // such colour, so it resolved to nothing and that badge had no
+          // text colour at all. Now it has one.
+          foreground: "hsl(var(--gold-foreground) / <alpha-value>)",
         },
+        // The ground a photograph or a video is viewed against, so
+        // `bg-media/70` and `bg-media/30` resolve for player chrome. Black in
+        // both themes on purpose — see the token.
+        media: "hsl(var(--media-ground) / <alpha-value>)",
+        // Text or a control drawn on a saturated fill we chose — a generated
+        // avatar colour, an emerald badge, a play button on a video. White in
+        // both themes, because the fill under it is the same in both.
+        onfill: "hsl(var(--on-fill) / <alpha-value>)",
       },
       fontFamily: {
         sans: ["var(--font-sans)"],

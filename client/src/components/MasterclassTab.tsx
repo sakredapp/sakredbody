@@ -109,17 +109,17 @@ function VideoCard({
         )}
 
         {/* Hover overlay */}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-300 flex items-center justify-center">
+        <div className="absolute inset-0 bg-media/0 group-hover:bg-media/30 transition-all duration-300 flex items-center justify-center">
           <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-              <Play className="w-5 h-5 text-black ml-0.5" />
+            <div className="w-12 h-12 rounded-full bg-onfill/90 flex items-center justify-center shadow-lg">
+              <Play className="w-5 h-5 text-media ml-0.5" />
             </div>
           </div>
         </div>
 
         {/* Duration badge */}
         {video.duration && (
-          <div className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1">
+          <div className="absolute bottom-2 right-2 bg-media/70 text-onfill text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1">
             <Clock className="w-2.5 h-2.5" />
             {video.duration}
           </div>
@@ -127,7 +127,7 @@ function VideoCard({
 
         {/* Featured indicator */}
         {video.isFeatured && (
-          <div className="absolute top-2 left-2 bg-[hsl(var(--gold))] text-white text-[10px] px-2 py-0.5 rounded-full font-medium">
+          <div className="absolute top-2 left-2 bg-[hsl(var(--gold))] text-gold-foreground text-[10px] px-2 py-0.5 rounded-full font-medium">
             Featured
           </div>
         )}
@@ -211,7 +211,7 @@ function VideoModal({
     <Dialog open onOpenChange={() => onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0">
         {/* Video player area */}
-        <div className="relative w-full aspect-video bg-black rounded-t-lg overflow-hidden">
+        <div className="relative w-full aspect-video bg-media rounded-t-lg overflow-hidden">
           {video.videoUrl.includes("youtube") || video.videoUrl.includes("vimeo") ? (
             <iframe
               src={video.videoUrl}

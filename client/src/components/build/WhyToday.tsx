@@ -73,7 +73,7 @@ export function WhyToday({
         ) : (
           <Button
             size="sm"
-            className="bg-gold border-gold-border text-white"
+            className="bg-gold border-gold-border text-gold-foreground"
             disabled={starting}
             onClick={onStart}
             data-testid="button-start-recommended"

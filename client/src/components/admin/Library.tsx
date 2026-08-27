@@ -223,7 +223,7 @@ export function LibraryAdmin() {
             <Button
               onClick={() => create.mutate()}
               disabled={!draft.title.trim() || create.isPending}
-              className="bg-gold border-gold-border text-white"
+              className="bg-gold border-gold-border text-gold-foreground"
             >
               Create
             </Button>

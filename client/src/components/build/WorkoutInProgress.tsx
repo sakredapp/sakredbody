@@ -119,7 +119,7 @@ export function WorkoutInProgress({
       <div className="flex flex-wrap items-center gap-2">
         <Button
           size="sm"
-          className="bg-gold border-gold-border text-white"
+          className="bg-gold border-gold-border text-gold-foreground"
           onClick={onResume}
           disabled={discarding}
           data-testid="button-resume-workout"

@@ -209,7 +209,7 @@ function Centres() {
             <Button
               onClick={() => create.mutate()}
               disabled={!draft.name.trim() || create.isPending}
-              className="bg-gold border-gold-border text-white"
+              className="bg-gold border-gold-border text-gold-foreground"
             >
               Create
             </Button>
@@ -533,7 +533,7 @@ function Frequencies() {
             <Button
               onClick={() => create.mutate()}
               disabled={!draft.name.trim() || !draft.audioUrl.trim() || create.isPending}
-              className="bg-gold border-gold-border text-white"
+              className="bg-gold border-gold-border text-gold-foreground"
             >
               Create
             </Button>

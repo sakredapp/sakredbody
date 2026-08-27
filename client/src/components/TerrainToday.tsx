@@ -93,7 +93,7 @@ export function TerrainToday({ onOpenRestore }: { onOpenRestore?: () => void }) 
       onClick={onOpenRestore}
       disabled={!onOpenRestore}
       className={cn(
-        "w-full text-left rounded-xl border border-[hsl(var(--gold))]/12 bg-black/20 px-4 py-3.5 tap-clean",
+        "w-full text-left rounded-xl border border-[hsl(var(--gold))]/12 bg-well px-4 py-3.5 tap-clean",
         onOpenRestore && "hover:border-[hsl(var(--gold))]/30 transition-colors",
       )}
       data-testid="terrain-today"

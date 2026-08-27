@@ -128,7 +128,7 @@ export function VoiceRecorderControl({
           size="sm"
           onClick={send}
           disabled={uploading}
-          className="bg-gold border-gold-border text-white"
+          className="bg-gold border-gold-border text-gold-foreground"
           data-testid="button-send-memo"
         >
           {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

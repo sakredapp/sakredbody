@@ -166,7 +166,7 @@ function HabitCard({
                 : "border-muted-foreground/40 hover:border-[hsl(var(--gold))]"
             }`}
           >
-            {habit.completed && <Check className="w-3.5 h-3.5 text-white" />}
+            {habit.completed && <Check className="w-3.5 h-3.5 text-gold-foreground" />}
           </button>
 
           <div className="flex-1 min-w-0">
@@ -553,11 +553,11 @@ export function JourneyMap() {
                     } ${selectedDate === day.date ? "ring-2 ring-foreground/30" : ""}`}
                   >
                     {state === "today" && data ? (
-                      <span className="text-xs font-bold text-white">
+                      <span className="text-xs font-bold text-gold-foreground">
                         {data.completed}/{data.total}
                       </span>
                     ) : state === "completed" ? (
-                      <Check className="w-4 h-4 text-white" />
+                      <Check className="w-4 h-4 text-gold-foreground" />
                     ) : state === "partial" && data ? (
                       <span className="text-[10px] font-medium">
                         {data.completed}/{data.total}
@@ -607,7 +607,7 @@ export function JourneyMap() {
                           : "border border-muted-foreground/40"
                       }`}
                     >
-                      {h.completed && <Check className="w-2.5 h-2.5 text-white" />}
+                      {h.completed && <Check className="w-2.5 h-2.5 text-gold-foreground" />}
                     </div>
                     <span className={h.completed ? "text-muted-foreground line-through" : ""}>
                       {h.title}
@@ -936,7 +936,7 @@ export function RoutinesTab() {
             <Button
               onClick={handleEnroll}
               disabled={enrollMutation.isPending || !!activeEnrollment}
-              className="w-full bg-[hsl(var(--gold))] text-white hover:bg-[hsl(var(--gold-dark))]"
+              className="w-full bg-[hsl(var(--gold))] text-gold-foreground hover:bg-[hsl(var(--gold-dark))]"
             >
               {enrollMutation.isPending ? "Enrolling..." : "Begin Routine"}
             </Button>
@@ -1169,7 +1169,7 @@ export function CatalogSection() {
             <Button
               onClick={handleCreateCustom}
               disabled={!customTitle.trim() || createCustomMutation.isPending}
-              className="w-full bg-[hsl(var(--gold))] text-white hover:bg-[hsl(var(--gold-dark))]"
+              className="w-full bg-[hsl(var(--gold))] text-gold-foreground hover:bg-[hsl(var(--gold-dark))]"
             >
               {createCustomMutation.isPending ? "Creating..." : "Create Habit"}
             </Button>

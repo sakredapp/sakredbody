@@ -332,7 +332,7 @@ export function HealthSwatches({ onOpenStats }: { onOpenStats?: () => void }) {
   if (view.kind === "unavailable") {
     return (
       <div
-        className="rounded-xl border border-border/40 bg-white/[0.03] p-4"
+        className="rounded-xl border border-border/40 bg-raise p-4"
         data-testid="health-unavailable"
       >
         <p className="text-sm">{storeName} isn't available on this phone</p>
@@ -346,7 +346,7 @@ export function HealthSwatches({ onOpenStats }: { onOpenStats?: () => void }) {
       <button
         onClick={() => connect.mutate()}
         disabled={connect.isPending}
-        className="w-full rounded-xl border border-[hsl(var(--gold))]/20 bg-white/[0.03] p-4 text-left tap-clean hover:border-[hsl(var(--gold))]/40 transition-colors"
+        className="w-full rounded-xl border border-[hsl(var(--gold))]/20 bg-raise p-4 text-left tap-clean hover:border-[hsl(var(--gold))]/40 transition-colors"
         data-testid="health-connect-prompt"
       >
         <p className="font-display text-base">
@@ -364,7 +364,7 @@ export function HealthSwatches({ onOpenStats }: { onOpenStats?: () => void }) {
   if (view.kind === "hydrating") {
     return (
       <div
-        className="rounded-xl border border-border/40 bg-white/[0.03] p-4"
+        className="rounded-xl border border-border/40 bg-raise p-4"
         data-testid="health-hydrating"
       >
         <p className="text-xs text-muted-foreground">Loading your health data…</p>
@@ -374,7 +374,7 @@ export function HealthSwatches({ onOpenStats }: { onOpenStats?: () => void }) {
 
   if (view.kind === "error") {
     return (
-      <div className="rounded-xl border border-border/40 bg-white/[0.03] p-4">
+      <div className="rounded-xl border border-border/40 bg-raise p-4">
         <p className="text-xs text-muted-foreground">
           We couldn't reach your health data just now. It's still on your phone.
         </p>
@@ -384,7 +384,7 @@ export function HealthSwatches({ onOpenStats }: { onOpenStats?: () => void }) {
 
   if (view.kind === "empty" || !tiles.length) {
     return (
-      <div className="rounded-xl border border-border/40 bg-white/[0.03] p-4">
+      <div className="rounded-xl border border-border/40 bg-raise p-4">
         <p className="text-xs text-muted-foreground">
           {storeName} is connected. Nothing has come through yet — if you only just allowed it,
           give it a minute.
@@ -428,7 +428,7 @@ export function HealthSwatches({ onOpenStats }: { onOpenStats?: () => void }) {
             key={tile.metric}
             onClick={() => setOpenMetric(tile.metric)}
             className={cn(
-              "rounded-xl border border-[hsl(var(--gold))]/12 bg-white/[0.03] p-3 text-left tap-clean",
+              "rounded-xl border border-[hsl(var(--gold))]/12 bg-raise p-3 text-left tap-clean",
               onOpenStats && "hover:border-[hsl(var(--gold))]/30 transition-colors",
               tile.span === 4 ? "col-span-4" : "col-span-2",
               tile.shape === "hero" ? "h-32" : "h-[86px]",

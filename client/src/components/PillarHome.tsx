@@ -308,7 +308,7 @@ function Door({
         <div className="min-w-0 flex-1">
           <h2
             className={cn(
-              "font-display tracking-wide uppercase text-white",
+              "font-display tracking-wide uppercase text-[hsl(var(--ink-foreground))]",
               pillar.lead ? "text-xl" : "text-base",
             )}
           >
@@ -318,7 +318,7 @@ function Door({
               small type under a title made these read as dense. It is on every
               card now because the first person to use the version without them
               asked what one of the doors was — dense beats unexplained. */}
-          <p className="text-[11px] leading-snug text-white/55 mt-0.5 line-clamp-1">
+          <p className="text-[11px] leading-snug text-[hsl(var(--ink-foreground)/0.55)] mt-0.5 line-clamp-1">
             {pillar.blurb}
           </p>
           {fact && <p className="text-[11px] text-[hsl(var(--gold))] mt-1">{fact}</p>}

@@ -162,7 +162,7 @@ function Composer({
           size="sm"
           onClick={submit}
           disabled={(!body.trim() && !photo) || pending}
-          className="bg-gold border-gold-border text-white"
+          className="bg-gold border-gold-border text-gold-foreground"
           data-testid="button-community-send"
         >
           {submitLabel}

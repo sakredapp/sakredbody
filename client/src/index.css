@@ -123,6 +123,43 @@
   /* Five-element accents (TCM) — kept desaturated so gold stays dominant. */
   --element-wood: 138 25% 42%;
   --element-fire: 6 45% 52%;
+  /*
+    Surfaces and fills that a colour literal used to stand in for.
+
+    Each of these replaced a `text-white` or a `bg-black/20` somewhere in the
+    portal, and each exists to record which of two different things that
+    literal meant. `--raise` and `--well` are *relative to the ground*: a
+    panel lifted off it and a panel sunk into it, which on ink means a white
+    wash and a black one and on limestone means the opposite of neither —
+    both are walnut, at different strengths. They have to flip.
+
+    `--gold-foreground` and `--on-fill` do not flip, and that is the point.
+    Gold is `39 48% 56%` in both themes; text on it is white in both. Writing
+    that as `text-white` made a fixed pairing look like a theme assumption,
+    and the audit could not tell the two apart. Now the name says which it is.
+  */
+  --raise: 28 14% 20% / 0.030;
+  --raise-hover: 28 14% 20% / 0.052;
+  /* An inner control hovering on top of a surface that already carries
+     `--raise`, rather than on the bare ground. Additive, so half. */
+  --raise-hover-soft: 28 14% 20% / 0.026;
+  --well: 28 14% 20% / 0.048;
+  --hairline: 28 14% 20% / 0.10;
+  /* Walnut, not black. A pure-black scrim on parchment reads as a hole. */
+  --scrim: 28 14% 22% / 0.55;
+
+  /* Fixed in both atmospheres — see above. */
+  --gold-foreground: 0 0% 100%;
+  --on-fill: 0 0% 100%;
+  /*
+    A photograph or a video letterboxed for viewing.
+
+    Every viewer on every platform does this against black, in daylight as
+    much as at night, because the ground is there to disappear rather than to
+    belong to the app. Not a theme leak; a different surface.
+  */
+  --media-ground: 0 0% 0%;
+
   --element-earth: 39 48% 56%;
   --element-metal: 40 8% 62%;
   --element-water: 210 22% 38%;
@@ -209,6 +246,22 @@
   --gold: 39 48% 56%;
   --gold-light: 42 70% 76%;
   --gold-dark: 42 38% 47%;
+
+  /*
+    Lifted and sunk, at night.
+
+    These are the values the literals they replaced already had, to the
+    hundredth — `bg-white/[0.03]`, `hover:bg-white/[0.04]`, `bg-black/20`,
+    `border-white/10`, `bg-black/80`. Dark is meant to be pixel-identical
+    across this migration, so nothing here is an improvement on what was
+    there; it is the same number with a name.
+  */
+  --raise: 0 0% 100% / 0.03;
+  --raise-hover: 0 0% 100% / 0.04;
+  --raise-hover-soft: 0 0% 100% / 0.02;
+  --well: 0 0% 0% / 0.20;
+  --hairline: 0 0% 100% / 0.10;
+  --scrim: 0 0% 0% / 0.80;
 }
 
 /*
@@ -388,6 +441,36 @@
   }
   .shadow-gold-strong {
     box-shadow: 0px 6px 24px hsl(var(--gold) / 0.35);
+  }
+
+  /*
+    The five that replaced the literals.
+
+    Hand-written rather than palette entries because the alpha lives inside
+    the token — `--raise` is `0 0% 100% / 0.03`, not a colour plus a
+    modifier — which is what lets one name mean "lifted off the ground"
+    across two grounds that lift in opposite directions.
+  */
+  .bg-raise {
+    background-color: hsl(var(--raise));
+  }
+  .bg-raise-hover:hover {
+    background-color: hsl(var(--raise-hover));
+  }
+  .bg-well {
+    background-color: hsl(var(--well));
+  }
+  .bg-scrim {
+    background-color: hsl(var(--scrim));
+  }
+  .border-hairline {
+    border-color: hsl(var(--hairline));
+  }
+  .after-hairline::after {
+    border-color: hsl(var(--hairline));
+  }
+  .bg-raise-hover-soft:hover {
+    background-color: hsl(var(--raise-hover-soft));
   }
 
   /*

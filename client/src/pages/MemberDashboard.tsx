@@ -114,7 +114,7 @@ function tierColor(tier: string) {
   switch (tier) {
     case "essential": return "bg-muted text-muted-foreground";
     case "premium": return "bg-gold/15 text-gold-foreground";
-    case "elite": return "bg-gold text-white";
+    case "elite": return "bg-gold text-gold-foreground";
     default: return "";
   }
 }
@@ -122,7 +122,7 @@ function tierColor(tier: string) {
 function statusBadge(status: string) {
   switch (status) {
     case "requested": return <Badge variant="outline" className="gap-1"><Clock className="w-3 h-3" /> Pending Review</Badge>;
-    case "confirmed": return <Badge className="gap-1 bg-emerald-600 text-white"><Check className="w-3 h-3" /> Confirmed</Badge>;
+    case "confirmed": return <Badge className="gap-1 bg-emerald-600 text-onfill"><Check className="w-3 h-3" /> Confirmed</Badge>;
     case "completed": return <Badge variant="secondary" className="gap-1"><Star className="w-3 h-3" /> Completed</Badge>;
     case "cancelled": return <Badge variant="destructive" className="gap-1">Cancelled</Badge>;
     default: return <Badge variant="outline">{status}</Badge>;
@@ -875,7 +875,7 @@ export default function MemberDashboard() {
                   >
                     <ArrowRight className="w-4 h-4 mr-1 rotate-180" /> Change experience
                   </Button>
-                  <Badge className={retreatType === "private" ? "bg-gold text-white" : "bg-gold/15 text-gold-foreground"}>
+                  <Badge className={retreatType === "private" ? "bg-gold text-gold-foreground" : "bg-gold/15 text-gold-foreground"}>
                     {retreatType === "private" ? "Private Retreat" : "Shared Retreat"}
                   </Badge>
                 </div>
@@ -1017,7 +1017,7 @@ export default function MemberDashboard() {
                   </div>
                   <Button
                     onClick={() => setShowBookingDialog(true)}
-                    className="bg-gold border-gold-border text-white"
+                    className="bg-gold border-gold-border text-gold-foreground"
                     disabled={!preferredStartDate}
                     data-testid="button-review-booking"
                   >
@@ -1208,7 +1208,7 @@ export default function MemberDashboard() {
             <Button
               onClick={handleSubmitBooking}
               disabled={createBookingMutation.isPending}
-              className="w-full bg-gold border-gold-border text-white"
+              className="w-full bg-gold border-gold-border text-gold-foreground"
               data-testid="button-submit-booking"
             >
               {createBookingMutation.isPending ? "Submitting..." : "Submit Retreat Request"}

@@ -162,13 +162,13 @@ function Lightbox({ a, onClose }: { a: Attachment; onClose: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-media/90 flex items-center justify-center p-4"
       onClick={onClose}
       data-testid="attachment-lightbox"
     >
       <button
         onClick={onClose}
-        className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors p-2"
+        className="absolute top-4 right-4 text-onfill/70 hover:text-onfill transition-colors p-2"
         aria-label="Close"
       >
         <X className="h-5 w-5" />

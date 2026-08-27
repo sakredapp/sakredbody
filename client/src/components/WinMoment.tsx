@@ -117,8 +117,8 @@ export function WinMoment({ wins, onClose }: { wins: Win[]; onClose: () => void 
               transition={{ duration: 0.6, delay: 0.2 }}
               className="h-px bg-[hsl(var(--gold))] mb-3"
             />
-            <h2 className="font-display text-2xl leading-tight text-white">{win.title}</h2>
-            {win.subtitle && <p className="text-sm text-white/70 mt-1">{win.subtitle}</p>}
+            <h2 className="font-display text-2xl leading-tight text-[hsl(var(--ink-foreground))]">{win.title}</h2>
+            {win.subtitle && <p className="text-sm text-[hsl(var(--ink-foreground)/0.7)] mt-1">{win.subtitle}</p>}
           </motion.div>
         </div>
 
@@ -127,7 +127,7 @@ export function WinMoment({ wins, onClose }: { wins: Win[]; onClose: () => void 
             <Button
               onClick={() => share.mutate()}
               disabled={share.isPending || !!win.sharedAt}
-              className="flex-1 bg-gold border-gold-border text-white"
+              className="flex-1 bg-gold border-gold-border text-gold-foreground"
               data-testid="button-moment-share"
             >
               <Share2 className="h-4 w-4 mr-1.5" />

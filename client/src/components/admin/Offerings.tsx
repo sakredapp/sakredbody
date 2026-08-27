@@ -359,7 +359,7 @@ function Editor({
         <Button
           onClick={() => save.mutate()}
           disabled={!d.name.trim() || !d.slug.trim() || save.isPending}
-          className="bg-gold border-gold-border text-white"
+          className="bg-gold border-gold-border text-gold-foreground"
           data-testid="button-save-offering"
         >
           {isNew ? "Create" : "Save"}

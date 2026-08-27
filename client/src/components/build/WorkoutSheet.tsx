@@ -1101,7 +1101,7 @@ function Sheet() {
 
         <div className="shrink-0 px-4 py-3 pb-safe border-t border-border/40 space-y-2">
           <Button
-            className="w-full bg-gold border-gold-border text-white"
+            className="w-full bg-gold border-gold-border text-gold-foreground"
             disabled={observe.isPending || finish.isPending}
             onClick={async () => {
               /**
@@ -1221,7 +1221,7 @@ function Sheet() {
           {/* Opens the response loop rather than committing. See `reviewing`. */}
           <Button
             size="sm"
-            className="bg-gold border-gold-border text-white"
+            className="bg-gold border-gold-border text-gold-foreground"
             onClick={() => setReviewing(true)}
             disabled={total === 0 || finish.isPending}
             data-testid="finish-workout"

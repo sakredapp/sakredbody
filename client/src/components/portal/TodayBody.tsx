@@ -137,7 +137,7 @@ function TerrainNow() {
   if (!data || data.lean === "unknown") return null;
 
   return (
-    <div className="rounded-xl border border-[hsl(var(--gold))]/12 bg-white/[0.03] p-4">
+    <div className="rounded-xl border border-[hsl(var(--gold))]/12 bg-raise p-4">
       <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Terrain now</p>
       <p className="font-display text-base leading-snug mt-1.5">{data.headline}</p>
       {data.reasons.length > 0 && (

@@ -141,7 +141,7 @@ export function ReportDialog({
           <Button
             onClick={() => report.mutate()}
             disabled={!reason || report.isPending}
-            className="w-full bg-gold border-gold-border text-white"
+            className="w-full bg-gold border-gold-border text-gold-foreground"
             data-testid="button-submit-report"
           >
             {report.isPending ? (

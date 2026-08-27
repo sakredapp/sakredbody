@@ -307,7 +307,7 @@ export function MovementPicker({
                 <li key={m.id}>
                   <button
                     onClick={() => onPick(m)}
-                    className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left tap-clean hover:bg-white/[0.04] transition-colors"
+                    className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left tap-clean bg-raise-hover transition-colors"
                     data-testid={`movement-${m.id}`}
                   >
                     <div className="min-w-0 flex-1">

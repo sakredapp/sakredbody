@@ -158,7 +158,7 @@ function TheirRhythm({ subject }: { subject: RhythmSubjectView }) {
 
   return (
     <div
-      className="rounded-xl border border-[hsl(var(--gold))]/12 bg-white/[0.03] p-4 space-y-3"
+      className="rounded-xl border border-[hsl(var(--gold))]/12 bg-raise p-4 space-y-3"
       data-testid={`rhythm-partner-${subject.id}`}
     >
       <div className="flex items-baseline justify-between gap-2">
@@ -240,7 +240,7 @@ function MyRhythm({ subject }: { subject: RhythmSubjectView }) {
 
   return (
     <div
-      className="rounded-xl border border-[hsl(var(--gold))]/12 bg-white/[0.03] p-4 space-y-3"
+      className="rounded-xl border border-[hsl(var(--gold))]/12 bg-raise p-4 space-y-3"
       data-testid="rhythm-self"
     >
       <div className="flex items-baseline justify-between gap-2">
