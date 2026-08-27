@@ -1,10 +1,37 @@
+import { humanError } from "@shared/models/labels";
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { apiFetch } from "./apiFetch";
+
+/**
+ * A failed request, as something a member can be shown.
+ *
+ * `message` is already the member-facing sentence, because that is what every
+ * `toast({ title: e.message })` in the product renders — and there are many.
+ * Making the boundary safe here is the only version of this fix that does not
+ * depend on finding all of them.
+ *
+ * The server's own words are kept on `serverMessage` for logs and for
+ * `humanError` to reconsider. They are never the default.
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly serverMessage: string;
+
+  constructor(status: number, serverMessage: string) {
+    super(humanError({ status, serverMessage }));
+    this.name = "ApiError";
+    this.status = status;
+    this.serverMessage = serverMessage;
+  }
+}
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    /* Logged raw, shown human. A phone rendered {"message":"Unauthorized"}
+       in a banner because those used to be the same string. */
+    console.warn(`[api] ${res.status} ${res.url}: ${text.slice(0, 400)}`);
+    throw new ApiError(res.status, text);
   }
 }
 

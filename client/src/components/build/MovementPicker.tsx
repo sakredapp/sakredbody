@@ -52,6 +52,8 @@ export type Movement = {
   trackingType: "reps" | "duration" | "distance";
   takesLoad: boolean;
   unilateral: boolean;
+  /** "total" | "per_limb" — what the number in the weight box means. */
+  loadEntry: string;
   aliases: string[] | null;
   ownerUserId: string | null;
 };

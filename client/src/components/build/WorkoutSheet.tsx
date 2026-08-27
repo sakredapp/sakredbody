@@ -76,6 +76,7 @@ import {
   referenceNote,
   SET_STYLES,
   SET_STYLE_LABEL,
+  SET_STYLE_MEANING,
   type SetStyle,
   type WeightUnit,
 } from "@shared/schema";
@@ -99,6 +100,7 @@ import { Input } from "@/components/ui/input";
 import { MovementPicker, type Movement } from "./MovementPicker";
 import { NewMovement } from "./NewMovement";
 import { ObservationForm, observationSummary, type Observation } from "./Observation";
+import { loadEntryLabel } from "@shared/models/training";
 import { MovementMemory, MEMORY_KEY } from "./TrainingMemory";
 import { cn } from "@/lib/utils";
 
@@ -170,6 +172,7 @@ function movementOf(s: LoggedSet): Movement {
     trackingType: s.trackingType,
     takesLoad: s.takesLoad,
     unilateral: s.unilateral,
+    loadEntry: s.loadEntry ?? "total",
     aliases: null,
     ownerUserId: null,
   };
@@ -185,6 +188,7 @@ function movementFrom(m: SessionMovement): Movement {
     trackingType: m.trackingType,
     takesLoad: m.takesLoad,
     unilateral: m.unilateral,
+    loadEntry: m.loadEntry ?? "total",
     aliases: null,
     ownerUserId: null,
   };
@@ -312,15 +316,41 @@ function SetRow({
       <span className="text-[11px] text-muted-foreground w-4 shrink-0">{index}</span>
 
       {m.takesLoad && (
-        <Input
-          type="number"
-          inputMode="decimal"
-          placeholder={unit}
-          value={d.weight}
-          onChange={(e) => onChange({ weight: e.target.value })}
-          className="h-10"
-          aria-label={`Weight, set ${index}`}
-        />
+        /*
+          The unit used to be the placeholder, so it vanished the moment
+          anybody typed. A phone showed "Dumbbell Bench Press · 70 · reps" —
+          no unit, and nothing to say whether 70 was in each hand or
+          altogether, which are a factor of two apart in every number the
+          product derives from it.
+
+          A suffix rather than a second control row: this sits in a scrolling
+          list of sets, and the answer is the same for every one of them.
+        */
+        <div className="relative flex-1">
+          <Input
+            type="number"
+            inputMode="decimal"
+            placeholder={unit}
+            value={d.weight}
+            onChange={(e) => onChange({ weight: e.target.value })}
+            className="h-10 pr-14"
+            aria-label={`Weight, set ${index}, in ${unit}${
+              m.loadEntry === "per_limb" ? ` ${loadEntryLabel(m.loadEntry, m.unilateral)}` : ""
+            }`}
+          />
+          <span
+            className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] leading-tight text-muted-foreground/70 text-right"
+            data-testid={`load-entry-${m.id}`}
+          >
+            {unit}
+            {m.loadEntry === "per_limb" && (
+              <>
+                <br />
+                {loadEntryLabel(m.loadEntry, m.unilateral)}
+              </>
+            )}
+          </span>
+        </div>
       )}
 
       {duration ? (
@@ -459,6 +489,20 @@ function SetMeta({
               {SET_STYLE_LABEL[style]}
             </button>
           ))}
+          {/*
+            One line, under the chips, for the type currently chosen.
+
+            "I don't know what a back-off set is" — from a member using the
+            app. Four permanent explanations would be a textbook in a sheet
+            that already scrolls; one, about the thing they have their finger
+            on, is enough to make the choice meaningful.
+          */}
+          <p
+            className="w-full pt-0.5 text-[11px] leading-snug text-muted-foreground/80"
+            data-testid={`${testId}-style-meaning`}
+          >
+            {SET_STYLE_MEANING[d.style]}
+          </p>
         </div>
       )}
 
@@ -511,6 +555,21 @@ function SetMeta({
               answers the label's question rather than restating it. */}
           {d.toFailure ? "Yes" : "No"}
         </button>
+        {/*
+          Said once, when they say yes. "To failure" is the same class of
+          assumed vocabulary as "back-off" — a member who has never lifted in
+          a gym has no way to know whether it means the last rep they managed
+          or the one they didn't. Shown only on Yes, so the row stays a row
+          for everybody who already knows.
+        */}
+        {d.toFailure && (
+          <span
+            className="ml-2 text-[11px] text-muted-foreground/80"
+            data-testid={`${testId}-failure-meaning`}
+          >
+            You couldn't have done another clean rep.
+          </span>
+        )}
       </Detail>
     </div>
   );

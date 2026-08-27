@@ -44,6 +44,8 @@ export type SessionMovement = {
   trackingType: string;
   takesLoad: boolean;
   unilateral: boolean;
+  /** What the number in the weight box means. See exercises.loadEntry. */
+  loadEntry: string;
   position: number;
   supersetGroup: string | null;
   habitExerciseId: string | null;
@@ -92,6 +94,7 @@ export async function compositionFor(sessionId: string): Promise<SessionMovement
       trackingType: exercises.trackingType,
       takesLoad: exercises.takesLoad,
       unilateral: exercises.unilateral,
+      loadEntry: exercises.loadEntry,
       position: sessionExercises.position,
       supersetGroup: sessionExercises.supersetGroup,
       habitExerciseId: sessionExercises.habitExerciseId,

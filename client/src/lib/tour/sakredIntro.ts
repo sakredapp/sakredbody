@@ -188,7 +188,10 @@ export const SAKRED_INTRO: GuidedTour = {
       anchor: "workout-set-row",
       title: "Weight and reps",
       body:
-        "This is the whole of it. Tap a finished set later if you need to correct it.",
+        "This is the whole of it. Tap a finished set later if you need to correct it." +
+        "\n\nThe weight box says what it wants: for dumbbells it reads \"each\", " +
+        "because 70 in each hand and 70 altogether are different sessions. You can " +
+        "change how a movement is read from its ••• menu.",
       advance: { kind: "continue" },
     },
     {
@@ -213,7 +216,8 @@ export const SAKRED_INTRO: GuidedTour = {
       title: "When a set isn't a normal set",
       body:
         "Warm-up, drop, back-off, taken to failure — mark it when it matters, ignore " +
-        "it when it doesn't.",
+        "it when it doesn't.\n\nEach one says what it means when you pick it, so " +
+        "there's nothing here you're expected to already know.",
       advance: { kind: "continue" },
     },
     {

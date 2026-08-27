@@ -118,6 +118,30 @@ export const exercises = pgTable(
     unilateral: boolean("unilateral").notNull().default(false),
 
     /**
+     * What the number in the weight box means.
+     *
+     * ── Why this is not `unilateral` ─────────────────────────────────────
+     *
+     * They look like the same question and are not. `unilateral` is how the
+     * movement is *performed* — one side at a time, or both together. This is
+     * what the member is *entering*. All four combinations are real:
+     *
+     *   dumbbell bench      both arms at once   70 means 70 in each hand
+     *   barbell bench       both arms at once   225 means 225 altogether
+     *   one-arm pushdown    one side at a time  30 means 30 on that side
+     *   machine chest press both arms at once   90 means 90 on the stack
+     *
+     * A phone showed "Dumbbell Bench Press · 70 · reps" with no unit and no
+     * indication of which of those it was, and 70 per hand and 70 total are a
+     * factor of two apart in every derived number the product has.
+     *
+     * Collapsing the two into one boolean gets the third row wrong: a
+     * one-arm movement entered per side must not also be doubled for having
+     * two sides. See `setVolumeKg`, where that is the whole difficulty.
+     */
+    loadEntry: text("load_entry").notNull().default("total"),
+
+    /**
      * What a set of this is measured in: reps, duration or distance.
      *
      * The column exists because a plank has no reps and a carry has no reps,
@@ -1162,6 +1186,34 @@ export type SessionExercise = typeof sessionExercises.$inferSelect;
  * weigh" a question with a structural answer, and every average in the product
  * would have had to learn to skip a row that measures nothing.
  */
+/**
+ * What the weight box means for a movement. See `exercises.loadEntry`.
+ *
+ * Two values, not three: "per side" and "per hand" are the same fact about
+ * the number, and which word to show depends on the movement rather than on
+ * the data. `loadEntryLabel` picks the wording.
+ */
+export const LOAD_ENTRIES = ["total", "per_limb"] as const;
+export type LoadEntry = (typeof LOAD_ENTRIES)[number];
+
+/** What a member calls it, given how the movement is performed. */
+export function loadEntryLabel(entry: string, unilateral: boolean): string {
+  if (entry !== "per_limb") return "total";
+  return unilateral ? "per side" : "each";
+}
+
+/**
+ * What the catalogue should assume before anybody says otherwise.
+ *
+ * A default, never a conclusion — the column is what counts, and a member can
+ * change it on any movement. Dumbbells are the one piece of equipment whose
+ * number is conventionally per hand; a barbell, a stack and a band are all
+ * read as one load.
+ */
+export function defaultLoadEntry(equipment: string): LoadEntry {
+  return equipment === "dumbbell" || equipment === "kettlebell" ? "per_limb" : "total";
+}
+
 export const SET_STYLES = ["normal", "warmup", "dropset", "backoff"] as const;
 export type SetStyle = (typeof SET_STYLES)[number];
 
@@ -1170,6 +1222,25 @@ export const SET_STYLE_LABEL: Record<SetStyle, string> = {
   warmup: "Warm-up",
   dropset: "Drop set",
   backoff: "Back-off",
+};
+
+/**
+ * One line each, for somebody who has never been told.
+ *
+ * "I don't know what a back-off set is" — from a member, using the app. The
+ * label was correct and meant nothing, which is a discoverability failure
+ * rather than a wording one: strength-training vocabulary is not general
+ * knowledge, and a selector that assumes it excludes exactly the people this
+ * product is for.
+ *
+ * A sentence, not a textbook. It appears under the chosen type; nobody has to
+ * read four of them to pick one.
+ */
+export const SET_STYLE_MEANING: Record<SetStyle, string> = {
+  normal: "Your normal training set.",
+  warmup: "A lighter set to prepare. Not counted toward your totals.",
+  dropset: "Drop the weight and keep going, straight after a hard set.",
+  backoff: "A lighter set after your heavy ones, to add volume without the strain.",
 };
 
 export const workoutSets = pgTable(
@@ -1450,6 +1521,98 @@ export function volumeKg(reps: number, loadKg: number): number {
   return reps * loadKg;
 }
 
+/**
+ * How the entered number becomes the load that was actually in the member's
+ * hands, and how many times the set was performed.
+ *
+ * ── The trap ─────────────────────────────────────────────────────────────
+ *
+ * There are two reasons a set can be worth twice its entered number, and
+ * applying both is the defect this function exists to prevent:
+ *
+ *   dumbbell bench, 70 each, 8 reps
+ *     Both hands move at once. 140 kg is in the air. One set of 8.
+ *     → limbs 2, performances 1
+ *
+ *   one-arm pushdown, 30 per side, 10 reps
+ *     One hand moves. 30 kg is in the air. The set is done twice, once a side.
+ *     → limbs 1, performances 2
+ *
+ * Both come to twice the naive number, by different routes, and a version
+ * that multiplied by `per_limb` *and* by `unilateral` would quadruple the
+ * second one. So the rule: a movement performed one side at a time never has
+ * two limbs loaded, whatever the entry mode says — the entry mode is telling
+ * us about that one side.
+ */
+export function loadShape(
+  loadEntry: string,
+  unilateral: boolean,
+): { limbs: number; performances: number } {
+  if (unilateral) return { limbs: 1, performances: 2 };
+  return { limbs: loadEntry === "per_limb" ? 2 : 1, performances: 1 };
+}
+
+/**
+ * The external load actually moved, from the number the member typed.
+ *
+ * Bodyweight is deliberately not here. It is added per performance in
+ * `setVolumeKg`, because a member's body does not double when they hold two
+ * dumbbells.
+ */
+export function externalLoadKg(
+  enteredKg: number,
+  loadEntry: string,
+  unilateral: boolean,
+): number {
+  if (!Number.isFinite(enteredKg) || enteredKg <= 0) return 0;
+  return enteredKg * loadShape(loadEntry, unilateral).limbs;
+}
+
+/**
+ * What one recorded set contributed, in kilograms moved.
+ *
+ * This is the number behind "5,361 kg moved" on a Room card, and it was wrong
+ * before this existed: a dumbbell set entered per hand counted half of what
+ * happened, and a one-sided set counted half of its two sides.
+ */
+export function setVolumeKg(input: {
+  reps: number | null;
+  enteredKg: number;
+  loadEntry: string;
+  unilateral: boolean;
+  bodyweightFactor: number;
+  bodyweightKg: number | null;
+}): number {
+  const reps = input.reps ?? 0;
+  if (reps <= 0) return 0;
+  const { limbs, performances } = loadShape(input.loadEntry, input.unilateral);
+  const external = Math.max(0, input.enteredKg) * limbs;
+  const fromBody =
+    input.bodyweightFactor > 0 && input.bodyweightKg
+      ? input.bodyweightFactor * input.bodyweightKg
+      : 0;
+  return reps * performances * (external + fromBody);
+}
+
+/**
+ * The number, said the way the member entered it.
+ *
+ * History and the Room show what they typed — "70 each" — rather than the
+ * normalised 140, because silently rewriting somebody's log into a number
+ * they never entered is how a record stops being theirs. The normalised value
+ * is for arithmetic; this is for reading.
+ */
+export function enteredLoadLabel(
+  entered: number,
+  unit: string,
+  loadEntry: string,
+  unilateral: boolean,
+): string {
+  const rounded = Math.round(entered * 10) / 10;
+  const qualifier = loadEntry === "per_limb" ? ` ${loadEntryLabel(loadEntry, unilateral)}` : "";
+  return `${rounded} ${unit}${qualifier}`;
+}
+
 // ─── Reading a session back ────────────────────────────────────────────────
 
 /**
@@ -1462,8 +1625,13 @@ export type LoggedSet = {
   trackingType: string;
   reps: number | null;
   durationSeconds: number | null;
+  /** As the member entered it — see `loadEntry` for what it means. */
   weight: number | null;
   isWarmup: boolean;
+  /** "total" | "per_limb". Optional so an older server still parses. */
+  loadEntry?: string;
+  unilateral?: boolean;
+  takesLoad?: boolean;
 };
 
 /**

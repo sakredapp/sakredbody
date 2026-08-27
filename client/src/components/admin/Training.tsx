@@ -551,6 +551,7 @@ function Catalogue() {
     category: "full_body",
     takesLoad: true,
     unilateral: false,
+    loadEntry: "total",
   });
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -582,6 +583,7 @@ function Catalogue() {
         category: "full_body",
         takesLoad: true,
         unilateral: false,
+    loadEntry: "total",
       });
       setCreating(false);
       toast({ title: "Movement added" });
@@ -712,6 +714,27 @@ function Catalogue() {
                 <SelectContent>
                   <SelectItem value="no">No</SelectItem>
                   <SelectItem value="yes">Yes</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              {/*
+                What the weight box means, which is not the same question as
+                the one above it. "One side at a time" is how the movement is
+                performed; this is how the number is read. A dumbbell bench is
+                performed with both arms and entered per hand.
+              */}
+              <Label className="text-xs">Weight entered as</Label>
+              <Select
+                value={draft.loadEntry ?? "total"}
+                onValueChange={(v) => setDraft({ ...draft, loadEntry: v })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="total">Altogether</SelectItem>
+                  <SelectItem value="per_limb">
+                    {draft.unilateral ? "Per side" : "Each hand"}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>

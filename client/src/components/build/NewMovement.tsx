@@ -31,8 +31,9 @@
  * Everything else the row needs has a defensible default and is not asked.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { EXERCISE_CATEGORIES, EXERCISE_GROUPS } from "@shared/schema";
+import { defaultLoadEntry } from "@shared/models/training";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -60,6 +61,7 @@ export type NewMovementInput = {
   name: string;
   category: string;
   equipment: string;
+  loadEntry: string;
   trackingType: "reps" | "duration" | "distance";
   takesLoad: boolean;
   unilateral: boolean;
@@ -109,6 +111,17 @@ export function NewMovement({
   const [equipment, setEquipment] = useState<string>("dumbbell");
   const [counts, setCounts] = useState<(typeof COUNTS)[number]["id"]>("load_reps");
   const [unilateral, setUnilateral] = useState(false);
+  /*
+    Defaulted from the equipment and then left alone. `touched` is what stops
+    the default from undoing a member's own answer when they go back and
+    change the equipment afterwards — a default that overwrites a choice is
+    not a default.
+  */
+  const [loadEntry, setLoadEntry] = useState<string>(() => defaultLoadEntry("dumbbell"));
+  const [loadTouched, setLoadTouched] = useState(false);
+  useEffect(() => {
+    if (!loadTouched) setLoadEntry(defaultLoadEntry(equipment));
+  }, [equipment, loadTouched]);
 
   /**
    * Categories are shown a group at a time. Forty chips in a row is a list to
@@ -206,6 +219,40 @@ export function NewMovement({
             </Chip>
           </div>
         </div>
+
+        {/*
+          A different question from the one above, and asked only when there
+          is a weight to be ambiguous about.
+
+          "One side at a time" is how the movement is performed. This is what
+          the number means. Both are real and they are not the same: a
+          dumbbell bench is performed with both arms and entered per hand, a
+          barbell bench is performed with both arms and entered altogether.
+          Seventy in each hand and seventy in total are a factor of two apart
+          in every number derived from them.
+        */}
+        {chosen.load && (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              The weight you enter — is that each side, or altogether?
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Chip on={loadEntry === "total"} onClick={() => { setLoadTouched(true); setLoadEntry("total"); }}>
+                Altogether
+              </Chip>
+              <Chip on={loadEntry === "per_limb"} onClick={() => { setLoadTouched(true); setLoadEntry("per_limb"); }}>
+                {unilateral ? "Per side" : "Each hand"}
+              </Chip>
+            </div>
+            <p className="text-[11px] text-muted-foreground/70">
+              {loadEntry === "per_limb"
+                ? unilateral
+                  ? "You'll enter what one side moved."
+                  : "You'll enter what's in one hand — two dumbbells of 70 is 70."
+                : "You'll enter the whole load — a bar, or a stack."}
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="shrink-0 px-4 py-3 pb-safe border-t border-border/40 flex gap-2">
@@ -223,6 +270,9 @@ export function NewMovement({
               trackingType: chosen.tracking,
               takesLoad: chosen.load,
               unilateral,
+              /* Meaningless without a weight, and stored as the safe reading
+                 rather than as whatever the chips last happened to show. */
+              loadEntry: chosen.load ? loadEntry : "total",
             })
           }
           data-testid="new-movement-save"

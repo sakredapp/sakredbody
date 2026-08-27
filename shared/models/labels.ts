@@ -375,6 +375,107 @@ export function humanise(value: string): string {
 }
 
 /**
+ * What a failed request says to the member.
+ *
+ * ── The leak this closes ──────────────────────────────────────────────────
+ *
+ * A phone showed this, in a red banner, over Build:
+ *
+ *     {"message":"Unauthorized"}
+ *
+ * `throwIfResNotOk` threw `new Error(\`${status}: ${body}\`)`, so the raw
+ * response body *was* the error message, and every `toast({ title: e.message })`
+ * in the product — there are many — printed it. Exactly the failure this
+ * module exists for: a machine value with nothing between it and a member.
+ *
+ * ── Why the server's own words are sometimes kept ─────────────────────────
+ *
+ * Some of them are written for people — "Could not save health data." —
+ * and throwing those away for a generic sentence would lose real information.
+ * Some of them are HTTP vocabulary: "Unauthorized", "Forbidden", "Not Found".
+ * The test is whether it reads as a sentence somebody wrote: more than one
+ * word, and not one of the status names. Everything else falls back to the
+ * wording for its status, and the raw text stays in the logs.
+ */
+const STATUS_SAYS: Record<number, string> = {
+  400: "That didn't look right. Check it and try again.",
+  401: "Your session needs to be refreshed. Sign in again.",
+  403: "You don't have access to that.",
+  404: "That's no longer here.",
+  409: "That's already been done.",
+  413: "That file is too large.",
+  429: "That's a lot at once. Give it a moment.",
+};
+
+/** HTTP's own vocabulary, which is never member-facing however it arrives. */
+const MACHINE_WORDS = new Set([
+  "unauthorized",
+  "forbidden",
+  "not found",
+  "bad request",
+  "conflict",
+  "internal server error",
+  "service unavailable",
+  "unprocessable entity",
+  "too many requests",
+]);
+
+export function statusSays(status: number): string {
+  if (STATUS_SAYS[status]) return STATUS_SAYS[status];
+  if (status >= 500) return "Something went wrong on our end. Try again.";
+  return "That didn't work. Try again.";
+}
+
+/** Whether a server's `message` is prose a member can be shown. */
+export function readsAsSentence(text: string): boolean {
+  const t = text.trim();
+  if (!t || MACHINE_WORDS.has(t.toLowerCase())) return false;
+  /* One word is a token, not a sentence — and JSON or a stack never is. */
+  if (!/\s/.test(t)) return false;
+  if (/^[[{]/.test(t) || /^\d{3}:/.test(t)) return false;
+  return /^[A-Z]/.test(t);
+}
+
+/**
+ * The member-facing sentence for a thrown request failure.
+ *
+ * `fallback` is what to say when nothing better can be worked out — pass the
+ * one that fits the action, so "That didn't post." beats a general apology.
+ */
+export function humanError(err: unknown, fallback = "That didn't work. Try again."): string {
+  const status =
+    err && typeof err === "object" && "status" in err && typeof err.status === "number"
+      ? err.status
+      : null;
+  const raw =
+    err && typeof err === "object" && "serverMessage" in err && typeof err.serverMessage === "string"
+      ? err.serverMessage
+      : err instanceof Error
+        ? err.message
+        : "";
+
+  /* `401: {"message":"Unauthorized"}` — the shape thrown before this existed. */
+  const stripped = raw.replace(/^\d{3}:\s*/, "").trim();
+  let said = stripped;
+  if (/^[[{]/.test(stripped)) {
+    try {
+      const parsed: unknown = JSON.parse(stripped);
+      said =
+        parsed && typeof parsed === "object" && "message" in parsed &&
+        typeof (parsed as { message: unknown }).message === "string"
+          ? (parsed as { message: string }).message
+          : "";
+    } catch {
+      said = "";
+    }
+  }
+
+  if (readsAsSentence(said)) return said;
+  if (status !== null) return statusSays(status);
+  return fallback;
+}
+
+/**
  * Every finite enum this module is responsible for, for the test that proves
  * none of them can grow a value without wording.
  */

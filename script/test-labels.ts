@@ -30,6 +30,9 @@ import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import {
+  humanError,
+  readsAsSentence,
+  statusSays,
   LABELLED_ENUMS,
   terrainSourceLabel,
   humanise,
@@ -238,6 +241,87 @@ check("…and the two remain distinguishable in both voices",
   const entries = [...src.matchAll(/\{\s*id:\s*"([\w-]+)",\s*label:\s*"([^"]*)"/g)];
   const blank = entries.filter(([, , label]) => !label.trim()).map(([, id]) => id);
   check("every exercise category carries wording", blank.length === 0, blank.join(", "));
+}
+
+/*
+  ── A failed request is a member-facing string too ────────────────────────
+
+  The same defect as `full_body`, one layer further out. A phone showed this
+  in a red banner over Build:
+
+      {"message":"Unauthorized"}
+
+  `throwIfResNotOk` threw `new Error(`${status}: ${body}`)`, so the response
+  body was the error message and every `toast({ title: e.message })` in the
+  product rendered it. These start from that exact string.
+*/
+{
+  const leaked = '401: {"message":"Unauthorized"}';
+  check(
+    "the string a phone actually showed does not survive the boundary",
+    humanError(new Error(leaked)) === "That didn't work. Try again." ||
+      !humanError(new Error(leaked)).includes("{"),
+    humanError(new Error(leaked)),
+  );
+  check(
+    "an ApiError-shaped 401 says what to do about it",
+    humanError({ status: 401, serverMessage: '{"message":"Unauthorized"}' }).includes(
+      "session",
+    ),
+    humanError({ status: 401, serverMessage: '{"message":"Unauthorized"}' }),
+  );
+
+  /* Nothing JSON-shaped, ever, whatever the server sent. */
+  const shapes = [
+    '{"message":"Unauthorized"}',
+    '401: {"message":"Unauthorized"}',
+    '{"errors":[{"path":"weightKg"}]}',
+    "500: <!DOCTYPE html><html>",
+    "",
+  ];
+  const leaks = shapes.filter((raw) => /[{}<>[\]]/.test(humanError(new Error(raw))));
+  check("no server payload shape reaches the member", leaks.length === 0, leaks.join(" | "));
+
+  /*
+    But a sentence somebody wrote for a person is kept. Throwing those away
+    for a generic apology would lose real information — "Could not save health
+    data." says more than "That didn't work."
+  */
+  check(
+    "a sentence written for a person survives",
+    humanError({ status: 500, serverMessage: '{"message":"Could not save health data."}' }) ===
+      "Could not save health data.",
+  );
+  check("and HTTP's own vocabulary does not", !readsAsSentence("Unauthorized"));
+  check("nor does a single word", !readsAsSentence("Nope"));
+  check("nor does anything JSON-shaped", !readsAsSentence('{"message":"x y"}'));
+  check("a real sentence does", readsAsSentence("Could not save health data."));
+
+  /* The caller's own fallback beats a general one when nothing is known. */
+  check(
+    "an unknown failure uses the caller's words",
+    humanError(new Error("network down"), "That didn't post.") === "That didn't post.",
+  );
+  check("every status has wording", [400, 401, 403, 404, 409, 413, 429, 500, 503, 418]
+    .every((s) => statusSays(s).length > 10 && /^[A-Z]/.test(statusSays(s))));
+}
+
+/*
+  And the throw itself has to stay safe. `ApiError.message` is what the
+  hundred existing `toast({ title: e.message })` call sites render, so the
+  boundary only holds while the constructor keeps putting the human sentence
+  there rather than the body.
+*/
+{
+  const client = readFileSync(join(ROOT, "client/src/lib/queryClient.ts"), "utf8");
+  check(
+    "the thrown error's message is the human one",
+    /super\(humanError\(\{ status, serverMessage \}\)\)/.test(client),
+  );
+  check(
+    "and the raw body is kept for the log, not the member",
+    /console\.warn\(/.test(client) && !/new Error\(`\$\{res\.status\}: /.test(client),
+  );
 }
 
 if (failures.length) {

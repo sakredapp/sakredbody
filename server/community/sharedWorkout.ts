@@ -36,7 +36,7 @@
  * exactly what they wrote.
  */
 
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "../db.js";
 import { exercises, sessionExercises, workoutSessions, workoutSets } from "../../shared/schema.js";
 import {
@@ -78,6 +78,18 @@ export async function publishedWorkout(
       exerciseId: sessionExercises.exerciseId,
       supersetGroup: sessionExercises.supersetGroup,
       name: exercises.name,
+      /*
+        Read here because the volume on the card cannot be computed without
+        them, and computing it wrong is worse than not publishing it: the
+        card said "5,361 kg moved" on a session whose dumbbell work was
+        entered per hand and counted once.
+
+        Coalesced because the join is a left one — a movement whose catalogue
+        row has gone leaves nulls, and the safe reading of an unknown movement
+        is one load, both sides, no body.
+      */
+      loadEntry: sql<string>`coalesce(${exercises.loadEntry}, 'total')`,
+      unilateral: sql<boolean>`coalesce(${exercises.unilateral}, false)`,
     })
     .from(sessionExercises)
     .leftJoin(exercises, eq(exercises.id, sessionExercises.exerciseId))

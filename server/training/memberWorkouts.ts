@@ -32,6 +32,7 @@ import {
   modalitiesSchema,
   BUILD_MODALITIES,
 } from "../../shared/schema.js";
+import { LOAD_ENTRIES, defaultLoadEntry } from "../../shared/models/training.js";
 import { track } from "../telemetry/index.js";
 import { catalogueRows, slug, arrayLiteral } from "../../shared/data/exerciseCatalogue.js";
 
@@ -62,6 +63,10 @@ const exerciseInput = z.object({
   trackingType: z.enum(["reps", "duration", "distance"]).optional(),
   takesLoad: z.boolean().optional(),
   unilateral: z.boolean().optional(),
+  /* What the weight box means. Validated rather than trusted: it reaches a
+     CHECK constraint, and a rejected insert is a worse error than a rejected
+     request. */
+  loadEntry: z.enum(LOAD_ENTRIES).optional(),
 });
 
 const workoutInput = z.object({
@@ -119,6 +124,7 @@ export function registerMemberWorkoutRoutes(app: Express): void {
           trackingType: input.trackingType ?? "reps",
           takesLoad: input.takesLoad ?? true,
           unilateral: input.unilateral ?? false,
+          loadEntry: input.loadEntry ?? defaultLoadEntry(input.equipment ?? "other"),
           tracksOneRepMax: false,
           ownerUserId: userId,
           // Behind the catalogue in the picker: theirs is findable by name and
@@ -162,6 +168,7 @@ export function registerMemberWorkoutRoutes(app: Express): void {
           trackingType: exercises.trackingType,
           takesLoad: exercises.takesLoad,
           unilateral: exercises.unilateral,
+          loadEntry: exercises.loadEntry,
           category: exercises.category,
         })
         .from(memberWorkoutExercises)

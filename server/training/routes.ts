@@ -1697,6 +1697,7 @@ export function registerTrainingRoutes(app: Express) {
           trackingType: exercises.trackingType,
           takesLoad: exercises.takesLoad,
           unilateral: exercises.unilateral,
+          loadEntry: exercises.loadEntry,
           setIndex: workoutSets.setIndex,
           reps: workoutSets.reps,
           durationSeconds: workoutSets.durationSeconds,

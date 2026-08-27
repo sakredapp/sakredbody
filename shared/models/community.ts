@@ -34,6 +34,8 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+import { setVolumeKg } from "./training.js";
+
 // ─── 1. TIERS ──────────────────────────────────────────────────────────────
 
 export const membershipTiers = pgTable(
@@ -240,12 +242,23 @@ export type CompositionRow = {
   exerciseId: string;
   supersetGroup: string | null;
   name: string | null;
+  /**
+   * What the weight box meant, and whether the set was done a side at a time.
+   *
+   * Here because the volume on the card cannot be computed without them. It
+   * was `weightKg × reps`, which counts a dumbbell set entered per hand at
+   * half of what happened and a one-sided set at half of its two sides — so
+   * "5,361 kg moved" was published as a fact and was neither.
+   */
+  loadEntry: string;
+  unilateral: boolean;
 };
 
 /** One working set. Weight and reps only — not RPE, failure, or its note. */
 export type SetRow = {
   exerciseId: string;
   reps: number | null;
+  /** As the member entered it. See `loadEntry` on the movement. */
   weightKg: number;
 };
 
@@ -266,6 +279,9 @@ export function summarise(
   sets: readonly SetRow[],
   publishedAt: string,
 ): SharedWorkout {
+  /* How each movement's number is to be read. See CompositionRow. */
+  const shapeOf = new Map(composition.map((c) => [c.exerciseId, c]));
+
   const byMovement = new Map<string, { sets: number; reps: number | null; top: number | null; volume: number }>();
   for (const s of sets) {
     const acc = byMovement.get(s.exerciseId) ?? { sets: 0, reps: null, top: null, volume: 0 };
@@ -273,10 +289,31 @@ export function summarise(
     // The rep count shown is the one performed most recently that had any —
     // a single number on a card, not a claim about every set.
     if (s.reps != null) acc.reps = s.reps;
+    const shape = shapeOf.get(s.exerciseId);
     if (s.weightKg > 0) {
+      /* The top set is what they entered, not the normalised figure — "70"
+         is the number they put on the bar, and rewriting it to 140 on their
+         own card would be the app disagreeing with their memory. */
       acc.top = Math.max(acc.top ?? 0, s.weightKg);
-      acc.volume += s.weightKg * (s.reps ?? 0);
     }
+    acc.volume += setVolumeKg({
+      reps: s.reps,
+      enteredKg: s.weightKg,
+      loadEntry: shape?.loadEntry ?? "total",
+      unilateral: shape?.unilateral ?? false,
+      /*
+        Bodyweight is deliberately not in the card's number, and was not
+        before this change either. `workout_sets` does not carry what the
+        member weighed — it is looked up by date where it is needed — and
+        adding a second correction while fixing the per-limb one would make
+        every published total move for two reasons at once.
+
+        So this fixes what was wrong: a dumbbell set entered per hand counted
+        once, and a one-sided set counted one of its two sides.
+      */
+      bodyweightFactor: 0,
+      bodyweightKg: null,
+    });
     byMovement.set(s.exerciseId, acc);
   }
 

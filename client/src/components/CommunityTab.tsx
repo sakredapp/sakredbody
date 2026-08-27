@@ -53,7 +53,13 @@ import { SectionHeading } from "@/components/portal/Panel";
 import { ReportDialog } from "@/components/ReportDialog";
 import { VoiceRecorderControl, VoiceMemoPlayer } from "@/components/VoiceMemo";
 import { MediaImage } from "@/components/MediaImage";
-import { PhotoAttach, type PhotoAttachment } from "@/components/PhotoAttach";
+import { humanError } from "@shared/models/labels";
+import {
+  PhotoAttach,
+  PhotoDraft,
+  photoPending,
+  type PhotoAttachment,
+} from "@/components/PhotoAttach";
 import { SharedWorkoutCard } from "@/components/SharedWorkoutCard";
 
 /** Kept short deliberately. A long picker turns a reaction into a decision. */
@@ -90,11 +96,20 @@ function Composer({
   initial?: string;
   autoFocus?: boolean;
   pending: boolean;
+  /**
+   * Returning a promise is what lets the draft survive a failed post.
+   *
+   * This used to return void and the composer emptied itself on the next
+   * line, before anything had reached the server — so a post that failed
+   * took the member's words and their photograph with it, and the toast
+   * arrived over an empty box. Callers that resolve are cleared; callers
+   * that reject keep the draft exactly as it was.
+   */
   onSubmit: (
     body: string,
     audio?: { url: string; mime: string; durationSeconds: number },
     imageAssetId?: string | null,
-  ) => void;
+  ) => void | Promise<unknown>;
   onCancel?: () => void;
   /** Off for edits — you can add words to a memo, not re-record it. */
   allowVoice?: boolean;
@@ -118,7 +133,24 @@ function Composer({
     el.style.height = `${Math.min(el.scrollHeight, 320)}px`;
   }, [body]);
 
-  const submit = () => {
+  /*
+    Removing the photo before posting. Revokes the blob URL and lets the
+    attach control reset its file input, so choosing the identical picture
+    again fires a change event — without that, removing and re-picking the
+    same file does nothing at all.
+  */
+  const clearPhoto = () => {
+    if (photo) URL.revokeObjectURL(photo.previewUrl);
+    setPhoto(null);
+  };
+
+  const clearDraft = () => {
+    if (photo) URL.revokeObjectURL(photo.previewUrl);
+    setBody("");
+    setPhoto(null);
+  };
+
+  const submit = async () => {
     const text = body.trim();
     /*
       A photograph is a thing to say. Requiring words alongside it would mean
@@ -126,9 +158,16 @@ function Composer({
       composer refuses to send.
     */
     if ((!text && !photo) || pending) return;
-    onSubmit(text, undefined, photo?.assetId ?? null);
-    setBody("");
-    setPhoto(null);
+    /* Attached but still uploading. Posting now would refer to an asset that
+       does not exist yet; the button says "Attaching…" and waits. */
+    if (photoPending(photo)) return;
+    try {
+      await onSubmit(text, undefined, photo?.assetId ?? null);
+      clearDraft();
+    } catch {
+      /* Kept on purpose. The toast says what went wrong; the draft is still
+         here to try again with. */
+    }
   };
 
   return (
@@ -152,6 +191,22 @@ function Composer({
         className="resize-none min-h-0"
         data-testid="input-community-composer"
       />
+      {/*
+        Inside the draft, under the words, above the buttons.
+
+        It used to be rendered by the button in the action row, which put the
+        member's photograph in the gap between the composer and the feed —
+        floating, square-cropped, and giving no sign that Post would publish
+        it. An attachment belongs visually to the thing that will publish it.
+      */}
+      {photo && (
+        <div className="rounded-lg border border-border/60 bg-raise p-2">
+          <PhotoDraft photo={photo} onRemove={clearPhoto} />
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            {photo.assetId ? "Photo attached" : "Attaching…"}
+          </p>
+        </div>
+      )}
       {/* One action row.
           Record used to sit in its own block underneath, which read as a
           separate feature rather than the other way to say the same thing —
@@ -160,12 +215,22 @@ function Composer({
       <div className="flex items-center gap-2">
         <Button
           size="sm"
-          onClick={submit}
-          disabled={(!body.trim() && !photo) || pending}
+          onClick={() => void submit()}
+          disabled={(!body.trim() && !photo) || pending || photoPending(photo)}
           className="bg-gold border-gold-border text-gold-foreground"
           data-testid="button-community-send"
         >
-          {submitLabel}
+          {/*
+            Named for what it will do. A draft that is only a photograph gives
+            no clue that "Post" publishes the picture — which is exactly what
+            was unclear on a phone: the image sat outside the box, and the
+            button said the same word it says for a sentence.
+          */}
+          {photoPending(photo)
+            ? "Attaching…"
+            : photo && !body.trim()
+              ? "Post photo"
+              : submitLabel}
         </Button>
 
         {/* A memo sends on its own — it does not wait for the text box,
@@ -174,10 +239,13 @@ function Composer({
         {allowVoice && (
           <VoiceRecorderControl
             disabled={pending}
-            onSend={(audio) => {
-              onSubmit(body.trim(), audio, photo?.assetId ?? null);
-              setBody("");
-              setPhoto(null);
+            onSend={async (audio) => {
+              try {
+                await onSubmit(body.trim(), audio, photo?.assetId ?? null);
+                clearDraft();
+              } catch {
+                /* Same as above — a failed memo keeps the draft. */
+              }
             }}
           />
         )}
@@ -189,6 +257,7 @@ function Composer({
             onAttached={setPhoto}
             onCleared={() => setPhoto(null)}
             disabled={pending}
+            preview="none"
           />
         )}
 
@@ -500,9 +569,9 @@ function ThreadNode({
               pending={post.isPending}
               allowVoice
               allowPhoto
-              onSubmit={(body, audio, imageAssetId) => {
-                post.mutate(
-                  {
+              onSubmit={async (body, audio, imageAssetId) => {
+                try {
+                  await post.mutateAsync({
                     channelId,
                     parentId: m.id,
                     body,
@@ -510,9 +579,13 @@ function ThreadNode({
                     audioMime: audio?.mime ?? null,
                     audioDurationSeconds: audio?.durationSeconds ?? null,
                     imageAssetId,
-                  },
-                  { onError: (e) => toast({ title: e.message, variant: "destructive" }) },
-                );
+                  });
+                } catch (e) {
+                  toast({ title: humanError(e, "That reply didn't post."), variant: "destructive" });
+                  throw e;
+                }
+                /* Only once it is actually posted. Closing the reply box on a
+                   failure would take the draft off screen along with it. */
                 setReplying(false);
               }}
               onCancel={() => setReplying(false)}
@@ -634,19 +707,26 @@ function RoomView({
           pending={post.isPending}
           allowVoice
           allowPhoto
-          onSubmit={(body, audio, imageAssetId) =>
-            post.mutate(
-              {
+          /*
+            `mutateAsync`, so a rejection reaches the composer and the draft
+            survives. `mutate` swallows the failure into its own callback, and
+            the composer — having no way to know — emptied itself regardless.
+          */
+          onSubmit={async (body, audio, imageAssetId) => {
+            try {
+              await post.mutateAsync({
                 channelId: channel.id,
                 body,
                 audioUrl: audio?.url ?? null,
                 audioMime: audio?.mime ?? null,
                 audioDurationSeconds: audio?.durationSeconds ?? null,
                 imageAssetId,
-              },
-              { onError: (e) => toast({ title: e.message, variant: "destructive" }) },
-            )
-          }
+              });
+            } catch (e) {
+              toast({ title: humanError(e, "That didn't post."), variant: "destructive" });
+              throw e;
+            }
+          }}
         />
       )}
 

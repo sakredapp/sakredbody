@@ -61,6 +61,8 @@ export type LoggedSet = {
   trackingType: "reps" | "duration" | "distance";
   takesLoad: boolean;
   unilateral: boolean;
+  /** What the number in the weight box means. See exercises.loadEntry. */
+  loadEntry: string;
   setIndex: number;
   reps: number | null;
   durationSeconds: number | null;
@@ -92,6 +94,8 @@ export type SessionMovement = {
   trackingType: "reps" | "duration" | "distance";
   takesLoad: boolean;
   unilateral: boolean;
+  /** What the number in the weight box means. See exercises.loadEntry. */
+  loadEntry: string;
   position: number;
   supersetGroup: string | null;
   habitExerciseId: string | null;
