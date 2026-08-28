@@ -84,11 +84,13 @@ export async function publishedWorkout(
         card said "5,361 kg moved" on a session whose dumbbell work was
         entered per hand and counted once.
 
-        Coalesced because the join is a left one — a movement whose catalogue
-        row has gone leaves nulls, and the safe reading of an unknown movement
-        is one load, both sides, no body.
+        Read from `session_exercises`, which recorded it when the movement
+        entered that workout, and never from the catalogue: a member changing
+        how a movement is entered today must not change the number on a card
+        published in March. Null means the session predates the question, and
+        the card then publishes the total it always published.
       */
-      loadEntry: sql<string>`coalesce(${exercises.loadEntry}, 'total')`,
+      loadEntry: sessionExercises.loadEntry,
       unilateral: sql<boolean>`coalesce(${exercises.unilateral}, false)`,
     })
     .from(sessionExercises)

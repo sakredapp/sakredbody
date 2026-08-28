@@ -211,6 +211,45 @@ const session = { id: "s1", title: "Tuesday", onDate: "2026-08-18", durationMinu
     /jsonb\("shared_workout"\)/.test(model));
 }
 
+// ─── 5. The card publishes what the session meant, not what the catalogue says ──
+
+/*
+  A published card is a snapshot. The volume on it has to be computed from what
+  the numbers meant *in that workout*, and the only place that is recorded is
+  `session_exercises.load_entry`. Joining to `exercises.load_entry` instead
+  would mean a member correcting how a movement is entered next year silently
+  changed the number on a card their friends replied to in March.
+*/
+
+{
+  const dumbbells = [{ exerciseId: "db-bench", supersetGroup: null, name: "Dumbbell Bench" }];
+  const sets = [{ exerciseId: "db-bench", reps: 8, weightKg: 30 }];
+
+  const legacy = summarise(session,
+    dumbbells.map((c) => ({ ...c, loadEntry: null, unilateral: false })), sets, AT);
+  eq("a workout that never recorded what 30 meant publishes what it always did",
+    legacy.volumeKg, 8 * 30);
+
+  const recorded = summarise(session,
+    dumbbells.map((c) => ({ ...c, loadEntry: "per_limb", unilateral: false })), sets, AT);
+  eq("one that recorded 'each' publishes both hands", recorded.volumeKg, 8 * 30 * 2);
+
+  const oneArm = summarise(session,
+    dumbbells.map((c) => ({ ...c, loadEntry: "per_limb", unilateral: true })), sets, AT);
+  eq("and a one-sided one counts its two sides, not four", oneArm.volumeKg, 8 * 30 * 2);
+
+  eq("the top weight stays the number the member entered",
+    recorded.movements[0].topWeightKg, 30);
+}
+
+{
+  const builder = code("server/community/sharedWorkout.ts");
+  check("the card reads the session's own reading",
+    /loadEntry:\s*sessionExercises\.loadEntry/.test(builder));
+  check("and never the catalogue's current setting",
+    !/loadEntry:[^\n]*exercises\.loadEntry/.test(builder));
+}
+
 if (failures.length) {
   console.error("\n✗ room share\n");
   for (const f of failures) console.error(`    ${f}`);

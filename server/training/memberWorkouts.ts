@@ -27,6 +27,9 @@ import {
   exercises,
   memberWorkouts,
   memberWorkoutExercises,
+  sessionExercises,
+  workoutSessions,
+  workoutSets,
   memberBuildProfile,
   exerciseCategoryEnum,
   modalitiesSchema,
@@ -81,6 +84,11 @@ const workoutInput = z.object({
         targetRepsHigh: z.number().int().min(1).max(500).nullable().optional(),
         restSeconds: z.number().int().min(0).max(3600).nullable().optional(),
         note: z.string().max(500).nullable().optional(),
+        /* Movements sharing a key are a superset — the same key
+           `session_exercises` uses. Carried through create and update so that
+           editing a saved workout cannot silently drop the one part of its
+           shape that is not just a list. */
+        supersetGroup: z.string().uuid().nullable().optional(),
       }),
     )
     .max(40, "That's a lot for one session")
@@ -164,6 +172,7 @@ export function registerMemberWorkoutRoutes(app: Express): void {
           targetRepsHigh: memberWorkoutExercises.targetRepsHigh,
           restSeconds: memberWorkoutExercises.restSeconds,
           note: memberWorkoutExercises.note,
+          supersetGroup: memberWorkoutExercises.supersetGroup,
           name: exercises.name,
           trackingType: exercises.trackingType,
           takesLoad: exercises.takesLoad,
@@ -214,10 +223,126 @@ export function registerMemberWorkoutRoutes(app: Express): void {
             targetRepsHigh: e.targetRepsHigh ?? null,
             restSeconds: e.restSeconds ?? null,
             note: e.note ?? null,
+            supersetGroup: e.supersetGroup ?? null,
           })),
         );
       }
 
+      res.status(201).json(workout);
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
+  /**
+   * Keep the workout you just did.
+   *
+   * ── The missing half of the loop ─────────────────────────────────────────
+   *
+   * A member could write a workout in the builder and repeat it. What they
+   * could not do was keep one they had just performed — which is how most
+   * workouts come into existence. They train, it goes well, and the way to
+   * have it again next week was to open a separate screen and type the same
+   * seven movements back in from memory.
+   *
+   * ── What is kept, and what deliberately is not ───────────────────────────
+   *
+   * The structure: the movements, their order, and which of them are a
+   * superset. Not the reps, the loads, the RPE, whether a set went to failure,
+   * or anything said in the note — those are a record of one Tuesday, and
+   * carrying them forward as a plan would put last week's numbers on the
+   * screen dressed as today's.
+   *
+   * `targetSets` is the one number that crosses, and it is a count of the
+   * working sets performed rather than a load: "you did four of these" is a
+   * fair opening plan for doing them again, and it is the number a member
+   * would otherwise have to set by hand for every movement. Warm-ups are not
+   * counted, matching every other derived number in the product.
+   */
+  app.post("/api/training/sessions/:id/save-as-workout", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      const sessionId = param(req, "id");
+      const input = z
+        .object({ name: z.string().trim().min(1, "Give it a name").max(80).optional() })
+        .parse(req.body ?? {});
+
+      // Ownership in the predicate. A session id is a uuid somebody could
+      // guess at, and the answer to somebody else's is that there is no such
+      // session.
+      const [session] = await db
+        .select({ id: workoutSessions.id, title: workoutSessions.title, onDate: workoutSessions.onDate })
+        .from(workoutSessions)
+        .where(and(eq(workoutSessions.id, sessionId), eq(workoutSessions.userId, userId)));
+      if (!session) return res.status(404).json({ message: "No such session" });
+
+      const composition = await db
+        .select({
+          exerciseId: sessionExercises.exerciseId,
+          supersetGroup: sessionExercises.supersetGroup,
+        })
+        .from(sessionExercises)
+        .where(eq(sessionExercises.sessionId, sessionId))
+        .orderBy(asc(sessionExercises.position), asc(sessionExercises.createdAt));
+
+      if (composition.length === 0) {
+        // An imported ride, or a logged practice. There is no structure to
+        // save, and saving an empty template named "Cycling" would be a thing
+        // that looks like a feature and does nothing.
+        return res.status(400).json({ message: "That one has no movements to save." });
+      }
+
+      // Already kept. Answered rather than duplicated: two identical workouts
+      // in the Saved list is worse than being told it is already there.
+      const [existing] = await db
+        .select({ id: memberWorkouts.id, name: memberWorkouts.name })
+        .from(memberWorkouts)
+        .where(
+          and(
+            eq(memberWorkouts.userId, userId),
+            eq(memberWorkouts.sourceSessionId, sessionId),
+            eq(memberWorkouts.isArchived, false),
+          ),
+        );
+      if (existing) return res.status(200).json({ ...existing, alreadySaved: true });
+
+      const performed = await db
+        .select({
+          exerciseId: workoutSets.exerciseId,
+          n: sql<number>`count(*)::int`,
+        })
+        .from(workoutSets)
+        .where(and(eq(workoutSets.sessionId, sessionId), eq(workoutSets.isWarmup, false)))
+        .groupBy(workoutSets.exerciseId);
+      const setsOf = new Map(performed.map((r) => [r.exerciseId, r.n]));
+
+      const name = input.name?.trim() || session.title?.trim() || `Workout — ${session.onDate}`;
+
+      const workout = await db.transaction(async (tx) => {
+        const [created] = await tx
+          .insert(memberWorkouts)
+          .values({ userId, name, sourceSessionId: sessionId })
+          .returning();
+
+        await tx.insert(memberWorkoutExercises).values(
+          composition.map((m, i) => ({
+            memberWorkoutId: created.id,
+            exerciseId: m.exerciseId,
+            orderIndex: i,
+            targetSets: Math.max(1, Math.min(20, setsOf.get(m.exerciseId) ?? 3)),
+            supersetGroup: m.supersetGroup,
+          })),
+        );
+
+        return created;
+      });
+
+      track("training.workout_saved", {
+        userId,
+        surface: "build",
+        subjectId: workout.id,
+        props: { movements: composition.length },
+      });
       res.status(201).json(workout);
     } catch (err) {
       fail(res, err);
@@ -262,11 +387,78 @@ export function registerMemberWorkoutRoutes(app: Express): void {
             targetRepsHigh: e.targetRepsHigh ?? null,
             restSeconds: e.restSeconds ?? null,
             note: e.note ?? null,
+            supersetGroup: e.supersetGroup ?? null,
           })),
         );
       }
 
       res.json({ id });
+    } catch (err) {
+      fail(res, err);
+    }
+  });
+
+  /**
+   * A copy, to change without losing the original.
+   *
+   * The usual reason is a variation: Push Day A becomes Push Day B with one
+   * movement swapped, and editing the original would lose the thing it was a
+   * variation of. Named "… (copy)" rather than asking, because the next thing
+   * anybody does is open it and rename it, and a dialog in front of that is a
+   * step that answers a question nobody had.
+   *
+   * `sourceSessionId` is deliberately not copied. Provenance belongs to the
+   * workout that was actually saved from a session; a copy of it was saved
+   * from a workout.
+   */
+  app.post("/api/training/workouts/:id/duplicate", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session!.userId!;
+      const id = param(req, "id");
+
+      const [original] = await db
+        .select()
+        .from(memberWorkouts)
+        .where(and(eq(memberWorkouts.id, id), eq(memberWorkouts.userId, userId)));
+      if (!original) return res.status(404).json({ message: "No such workout" });
+
+      const items = await db
+        .select()
+        .from(memberWorkoutExercises)
+        .where(eq(memberWorkoutExercises.memberWorkoutId, id))
+        .orderBy(asc(memberWorkoutExercises.orderIndex));
+
+      const copy = await db.transaction(async (tx) => {
+        const [created] = await tx
+          .insert(memberWorkouts)
+          .values({
+            userId,
+            name: `${original.name} (copy)`.slice(0, 80),
+            note: original.note,
+          })
+          .returning();
+
+        if (items.length) {
+          await tx.insert(memberWorkoutExercises).values(
+            items.map((e, i) => ({
+              memberWorkoutId: created.id,
+              exerciseId: e.exerciseId,
+              orderIndex: i,
+              targetSets: e.targetSets,
+              targetRepsLow: e.targetRepsLow,
+              targetRepsHigh: e.targetRepsHigh,
+              targetPercent1rm: e.targetPercent1rm,
+              restSeconds: e.restSeconds,
+              note: e.note,
+              // The pairing is part of the shape, so it comes too.
+              supersetGroup: e.supersetGroup,
+            })),
+          );
+        }
+        return created;
+      });
+
+      res.status(201).json(copy);
     } catch (err) {
       fail(res, err);
     }

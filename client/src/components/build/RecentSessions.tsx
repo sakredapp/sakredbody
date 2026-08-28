@@ -35,7 +35,7 @@
  */
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   isPracticeCategory,
   summariseSession,
@@ -48,6 +48,12 @@ import {
 import type { HealthWorkout } from "@shared/schema";
 import { useHealthSummary } from "@/hooks/use-health";
 import { Panel } from "@/components/portal/Panel";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { startSession } from "@/lib/startSession";
+import { seedOpenWorkout } from "@/hooks/use-open-workout";
+import { useWorkoutSheet } from "./WorkoutSheet";
 import { cn } from "@/lib/utils";
 import { formatLocalDateString, addDaysToString } from "@shared/utils/dates";
 import {
@@ -65,6 +71,16 @@ type Session = {
   title: string | null;
   durationMinutes: number | null;
   finishedAt: string | null;
+  /**
+   * What it was made of, and how much of that is a class rather than a
+   * movement. Optional, because a bundled client meets a server that predates
+   * them — and a missing count means no Repeat offered, which is the safe way
+   * round.
+   */
+  movements?: number;
+  practiceMovements?: number;
+  /** The workout already saved from it, if there is one. */
+  savedWorkoutId?: string | null;
   sets: (LoggedSet & { id: string })[];
 };
 
@@ -77,6 +93,16 @@ type Entry = SummarisableEntry & {
   title: string;
   lines: string[];
   source: string;
+  /**
+   * Whether this one can be done again, and whether it has been kept.
+   *
+   * Absent on everything that has no reusable structure. An imported bike ride
+   * and a logged Pilates class are records of something that happened, not
+   * templates — offering "Repeat workout" on them would mean starting a
+   * session named "Cycling" with nothing in it, which is the same defect that
+   * made saved workouts look broken. See the note in `sessionHistory`.
+   */
+  reusable?: { sessionId: string; savedWorkoutId: string | null };
 };
 
 /** "Today", "Yesterday", then the weekday. Nobody needs a date for this week. */
@@ -255,6 +281,15 @@ export function RecentSessions({
       title: s.title?.trim() || "Training",
       lines: summariseSession(s.sets, data.unit),
       source: "Sakred",
+      /*
+        Structure, not a log. A session whose every movement is a class or a
+        ride was logged rather than composed; one with a movement in it can be
+        done again.
+      */
+      reusable:
+        (s.movements ?? 0) > (s.practiceMovements ?? 0)
+          ? { sessionId: s.id, savedWorkoutId: s.savedWorkoutId ?? null }
+          : undefined,
       // Left to the sets rather than asserted here: a Sakred session can span
       // several categories, and reducing it to one badge would be a claim the
       // data does not support.
@@ -312,6 +347,100 @@ export function RecentSessions({
       open={open}
       onToggle={() => setOpen((v) => !v)}
     />
+  );
+}
+
+/**
+ * Do it again, or keep it.
+ *
+ * ── Two verbs, because they are two different intentions ─────────────────
+ *
+ * "Repeat" is for right now: start a session made of the same movements, in
+ * the same order, with the same supersets, and nothing that was lifted. It
+ * does not go through a save dialog — being made to name and file a template
+ * in order to do yesterday's session again is the sort of ceremony that makes
+ * a feature go unused.
+ *
+ * "Save as workout" is for later, and is offered only while the session has
+ * not already been kept. Once it has, the row says so instead: a second
+ * identical entry in the Saved list is worse than being told it is there.
+ */
+function Again({ entry }: { entry: Entry }) {
+  const { sessionId, savedWorkoutId } = entry.reusable!;
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const { open } = useWorkoutSheet();
+  const [kept, setKept] = useState<string | null>(savedWorkoutId);
+
+  const repeat = useMutation({
+    mutationFn: () => startSession({ repeatSessionId: sessionId }),
+    onSuccess: async (result) => {
+      /*
+        A workout is already running. Not an error — the server is answering
+        correctly — so the member is told and shown the one they have, rather
+        than being handed a failure for asking a reasonable question.
+      */
+      if ("conflict" in result) {
+        toast({ title: "You already have a workout in progress." });
+        open();
+        return;
+      }
+      await seedOpenWorkout(qc, result.started);
+      qc.invalidateQueries({ queryKey: ["/api/training/sessions"] });
+      open();
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const keep = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest(
+        "POST",
+        `/api/training/sessions/${sessionId}/save-as-workout`,
+        {},
+      );
+      return (await res.json()) as { id: string };
+    },
+    onSuccess: (w) => {
+      setKept(w.id);
+      qc.invalidateQueries({ queryKey: ["/api/training/workouts"] });
+      toast({ title: "Saved. It's in Build under Saved." });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <div className="flex items-center gap-3 pt-0.5">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-6 px-0 text-[11px] text-gold hover:bg-transparent"
+        onClick={() => repeat.mutate()}
+        disabled={repeat.isPending}
+        data-testid={`repeat-session-${sessionId}`}
+      >
+        {repeat.isPending ? "Starting…" : "Do it again"}
+      </Button>
+      {kept ? (
+        <span
+          className="text-[11px] text-muted-foreground"
+          data-testid={`session-kept-${sessionId}`}
+        >
+          Saved
+        </span>
+      ) : (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 px-0 text-[11px] text-muted-foreground hover:bg-transparent"
+          onClick={() => keep.mutate()}
+          disabled={keep.isPending}
+          data-testid={`keep-session-${sessionId}`}
+        >
+          {keep.isPending ? "Saving…" : "Save as workout"}
+        </Button>
+      )}
+    </div>
   );
 }
 
@@ -423,6 +552,7 @@ function Sessions({
               explanation instead of a mystery.
             */}
             <p className="text-[10px] text-muted-foreground/70 truncate">{e.source}</p>
+            {e.reusable && <Again entry={e} />}
             {e.placement && (
               <span
                 className={cn(

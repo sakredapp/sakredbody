@@ -61,8 +61,11 @@ export type LoggedSet = {
   trackingType: "reps" | "duration" | "distance";
   takesLoad: boolean;
   unilateral: boolean;
-  /** What the number in the weight box means. See exercises.loadEntry. */
-  loadEntry: string;
+  /**
+   * What the number in the weight box meant in this session. Null when the
+   * workout predates the question — see session_exercises.load_entry.
+   */
+  loadEntry: string | null;
   setIndex: number;
   reps: number | null;
   durationSeconds: number | null;
@@ -94,8 +97,11 @@ export type SessionMovement = {
   trackingType: "reps" | "duration" | "distance";
   takesLoad: boolean;
   unilateral: boolean;
-  /** What the number in the weight box means. See exercises.loadEntry. */
-  loadEntry: string;
+  /**
+   * What the number in the weight box meant in this session. Null when the
+   * workout predates the question — see session_exercises.load_entry.
+   */
+  loadEntry: string | null;
   position: number;
   supersetGroup: string | null;
   habitExerciseId: string | null;
@@ -105,6 +111,13 @@ export type SessionMovement = {
 export type PriorPerformance = {
   exerciseId: string;
   onDate: string;
+  /**
+   * What the numbers below meant in that session. Null — an older server, or a
+   * workout logged before the question existed — reads with no qualifier,
+   * which is how it has always read.
+   */
+  loadEntry?: string | null;
+  unilateral?: boolean;
   sets: {
     reps: number | null;
     durationSeconds: number | null;

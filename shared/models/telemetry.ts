@@ -143,6 +143,14 @@ export const EVENT_NAMES = [
   // prescribed logging actually works.
   "training.session_start",
   "training.session_finish",
+  /**
+   * A workout kept to be done again.
+   *
+   * Separate from finishing because it answers a different question: whether
+   * members write their own programme once they can. Nothing about what was
+   * lifted is recorded here — see the route.
+   */
+  "training.workout_saved",
   /** Put in the room. Deliberate and separate from finishing — see the route. */
   "training.session_shared",
   /** How many kinds of movement somebody says are part of their life. */

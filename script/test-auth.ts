@@ -14,6 +14,14 @@
 import { hashPassword, verifyPassword } from "../server/auth/password.js";
 import { THROTTLE } from "../shared/models/security.js";
 import { isAdult } from "../server/auth/age.js";
+import { readFileSync } from "node:fs";
+
+/** A file with its prose removed, so a comment cannot satisfy a grep for the
+    rule it explains. Same trick as test-media-privacy.ts. */
+const code = (p: string) =>
+  readFileSync(p, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
 
 let passed = 0;
 let failed = 0;
@@ -111,6 +119,65 @@ async function main() {
   check("an impossible date is refused", !isAdult("2008-02-31", now));
   check("a malformed date is refused", !isAdult("09/08/2008", now));
   check("an empty date is refused", !isAdult("", now));
+
+  // ── "I could not check" is not "you are not signed in" ──────────────────
+  console.log("\nA connection that died is not a member who is signed out\n");
+
+  /*
+    The defect: one Vercel function holds a `pg.Pool` across invocations, and
+    between them Supabase's pooler reclaims the seat. `pg` finds out when
+    something tries to use the client, so the first query after an idle stretch
+    throws and the second succeeds on a fresh one. `bearerAuth` swallowed that
+    and fell through unauthenticated, so from a phone it read as "the first tap
+    on Start Session said Unauthorized and the second one worked".
+
+    401 is a claim about the member and the client acts on it. This is a claim
+    about the server. Read from the file rather than remembered, with its prose
+    stripped, because the comment explaining the rule would otherwise satisfy
+    a grep for it — that has happened here before.
+  */
+  const bearer = code("server/auth/bearerAuth.ts");
+
+  check(
+    "a lookup that fails answers 503, not 401",
+    /status\(503\)/.test(bearer),
+  );
+  check(
+    "and never falls through to unauthenticated",
+    !/catch\s*\{\s*\}/.test(bearer),
+    "an empty catch is how a database error became a signed-out member",
+  );
+  check("it says to try again", /Retry-After/.test(bearer));
+  check(
+    "a dead pooled connection is retried once before that",
+    /auth\.token_lookup_retry/.test(bearer),
+  );
+  check(
+    "the failure is logged as an infrastructure event",
+    /auth\.token_lookup_failed/.test(bearer),
+  );
+  check(
+    "a missing token still reaches the ordinary 401",
+    /if \(!row\) return next\(\);/.test(bearer),
+  );
+  check(
+    "and so does an expired one",
+    /expiresAt\.getTime\(\) <= Date\.now\(\)/.test(bearer) &&
+      /\.catch\(\(\) => \{\}\)/.test(bearer),
+    "deleting an expired token must not be able to turn a 401 into a 503",
+  );
+
+  /* The other half of the fix, at the pool: our own idle clients are closed
+     well inside the window in which the pooler reclaims them, so the request
+     after an idle stretch opens a connection rather than finding a dead one. */
+  const dbModule = code("server/db.ts");
+  check("the pool closes its own idle connections", /idleTimeoutMillis/.test(dbModule));
+  check("and keeps the live ones alive", /keepAlive: true/.test(dbModule));
+
+  check(
+    "503 has member-facing wording of its own",
+    /503:/.test(code("shared/models/labels.ts")),
+  );
 
   console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);
   if (failed > 0) process.exit(1);

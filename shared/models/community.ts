@@ -249,8 +249,13 @@ export type CompositionRow = {
    * was `weightKg × reps`, which counts a dumbbell set entered per hand at
    * half of what happened and a one-sided set at half of its two sides — so
    * "5,361 kg moved" was published as a fact and was neither.
+   *
+   * Read from `session_exercises`, not from the catalogue: this is what the
+   * number meant in *that* workout. Null means the session never recorded it,
+   * and the card then publishes the same total it always did rather than a
+   * retroactive guess. See `loadShape`.
    */
-  loadEntry: string;
+  loadEntry: string | null;
   unilateral: boolean;
 };
 
@@ -299,7 +304,7 @@ export function summarise(
     acc.volume += setVolumeKg({
       reps: s.reps,
       enteredKg: s.weightKg,
-      loadEntry: shape?.loadEntry ?? "total",
+      loadEntry: shape?.loadEntry ?? null,
       unilateral: shape?.unilateral ?? false,
       /*
         Bodyweight is deliberately not in the card's number, and was not

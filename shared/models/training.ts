@@ -930,6 +930,17 @@ export const memberWorkouts = pgTable(
     note: text("note"),
     /** Hidden rather than deleted, so past sessions keep their origin. */
     isArchived: boolean("is_archived").notNull().default(false),
+
+    /**
+     * The finished session this was saved from, when it was saved from one.
+     *
+     * Provenance, not a reference: the workout is a copy taken at save time
+     * and editing it does not reach back into the session, exactly as a Room
+     * card does not reach back into the training log. It exists so a session
+     * already saved can stop offering "Save as workout", and so the list can
+     * say where a workout came from.
+     */
+    sourceSessionId: uuid("source_session_id"),
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
@@ -960,6 +971,19 @@ export const memberWorkoutExercises = pgTable(
     targetPercent1rm: real("target_percent_1rm"),
     restSeconds: integer("rest_seconds"),
     note: text("note"),
+
+    /**
+     * Movements sharing a key are performed as a superset, exactly as in
+     * `session_exercises`.
+     *
+     * Without this, saving a workout quietly dropped the one part of its shape
+     * that is not just a list — a member who paired their bench with a fly,
+     * saved it, and started it again the next week got two separate movements
+     * and no indication anything had been lost. A template that cannot hold
+     * the structure is not a template of that workout.
+     */
+    supersetGroup: uuid("superset_group"),
+
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   },
   (t) => [
@@ -1158,6 +1182,35 @@ export const sessionExercises = pgTable(
      */
     supersetGroup: uuid("superset_group"),
 
+    /**
+     * What the weight box meant *in this workout* — copied from
+     * `exercises.load_entry` when the movement entered the session.
+     *
+     * ── Why a snapshot and not a join ────────────────────────────────────
+     *
+     * `exercises.load_entry` is a setting: how this movement should be
+     * entered from now on. If every reader of history joined to it, then
+     * changing that setting today would rewrite what a workout six months ago
+     * is supposed to have weighed. A member correcting the catalogue would be
+     * editing their own past without being told, and the graph they screenshot
+     * in March would not match the graph in April.
+     *
+     * So the interpretation is recorded with the performance. The catalogue
+     * says how to enter tomorrow's numbers; this row says what yesterday's
+     * meant.
+     *
+     * ── Null means we were never told ────────────────────────────────────
+     *
+     * Every row that existed before this column did, and every session logged
+     * by a client that predates it. We cannot know whether that member's "70"
+     * on a dumbbell bench was per hand or altogether — equipment makes one of
+     * them likely and likely is not a record. Null is that admission, and
+     * `loadShape` answers it with exactly the arithmetic the product used at
+     * the time: one load, one performance. No history changes meaning because
+     * this feature shipped.
+     */
+    loadEntry: text("load_entry"),
+
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   },
   (t) => [
@@ -1197,7 +1250,7 @@ export const LOAD_ENTRIES = ["total", "per_limb"] as const;
 export type LoadEntry = (typeof LOAD_ENTRIES)[number];
 
 /** What a member calls it, given how the movement is performed. */
-export function loadEntryLabel(entry: string, unilateral: boolean): string {
+export function loadEntryLabel(entry: string | null | undefined, unilateral: boolean): string {
   if (entry !== "per_limb") return "total";
   return unilateral ? "per side" : "each";
 }
@@ -1545,11 +1598,28 @@ export function volumeKg(reps: number, loadKg: number): number {
  * us about that one side.
  */
 export function loadShape(
-  loadEntry: string,
+  loadEntry: string | null | undefined,
   unilateral: boolean,
 ): { limbs: number; performances: number } {
+  // Never recorded — see `session_exercises.load_entry`. The number is taken
+  // at face value, which is what every version of this product did before the
+  // question was asked, so deploying the question changes no past total.
+  if (loadEntry == null) return LEGACY_SHAPE;
   if (unilateral) return { limbs: 1, performances: 2 };
   return { limbs: loadEntry === "per_limb" ? 2 : 1, performances: 1 };
+}
+
+/**
+ * The arithmetic that applied before anybody was asked what the number meant.
+ *
+ * Verified against the code it replaces rather than remembered: volume was
+ * `reps × weight`, and `unilateral` was a column nothing multiplied by.
+ */
+const LEGACY_SHAPE = { limbs: 1, performances: 1 } as const;
+
+/** Whether this workout recorded what its numbers meant. */
+export function loadEntryKnown(loadEntry: string | null | undefined): boolean {
+  return loadEntry === "total" || loadEntry === "per_limb";
 }
 
 /**
@@ -1561,7 +1631,7 @@ export function loadShape(
  */
 export function externalLoadKg(
   enteredKg: number,
-  loadEntry: string,
+  loadEntry: string | null | undefined,
   unilateral: boolean,
 ): number {
   if (!Number.isFinite(enteredKg) || enteredKg <= 0) return 0;
@@ -1578,7 +1648,8 @@ export function externalLoadKg(
 export function setVolumeKg(input: {
   reps: number | null;
   enteredKg: number;
-  loadEntry: string;
+  /** The session's snapshot. Null is legacy — see `loadShape`. */
+  loadEntry: string | null | undefined;
   unilateral: boolean;
   bodyweightFactor: number;
   bodyweightKg: number | null;
@@ -1605,7 +1676,7 @@ export function setVolumeKg(input: {
 export function enteredLoadLabel(
   entered: number,
   unit: string,
-  loadEntry: string,
+  loadEntry: string | null | undefined,
   unilateral: boolean,
 ): string {
   const rounded = Math.round(entered * 10) / 10;
@@ -1628,8 +1699,11 @@ export type LoggedSet = {
   /** As the member entered it — see `loadEntry` for what it means. */
   weight: number | null;
   isWarmup: boolean;
-  /** "total" | "per_limb". Optional so an older server still parses. */
-  loadEntry?: string;
+  /**
+   * "total" | "per_limb", snapshotted by the session. Null or absent means the
+   * workout never recorded it — see `session_exercises.load_entry`.
+   */
+  loadEntry?: string | null;
   unilateral?: boolean;
   takesLoad?: boolean;
 };
@@ -1680,9 +1754,17 @@ export function summariseSession(sets: LoggedSet[], unit: WeightUnit): string[] 
     const same = reps.every((n) => n === reps[0]);
     const loads = group.map((s) => s.weight ?? 0).filter((n) => n > 0);
     const top = loads.length ? Math.max(...loads) : null;
+    /* A coach reading "@ 70lb" on a dumbbell bench cannot tell 70 in each hand
+       from 70 altogether, and the member's own history has the same problem.
+       Said only where the session recorded it — silence is what a workout from
+       before the question looks like, and it is honest. */
+    const each =
+      first.loadEntry === "per_limb"
+        ? ` ${loadEntryLabel(first.loadEntry, first.unilateral ?? false)}`
+        : "";
     return (
       `${name} — ${group.length} × ${same ? reps[0] : reps.join("/")}` +
-      (top ? ` @ ${top}${unit}` : "")
+      (top ? ` @ ${top}${unit}${each}` : "")
     );
   });
 }
@@ -1715,6 +1797,13 @@ export type PriorPerformance = {
   exerciseId: string;
   /** The member's own date, from the session it came from. */
   onDate: string;
+  /**
+   * What the numbers below meant in *that* session, not what the catalogue
+   * says today. Null when it was never recorded — the line then reads the way
+   * it always read, with no qualifier invented for it.
+   */
+  loadEntry?: string | null;
+  unilateral?: boolean;
   sets: PriorSet[];
 };
 
@@ -1755,7 +1844,15 @@ export function priorSummary(
       return load > 0 ? `${load} × ${reps}` : `${reps}`;
     })
     .join(" · ");
-  return anyLoad ? `${body} ${unit}` : `${body} reps`;
+  /* "200 × 5 lb" and "70 × 8 lb each" are different workouts, and this line is
+     read while deciding what to put on the bar. Only said when the session
+     recorded it: a workout from before the question was asked says nothing,
+     rather than being assigned an answer now. */
+  const qualifier =
+    prior.loadEntry === "per_limb"
+      ? ` ${loadEntryLabel(prior.loadEntry, prior.unilateral ?? false)}`
+      : "";
+  return anyLoad ? `${body} ${unit}${qualifier}` : `${body} reps`;
 }
 
 /** The heaviest working set, which is the one a reference is drawn from. */

@@ -77,6 +77,9 @@ import {
   alreadyImported,
   trainingObservations,
   observationSchema,
+  LOAD_ENTRIES,
+  memberWorkouts,
+  memberWorkoutExercises,
 } from "../../shared/schema.js";
 // Through the barrel, as wins/routes.ts already does. It is the single place
 // that answers "which rooms can they see", and reaching past index.js for it
@@ -94,6 +97,10 @@ import {
 import {
   compositionFor,
   ensureSessionExercise,
+  fillSessionComposition,
+  type PlannedMovement,
+  setLoadEntry,
+  setSessionLoadEntry,
   ownsSession,
   pairSessionExercise,
   priorPerformanceFor,
@@ -248,6 +255,10 @@ async function shareSessionWithCoach(userId: string, sessionId: string): Promise
       durationSeconds: workoutSets.durationSeconds,
       weightKg: workoutSets.weightKg,
       isWarmup: workoutSets.isWarmup,
+      // So "@ 70 lb" in the coach's copy can say "each" when that is what the
+      // member entered. From the session, not the catalogue.
+      loadEntry: setLoadEntry,
+      unilateral: exercises.unilateral,
     })
     .from(workoutSets)
     .innerJoin(exercises, eq(exercises.id, workoutSets.exerciseId))
@@ -422,16 +433,76 @@ async function sessionHistory(userId: string) {
       weightKg: workoutSets.weightKg,
       isWarmup: workoutSets.isWarmup,
       rpe: workoutSets.rpe,
+      // What the number meant in that workout — see session_exercises.
+      loadEntry: setLoadEntry,
+      unilateral: exercises.unilateral,
     })
     .from(workoutSets)
     .innerJoin(exercises, eq(workoutSets.exerciseId, exercises.id))
     .where(inArray(workoutSets.sessionId, sessions.map((s) => s.id)))
     .orderBy(asc(workoutSets.setIndex));
 
+  /*
+    Whether each of these can be done again, and whether it has already been
+    kept.
+
+    Two counted reads rather than a field on the session: composition lives in
+    `session_exercises` and templates in `member_workouts`, and denormalising
+    either onto the session would be a third copy of a fact to fall out of step
+    with the other two. A history screen offering "Repeat" on an imported bike
+    ride, or offering to save a workout that is already saved, is the failure
+    this pays for.
+  */
+  const ids = sessions.map((s) => s.id);
+  const [composed, saved] = await Promise.all([
+    db
+      .select({
+        sessionId: sessionExercises.sessionId,
+        category: exercises.category,
+      })
+      .from(sessionExercises)
+      .innerJoin(exercises, eq(exercises.id, sessionExercises.exerciseId))
+      .where(inArray(sessionExercises.sessionId, ids)),
+    db
+      .select({ id: memberWorkouts.id, sourceSessionId: memberWorkouts.sourceSessionId })
+      .from(memberWorkouts)
+      .where(
+        and(
+          eq(memberWorkouts.userId, userId),
+          eq(memberWorkouts.isArchived, false),
+          inArray(memberWorkouts.sourceSessionId, ids),
+        ),
+      ),
+  ]);
+  // Counted here rather than in SQL: `isPracticeCategory` is the shared
+  // model's answer to "is this a class or a movement", and a `filter (where
+  // category in (…))` would be a second copy of that list in a second
+  // language.
+  const shapeOf = new Map<string, { n: number; practices: number }>();
+  for (const row of composed) {
+    const acc = shapeOf.get(row.sessionId) ?? { n: 0, practices: 0 };
+    acc.n += 1;
+    if (isPracticeCategory(row.category)) acc.practices += 1;
+    shapeOf.set(row.sessionId, acc);
+  }
+  const savedAs = new Map(
+    saved.filter((r) => r.sourceSessionId).map((r) => [r.sourceSessionId as string, r.id]),
+  );
+
   return {
     unit,
     sessions: sessions.map((s) => ({
       ...s,
+      /*
+        How many movements it was made of, and how many of those are a class
+        or a ride rather than a movement. A logged 45-minute Pilates class has
+        a composition row and is not a template; a structured mobility flow is
+        one. The distinction is drawn here rather than in the client so that
+        the coach's copy of this screen cannot draw it differently.
+      */
+      movements: shapeOf.get(s.id)?.n ?? 0,
+      practiceMovements: shapeOf.get(s.id)?.practices ?? 0,
+      savedWorkoutId: savedAs.get(s.id) ?? null,
       sets: sets
         .filter((x) => x.sessionId === s.id)
         .map((x) => ({ ...x, weight: out(x.weightKg, unit) })),
@@ -564,6 +635,9 @@ async function movementSets(userId: string, exerciseId: string) {
       toFailure: workoutSets.toFailure,
       rpe: workoutSets.rpe,
       note: workoutSets.note,
+      // Per session, so a graph of one movement does not silently rescale
+      // when its catalogue entry is corrected.
+      loadEntry: setLoadEntry,
     })
     .from(workoutSets)
     .innerJoin(workoutSessions, eq(workoutSets.sessionId, workoutSessions.id))
@@ -770,6 +844,23 @@ export function registerTrainingRoutes(app: Express) {
         .object({
           habitId: z.string().uuid().nullable().optional(),
           title: z.string().max(120).nullable().optional(),
+          /*
+            Start it with something already in it. Two sources, because a
+            member repeating a workout means one of two things and neither is
+            "type the movements in again":
+
+              fromWorkoutId    one of their saved workouts
+              repeatSessionId  a structured session they already did
+
+            Both reduce to a PlannedMovement[] and are copied in the same
+            transaction as the session — see fillSessionComposition. Only one
+            may be given; asking for both is a caller bug, not a merge.
+          */
+          fromWorkoutId: z.string().uuid().optional(),
+          repeatSessionId: z.string().uuid().optional(),
+        })
+        .refine((v) => !(v.fromWorkoutId && v.repeatSessionId), {
+          message: "Start from a saved workout or from a past session, not both",
         })
         .parse(req.body ?? {});
 
@@ -834,17 +925,129 @@ export function registerTrainingRoutes(app: Express) {
         });
       }
 
-      const [row] = await db
-        .insert(workoutSessions)
-        .values({
-          userId,
-          habitId: input.habitId ?? null,
-          onDate: await memberToday(userId),
-          title: input.title ?? null,
-        })
-        .returning();
+      /*
+        What it is supposed to contain, read before anything is written.
 
-      track("training.session_start", { userId, surface: "build", subjectId: row.id });
+        A saved workout with no movements in it is a real thing — somebody
+        named it and has not filled it in — and starting it is allowed. A
+        saved workout that does not belong to this member is not, and the
+        ownership check is in the predicate rather than after the read.
+      */
+      let plan: PlannedMovement[] = [];
+      let planTitle: string | null = null;
+
+      if (input.fromWorkoutId) {
+        const [workout] = await db
+          .select({ id: memberWorkouts.id, name: memberWorkouts.name })
+          .from(memberWorkouts)
+          .where(
+            and(
+              eq(memberWorkouts.id, input.fromWorkoutId),
+              eq(memberWorkouts.userId, userId),
+            ),
+          );
+        if (!workout) return res.status(404).json({ message: "No such workout" });
+
+        planTitle = workout.name;
+        plan = (
+          await db
+            .select({
+              exerciseId: memberWorkoutExercises.exerciseId,
+              supersetGroup: memberWorkoutExercises.supersetGroup,
+            })
+            .from(memberWorkoutExercises)
+            .where(eq(memberWorkoutExercises.memberWorkoutId, workout.id))
+            .orderBy(asc(memberWorkoutExercises.orderIndex))
+        ).map((m) => ({ exerciseId: m.exerciseId, supersetGroup: m.supersetGroup }));
+      }
+
+      if (input.repeatSessionId) {
+        const [past] = await db
+          .select({ id: workoutSessions.id, title: workoutSessions.title })
+          .from(workoutSessions)
+          .where(
+            and(
+              eq(workoutSessions.id, input.repeatSessionId),
+              eq(workoutSessions.userId, userId),
+            ),
+          );
+        if (!past) return res.status(404).json({ message: "No such session" });
+
+        planTitle = past.title;
+        /*
+          The composition, not the sets. `session_exercises` is the record of
+          what the workout was made of; `workout_sets` is what happened, and
+          copying that forward would put last week's numbers on the screen as
+          today's performance. LAST TIME already shows them, in the place that
+          says they are from last time.
+        */
+        plan = (
+          await db
+            .select({
+              exerciseId: sessionExercises.exerciseId,
+              supersetGroup: sessionExercises.supersetGroup,
+            })
+            .from(sessionExercises)
+            .where(eq(sessionExercises.sessionId, past.id))
+            .orderBy(asc(sessionExercises.position), asc(sessionExercises.createdAt))
+        ).map((m) => ({ exerciseId: m.exerciseId, supersetGroup: m.supersetGroup }));
+
+        if (plan.length === 0) {
+          // An imported bike ride has no composition to repeat. Refusing is
+          // the honest answer; starting an empty session named "Cycling"
+          // would be the same defect this route is being fixed for.
+          return res
+            .status(400)
+            .json({ message: "That one has no movements to repeat." });
+        }
+      }
+
+      const onDate = await memberToday(userId);
+
+      /*
+        The session and what it is supposed to contain, together or not at all.
+
+        The defect: starting a saved workout created the session and copied
+        nothing, so the member landed in a running, empty workout wearing the
+        right name. A second statement after the insert would have narrowed
+        that window rather than closed it.
+      */
+      const row = await db.transaction(async (tx) => {
+        const [created] = await tx
+          .insert(workoutSessions)
+          .values({
+            userId,
+            habitId: input.habitId ?? null,
+            onDate,
+            title: input.title ?? planTitle ?? null,
+          })
+          .returning();
+
+        await fillSessionComposition(tx, created.id, plan);
+        return created;
+      });
+
+      // Only after it started. "Last performed" is a claim about a workout
+      // that was actually begun.
+      if (input.fromWorkoutId) {
+        await db
+          .update(memberWorkouts)
+          .set({ lastUsedAt: new Date() })
+          .where(eq(memberWorkouts.id, input.fromWorkoutId));
+      }
+
+      track("training.session_start", {
+        userId,
+        surface: "build",
+        subjectId: row.id,
+        // Where it came from, because "started with nothing in it" and
+        // "started from a saved workout" are the two halves of whether the
+        // template loop is being used at all.
+        props: {
+          from: input.fromWorkoutId ? "saved" : input.repeatSessionId ? "repeat" : "blank",
+          movements: plan.length,
+        },
+      });
       res.status(201).json(row);
     } catch (err) {
       fail(res, err);
@@ -1096,6 +1299,12 @@ export function registerTrainingRoutes(app: Express) {
           sessionId: session.id,
           exerciseId: input.exerciseId,
           position: 0,
+          // Snapshotted here too. A practice carries no weight today, and a
+          // composition row with no interpretation would be a legacy row
+          // created new — see session_exercises.load_entry.
+          loadEntry: sql<string>`(
+            select load_entry from ${exercises} where id = ${input.exerciseId}
+          )`,
         });
 
         await tx.insert(workoutSets).values({
@@ -1160,6 +1369,16 @@ export function registerTrainingRoutes(app: Express) {
       if (!owned) return res.status(404).json({ message: "No such session" });
 
       await db.delete(workoutSets).where(eq(workoutSets.sessionId, id));
+      /*
+        And what it was made of.
+
+        This was missing, and it left a `session_exercises` row per movement
+        pointing at a session that no longer exists — invisible, permanent, and
+        counted by anything that reads composition by exercise. Discarding a
+        workout has to discard the workout.
+      */
+      await db.delete(sessionExercises).where(eq(sessionExercises.sessionId, id));
+      await db.delete(trainingObservations).where(eq(trainingObservations.sessionId, id));
       await db.delete(workoutSessions).where(eq(workoutSessions.id, id));
 
       res.json({ ok: true });
@@ -1282,14 +1501,27 @@ export function registerTrainingRoutes(app: Express) {
       const userId = req.session!.userId!;
       const sessionId = param(req, "id");
       const input = z
-        .object({ supersetWith: z.string().min(1).nullable() })
+        .object({
+          supersetWith: z.string().min(1).nullable().optional(),
+          /*
+            And what the weight box means, when the catalogue's default was
+            wrong for how this member is actually entering it today. Scoped to
+            this session — see `setSessionLoadEntry`.
+          */
+          loadEntry: z.enum(LOAD_ENTRIES).optional(),
+        })
         .parse(req.body ?? {});
 
       if (!(await ownsSession(userId, sessionId))) {
         return res.status(404).json({ message: "No such session" });
       }
 
-      await pairSessionExercise(sessionId, param(req, "exerciseId"), input.supersetWith);
+      if (input.supersetWith !== undefined) {
+        await pairSessionExercise(sessionId, param(req, "exerciseId"), input.supersetWith);
+      }
+      if (input.loadEntry !== undefined) {
+        await setSessionLoadEntry(sessionId, param(req, "exerciseId"), input.loadEntry);
+      }
       res.json({ exercises: await compositionFor(sessionId) });
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -1697,7 +1929,10 @@ export function registerTrainingRoutes(app: Express) {
           trackingType: exercises.trackingType,
           takesLoad: exercises.takesLoad,
           unilateral: exercises.unilateral,
-          loadEntry: exercises.loadEntry,
+          // This session's reading. The catalogue setting is a default for
+          // movements entering a session, never the account of one already in
+          // progress — see session_exercises.load_entry.
+          loadEntry: setLoadEntry,
           setIndex: workoutSets.setIndex,
           reps: workoutSets.reps,
           durationSeconds: workoutSets.durationSeconds,

@@ -29,10 +29,38 @@ if (!connectionString) {
  */
 const poolMax = Number(process.env.DATABASE_POOL_MAX);
 
+/**
+ * How long a connection may sit unused before this process closes it.
+ *
+ * ── Why this is not `pg`'s ten-second default's business alone ────────────
+ *
+ * `pg` defaults to 10s already; what matters is that it is never raised, and
+ * that the reason is written down. This deploys as one Vercel function holding
+ * a pool across invocations, and between them the process sits idle while
+ * Supabase's pooler reclaims the seat on its own schedule. `pg` does not learn
+ * that a client is dead until something tries to use it, so a connection kept
+ * longer than the pooler keeps it produces a query that throws
+ * `Connection terminated unexpectedly` — once — followed by a successful one
+ * on a fresh client.
+ *
+ * From a member's side that was "the first tap said Unauthorized and the
+ * second one worked", because the query it landed on was the auth-token
+ * lookup. Closing our own idle clients well inside the pooler's window means
+ * the request after an idle stretch opens a connection rather than finding a
+ * reclaimed one. `bearerAuth` no longer mistakes the failure for a signed-out
+ * member either; both halves are wanted, because one is the cause and the
+ * other is what it should look like if it ever happens anyway.
+ */
+const idleTimeoutMs = Number(process.env.DATABASE_IDLE_TIMEOUT_MS);
+
 export const pool = new Pool({
   connectionString,
   ssl: { rejectUnauthorized: false },
   ...(Number.isFinite(poolMax) && poolMax > 0 ? { max: poolMax } : {}),
+  idleTimeoutMillis: Number.isFinite(idleTimeoutMs) && idleTimeoutMs > 0 ? idleTimeoutMs : 10_000,
+  // TCP keepalives on top of the idle timeout: they let a connection that dies
+  // *while in use* be noticed by the socket rather than by a query.
+  keepAlive: true,
 });
 /*
   An idle connection dying is not a reason for the process to.

@@ -178,7 +178,10 @@ export const SAKRED_INTRO: GuidedTour = {
       title: "Add what you're doing",
       body:
         "Movements go in here.\n\nSakred remembers the exercise before you log a " +
-        "single set, so you can walk away mid-session and come back to it.\n\nAdd one.",
+        "single set, so you can walk away mid-session and come back to it.\n\nTo " +
+        "superset two movements, open a movement's ••• menu and choose \"Superset " +
+        "with…\" — you can pair it with one that's already in the session or add the " +
+        "second one right there.\n\nAdd one.",
       advance: { kind: "present", anchor: "workout-set-row" },
     },
     {
@@ -243,7 +246,10 @@ export const SAKRED_INTRO: GuidedTour = {
       title: "That's a session",
       body:
         "Close this one. Nothing from the rehearsal is kept — no sets, no history, " +
-        "nothing added to what Sakred knows about your training.",
+        "nothing added to what Sakred knows about your training.\n\nAfter a real " +
+        "session you'll be offered \"Save this workout\" — it keeps the movements " +
+        "and their order so you can start the same one again from Build, or from " +
+        "the session in your history.",
       advance: { kind: "absent", anchor: "workout-set-row" },
     },
 

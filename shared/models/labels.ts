@@ -405,6 +405,11 @@ const STATUS_SAYS: Record<number, string> = {
   409: "That's already been done.",
   413: "That file is too large.",
   429: "That's a lot at once. Give it a moment.",
+  /* Said rather than left to the 5xx catch-all, because this one is worth
+     retrying and the generic sentence does not say so. `bearerAuth` answers
+     with it when it cannot reach the table that says who is signed in — which
+     is a fact about the server, never about the member. */
+  503: "Sakred couldn't reach the server just then. Try that again.",
 };
 
 /** HTTP's own vocabulary, which is never member-facing however it arrives. */

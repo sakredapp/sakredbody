@@ -45,12 +45,26 @@ const check = (name: string, got: unknown, want: unknown) => {
 /** One cookie jar per person, because that is what a browser has. */
 const jars = new Map<string, string>();
 
+/*
+  The session cookie is `secure` under NODE_ENV=production, which is how
+  script/qa-serve.sh runs it — the point of QA is the real configuration. Over
+  plain http on a loopback port Express refuses to set it at all, so every
+  request carries the proxy header the deployed app sits behind.
+
+  Without this every login here succeeds, returns the member, and hands back
+  nothing to be logged in with — and all twenty-eight assertions below fail as
+  401s, which reads exactly like a broken authorization matrix. The other
+  harnesses that drive this server have carried the header since they were
+  written; this one never did.
+*/
+const PROXIED = { "x-forwarded-proto": "https" };
+
 async function call(who: string | null, path: string, init: RequestInit = {}): Promise<Response> {
   const cookie = who ? jars.get(who) : undefined;
   return fetch(`${BASE}${path}`, {
     ...init,
     redirect: "manual",
-    headers: { ...(init.headers ?? {}), ...(cookie ? { cookie } : {}) },
+    headers: { ...PROXIED, ...(init.headers ?? {}), ...(cookie ? { cookie } : {}) },
   });
 }
 
@@ -58,7 +72,7 @@ async function login(who: string): Promise<Response> {
   const res = await fetch(`${BASE}/api/login`, {
     method: "POST",
     redirect: "manual",
-    headers: { "content-type": "application/json" },
+    headers: { ...PROXIED, "content-type": "application/json" },
     body: JSON.stringify({ email: `qa.${who}@sakred.local`, password: PASSWORD }),
   });
   const setCookie = res.headers.getSetCookie?.() ?? [];

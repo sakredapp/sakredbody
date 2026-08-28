@@ -65,6 +65,7 @@ import {
   ChevronRight,
   Plus,
   Check,
+  Bookmark,
   MoreHorizontal,
   Users,
   Send,
@@ -100,7 +101,7 @@ import { Input } from "@/components/ui/input";
 import { MovementPicker, type Movement } from "./MovementPicker";
 import { NewMovement } from "./NewMovement";
 import { ObservationForm, observationSummary, type Observation } from "./Observation";
-import { loadEntryLabel } from "@shared/models/training";
+import { LOAD_ENTRIES, loadEntryLabel } from "@shared/models/training";
 import { MovementMemory, MEMORY_KEY } from "./TrainingMemory";
 import { cn } from "@/lib/utils";
 
@@ -120,8 +121,26 @@ type Sheet = {
    * only renders while one does. Held here, and cleared by the member pressing
    * Done, so a background refetch cannot pull it out from under them.
    */
-  justFinished: { id: string; sets: number; shared: boolean } | null;
-  setJustFinished: (v: { id: string; sets: number; shared: boolean } | null) => void;
+  justFinished: Finished | null;
+  setJustFinished: (v: Finished | null) => void;
+};
+
+/**
+ * What is still true about a session that has just stopped existing.
+ *
+ * `movements` is carried because the confirmation screen offers to keep the
+ * workout, and that offer only makes sense for a session that had a structure
+ * — a logged bike ride has nothing to save. Reading it back from the server
+ * would mean querying a session the member has already finished with, to
+ * decide whether to draw a button.
+ */
+type Finished = {
+  id: string;
+  sets: number;
+  shared: boolean;
+  movements: number;
+  /** Kept as a reusable workout. One save, then the button says so. */
+  saved: boolean;
 };
 
 const SheetContext = createContext<Sheet>({
@@ -172,7 +191,8 @@ function movementOf(s: LoggedSet): Movement {
     trackingType: s.trackingType,
     takesLoad: s.takesLoad,
     unilateral: s.unilateral,
-    loadEntry: s.loadEntry ?? "total",
+    // Null stays null: the set's own session is what says what it meant.
+    loadEntry: s.loadEntry ?? null,
     aliases: null,
     ownerUserId: null,
   };
@@ -188,7 +208,7 @@ function movementFrom(m: SessionMovement): Movement {
     trackingType: m.trackingType,
     takesLoad: m.takesLoad,
     unilateral: m.unilateral,
-    loadEntry: m.loadEntry ?? "total",
+    loadEntry: m.loadEntry,
     aliases: null,
     ownerUserId: null,
   };
@@ -680,9 +700,29 @@ function Sheet() {
   /** Which movement is choosing a superset partner. */
   const [pairing, setPairing] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
+  /**
+   * Which movement the next added one should be paired with.
+   *
+   * "Superset with…" used to be hidden until a session had two movements,
+   * which is exactly backwards: the moment somebody wants a superset is while
+   * they are looking at the first movement and thinking of the second. Making
+   * them add it separately, then find their way back into this menu, meant the
+   * feature existed and could not be found. Set here, spent by `add`.
+   */
+  const [pairAfterAdd, setPairAfterAdd] = useState<string | null>(null);
   const [creating, setCreating] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  /**
+   * A change of reading that would re-read sets already logged, held for a
+   * second tap.
+   *
+   * One reading per movement per session — see `setSessionLoadEntry` on the
+   * server. That means correcting it after three sets changes what those three
+   * sets are taken to have weighed, which is right (they were entered the same
+   * way) and must never happen silently.
+   */
+  const [confirmLoad, setConfirmLoad] = useState<{ id: string; value: string } | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   /**
    * Which movement they are leaving a note on, `"session"` for the whole thing,
@@ -736,6 +776,36 @@ function Sheet() {
     }
     return Array.from(byId.values());
   }, [logged, session.exercises]);
+
+  /**
+   * "A1", "A2" — the superset, said on the row.
+   *
+   * The pairing was already stored, already grouped and already rendered as a
+   * line of small text naming the partner. What it was not, was visible: a
+   * member had to reopen the overflow menu to find out whether the thing they
+   * had set up was still set up. A letter per group in the order the groups
+   * appear, and a number within it, is the notation every programme is written
+   * in, and it reads at a glance in a list that scrolls.
+   */
+  const supersetLabel = useMemo(() => {
+    const letters = new Map<string, string>();
+    const seen = new Map<string, number>();
+    const out = new Map<string, string>();
+    for (const g of groups) {
+      if (!g.supersetGroup) continue;
+      let letter = letters.get(g.supersetGroup);
+      if (!letter) {
+        // A..Z, then round again. A session with 27 supersets in it has a
+        // bigger problem than an ambiguous letter.
+        letter = String.fromCharCode(65 + (letters.size % 26));
+        letters.set(g.supersetGroup, letter);
+      }
+      const n = (seen.get(g.supersetGroup) ?? 0) + 1;
+      seen.set(g.supersetGroup, n);
+      out.set(g.movement.id, `${letter}${n}`);
+    }
+    return out;
+  }, [groups]);
 
   /**
    * A movement with nothing under it yet opens its entry row without being
@@ -794,11 +864,43 @@ function Sheet() {
    * the database; nothing had ever been offered to it.
    */
   const addMovement = useMutation({
-    mutationFn: async (m: Movement) =>
-      apiRequest("POST", `/api/training/sessions/${session.id}/exercises`, { exerciseId: m.id }),
-    onSuccess: (_r, m) => {
+    // The pairing travels with the add rather than following it. Two requests
+    // would mean a window in which the movement is in the session and not in
+    // the superset, and a failure in the second would leave it there.
+    mutationFn: async (v: { movement: Movement; supersetWith: string | null }) =>
+      apiRequest("POST", `/api/training/sessions/${session.id}/exercises`, {
+        exerciseId: v.movement.id,
+        ...(v.supersetWith ? { supersetWith: v.supersetWith } : {}),
+      }),
+    onSuccess: (_r, v) => {
       setPicking(false);
-      setEntering((prev) => ({ ...prev, [m.id]: true }));
+      setPairAfterAdd(null);
+      setMenuFor(null);
+      setPairing(null);
+      setEntering((prev) => ({ ...prev, [v.movement.id]: true }));
+      refreshSession();
+    },
+    onError: failed,
+  });
+
+  /**
+   * What the weight box means, for this session only.
+   *
+   * Not the catalogue. The catalogue's setting is how the movement should be
+   * entered from now on; this is what today's numbers mean, and a member
+   * correcting one must not be silently editing the other — nor any workout
+   * they have already finished. See session_exercises.load_entry.
+   */
+  const setLoadEntry = useMutation({
+    mutationFn: async (v: { exerciseId: string; loadEntry: string }) =>
+      apiRequest(
+        "PATCH",
+        `/api/training/sessions/${session.id}/exercises/${v.exerciseId}`,
+        { loadEntry: v.loadEntry },
+      ),
+    onSuccess: () => {
+      setConfirmLoad(null);
+      setMenuFor(null);
       refreshSession();
     },
     onError: failed,
@@ -912,7 +1014,13 @@ function Sheet() {
        * would pull the confirmation screen out from under whoever was reading it.
        */
       qc.setQueryData(OPEN_WORKOUT_KEY, { session: null });
-      setJustFinished({ id: session.id, sets: total, shared: false });
+      setJustFinished({
+        id: session.id,
+        sets: total,
+        shared: false,
+        movements: groups.length,
+        saved: false,
+      });
     },
     onError: failed,
   });
@@ -932,7 +1040,7 @@ function Sheet() {
   const add = (m: Movement) => {
     if (addMovement.isPending) return;
     if (groups.some((g) => g.movement.id === m.id)) return setPicking(false);
-    addMovement.mutate(m);
+    addMovement.mutate({ movement: m, supersetWith: pairAfterAdd });
   };
 
   const draftFor = (id: string) => drafts[id] ?? blank();
@@ -1228,7 +1336,13 @@ function Sheet() {
           list actually needs.
         */}
         <div className="shrink-0 px-4 pt-3 pb-2 flex items-center justify-between gap-3 border-b border-border/40">
-          <p className="font-display text-lg">Add a movement</p>
+          {/* Named, so somebody who came here from "Superset with…" can see
+              that the pairing is still what they are doing. */}
+          <p className="font-display text-lg" data-testid="picker-title">
+            {pairAfterAdd
+              ? `Superset with ${groups.find((g) => g.movement.id === pairAfterAdd)?.movement.name ?? "it"}`
+              : "Add a movement"}
+          </p>
           {/*
             The picker stays up until the server has it. Choosing a movement is
             a write now, and a picker that closed on the tap would be claiming
@@ -1240,7 +1354,14 @@ function Sheet() {
                 Adding…
               </span>
             )}
-            <Button variant="ghost" size="sm" onClick={() => setPicking(false)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setPicking(false);
+                setPairAfterAdd(null);
+              }}
+            >
               Done
             </Button>
           </div>
@@ -1323,6 +1444,20 @@ function Sheet() {
             <div key={m.id} className="space-y-2" data-testid={`workout-movement-${m.id}`}>
               <div className="flex items-baseline justify-between gap-2">
                 <div className="min-w-0 flex items-baseline gap-2">
+                  {/*
+                    The pairing, on the row, without opening anything. See
+                    `supersetLabel` — it is the notation supersets are written
+                    in, and it survives a list that scrolls where a bracket
+                    drawn between two rows does not.
+                  */}
+                  {supersetLabel.has(m.id) && (
+                    <span
+                      className="shrink-0 rounded-sm bg-gold/15 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-gold"
+                      data-testid={`superset-label-${m.id}`}
+                    >
+                      {supersetLabel.get(m.id)}
+                    </span>
+                  )}
                   <p className="text-base truncate">{m.name}</p>
                   {m.unilateral && (
                     <span className="text-[10px] text-muted-foreground shrink-0">per side</span>
@@ -1414,6 +1549,22 @@ function Sheet() {
                             {x.movement.name}
                           </button>
                         ))}
+                      {/*
+                        The other half of the question. "Superset with…" is
+                        asked as often about a movement that is not in the
+                        session yet as about one that is, and offering only the
+                        second is what made this look like a missing feature.
+                      */}
+                      <button
+                        onClick={() => {
+                          setPairAfterAdd(m.id);
+                          setPicking(true);
+                        }}
+                        className="text-[11px] rounded-full border border-gold/40 text-gold px-2.5 py-1 tap-clean"
+                        data-testid={`pair-new-${m.id}`}
+                      >
+                        Add another movement
+                      </button>
                       <button
                         onClick={() => setPairing(null)}
                         className="text-[11px] text-muted-foreground px-1 tap-clean"
@@ -1432,15 +1583,83 @@ function Sheet() {
                       Perform separately
                     </button>
                   ) : (
-                    groups.length > 1 && (
-                      <button
-                        onClick={() => setPairing(m.id)}
-                        className="block text-xs text-muted-foreground tap-clean"
-                        data-testid={`pair-${m.id}`}
-                      >
-                        Superset with…
-                      </button>
-                    )
+                    /*
+                      Offered whether or not there is anything to pair with
+                      yet. It used to be hidden until the session held two
+                      movements, so the first time anybody looked for it — with
+                      one movement on screen and the second one in mind — it
+                      was not there. With one movement this goes straight to
+                      the picker; with more it asks which.
+                    */
+                    <button
+                      onClick={() => {
+                        if (groups.length > 1) return setPairing(m.id);
+                        setPairAfterAdd(m.id);
+                        setPicking(true);
+                      }}
+                      className="block text-xs text-muted-foreground tap-clean"
+                      data-testid={`pair-${m.id}`}
+                    >
+                      Superset with…
+                    </button>
+                  )}
+
+                  {/*
+                    ── What the number in the box means ──
+
+                    The catalogue's default is right most of the time and is a
+                    default, not a fact about this member: somebody loading one
+                    dumbbell on a bench, or reading a machine's total stack,
+                    needs to be able to say so. Scoped to this session, and it
+                    says out loud what it is about to re-read.
+                  */}
+                  {m.takesLoad && (
+                    <div className="space-y-1">
+                      <p className="text-[11px] text-muted-foreground">
+                        The weight I enter is
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {LOAD_ENTRIES.map((entry) => {
+                          const on = (m.loadEntry ?? "total") === entry;
+                          const pending = confirmLoad?.id === m.id && confirmLoad.value === entry;
+                          return (
+                            <button
+                              key={entry}
+                              onClick={() => {
+                                if (on) return;
+                                if (g.sets.length === 0 || pending) {
+                                  setLoadEntry.mutate({ exerciseId: m.id, loadEntry: entry });
+                                  return;
+                                }
+                                setConfirmLoad({ id: m.id, value: entry });
+                              }}
+                              disabled={setLoadEntry.isPending}
+                              className={cn(
+                                "text-[11px] rounded-full border px-2.5 py-1 tap-clean",
+                                on
+                                  ? "border-gold/50 text-gold"
+                                  : "border-border/60 text-muted-foreground",
+                              )}
+                              data-testid={`load-entry-${entry}-${m.id}`}
+                            >
+                              {entry === "total"
+                                ? "altogether"
+                                : loadEntryLabel(entry, m.unilateral)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {confirmLoad?.id === m.id && (
+                        <p
+                          className="text-[11px] text-gold"
+                          data-testid={`load-entry-warning-${m.id}`}
+                        >
+                          {`The ${g.sets.length} ${
+                            g.sets.length === 1 ? "set" : "sets"
+                          } already logged will be read that way too — tap again`}
+                        </p>
+                      )}
+                    </div>
                   )}
 
                   <button
@@ -1743,6 +1962,26 @@ function Logged() {
   const [caption, setCaption] = useState("");
   const [photo, setPhoto] = useState<PhotoAttachment | null>(null);
 
+  /**
+   * Keep the workout, not the workout's numbers.
+   *
+   * This is the moment somebody knows whether they want it again, and it was
+   * the missing half of the loop: a member could write a workout in the
+   * builder and repeat it, but could not keep one they had just performed —
+   * which is how most workouts come into existence. The server saves the
+   * movements, their order and their supersets and nothing that was lifted.
+   */
+  const keep = useMutation({
+    mutationFn: async () =>
+      apiRequest("POST", `/api/training/sessions/${done.id}/save-as-workout`, {}),
+    onSuccess: () => {
+      setJustFinished({ ...done, saved: true });
+      qc.invalidateQueries({ queryKey: ["/api/training/workouts"] });
+      toast({ title: "Saved. It's in Build under Saved." });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
   const share = useMutation({
     mutationFn: async () =>
       apiRequest("POST", `/api/training/sessions/${done.id}/share`, {
@@ -1816,6 +2055,30 @@ function Logged() {
               Share it with the room
             </Button>
           )}
+
+          {/*
+            Only for a session that has a structure to keep. An imported ride
+            and a logged practice have one movement and no arrangement, and a
+            "Save this workout" button on those would be a control that either
+            does nothing useful or fills the Saved list with names.
+          */}
+          {done.movements > 0 &&
+            (done.saved ? (
+              <p className="text-xs text-muted-foreground" data-testid="workout-kept">
+                Saved to your workouts.
+              </p>
+            ) : (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => keep.mutate()}
+                disabled={keep.isPending}
+                data-testid="save-as-workout"
+              >
+                <Bookmark className="h-3.5 w-3.5 mr-1.5" />
+                {keep.isPending ? "Saving…" : "Save this workout"}
+              </Button>
+            ))}
 
           <Button
             variant="ghost"

@@ -23,13 +23,17 @@
  * A model that multiplies by `per_limb` and again by `unilateral` quadruples
  * the second. Half of what follows is about that one multiplication.
  */
+import { readFileSync } from "node:fs";
 import {
   defaultLoadEntry,
   enteredLoadLabel,
   externalLoadKg,
   loadEntryLabel,
+  loadEntryKnown,
   loadShape,
+  priorSummary,
   setVolumeKg,
+  summariseSession,
   LOAD_ENTRIES,
 } from "../shared/models/training.js";
 
@@ -40,6 +44,13 @@ function check(name: string, ok: boolean, detail = "") {
   else failures.push(`${name}${detail ? ` — ${detail}` : ""}`);
 }
 const section = (t: string) => console.log(`\n${t}\n`);
+
+/** A file with its prose removed, so a comment cannot satisfy a grep for the
+    rule it explains. That has happened here before. */
+const code = (p: string) =>
+  readFileSync(p, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
 
 // ── The three worked examples ──────────────────────────────────────────────
 section("The three the brief names");
@@ -182,6 +193,165 @@ check("and equipment nobody listed is one load", defaultLoadEntry("kayak") === "
 check("both-together per-limb reads as each", loadEntryLabel("per_limb", false) === "each");
 check("one-at-a-time per-limb reads as per side", loadEntryLabel("per_limb", true) === "per side");
 check("total reads as total either way", loadEntryLabel("total", true) === "total");
+
+// ── History is not reinterpreted ───────────────────────────────────────────
+section("A workout that was never asked keeps its arithmetic");
+
+/*
+  The defect this section exists to prevent.
+
+  `exercises.load_entry` is a setting — how a movement should be entered from
+  now on. If history read it, then correcting that setting today would rewrite
+  what a workout six months ago is supposed to have weighed, and nobody would
+  be told. Equipment makes "70 per hand" likely for a dumbbell. Likely is not a
+  record.
+
+  So the interpretation is snapshotted onto `session_exercises` when a movement
+  enters a session, and null there means the session predates the question.
+  Null must reproduce, exactly, the arithmetic the product used before this
+  feature: `reps × weight`, with `unilateral` multiplying nothing. That is not
+  remembered — it is the code at d1bd71a^, where `summarise` read
+  `s.weightKg * (s.reps ?? 0)` and `unilateral` was a column with no consumer.
+*/
+
+const LEGACY_DUMBBELL = {
+  reps: 8, enteredKg: 31.75, loadEntry: null,
+  unilateral: false, bodyweightFactor: 0, bodyweightKg: null,
+};
+check("an old dumbbell set counts what it always counted",
+  setVolumeKg(LEGACY_DUMBBELL) === 8 * 31.75,
+  String(setVolumeKg(LEGACY_DUMBBELL)));
+check("and not the per-limb reading of it",
+  setVolumeKg(LEGACY_DUMBBELL) !== setVolumeKg({ ...LEGACY_DUMBBELL, loadEntry: "per_limb" }));
+
+const LEGACY_ONE_ARM = {
+  reps: 10, enteredKg: 13.6, loadEntry: null,
+  unilateral: true, bodyweightFactor: 0, bodyweightKg: null,
+};
+check("an old one-armed set is not retroactively doubled either",
+  setVolumeKg(LEGACY_ONE_ARM) === 10 * 13.6,
+  String(setVolumeKg(LEGACY_ONE_ARM)));
+
+check("undefined is the same admission as null",
+  setVolumeKg({ ...LEGACY_DUMBBELL, loadEntry: undefined }) === 8 * 31.75);
+
+/* The shape itself, said directly, so the reason survives a refactor. */
+check("legacy loads one limb", loadShape(null, false).limbs === 1);
+check("legacy performs once", loadShape(null, false).performances === 1);
+check("legacy performs once even one-sided", loadShape(null, true).performances === 1);
+check("and legacy loads one limb even one-sided", loadShape(null, true).limbs === 1);
+
+/*
+  The other half of the same rule: changing the catalogue must not be able to
+  reach a session that already recorded its own answer. There is no code path
+  here to exercise — the snapshot is a column — so what is asserted is that the
+  two inputs are genuinely independent, which is what stops a future reader
+  passing the catalogue value in by habit.
+*/
+const RECORDED_TOTAL = {
+  reps: 8, enteredKg: 31.75, loadEntry: "total",
+  unilateral: false, bodyweightFactor: 0, bodyweightKg: null,
+};
+check("a session that recorded 'total' stays 70 altogether",
+  setVolumeKg(RECORDED_TOTAL) === 8 * 31.75);
+check("a session that recorded 'per limb' stays 70 each",
+  setVolumeKg({ ...RECORDED_TOTAL, loadEntry: "per_limb" }) === 8 * 31.75 * 2);
+/*
+  The two per-limb routes both arrive at twice, by different arithmetic — two
+  limbs loaded once, or one limb loaded twice. That they agree is the correct
+  answer and the reason the naive fix quadruples: a version multiplying by both
+  would put 2,032 here.
+*/
+check("a one-sided per-limb set is twice, not four times",
+  setVolumeKg({ ...RECORDED_TOTAL, loadEntry: "per_limb", unilateral: true }) === 8 * 31.75 * 2,
+  String(setVolumeKg({ ...RECORDED_TOTAL, loadEntry: "per_limb", unilateral: true })));
+check("recorded and unrecorded are genuinely different numbers, or the column is decorative",
+  setVolumeKg({ ...RECORDED_TOTAL, loadEntry: null }) !==
+    setVolumeKg({ ...RECORDED_TOTAL, loadEntry: "per_limb" }));
+
+check("legacy is known to be unrecorded", loadEntryKnown(null) === false);
+check("and so is a value nobody recognises", loadEntryKnown("dunno") === false);
+check("recorded readings are known", loadEntryKnown("total") && loadEntryKnown("per_limb"));
+
+/* Nothing is said about a workout that said nothing. */
+check("an old set is labelled with no qualifier",
+  enteredLoadLabel(70, "lb", null, false) === "70 lb");
+check("where a recorded one is",
+  enteredLoadLabel(70, "lb", "per_limb", false) === "70 lb each");
+
+// ── The line a coach and a member both read ────────────────────────────────
+section("Said the same way in both places");
+
+const SET = {
+  name: "Dumbbell Bench Press", category: "chest", trackingType: "reps",
+  reps: 8, durationSeconds: null, weight: 70, isWarmup: false,
+};
+check("a recorded per-limb session says each",
+  summariseSession([{ ...SET, loadEntry: "per_limb", unilateral: false }], "lb")[0] ===
+    "Dumbbell Bench Press — 1 × 8 @ 70lb each");
+check("a one-sided one says per side",
+  summariseSession([{ ...SET, loadEntry: "per_limb", unilateral: true }], "lb")[0] ===
+    "Dumbbell Bench Press — 1 × 8 @ 70lb per side");
+check("a session that never recorded it says nothing extra",
+  summariseSession([{ ...SET, loadEntry: null }], "lb")[0] ===
+    "Dumbbell Bench Press — 1 × 8 @ 70lb");
+check("and neither does one that recorded 'total'",
+  summariseSession([{ ...SET, loadEntry: "total" }], "lb")[0] ===
+    "Dumbbell Bench Press — 1 × 8 @ 70lb");
+
+const PRIOR_SETS = [{ reps: 8, durationSeconds: null, distanceM: null, weight: 70, rpe: null, isWarmup: false }];
+check("LAST TIME carries the qualifier too",
+  priorSummary({ exerciseId: "db-bench", onDate: "2026-08-01", loadEntry: "per_limb", unilateral: false, sets: PRIOR_SETS }, "lb") ===
+    "70 × 8 lb each");
+check("and stays silent about an unrecorded one",
+  priorSummary({ exerciseId: "db-bench", onDate: "2026-08-01", loadEntry: null, sets: PRIOR_SETS }, "lb") ===
+    "70 × 8 lb");
+
+// ── The migration cannot reinterpret anybody's history ─────────────────────
+section("The migration, read rather than trusted");
+
+/*
+  The first draft of this file had one column and a backfill that decided every
+  historical dumbbell set had been entered per hand. It would have been right
+  more often than not, and that is exactly the problem: this product does not
+  convert a probability into a record. What follows are the properties that
+  keep the two columns doing different jobs.
+*/
+const migration = readFileSync("supabase/2026-08-28-load-entry.sql", "utf8");
+
+check("the record column is added",
+  /ALTER TABLE session_exercises\s+ADD COLUMN IF NOT EXISTS load_entry text;/.test(migration));
+check("with no default, so no workout is assigned a reading",
+  !/session_exercises[\s\S]{0,120}load_entry text[^;]*DEFAULT/.test(migration));
+check("and nothing backfills it",
+  !/UPDATE session_exercises/i.test(migration));
+check("the migration checks that it stayed nullable",
+  /must stay nullable/.test(migration));
+check("the setting keeps its own constraint",
+  /exercises_load_entry_check/.test(migration));
+check("the record column allows the admission",
+  /load_entry IS NULL OR load_entry IN \('total', 'per_limb'\)/.test(migration));
+check("the equipment default still catches up on the catalogue",
+  /UPDATE exercises\s+SET load_entry = 'per_limb'/.test(migration));
+check("and only where nobody has answered",
+  /AND load_entry = 'total'/.test(migration));
+
+/*
+  The server side of the same rule. Composition is snapshotted on insert and
+  read back from the session row; the six readbacks over `workout_sets` share
+  one correlated subquery so a new one cannot quietly join the catalogue.
+*/
+const composition = code("server/training/composition.ts");
+check("a movement entering a session records what its numbers will mean",
+  /loadEntry: sql<string>`\(\s*select load_entry from/.test(composition));
+check("and the session's own reading is what comes back out",
+  /loadEntry: sessionExercises\.loadEntry/.test(composition));
+check("sets read their session's reading through one place",
+  /export const setLoadEntry/.test(composition));
+
+const training = code("server/training/routes.ts");
+check("no readback over sets joins the catalogue for it",
+  !/loadEntry: exercises\.loadEntry/.test(training));
 
 if (failures.length) {
   console.error("\n✗ load semantics\n");

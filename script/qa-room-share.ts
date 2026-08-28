@@ -127,6 +127,31 @@ async function sweep(): Promise<number> {
 const swept = await sweep();
 if (swept) console.log(`  swept ${swept} fixture(s) left by an earlier run`);
 
+/*
+  And any workout still running, whoever left it.
+
+  One open workout per member is enforced by a 409, so a session another
+  harness left open makes `POST /api/training/sessions` return a refusal
+  instead of a session — and this file then carried an undefined id through
+  five more requests before dying on a response shape. Own the setup.
+
+  Done in SQL rather than through the route because the sign-in below has not
+  happened yet, and moving it after the login would put a write between the
+  sweep and the fixture it protects.
+*/
+{
+  const { rows } = await client.query<{ id: string }>(
+    "select id from workout_sessions where user_id = 'qa-member' and finished_at is null",
+  );
+  for (const { id } of rows) {
+    await client.query("delete from workout_sets where session_id = $1", [id]);
+    await client.query("delete from session_exercises where session_id = $1", [id]);
+    await client.query("delete from training_observations where session_id = $1", [id]);
+    await client.query("delete from workout_sessions where id = $1", [id]);
+  }
+  if (rows.length) console.log(`  discarded ${rows.length} workout(s) another run left open`);
+}
+
 // ─── Sign in ──────────────────────────────────────────────────────────────
 
 {
@@ -178,6 +203,15 @@ const shared = await json<{ messageId: string }>(
   await post(`/api/training/sessions/${session.id}/share`, { caption: "QA fixture" }),
 );
 check("the workout was shared to the Room", !!shared.messageId, JSON.stringify(shared).slice(0, 160));
+
+/* Nothing below this line means anything without a post to read. Stopping
+   here reports the failure that happened; carrying on reports a different one
+   five requests later. */
+if (!shared.messageId) {
+  console.error("\n✗ room share — the fixture was never published, so nothing after this ran\n");
+  await client.end();
+  process.exit(1);
+}
 
 const readCard = async (): Promise<Card | null> => {
   const thread = await json<{ id: string; workout: Card | null }[]>(

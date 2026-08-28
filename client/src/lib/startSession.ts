@@ -37,6 +37,17 @@ export type StartResult =
 export async function startSession(body: {
   habitId?: string | null;
   title?: string | null;
+  /**
+   * Start it with something already in it.
+   *
+   * `fromWorkoutId` is one of the member's saved workouts; `repeatSessionId`
+   * is a structured session they already did. The server copies the movements,
+   * their order and their supersets into the new session in the same
+   * transaction that creates it — so a start either lands with the workout in
+   * it or fails and says so. It copies nothing that was performed.
+   */
+  fromWorkoutId?: string;
+  repeatSessionId?: string;
 }): Promise<StartResult> {
   const res = await apiFetch("/api/training/sessions", {
     method: "POST",

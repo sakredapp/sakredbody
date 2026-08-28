@@ -421,11 +421,33 @@ if (A) {
     );
   }
 
-  /* Leave nothing running for the next harness. */
-  await tap('[data-testid="button-discard-session"], [data-testid="discard-session"]');
-  await b.settle();
-  await tap('[data-testid="confirm-discard"]');
 }
+
+/*
+  Leave nothing running for the next harness.
+
+  This used to tap a discard button and a confirmation, and neither selector
+  matched anything — so every run of this file left the QA member holding an
+  open workout. The next harness to call `POST /api/training/sessions` got a
+  409, carried on with an undefined session id, and died some lines later on
+  something unrelated. Half an evening went into "why does qa-room-share think
+  a thread is not an array".
+
+  Through the same DELETE the Build screen uses, and asserted rather than
+  hoped: a teardown that quietly does nothing is worse than none, because it
+  reads as one.
+*/
+const leftOpen = await discardOpenWorkouts();
+check("nothing is left running for the next harness", leftOpen <= 1, `${leftOpen} still open`);
+check(
+  "and the member has no open workout at the end",
+  (await b.evaluate<number>(`
+     const res = await fetch("/api/training/sessions/open", { credentials: "include" });
+     if (!res.ok) return -1;
+     const body = await res.json();
+     return body.session ? 1 : 0;
+   `)) === 0,
+);
 
 await b.close();
 

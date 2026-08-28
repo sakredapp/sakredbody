@@ -44,12 +44,48 @@ export type SessionMovement = {
   trackingType: string;
   takesLoad: boolean;
   unilateral: boolean;
-  /** What the number in the weight box means. See exercises.loadEntry. */
-  loadEntry: string;
+  /**
+   * What the number in the weight box meant in this session. Null when the
+   * workout predates the question — see `session_exercises.load_entry`.
+   */
+  loadEntry: string | null;
   position: number;
   supersetGroup: string | null;
   habitExerciseId: string | null;
 };
+
+/**
+ * What a set's own workout said its numbers meant.
+ *
+ * A correlated subquery rather than a join, so any of the six readbacks that
+ * already select from `workout_sets` can add one line and get the session's
+ * own interpretation instead of the catalogue's current setting. The unique
+ * index on `(session_id, exercise_id)` makes it an index lookup and makes the
+ * single row unambiguous.
+ *
+ * Null when the session predates the column — the arithmetic that answers
+ * that is in `loadShape`, and it is the arithmetic this product already used.
+ *
+ * ── The outer table is named, not interpolated as a column ───────────────
+ *
+ * `${workoutSets}.session_id`, not `${workoutSets.sessionId}`. Drizzle renders
+ * a column reference inside a *selected* expression unqualified — the first
+ * version of this emitted `where se.session_id = "session_id"`, which Postgres
+ * resolves against the innermost table in scope. That is `se`, so the
+ * correlation became `se.session_id = se.session_id`: always true, every row
+ * of the table returned, and every query using it failing at runtime with
+ * "more than one row returned by a subquery used as an expression".
+ *
+ * It typechecked, it read correctly, and it was wrong on the first request.
+ * script/qa-workout-pass.ts is what found it; nothing without a database
+ * could have.
+ */
+export const setLoadEntry = sql<string | null>`(
+  select se.load_entry
+    from ${sessionExercises} se
+   where se.session_id = ${workoutSets}.session_id
+     and se.exercise_id = ${workoutSets}.exercise_id
+)`;
 
 /**
  * Put a movement in the session, or leave it where it already is.
@@ -74,6 +110,18 @@ export async function ensureSessionExercise(
       sessionId,
       exerciseId,
       habitExerciseId: habitExerciseId ?? null,
+      /*
+        What the weight box means, copied now rather than joined later.
+
+        The catalogue setting can change; what this workout meant cannot. Read
+        in the same statement that inserts the row so there is no window in
+        which a movement is in a session with no recorded interpretation, and
+        so two devices adding the same movement cannot record two different
+        ones — `onConflictDoNothing` keeps the first.
+      */
+      loadEntry: sql<string>`(
+        select load_entry from ${exercises} where id = ${exerciseId}
+      )`,
       position: sql<number>`(
         select coalesce(max(position), -1) + 1
         from ${sessionExercises}
@@ -94,7 +142,9 @@ export async function compositionFor(sessionId: string): Promise<SessionMovement
       trackingType: exercises.trackingType,
       takesLoad: exercises.takesLoad,
       unilateral: exercises.unilateral,
-      loadEntry: exercises.loadEntry,
+      /* This session's reading, not the catalogue's current one. Null for
+         anything logged before the column existed — see the schema note. */
+      loadEntry: sessionExercises.loadEntry,
       position: sessionExercises.position,
       supersetGroup: sessionExercises.supersetGroup,
       habitExerciseId: sessionExercises.habitExerciseId,
@@ -124,6 +174,107 @@ export async function removeSessionExercise(
     );
 
   return { removed: removed.length };
+}
+
+/**
+ * A workout's shape, with nothing in it that was performed.
+ *
+ * The one type that a saved workout, a finished session and a prescribed habit
+ * all reduce to, so "start this again" is one code path rather than three that
+ * drift. Sets, reps, loads, RPE and notes are deliberately not here: repeating
+ * a workout means doing it again, not being handed last week's numbers as
+ * though they were today's.
+ */
+export type PlannedMovement = {
+  exerciseId: string;
+  supersetGroup: string | null;
+  habitExerciseId?: string | null;
+};
+
+/**
+ * Fill a new session with the movements it is supposed to contain.
+ *
+ * ── Why it takes a transaction ───────────────────────────────────────────
+ *
+ * The defect this replaces created the session and copied nothing, so a member
+ * tapping a saved workout got its name, a running timer and an empty screen —
+ * the app appearing to have lost the workout they had just chosen. The fix is
+ * not "also copy the movements"; it is that a session and its intended
+ * composition are one fact. Either both exist or the start fails and says so.
+ * A caller that inserted the session first and then called this would have
+ * reintroduced exactly the window it exists to close, which is why there is no
+ * pool-taking version of it.
+ *
+ * ── Superset keys are minted here ────────────────────────────────────────
+ *
+ * The plan's keys are only a statement of which movements travel together. New
+ * uuids per session keep a group's identity local to the workout it happened
+ * in, so nothing can ever join two sessions' movements into one bracket.
+ */
+export async function fillSessionComposition(
+  tx: { insert: typeof db.insert },
+  sessionId: string,
+  plan: readonly PlannedMovement[],
+): Promise<number> {
+  if (plan.length === 0) return 0;
+
+  const minted = new Map<string, string>();
+  const groupFor = (key: string | null): string | null => {
+    if (!key) return null;
+    const existing = minted.get(key);
+    if (existing) return existing;
+    const fresh = crypto.randomUUID();
+    minted.set(key, fresh);
+    return fresh;
+  };
+
+  await tx.insert(sessionExercises).values(
+    plan.map((m, i) => ({
+      sessionId,
+      exerciseId: m.exerciseId,
+      habitExerciseId: m.habitExerciseId ?? null,
+      position: i,
+      supersetGroup: groupFor(m.supersetGroup),
+      // The same snapshot `ensureSessionExercise` takes. A movement arriving
+      // from a template still records what its numbers will mean *today*,
+      // read from the catalogue as it stands now — see the schema note.
+      loadEntry: sql<string>`(select load_entry from ${exercises} where id = ${m.exerciseId})`,
+    })),
+  );
+
+  return plan.length;
+}
+
+/**
+ * Correct what the weight box means, for this workout.
+ *
+ * ── Session-scoped, deliberately ─────────────────────────────────────────
+ *
+ * The catalogue's setting is not touched. A member saying "actually I'm
+ * entering this per hand today" is telling us about today; rewriting the
+ * movement would reach every *future* session silently, and rewriting past
+ * sessions is the thing this whole column exists to make impossible.
+ *
+ * ── One reading per movement per session ─────────────────────────────────
+ *
+ * Not per set. A member who changes it after three sets is correcting a
+ * mistake in how they were entering the number, not describing a change in
+ * what they were doing — so the whole movement re-reads, and the screen says
+ * so before they confirm. Per-set semantics would make "what did this
+ * movement weigh" a question with no single answer, and every reader of it
+ * would have to learn to ask per row.
+ */
+export async function setSessionLoadEntry(
+  sessionId: string,
+  exerciseId: string,
+  loadEntry: string,
+): Promise<void> {
+  await db
+    .update(sessionExercises)
+    .set({ loadEntry })
+    .where(
+      and(eq(sessionExercises.sessionId, sessionId), eq(sessionExercises.exerciseId, exerciseId)),
+    );
 }
 
 /**
@@ -249,6 +400,15 @@ export async function priorPerformanceFor(
   const found = latest.rows ?? [];
   if (found.length === 0) return {};
 
+  // How the movement is performed, which is a property of the movement and not
+  // of the day it was performed on — so unlike `load_entry` this is right to
+  // read from the catalogue.
+  const shapes = await db
+    .select({ id: exercises.id, unilateral: exercises.unilateral })
+    .from(exercises)
+    .where(inArray(exercises.id, found.map((r) => r.exercise_id)));
+  const unilateralOf = new Map(shapes.map((r) => [r.id, r.unilateral]));
+
   const sets = await db
     .select({
       sessionId: workoutSets.sessionId,
@@ -260,6 +420,9 @@ export async function priorPerformanceFor(
       weightKg: workoutSets.weightKg,
       rpe: workoutSets.rpe,
       isWarmup: workoutSets.isWarmup,
+      /* So "70 × 8 lb" beside today's row can say whether that was 70 in each
+         hand. Read from the session it happened in, never from the catalogue. */
+      loadEntry: setLoadEntry,
     })
     .from(workoutSets)
     .where(
@@ -285,6 +448,10 @@ export async function priorPerformanceFor(
     out[row.exercise_id] = {
       exerciseId: row.exercise_id,
       onDate: row.on_date,
+      // One interpretation per movement per session, which is what the column
+      // is — taking it off the first set is reading the session's row.
+      loadEntry: mine[0].loadEntry ?? null,
+      unilateral: unilateralOf.get(row.exercise_id) ?? false,
       sets: mine.map((s) => ({
         reps: s.reps,
         durationSeconds: s.durationSeconds,

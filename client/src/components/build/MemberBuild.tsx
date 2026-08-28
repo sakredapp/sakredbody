@@ -21,7 +21,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Dumbbell, Plus, Play, Pencil, Trash2, X, GripVertical, Clock } from "lucide-react";
+import { Dumbbell, Plus, Play, Pencil, Copy, Trash2, X, GripVertical, Clock } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -51,14 +51,51 @@ type SavedExercise = {
   trackingType: "reps" | "duration" | "distance";
   takesLoad: boolean;
   unilateral: boolean;
+  /** Movements sharing a key are a superset — the key `session_exercises` uses. */
+  supersetGroup: string | null;
 };
 
 type SavedWorkout = {
   id: string;
   name: string;
   note: string | null;
+  /** When it was last actually begun, not when it was last edited. */
+  lastUsedAt: string | null;
+  /** The finished session it was saved from, if it was saved from one. */
+  sourceSessionId: string | null;
   exercises: SavedExercise[];
 };
+
+/** "A1", "A2" — the same notation the active workout draws. See WorkoutSheet. */
+function supersetLabels(items: readonly { exerciseId: string; supersetGroup: string | null }[]) {
+  const letters = new Map<string, string>();
+  const seen = new Map<string, number>();
+  const out = new Map<string, string>();
+  for (const i of items) {
+    if (!i.supersetGroup) continue;
+    let letter = letters.get(i.supersetGroup);
+    if (!letter) {
+      letter = String.fromCharCode(65 + (letters.size % 26));
+      letters.set(i.supersetGroup, letter);
+    }
+    const n = (seen.get(i.supersetGroup) ?? 0) + 1;
+    seen.set(i.supersetGroup, n);
+    out.set(i.exerciseId, `${letter}${n}`);
+  }
+  return out;
+}
+
+/** "today", "yesterday", "3 Aug" — short enough to sit under a workout's name. */
+function lastDone(at: string | null): string | null {
+  if (!at) return null;
+  const then = new Date(at);
+  if (Number.isNaN(then.getTime())) return null;
+  const days = Math.floor((Date.now() - then.getTime()) / 86_400_000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days} days ago`;
+  return then.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
 
 /** A movement while it is being composed, before it has been saved. */
 type Draft = {
@@ -69,6 +106,15 @@ type Draft = {
   targetRepsHigh: number | null;
   trackingType: "reps" | "duration" | "distance";
   takesLoad: boolean;
+  /**
+   * Carried, though the builder cannot create one.
+   *
+   * Pairing is decided while training — that is where "Superset with…" lives,
+   * and where a member actually knows they want it. What matters here is that
+   * editing a workout saved from a session cannot silently drop it, which is
+   * what an omitted field would do on the next save.
+   */
+  supersetGroup: string | null;
 };
 
 export function MemberBuild({
@@ -121,20 +167,29 @@ export function MemberBuild({
   });
 
   const startSession = useMutation({
-    mutationFn: (title: string) => beginSession({ title: title || null }),
+    mutationFn: (v: Parameters<typeof beginSession>[0]) => beginSession(v),
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
   /**
    * Start, unless one is already open.
    *
-   * Returns null when it collided, so both call sites stop rather than
+   * Returns null when it collided, so every call site stops rather than
    * announcing a session that was never created.
+   *
+   * The whole body is carried into the retry, not just the title. That was the
+   * shape of the bug this replaces: a saved workout was started by passing its
+   * *name*, so the session arrived correctly titled and completely empty — and
+   * a member who tapped "Push Day A" got a running timer over a blank screen,
+   * which reads as the app having lost their workout. What a session is made
+   * of is not a string.
    */
-  const begin = async (title: string): Promise<{ id: string } | null> => {
-    const result = await startSession.mutateAsync(title);
+  const begin = async (
+    body: Parameters<typeof beginSession>[0],
+  ): Promise<{ id: string } | null> => {
+    const result = await startSession.mutateAsync(body);
     if ("conflict" in result) {
-      setCollision({ session: result.conflict, retry: () => void begin(title) });
+      setCollision({ session: result.conflict, retry: () => void begin(body) });
       return null;
     }
     // The new session goes into the shared cache before anybody renders
@@ -144,6 +199,16 @@ export function MemberBuild({
     await seedOpenWorkout(qc, result.started);
     return result.started;
   };
+
+  const duplicate = useMutation({
+    mutationFn: async (id: string) =>
+      apiRequest("POST", `/api/training/workouts/${id}/duplicate`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/training/workouts"] });
+      toast({ title: "Copied. Open it to rename." });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
 
   const remove = useMutation({
     mutationFn: async (id: string) => apiRequest("DELETE", `/api/training/workouts/${id}`),
@@ -196,7 +261,7 @@ export function MemberBuild({
             <Button
               size="sm"
               onClick={async () => {
-                const s = await begin("");
+                const s = await begin({ title: null });
                 if (s) onStarted();
               }}
               disabled={startSession.isPending}
@@ -255,13 +320,44 @@ export function MemberBuild({
                         ? w.exercises.map((e) => e.name).join(" · ")
                         : "Nothing in it yet"}
                     </p>
+                    {/*
+                      What it is made of, said in the list rather than only
+                      after it starts — a saved workout is a structure, and
+                      "4 movements · 1 superset" is what distinguishes two of
+                      them from each other at a glance.
+                    */}
+                    {w.exercises.length > 0 && (
+                      <p
+                        className="text-[10px] text-muted-foreground/70 truncate"
+                        data-testid={`saved-workout-shape-${w.id}`}
+                      >
+                        {[
+                          `${w.exercises.length} ${
+                            w.exercises.length === 1 ? "movement" : "movements"
+                          }`,
+                          new Set(
+                            w.exercises.map((e) => e.supersetGroup).filter(Boolean),
+                          ).size > 0
+                            ? `${
+                                new Set(
+                                  w.exercises.map((e) => e.supersetGroup).filter(Boolean),
+                                ).size
+                              } superset`
+                            : null,
+                          lastDone(w.lastUsedAt) && `last done ${lastDone(w.lastUsedAt)}`,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    )}
                   </div>
                   <Button
                     size="sm"
                     variant="ghost"
                     className="shrink-0"
                     onClick={async () => {
-                      const s = await begin(w.name);
+                      // The workout, not its name. See `begin`.
+                      const s = await begin({ fromWorkoutId: w.id });
                       if (s) onStarted();
                     }}
                     data-testid={`start-workout-${w.id}`}
@@ -277,12 +373,26 @@ export function MemberBuild({
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
+                  {/* A variation without losing what it varies from — Push Day
+                      A becomes Push Day B with one movement swapped. */}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="shrink-0 text-muted-foreground"
+                    onClick={() => duplicate.mutate(w.id)}
+                    disabled={duplicate.isPending}
+                    aria-label="Duplicate"
+                    data-testid={`duplicate-workout-${w.id}`}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
                   <Button
                     size="sm"
                     variant="ghost"
                     className="shrink-0 text-muted-foreground hover:text-destructive"
                     onClick={() => remove.mutate(w.id)}
                     aria-label="Remove"
+                    data-testid={`remove-workout-${w.id}`}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
@@ -352,6 +462,7 @@ function WorkoutBuilder({
       targetRepsHigh: e.targetRepsHigh,
       trackingType: e.trackingType,
       takesLoad: e.takesLoad,
+      supersetGroup: e.supersetGroup,
     })) ?? [],
   );
 
@@ -386,6 +497,8 @@ function WorkoutBuilder({
           targetSets: i.targetSets,
           targetRepsLow: i.targetRepsLow,
           targetRepsHigh: i.targetRepsHigh,
+          // Sent back, or the next save would quietly unpair the workout.
+          supersetGroup: i.supersetGroup,
         })),
       };
       return workout
@@ -412,11 +525,13 @@ function WorkoutBuilder({
               targetRepsHigh: m.trackingType === "reps" ? 12 : null,
               trackingType: m.trackingType,
               takesLoad: m.takesLoad,
+              supersetGroup: null,
             },
           ],
     );
 
   const picked = new Set(items.map((i) => i.exerciseId));
+  const pairs = supersetLabels(items);
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -468,7 +583,18 @@ function WorkoutBuilder({
                   >
                     <GripVertical className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm truncate">{i.name}</p>
+                      <div className="flex items-baseline gap-1.5">
+                        {/* Shown, not editable. See the note on Draft. */}
+                        {pairs.has(i.exerciseId) && (
+                          <span
+                            className="shrink-0 rounded-sm bg-gold/15 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-gold"
+                            data-testid={`builder-superset-${i.exerciseId}`}
+                          >
+                            {pairs.get(i.exerciseId)}
+                          </span>
+                        )}
+                        <p className="text-sm truncate">{i.name}</p>
+                      </div>
                       <div className="flex items-center gap-1.5 mt-1">
                         <input
                           type="number"

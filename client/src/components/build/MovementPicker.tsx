@@ -52,8 +52,14 @@ export type Movement = {
   trackingType: "reps" | "duration" | "distance";
   takesLoad: boolean;
   unilateral: boolean;
-  /** "total" | "per_limb" — what the number in the weight box means. */
-  loadEntry: string;
+  /**
+   * "total" | "per_limb" — what the number in the weight box means.
+   *
+   * Null when it comes from a session logged before the question was asked.
+   * The catalogue always has an answer; a workout from last March may not, and
+   * inventing one for it there would be inventing history. See `loadShape`.
+   */
+  loadEntry: string | null;
   aliases: string[] | null;
   ownerUserId: string | null;
 };
