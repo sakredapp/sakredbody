@@ -30,7 +30,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Panel } from "@/components/portal/Panel";
 import { WorkoutInProgress } from "@/components/build/WorkoutInProgress";
 import { startSession as beginSession, type RunningSession } from "@/lib/startSession";
-import { seedOpenWorkout } from "@/hooks/use-open-workout";
+import { reconcileOpenWorkout, seedOpenWorkout } from "@/hooks/use-open-workout";
 import { MovementPicker, type Movement } from "./MovementPicker";
 import { NewMovement, type NewMovementInput } from "./NewMovement";
 import { LogPractice } from "./LogPractice";
@@ -39,6 +39,7 @@ import { ProgressPhotos } from "@/components/ProgressPhotos";
 import { useMyCoach } from "@/hooks/use-coaching";
 import { TodaysMovement } from "@/components/portal/TodaysMovement";
 import { ModalityPrompt } from "./Modalities";
+import { pairMovements, supersetLabels } from "@shared/models/training";
 import { cn } from "@/lib/utils";
 
 type SavedExercise = {
@@ -66,25 +67,6 @@ type SavedWorkout = {
   exercises: SavedExercise[];
 };
 
-/** "A1", "A2" — the same notation the active workout draws. See WorkoutSheet. */
-function supersetLabels(items: readonly { exerciseId: string; supersetGroup: string | null }[]) {
-  const letters = new Map<string, string>();
-  const seen = new Map<string, number>();
-  const out = new Map<string, string>();
-  for (const i of items) {
-    if (!i.supersetGroup) continue;
-    let letter = letters.get(i.supersetGroup);
-    if (!letter) {
-      letter = String.fromCharCode(65 + (letters.size % 26));
-      letters.set(i.supersetGroup, letter);
-    }
-    const n = (seen.get(i.supersetGroup) ?? 0) + 1;
-    seen.set(i.supersetGroup, n);
-    out.set(i.exerciseId, `${letter}${n}`);
-  }
-  return out;
-}
-
 /** "today", "yesterday", "3 Aug" — short enough to sit under a workout's name. */
 function lastDone(at: string | null): string | null {
   if (!at) return null;
@@ -107,12 +89,17 @@ type Draft = {
   trackingType: "reps" | "duration" | "distance";
   takesLoad: boolean;
   /**
-   * Carried, though the builder cannot create one.
+   * Which movements are performed together.
    *
-   * Pairing is decided while training — that is where "Superset with…" lives,
-   * and where a member actually knows they want it. What matters here is that
-   * editing a workout saved from a session cannot silently drop it, which is
-   * what an omitted field would do on the next save.
+   * The same key `session_exercises.superset_group` uses, minted here because
+   * a workout being designed has nothing to write to yet. Superset structure
+   * is part of the composition, not something only discovered mid-session: a
+   * member writing "Chest + Shoulders" to run every week should be able to say
+   * that the incline press and the fly are a pair before they train it once.
+   *
+   * The pairing rule itself is `pairMovements` in the shared model — the same
+   * function shape the server applies — so the builder and the active workout
+   * cannot come to different conclusions about what joining a group means.
    */
   supersetGroup: string | null;
 };
@@ -197,6 +184,23 @@ export function MemberBuild({
     // same fact — and so a `/open` read already in flight cannot come back and
     // say nothing is running. See `seedOpenWorkout`.
     await seedOpenWorkout(qc, result.started);
+
+    /*
+      A session that arrives with movements in it has to be read back before
+      the screen draws.
+
+      The POST answers with the session row and nothing else — it has no
+      composition on it, because for a blank start there is none. Seeding that
+      and opening the sheet is right for a blank start and wrong for this one:
+      the member taps their saved workout, the sheet opens, and it is empty
+      until some later refetch fills it in. Which is the exact thing this whole
+      path was fixed for, arriving a second time by a different route.
+
+      So a planned start waits for the truth. One request, at the moment
+      somebody is looking at the screen, in exchange for the screen being
+      right when they look at it.
+    */
+    if (body.fromWorkoutId || body.repeatSessionId) await reconcileOpenWorkout(qc);
     return result.started;
   };
 
@@ -533,6 +537,21 @@ function WorkoutBuilder({
   const picked = new Set(items.map((i) => i.exerciseId));
   const pairs = supersetLabels(items);
 
+  /** Which movement is choosing a partner, if any. */
+  const [pairing, setPairing] = useState<string | null>(null);
+
+  /*
+    The same rule the active workout applies, from the same function. Joining a
+    movement already in a group joins that group; leaving one that would be
+    left holding a single movement dissolves it. The key is minted here because
+    a workout being designed has no rows yet — the server mints fresh ones per
+    session when it is started, so nothing about this key outlives the template.
+  */
+  const pair = (exerciseId: string, partnerExerciseId: string | null) => {
+    setItems((prev) => pairMovements(prev, exerciseId, partnerExerciseId, () => crypto.randomUUID()));
+    setPairing(null);
+  };
+
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md max-h-[88svh] flex flex-col">
@@ -639,11 +658,76 @@ function WorkoutBuilder({
                           <span className="text-[11px] text-muted-foreground">reps</span>
                         )}
                       </div>
+
+                      {/*
+                        ── Pairing, while the workout is being written ──
+
+                        Offered on every movement, including when it is the
+                        only one — a member adds the incline press *thinking*
+                        of the fly, and a control that appears only once there
+                        are two is missing at the moment it is wanted. With one
+                        movement this says so rather than opening an empty
+                        chooser.
+                      */}
+                      {pairing === i.exerciseId ? (
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {items
+                            .filter((x) => x.exerciseId !== i.exerciseId)
+                            .map((x) => (
+                              <button
+                                key={x.exerciseId}
+                                onClick={() => pair(i.exerciseId, x.exerciseId)}
+                                className="text-[11px] rounded-full border border-border/60 px-2 py-0.5 tap-clean"
+                                data-testid={`builder-pair-with-${x.exerciseId}`}
+                              >
+                                {x.name}
+                              </button>
+                            ))}
+                          <button
+                            onClick={() => setPairing(null)}
+                            className="text-[11px] text-muted-foreground px-1 tap-clean"
+                            data-testid={`builder-pair-cancel-${i.exerciseId}`}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : i.supersetGroup ? (
+                        <button
+                          onClick={() => pair(i.exerciseId, null)}
+                          className="mt-1 block text-[11px] text-muted-foreground tap-clean"
+                          data-testid={`builder-unpair-${i.exerciseId}`}
+                        >
+                          {`Superset with ${items
+                            .filter((x) => x.supersetGroup === i.supersetGroup && x.exerciseId !== i.exerciseId)
+                            .map((x) => x.name)
+                            .join(", ")} — perform separately`}
+                        </button>
+                      ) : items.length > 1 ? (
+                        <button
+                          onClick={() => setPairing(i.exerciseId)}
+                          className="mt-1 block text-[11px] text-muted-foreground tap-clean"
+                          data-testid={`builder-pair-${i.exerciseId}`}
+                        >
+                          Superset with…
+                        </button>
+                      ) : (
+                        <p className="mt-1 text-[11px] text-muted-foreground/60">
+                          Add another movement to superset this one.
+                        </p>
+                      )}
                     </div>
                     <button
-                      onClick={() => setItems((prev) => prev.filter((_, n) => n !== idx))}
+                      onClick={() => {
+                        // Removing it also takes it out of whatever it was
+                        // paired with — through the same rule, so a pair left
+                        // holding one movement dissolves rather than keeping a
+                        // bracket around nothing.
+                        const loose = pairMovements(items, i.exerciseId, null, () => crypto.randomUUID());
+                        setItems(loose.filter((x) => x.exerciseId !== i.exerciseId));
+                      }}
                       className="shrink-0 p-1 text-muted-foreground hover:text-destructive"
                       aria-label={`Remove ${i.name}`}
+                      data-testid={`builder-remove-${i.exerciseId}`}
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -652,7 +736,12 @@ function WorkoutBuilder({
               </ul>
             )}
 
-            <Button variant="outline" className="w-full" onClick={() => setPicking(true)}>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setPicking(true)}
+              data-testid="builder-add-movement"
+            >
               <Plus className="h-3.5 w-3.5 mr-1.5" />
               Add a movement
             </Button>

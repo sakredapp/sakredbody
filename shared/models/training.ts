@@ -1231,6 +1231,100 @@ export type SessionExercise = typeof sessionExercises.$inferSelect;
 // ─── 6. SETS ───────────────────────────────────────────────────────────────
 
 /**
+ * Pair two movements, or set one loose — over a list, with no database.
+ *
+ * ── Why this is here and not only on the server ──────────────────────────
+ *
+ * There are now two places a superset can be made: the active workout, where
+ * `pairSessionExercise` writes `session_exercises.superset_group`, and the
+ * builder, where a member is designing a workout they have not performed yet
+ * and there is nothing to write to until they save. Those two had better agree
+ * on what pairing *means*, and the parts that are easy to get subtly different
+ * are the two below:
+ *
+ *   · joining a movement that is already in a group joins *that* group, so a
+ *     tri-set is three movements sharing one key rather than a chain of pairs;
+ *   · a group left holding one movement is dissolved, because a superset of
+ *     one is a set, and leaving the key behind draws a bracket around nothing.
+ *
+ * So the rule lives once, in the shared model, and both sides call it. It is
+ * pure over a list, which is also what makes it testable without a browser or
+ * a database — see script/test-training.ts.
+ *
+ * `mintKey` is passed in rather than called here: `crypto.randomUUID` exists in
+ * both environments but this module is imported by code that must stay
+ * deterministic under test, and a function that invents an identifier every
+ * time it runs is the kind of thing a snapshot test discovers the hard way.
+ */
+export function pairMovements<T extends { exerciseId: string; supersetGroup: string | null }>(
+  items: readonly T[],
+  exerciseId: string,
+  partnerExerciseId: string | null,
+  mintKey: () => string,
+): T[] {
+  const mine = items.find((i) => i.exerciseId === exerciseId);
+  if (!mine) return [...items];
+
+  const previous = mine.supersetGroup;
+  let joined: string | null = null;
+  let next: T[];
+
+  if (partnerExerciseId === null) {
+    next = items.map((i) => (i.exerciseId === exerciseId ? { ...i, supersetGroup: null } : i));
+  } else {
+    const partner = items.find((i) => i.exerciseId === partnerExerciseId);
+    if (!partner || partner.exerciseId === exerciseId) return [...items];
+    joined = partner.supersetGroup ?? mintKey();
+    next = items.map((i) =>
+      i.exerciseId === exerciseId || i.exerciseId === partnerExerciseId
+        ? { ...i, supersetGroup: joined }
+        : i,
+    );
+  }
+
+  // Whatever the movement just left, if it is now a group of one, is not a
+  // superset any more. Compared against the group it joined rather than
+  // against the partner — those are different kinds of thing.
+  if (previous && previous !== joined) {
+    const left = next.filter((i) => i.supersetGroup === previous);
+    if (left.length <= 1) {
+      next = next.map((i) => (i.supersetGroup === previous ? { ...i, supersetGroup: null } : i));
+    }
+  }
+
+  return next;
+}
+
+/**
+ * "A1", "A2" — a letter per superset in the order they appear, numbered within.
+ *
+ * The notation every written programme uses, and the reason the pairing is
+ * legible on a row without opening anything. Shared because three screens draw
+ * it: the active workout, the builder, and the saved-workout list.
+ */
+export function supersetLabels(
+  items: readonly { exerciseId: string; supersetGroup: string | null }[],
+): Map<string, string> {
+  const letters = new Map<string, string>();
+  const seen = new Map<string, number>();
+  const out = new Map<string, string>();
+  for (const i of items) {
+    if (!i.supersetGroup) continue;
+    let letter = letters.get(i.supersetGroup);
+    if (!letter) {
+      // A..Z, then round again. A session with twenty-seven supersets in it
+      // has a bigger problem than an ambiguous letter.
+      letter = String.fromCharCode(65 + (letters.size % 26));
+      letters.set(i.supersetGroup, letter);
+    }
+    const n = (seen.get(i.supersetGroup) ?? 0) + 1;
+    seen.set(i.supersetGroup, n);
+    out.set(i.exerciseId, `${letter}${n}`);
+  }
+  return out;
+}
+
+/**
  * The four kinds of set worth telling apart, and the reason there is no fifth.
  *
  * `superset` is deliberately absent. It is the relationship between two
@@ -1543,6 +1637,32 @@ export const observationSchema = z
  *     roughly linear and real strength curves are not, so a set of thirty
  *     bodyweight squats would "prove" a 2× bodyweight max. Beyond the cap this
  *     returns null and the caller shows nothing rather than a fiction.
+ *
+ * ── This is not the place `load_entry` belongs. Deliberately. ────────────
+ *
+ * Volume was corrected to use the total external load: a dumbbell bench at 70
+ * in each hand moves 140kg, and a card saying otherwise was publishing a
+ * guess. The obvious next step is to "finish the job" by doubling dumbbells
+ * here too. Do not.
+ *
+ * They answer different questions. Volume is a claim about mass moved, and
+ * 140kg is what was in the air. An estimated one-rep max is a claim about
+ * capacity in the units the movement is performed and recorded in, and for a
+ * dumbbell press that unit is the dumbbell: "my dumbbell bench e1RM is 78 per
+ * hand" is how the number is used, compared and programmed against. Doubling
+ * it produces 156, which is not a weight this member has ever been near and
+ * not a number any coach would recognise.
+ *
+ * There is also a shape problem underneath the semantics. `load_entry` is
+ * recorded per session and is null for every workout logged before the column
+ * existed, so normalising here would put a step in every dumbbell graph at the
+ * date this shipped — old sessions on one scale, new ones on another, in a
+ * chart whose whole purpose is comparison over time.
+ *
+ * So: `setVolumeKg` normalises. `estimateOneRepMax`, `progressionSeries` and
+ * `relativeStrength` take the number the member entered, and the unit of each
+ * derived figure stays the unit of the thing it describes.
+ * script/test-load.ts holds this, so the change cannot be made quietly.
  */
 export const MAX_REPS_FOR_ESTIMATE = 12;
 

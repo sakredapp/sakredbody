@@ -1368,17 +1368,25 @@ export function registerTrainingRoutes(app: Express) {
         .where(and(eq(workoutSessions.id, id), eq(workoutSessions.userId, userId)));
       if (!owned) return res.status(404).json({ message: "No such session" });
 
-      await db.delete(workoutSets).where(eq(workoutSets.sessionId, id));
       /*
-        And what it was made of.
+        The sets, and then the session.
 
-        This was missing, and it left a `session_exercises` row per movement
-        pointing at a session that no longer exists — invisible, permanent, and
-        counted by anything that reads composition by exercise. Discarding a
-        workout has to discard the workout.
+        Everything else that hangs off a session — its composition, its
+        observations — goes with it in the database: `session_exercises`,
+        `workout_sets` and `training_observations` all carry
+        `ON DELETE CASCADE` on `session_id`. This was very nearly "fixed" by
+        adding explicit deletes for the first two on the belief that discarding
+        a workout was leaving composition rows behind. It is not; planting the
+        omission and running script/qa-workout-pass.ts against a real database
+        showed the rows going anyway, which is what the cascade is for. The
+        harness now asserts both the outcome and the constraint that produces
+        it, so the day somebody drops the cascade the failure names it.
+
+        The explicit delete of the sets is older than that reading and is kept:
+        it is redundant, harmless, and one statement, and removing it is a
+        change with no upside.
       */
-      await db.delete(sessionExercises).where(eq(sessionExercises.sessionId, id));
-      await db.delete(trainingObservations).where(eq(trainingObservations.sessionId, id));
+      await db.delete(workoutSets).where(eq(workoutSets.sessionId, id));
       await db.delete(workoutSessions).where(eq(workoutSessions.id, id));
 
       res.json({ ok: true });

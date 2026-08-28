@@ -409,8 +409,33 @@ export function MemberBottomNav({
   section: MemberSection;
   onChange: (s: MemberSection) => void;
 }) {
-  const secondary = useSecondary();
-  const roles = useRoles();
+  const live = useSecondary();
+  const liveRoles = useRoles();
+
+  /**
+   * The rows as they were when the sheet opened, held until it closes.
+   *
+   * ── Why an open sheet must not change ────────────────────────────────────
+   *
+   * Which rows exist depends on queries — whether this member has a coach,
+   * which roles they hold — and those resolve whenever they resolve. Open the
+   * sheet a moment before one lands and a row appears in the middle of the
+   * list, moving everything under it down by its own height.
+   *
+   * Measured: "Goals" moved 60px between a press and the release that
+   * followed it, because the coaching row arrived in between. The browser
+   * dispatches `click` on the nearest common ancestor of the two, which is the
+   * list, and the tap is lost — the same dead tap the entry animation causes,
+   * arriving by a second route and surviving the fix for the first.
+   *
+   * So the list is taken once, when the sheet opens, and left alone until it
+   * closes. A row that appears while somebody is reading is not new
+   * information worth having; it is the page moving under their finger.
+   */
+  const [frozen, setFrozen] = useState<{ rows: typeof live; roles: typeof liveRoles } | null>(null);
+  const secondary = frozen?.rows ?? live;
+  const roles = frozen?.roles ?? liveRoles;
+
   const inMore = secondary.some((d) => d.section === section);
   /**
    * One dot, for anything under More wanting attention.
@@ -432,6 +457,28 @@ export function MemberBottomNav({
     nothing here fights a member who opens or closes it themselves.
   */
   const [moreOpen, setMoreOpen] = useState(false);
+
+  /**
+   * Whether the sheet has finished sliding up.
+   *
+   * ── The dead tap this closes ─────────────────────────────────────────────
+   *
+   * The sheet animates in from the bottom, and its rows travel about 475px on
+   * the way. A tap that begins while they are still moving presses one element
+   * and releases over another, so the browser dispatches `click` on their
+   * nearest common ancestor — the sheet — and nothing happens. Measured: on a
+   * 393×852 screen, "Goals" was at y=847 the instant the row became visible
+   * and at y=372 when it stopped. The member's recourse was to tap again, with
+   * nothing on screen explaining why the first one did not count.
+   *
+   * It cannot activate the *wrong* row — a common ancestor is never a sibling
+   * — so this is a lost tap rather than a wrong one. It is still a lost tap.
+   *
+   * So the rows do not accept a press until they have stopped moving. That
+   * turns "sometimes nothing happens" into "nothing happens for 200ms and then
+   * everything works", which is what a sheet on a phone does everywhere else.
+   */
+  const [settled, setSettled] = useState(false);
   /*
     Opens, never closes.
 
@@ -494,7 +541,20 @@ export function MemberBottomNav({
           );
         })}
 
-        <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+        <Sheet
+          open={moreOpen}
+          onOpenChange={(o) => {
+            // Reset before it opens, not after it closes: a sheet reopened
+            // while the closing animation is still running would otherwise
+            // start already believing it had settled.
+            if (o) setSettled(false);
+            // And take the list as it stands now, so it cannot change while
+            // somebody is reading it. Released on close, so the next opening
+            // sees whatever has arrived since.
+            setFrozen(o ? { rows: live, roles: liveRoles } : null);
+            setMoreOpen(o);
+          }}
+        >
           <SheetTrigger asChild>
             <button
               className={cn(
@@ -526,14 +586,29 @@ export function MemberBottomNav({
               step ends when this opens, not when the button is pressed, so a
               member who opens it a second time isn't stuck on a completed
               instruction. */}
-          <SheetContent side="bottom" className="pb-safe" data-tour-id="more-sheet">
+          <SheetContent
+            side="bottom"
+            className="pb-safe"
+            data-tour-id="more-sheet"
+            /* `animationend` rather than a timer: the duration lives in the
+               stylesheet and a number copied here would be a second copy of it
+               to fall out of step. Bubbling children could fire this too, so
+               only the sheet's own animation counts. */
+            onAnimationEnd={(e) => {
+              if (e.target === e.currentTarget) setSettled(true);
+            }}
+            data-tour-settled={settled ? "true" : "false"}
+          >
             <SheetHeader className="text-left">
               <SheetTitle className="font-display text-xl font-normal">
                 Everything else
               </SheetTitle>
             </SheetHeader>
 
-            <div className="mt-4 -mx-2">
+            <div
+              className={cn("mt-4 -mx-2", !settled && "pointer-events-none")}
+              data-tour-id="more-rows"
+            >
               {/* Wrapped in SheetClose, because the comment that used to sit
                   here was wrong: Radix does NOT close a Dialog on an arbitrary
                   click inside it. Only an explicit Close, an outside click or

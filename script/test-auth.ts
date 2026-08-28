@@ -179,6 +179,90 @@ async function main() {
     /503:/.test(code("shared/models/labels.ts")),
   );
 
+  // ── The contract, executed ──────────────────────────────────────────────
+  console.log("\nA failed lookup is answered as a failed lookup\n");
+
+  /*
+    The checks above read the file. These run it.
+
+    The behaviour that matters cannot be produced against a real database: QA
+    cannot make Supabase's pooler reclaim a seat on demand, and a test that
+    waits for one never runs. So the token read is a parameter — see
+    `bearerAuthWith` — and it is driven here by a reader that fails once, one
+    that always fails, and one that answers.
+
+    `DATABASE_URL` is set to a string that is never dialled: `server/db.ts`
+    refuses to load without one, and `new Pool` opens nothing until a query is
+    issued. Every path exercised below has its reader and its delete injected,
+    so none is.
+  */
+  process.env.DATABASE_URL ??= "postgres://unused@127.0.0.1:1/unused";
+  const { bearerAuthWith } = await import("../server/auth/bearerAuth.js");
+
+  type Answer = { status: number | null; body: unknown; nexted: boolean; userId?: string };
+
+  /** Run the middleware over one request and report what it did. */
+  async function run(
+    read: (hash: string) => Promise<any[]>,
+    header?: string,
+  ): Promise<Answer> {
+    const session: Record<string, unknown> = {};
+    const answer: Answer = { status: null, body: null, nexted: false };
+    const req: any = { session, headers: header ? { authorization: header } : {}, path: "/api/training/sessions" };
+    const res: any = {
+      setHeader() {},
+      status(code: number) { answer.status = code; return res; },
+      json(body: unknown) { answer.body = body; return res; },
+    };
+    await bearerAuthWith(read, async () => {})(req, res, () => {
+      answer.nexted = true;
+      answer.userId = session.userId as string | undefined;
+    });
+    return answer;
+  }
+
+  const LIVE = [{ id: "t1", userId: "member-1", expiresAt: new Date(Date.now() + 86_400_000), lastUsedAt: new Date() }];
+  const DEAD = () => Promise.reject(new Error("Connection terminated unexpectedly"));
+
+  /* One failure then an answer — the shape of a reclaimed pooler seat. */
+  {
+    let calls = 0;
+    const flaky = () => (++calls === 1 ? DEAD() : Promise.resolve(LIVE));
+    const a = await run(flaky, "Bearer good-token");
+    check("a connection that dies once is retried", calls === 2, `${calls} call(s)`);
+    check("and the member stays signed in", a.nexted && a.userId === "member-1", JSON.stringify(a));
+    check("with no status written at all", a.status === null, String(a.status));
+  }
+
+  /* Both attempts fail. This is the one that used to become a 401. */
+  {
+    const a = await run(DEAD, "Bearer good-token");
+    check("a database that cannot be reached answers 503", a.status === 503, String(a.status));
+    check("never 401", a.status !== 401);
+    check("and does not pass the request on as anonymous", !a.nexted);
+    check(
+      "saying something a member can read",
+      typeof (a.body as any)?.message === "string" && /try that again/i.test((a.body as any).message),
+      JSON.stringify(a.body),
+    );
+  }
+
+  /* And the failures that really are the member's. */
+  {
+    const a = await run(async () => [], "Bearer no-such-token");
+    check("a token nobody knows falls through to the ordinary 401", a.nexted && !a.userId);
+    check("rather than a 503", a.status === null);
+  }
+  {
+    const expired = [{ ...LIVE[0], expiresAt: new Date(Date.now() - 1000) }];
+    const a = await run(async () => expired, "Bearer stale-token");
+    check("an expired token does too", a.nexted && !a.userId, JSON.stringify(a));
+  }
+  {
+    const a = await run(async () => { throw new Error("should not be called"); });
+    check("and a request with no credential never asks the database", a.nexted && !a.userId);
+  }
+
   console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);
   if (failed > 0) process.exit(1);
 }

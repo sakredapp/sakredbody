@@ -102,11 +102,27 @@ export function bearerFrom(header: string | undefined): string | null {
  * with no side effects, so repeating it is safe in a way that repeating a
  * route handler is not.
  */
-async function lookupToken(raw: string) {
-  const read = () =>
-    db.select().from(authTokens).where(eq(authTokens.tokenHash, hashToken(raw))).limit(1);
+/** What a token row has to look like, so the reader can be swapped in a test. */
+export type TokenRow = {
+  id: string;
+  userId: string;
+  expiresAt: Date | null;
+  lastUsedAt: Date | null;
+};
+
+/** Read one token row by hash. The real one; `bearerAuthWith` takes another. */
+const readTokenFromDb = (hash: string) =>
+  db.select().from(authTokens).where(eq(authTokens.tokenHash, hash)).limit(1) as Promise<TokenRow[]>;
+
+/** Drop an expired token. Injectable for the same reason the read is. */
+const forgetTokenInDb = async (id: string): Promise<void> => {
+  await db.delete(authTokens).where(eq(authTokens.id, id));
+};
+
+async function lookupToken(read: (hash: string) => Promise<TokenRow[]>, raw: string) {
+  const hash = hashToken(raw);
   try {
-    return await read();
+    return await read(hash);
   } catch (first) {
     console.warn(
       JSON.stringify({
@@ -115,86 +131,105 @@ async function lookupToken(raw: string) {
         message: first instanceof Error ? first.message : String(first),
       }),
     );
-    return await read();
+    return await read(hash);
   }
 }
 
-export const bearerAuth: RequestHandler = async (req, res, next) => {
-  // A cookie session, where one exists, always wins. This middleware only
-  // fills a gap; it must never override or downgrade an existing login.
-  if (!req.session || req.session.userId) return next();
+/**
+ * The middleware, with the token read left open.
+ *
+ * Not indirection for its own sake. The contract this file exists to hold —
+ * that a database failure is never reported to a member as being signed out —
+ * is precisely the one that cannot be exercised against a real connection: QA
+ * cannot induce Supabase's pooler to reclaim a seat on demand, and a test that
+ * waits for one is a test that never runs.
+ *
+ * So the read is a parameter, and script/test-auth.ts drives it with a reader
+ * that fails once, a reader that always fails, and a reader that answers
+ * honestly. Everything else about the request path is the same code the
+ * server runs.
+ */
+export function bearerAuthWith(
+  read: (hash: string) => Promise<TokenRow[]>,
+  forget: (id: string) => Promise<void> = forgetTokenInDb,
+): RequestHandler {
+  return async (req, res, next) => {
+    // A cookie session, where one exists, always wins. This middleware only
+    // fills a gap; it must never override or downgrade an existing login.
+    if (!req.session || req.session.userId) return next();
 
-  const raw = bearerFrom(req.headers.authorization);
-  if (!raw) return next();
+    const raw = bearerFrom(req.headers.authorization);
+    if (!raw) return next();
 
-  let row;
-  try {
-    [row] = await lookupToken(raw);
-  } catch (err) {
-    /**
-     * ── "I could not check" is not "you are not signed in" ────────────────
-     *
-     * This used to swallow the error and fall through, on the reasoning that
-     * unauthenticated is the safe outcome of a database blip. It is not. The
-     * member is signed in; the app cannot reach the table that says so. The
-     * two are different facts and they need different answers, because 401 is
-     * a statement about the member — one the client acts on by clearing state
-     * and offering a sign-in — and this is a statement about the server.
-     *
-     * 503 with Retry-After says what is true, is retried rather than believed,
-     * and shows up in logs as an infrastructure event instead of hiding inside
-     * a member's authentication.
-     */
-    console.error(
-      JSON.stringify({
-        at: new Date().toISOString(),
-        event: "auth.token_lookup_failed",
-        path: req.path,
-        message: err instanceof Error ? err.message : String(err),
-      }),
-    );
-    res.setHeader("Retry-After", "1");
-    return res.status(503).json({
-      message: "Sakred couldn't reach its database just then. Try that again.",
+    let row: TokenRow | undefined;
+    try {
+      [row] = await lookupToken(read, raw);
+    } catch (err) {
+      /**
+       * ── "I could not check" is not "you are not signed in" ────────────────
+       *
+       * This used to swallow the error and fall through, on the reasoning that
+       * unauthenticated is the safe outcome of a database blip. It is not. The
+       * member is signed in; the app cannot reach the table that says so. The
+       * two are different facts and they need different answers, because 401 is
+       * a statement about the member — one the client acts on by clearing state
+       * and offering a sign-in — and this is a statement about the server.
+       *
+       * 503 with Retry-After says what is true, is retried rather than believed,
+       * and shows up in logs as an infrastructure event instead of hiding inside
+       * a member's authentication.
+       */
+      console.error(
+        JSON.stringify({
+          at: new Date().toISOString(),
+          event: "auth.token_lookup_failed",
+          path: req.path,
+          message: err instanceof Error ? err.message : String(err),
+        }),
+      );
+      res.setHeader("Retry-After", "1");
+      return res.status(503).json({
+        message: "Sakred couldn't reach its database just then. Try that again.",
+      });
+    }
+
+    // Falling through to next() rather than 401ing is intentional: rejecting
+    // here would mean an expired token produced a different failure than a
+    // missing one. Both should arrive at the same `isAuthenticated` 401.
+    if (!row) return next();
+
+    if (!row.expiresAt || row.expiresAt.getTime() <= Date.now()) {
+      // Best effort. A token that cannot be deleted is still expired, and
+      // failing the request over the tidy-up would turn a correct 401 into a
+      // 503 — which is the confusion this middleware just stopped making in the
+      // other direction.
+      await forget(row.id).catch(() => {});
+      return next();
+    }
+
+    // Non-enumerable — see the note at the top of this file. Removing that
+    // flag silently reintroduces a per-request session write.
+    Object.defineProperty(req.session, "userId", {
+      value: row.userId,
+      enumerable: false,
+      configurable: true,
+      writable: true,
     });
-  }
 
-  // Falling through to next() rather than 401ing is intentional: rejecting
-  // here would mean an expired token produced a different failure than a
-  // missing one. Both should arrive at the same `isAuthenticated` 401.
-  if (!row) return next();
+    const lastUsed = row.lastUsedAt?.getTime() ?? 0;
+    if (Date.now() - lastUsed > LAST_USED_REFRESH_MS) {
+      // Not awaited: this is housekeeping, and making every authenticated
+      // request wait on a write to record that it happened is a poor trade.
+      void db
+        .update(authTokens)
+        .set({ lastUsedAt: new Date() })
+        .where(eq(authTokens.id, row.id))
+        .catch(() => {});
+    }
 
-  if (!row.expiresAt || row.expiresAt.getTime() <= Date.now()) {
-    // Best effort. A token that cannot be deleted is still expired, and
-    // failing the request over the tidy-up would turn a correct 401 into a
-    // 503 — which is the confusion this middleware just stopped making in the
-    // other direction.
-    await db
-      .delete(authTokens)
-      .where(eq(authTokens.id, row.id))
-      .catch(() => {});
-    return next();
-  }
+    next();
+  };
+}
 
-  // Non-enumerable — see the note at the top of this file. Removing that
-  // flag silently reintroduces a per-request session write.
-  Object.defineProperty(req.session, "userId", {
-    value: row.userId,
-    enumerable: false,
-    configurable: true,
-    writable: true,
-  });
-
-  const lastUsed = row.lastUsedAt?.getTime() ?? 0;
-  if (Date.now() - lastUsed > LAST_USED_REFRESH_MS) {
-    // Not awaited: this is housekeeping, and making every authenticated
-    // request wait on a write to record that it happened is a poor trade.
-    void db
-      .update(authTokens)
-      .set({ lastUsedAt: new Date() })
-      .where(eq(authTokens.id, row.id))
-      .catch(() => {});
-  }
-
-  next();
-};
+/** The one the server installs. */
+export const bearerAuth: RequestHandler = bearerAuthWith(readTokenFromDb);

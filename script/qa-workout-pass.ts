@@ -479,6 +479,94 @@ const started = await start({ fromWorkoutId: kept.id });
   await client.query("delete from member_workouts where id = $1", [copy.id]);
 }
 
+// ─── 7b. A workout designed rather than performed ─────────────────────────
+
+console.log("A superset can be written into a workout before it is ever trained\n");
+
+/*
+  The builder's half of the chain. Superset structure is part of a reusable
+  workout's composition — a member writing "Chest + Shoulders" to run every
+  week should be able to say the incline press and the fly are a pair before
+  training it once. This is the persistence half: the key the builder mints,
+  saved, read back, edited, and started.
+*/
+{
+  const designedGroup = crypto.randomUUID();
+  const created = await json<{ id: string }>(
+    await post("/api/training/workouts", {
+      name: `${TAG} — designed`,
+      exercises: [
+        { exerciseId: DB, targetSets: 3, supersetGroup: designedGroup },
+        { exerciseId: BB, targetSets: 3, supersetGroup: designedGroup },
+        { exerciseId: ONE_ARM, targetSets: 2 },
+      ],
+    }),
+  );
+
+  type Saved = {
+    id: string;
+    exercises: { exerciseId: string; supersetGroup: string | null }[];
+  };
+  const readBack = async () =>
+    (await json<Saved[]>(await call("/api/training/workouts"))).find((w) => w.id === created.id);
+
+  {
+    const w = await readBack();
+    const grouped = (w?.exercises ?? []).filter((e) => e.supersetGroup);
+    check("the pairing survives being saved", grouped.length === 2, `${grouped.length} grouped`);
+    check(
+      "as one group, not two",
+      new Set(grouped.map((e) => e.supersetGroup)).size === 1,
+    );
+    eq(
+      "and the movement outside it stays outside it",
+      w?.exercises.find((e) => e.exerciseId === ONE_ARM)?.supersetGroup ?? null,
+      null,
+    );
+  }
+
+  /*
+    The round trip that used to drop it. Editing a saved workout replaces its
+    movements wholesale, so a field the editor does not send back is a field
+    the edit silently deletes — which is how a paired workout became two loose
+    movements the second time anybody renamed it.
+  */
+  {
+    const w = await readBack();
+    await call(`/api/training/workouts/${created.id}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        name: `${TAG} — designed, renamed`,
+        exercises: (w?.exercises ?? []).map((e) => ({
+          exerciseId: e.exerciseId,
+          targetSets: 3,
+          supersetGroup: e.supersetGroup,
+        })),
+      }),
+    });
+    const after = await readBack();
+    const grouped = (after?.exercises ?? []).filter((e) => e.supersetGroup);
+    check("and survives being edited", grouped.length === 2, `${grouped.length} grouped after edit`);
+  }
+
+  const ran = await start({ fromWorkoutId: created.id });
+  {
+    const rows = await composition(ran.id);
+    eq("starting it brings all three movements", rows.length, 3);
+    const groups = rows.filter((r) => r.superset_group);
+    check("with the designed pair still paired", groups.length === 2);
+    check(
+      "under a key of this session's own, not the template's",
+      groups.length === 2 && groups[0].superset_group !== designedGroup,
+      `${groups[0]?.superset_group}`,
+    );
+  }
+  await clearOpen();
+
+  await client.query("delete from member_workout_exercises where member_workout_id = $1", [created.id]);
+  await client.query("delete from member_workouts where id = $1", [created.id]);
+}
+
 // ─── 8. Repeating a session directly ──────────────────────────────────────
 
 console.log("Yesterday's session can be done again without filing a template\n");
@@ -509,6 +597,129 @@ await clearOpen();
   eq("and refuses to be saved as a workout", res2.status, 400);
   const open = await json<{ session: unknown }>(await call("/api/training/sessions/open"));
   eq("and no empty session is left running", open.session, null);
+}
+
+// ─── 8b. Discarding a workout discards the workout ────────────────────────
+
+console.log("Discarding a workout leaves nothing of it behind\n");
+
+/*
+  ── What this section is, and what it is not ──────────────────────────────
+
+  It began as a regression for a bug that turned out not to exist. Reading
+  `DELETE /sessions/:id` — which removes the sets and the session and says
+  nothing about composition — the obvious conclusion is that every discarded
+  workout leaves a `session_exercises` row per movement pointing at a session
+  that is gone. The fix was written, and then the omission was planted back and
+  this harness run against a real database: the rows went anyway.
+
+  `session_exercises`, `workout_sets` and `training_observations` all carry
+  `ON DELETE CASCADE` on `session_id`. The database was already doing it. So
+  what is asserted here is the outcome — nothing of a discarded workout
+  survives, by whatever means — and, separately, the constraint that produces
+  it, so that the day somebody drops a cascade the failure says which one.
+
+  Three shapes, because they are created by three different paths: a plain
+  session, one started from a saved workout, and one with a superset in it.
+*/
+async function leftBehind(id: string) {
+  const one = async (sql: string) =>
+    Number((await client.query<{ n: string }>(sql, [id])).rows[0].n);
+  return {
+    sessions: await one("select count(*) as n from workout_sessions where id = $1"),
+    composition: await one("select count(*) as n from session_exercises where session_id = $1"),
+    sets: await one("select count(*) as n from workout_sets where session_id = $1"),
+    observations: await one("select count(*) as n from training_observations where session_id = $1"),
+  };
+}
+
+{
+  const plain = await start({ title: `${TAG} — discarded` });
+  await add(plain.id, DB);
+  await add(plain.id, BB);
+  await add(plain.id, ONE_ARM);
+  await logSet(plain.id, DB, 30, 8);
+  await logSet(plain.id, BB, 60, 5);
+  await post(`/api/training/sessions/${plain.id}/observations`, {
+    exerciseId: DB,
+    note: "QA — something to leave behind",
+    quality: "good",
+  });
+
+  const before = await leftBehind(plain.id);
+  check(
+    "there is something to discard",
+    before.composition === 3 && before.sets === 2,
+    JSON.stringify(before),
+  );
+
+  const gone = await del(`/api/training/sessions/${plain.id}`);
+  eq("the session is discarded", gone.status, 200);
+  eq("and nothing of it is left", await leftBehind(plain.id), {
+    sessions: 0,
+    composition: 0,
+    sets: 0,
+    observations: 0,
+  });
+}
+
+{
+  /* One started from a saved workout, whose composition was written by the
+     start rather than by the member — a different code path into the same
+     table, and the one the orphan fix has to cover too. */
+  const fromSaved = await start({ fromWorkoutId: kept.id });
+  const before = await leftBehind(fromSaved.id);
+  check("a workout started from a template has a composition", before.composition === 2, JSON.stringify(before));
+  await del(`/api/training/sessions/${fromSaved.id}`);
+  eq("and discarding it leaves none of it", await leftBehind(fromSaved.id), {
+    sessions: 0,
+    composition: 0,
+    sets: 0,
+    observations: 0,
+  });
+}
+
+{
+  const paired = await start({ title: `${TAG} — discarded superset` });
+  await add(paired.id, DB);
+  await add(paired.id, BB, DB);
+  const before = await leftBehind(paired.id);
+  check("a paired session has both movements", before.composition === 2, JSON.stringify(before));
+  await del(`/api/training/sessions/${paired.id}`);
+  eq("and its pairing goes with it", await leftBehind(paired.id), {
+    sessions: 0,
+    composition: 0,
+    sets: 0,
+    observations: 0,
+  });
+
+  /* Nothing anywhere still points at any of the three. Counted across the
+     whole table rather than by id, because an orphan is by definition a row
+     whose session cannot be looked up. */
+  const { rows } = await client.query<{ n: string }>(`
+    select count(*) as n from session_exercises se
+     where not exists (select 1 from workout_sessions s where s.id = se.session_id)`);
+  eq("and no composition row anywhere points at a session that is gone", rows[0].n, "0");
+
+  /*
+    And the mechanism, named. The assertions above would go on passing if the
+    route grew explicit deletes and the cascade were dropped — which is fine
+    until a fourth path deletes a session without them. This is the rule the
+    outcome actually rests on.
+  */
+  const { rows: cascades } = await client.query<{ child: string; on_delete: string }>(`
+    select cl.relname as child, con.confdeltype as on_delete
+      from pg_constraint con
+      join pg_class cl on cl.oid = con.conrelid
+      join pg_class rf on rf.oid = con.confrelid
+     where con.contype = 'f' and rf.relname = 'workout_sessions'
+       and cl.relname in ('session_exercises', 'workout_sets', 'training_observations')
+     order by cl.relname`);
+  eq(
+    "and the cascade that does it is still on all three",
+    cascades.map((r) => `${r.child}:${r.on_delete}`),
+    ["session_exercises:c", "training_observations:c", "workout_sets:c"],
+  );
 }
 
 // ─── 9. History says which of these can be done again ─────────────────────

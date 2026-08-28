@@ -55,6 +55,8 @@ import {
   effectivePlacement,
   placementIsMembers,
   type LoggedSet,
+  pairMovements,
+  supersetLabels,
 } from "../shared/models/training.js";
 import { workoutFeedbackSchema } from "../shared/models/health.js";
 import { catalogueRows, slug, arrayLiteral } from "../shared/data/exerciseCatalogue.js";
@@ -776,6 +778,68 @@ check(
   summarise([entry("build", 1800), entry(null, null)]),
 );
 check("under an hour reads in minutes", summarise([entry("build", 900)]).includes("15m"));
+
+// ── Supersets, in the two places one can be made ──────────────────────────
+
+/*
+  A superset can now be declared in two places: the active workout, where the
+  server writes `session_exercises.superset_group`, and the builder, where a
+  member is designing a workout they have not performed yet and there is
+  nothing to write to. Those two have to mean the same thing by it, so the rule
+  is one function and this is where it is held to.
+
+  Keys are minted by a counter here rather than by randomUUID, so a failure
+  names a group somebody can find in the output.
+*/
+{
+  let n = 0;
+  const key = () => `g${++n}`;
+  const list = (...ids: string[]) => ids.map((id) => ({ exerciseId: id, supersetGroup: null as string | null }));
+  const groupOf = (rows: { exerciseId: string; supersetGroup: string | null }[], id: string) =>
+    rows.find((r) => r.exerciseId === id)?.supersetGroup ?? null;
+
+  const paired = pairMovements(list("press", "fly", "row"), "press", "fly", key);
+  check("pairing two movements gives them one key", groupOf(paired, "press") === groupOf(paired, "fly"));
+  check("and a real one", groupOf(paired, "press") === "g1");
+  check("leaving everything else alone", groupOf(paired, "row") === null);
+
+  /* A third movement joining the pair joins *that* group — a tri-set is three
+     movements sharing one key, not a chain of pairs. */
+  const tri = pairMovements(paired, "row", "press", key);
+  check("a third joins the group rather than starting another",
+    groupOf(tri, "row") === groupOf(tri, "press") && groupOf(tri, "row") === groupOf(tri, "fly"));
+
+  /* And leaving a group of three leaves two, which is still a superset. */
+  const back = pairMovements(tri, "row", null, key);
+  check("leaving a tri-set sets that movement loose", groupOf(back, "row") === null);
+  check("and the remaining pair is still a pair",
+    groupOf(back, "press") !== null && groupOf(back, "press") === groupOf(back, "fly"));
+
+  /* A group left holding one movement is not a superset. */
+  const alone = pairMovements(back, "press", null, key);
+  check("a superset of one dissolves", groupOf(alone, "press") === null && groupOf(alone, "fly") === null);
+
+  check("pairing with a movement that is not there changes nothing",
+    JSON.stringify(pairMovements(paired, "press", "squat", key)) === JSON.stringify(paired));
+  check("and neither does pairing something with itself",
+    JSON.stringify(pairMovements(paired, "press", "press", key)) === JSON.stringify(paired));
+  check("nor naming a movement that is not in the list",
+    JSON.stringify(pairMovements(paired, "squat", "press", key)) === JSON.stringify(paired));
+
+  /* The notation. One implementation, because the active workout, the builder
+     and the saved list all draw it and a session lettered differently in two
+     of them is worse than no letters. */
+  const labels = supersetLabels([
+    { exerciseId: "press", supersetGroup: "a" },
+    { exerciseId: "fly", supersetGroup: "a" },
+    { exerciseId: "squat", supersetGroup: null },
+    { exerciseId: "curl", supersetGroup: "b" },
+    { exerciseId: "pushdown", supersetGroup: "b" },
+  ]);
+  check("the first pair is A1 and A2", labels.get("press") === "A1" && labels.get("fly") === "A2");
+  check("the second is B1 and B2", labels.get("curl") === "B1" && labels.get("pushdown") === "B2");
+  check("and a movement on its own is not lettered", !labels.has("squat"));
+}
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

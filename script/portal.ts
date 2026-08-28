@@ -386,14 +386,28 @@ export class Portal {
       }
 
       /*
-        Wait for the row to be reachable, rather than for a moment to pass.
+        Wait for the row to have stopped moving, not merely to be visible.
+
         The sheet animates up from nothing, so its rows are mounted and sized
         zero, then sized and below the fold, then finally where a finger could
-        reach them.
+        reach them — and this check used to stop one step early. A row at
+        y=847 on an 852-tall screen passes "on screen and hit-testable" and is
+        475px from where it will end up, so a press and a release straddling
+        the animation land on two different elements and the browser dispatches
+        the click on their common ancestor. That was reported for months as "a
+        real tap went nowhere on retreat and goals", and it was the truth: the
+        tap went to the sheet.
+
+        `data-tour-settled` is the sheet saying its own entry animation has
+        ended — see MemberNav, which now also withholds pointer events until
+        then, so this is waiting for the same fact the product waits for rather
+        than for a duration guessed from the outside.
       */
       const reachable = await this.b
         .waitFor(
           `[...document.querySelectorAll('[data-tour-id="nav-more-${id}"]')].some(e => {
+             const sheet = e.closest('[data-tour-id="more-sheet"]');
+             if (sheet && sheet.getAttribute("data-tour-settled") !== "true") return false;
              const r = e.getBoundingClientRect();
              if (!r.width || !r.height) return false;
              const x = r.x + r.width / 2, y = r.y + r.height / 2;

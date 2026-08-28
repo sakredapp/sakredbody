@@ -101,7 +101,7 @@ import { Input } from "@/components/ui/input";
 import { MovementPicker, type Movement } from "./MovementPicker";
 import { NewMovement } from "./NewMovement";
 import { ObservationForm, observationSummary, type Observation } from "./Observation";
-import { LOAD_ENTRIES, loadEntryLabel } from "@shared/models/training";
+import { LOAD_ENTRIES, loadEntryLabel, supersetLabels } from "@shared/models/training";
 import { MovementMemory, MEMORY_KEY } from "./TrainingMemory";
 import { cn } from "@/lib/utils";
 
@@ -783,29 +783,17 @@ function Sheet() {
    * The pairing was already stored, already grouped and already rendered as a
    * line of small text naming the partner. What it was not, was visible: a
    * member had to reopen the overflow menu to find out whether the thing they
-   * had set up was still set up. A letter per group in the order the groups
-   * appear, and a number within it, is the notation every programme is written
-   * in, and it reads at a glance in a list that scrolls.
+   * had set up was still set up.
+   *
+   * The notation comes from the shared model, because three screens draw it —
+   * here, the builder, and the saved-workout list — and three copies of "A"
+   * plus an index is three chances for one of them to letter a session
+   * differently from the others.
    */
-  const supersetLabel = useMemo(() => {
-    const letters = new Map<string, string>();
-    const seen = new Map<string, number>();
-    const out = new Map<string, string>();
-    for (const g of groups) {
-      if (!g.supersetGroup) continue;
-      let letter = letters.get(g.supersetGroup);
-      if (!letter) {
-        // A..Z, then round again. A session with 27 supersets in it has a
-        // bigger problem than an ambiguous letter.
-        letter = String.fromCharCode(65 + (letters.size % 26));
-        letters.set(g.supersetGroup, letter);
-      }
-      const n = (seen.get(g.supersetGroup) ?? 0) + 1;
-      seen.set(g.supersetGroup, n);
-      out.set(g.movement.id, `${letter}${n}`);
-    }
-    return out;
-  }, [groups]);
+  const supersetLabel = useMemo(
+    () => supersetLabels(groups.map((g) => ({ exerciseId: g.movement.id, supersetGroup: g.supersetGroup }))),
+    [groups],
+  );
 
   /**
    * A movement with nothing under it yet opens its entry row without being

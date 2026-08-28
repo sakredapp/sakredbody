@@ -8,12 +8,20 @@
 --   • isAuthenticated — verifies session, attaches userId
 --   • isAdmin — checks users.is_admin = 'true'
 --
--- RLS below is a DEFENSE-IN-DEPTH layer that protects against:
---   • Accidental direct Supabase client SDK usage
---   • Future mobile/client-side Supabase SDK integration
+-- RLS below is NOT only defense in depth. Supabase grants `anon` and
+-- `authenticated` full DML on every table in `public` and exposes them over a
+-- REST endpoint keyed by a value that is public by design — so RLS is the only
+-- thing between that endpoint and the data, whether or not this product's own
+-- client ever uses the SDK. It never has: the only `createClient` calls in the
+-- tree are server-side with the service-role key, for object storage.
 --
--- The service role connection (used by the Express backend) bypasses RLS.
--- If you switch to the anon key for any client, these policies kick in.
+-- The owner connection (used by the Express backend) bypasses RLS, which is
+-- why the application cannot tell you whether any of this works. Only becoming
+-- another role can, and script/qa-rls.ts does exactly that.
+--
+-- The posture, and the list of tables deliberately denied to everyone, is
+-- script/rlsPosture.ts. Read it before adding a policy here: a table with row
+-- security on and no policies is a decision, not an omission.
 --
 -- Run this in the Supabase SQL Editor (Dashboard → SQL → New query)
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -267,22 +275,24 @@ CREATE POLICY sakred_exec_applications_select ON executive_applications
 CREATE POLICY sakred_exec_applications_update ON executive_applications
   FOR UPDATE USING (public.is_sakred_admin());
 
--- coaching_messages: users can read/write their own messages
-CREATE POLICY sakred_coaching_msgs_select ON coaching_messages
-  FOR SELECT USING (auth.uid()::text = user_id);
-
-CREATE POLICY sakred_coaching_msgs_insert ON coaching_messages
-  FOR INSERT WITH CHECK (auth.uid()::text = user_id);
-
--- Admin can read all messages and update (mark read, etc.)
-CREATE POLICY sakred_coaching_msgs_admin_select ON coaching_messages
-  FOR SELECT USING (public.is_sakred_admin());
-
-CREATE POLICY sakred_coaching_msgs_admin_insert ON coaching_messages
-  FOR INSERT WITH CHECK (public.is_sakred_admin());
-
-CREATE POLICY sakred_coaching_msgs_admin_update ON coaching_messages
-  FOR UPDATE USING (public.is_sakred_admin());
+-- coaching_messages: no policies. Deliberately.
+--
+-- This file used to declare `USING (auth.uid()::text = user_id)` here, and the
+-- database held something else: three unconditional policies — SELECT, INSERT
+-- and UPDATE, all `TO public USING (true)`. Asking as `anon` on the QA branch
+-- returned the coaching thread. Dropped in
+-- supabase/2026-08-28-rls-posture.sql.
+--
+-- Not corrected to the declared version, because the declared version was
+-- never going to work either: `auth.uid()` is a Supabase-auth concept and this
+-- product has never issued one. Members are rows in its own `users` table,
+-- authenticated in Express, and Postgres never sees that identity. Such a
+-- policy evaluates to NULL for every caller — which denies every caller, while
+-- reading like a rule that grants something.
+--
+-- So the table is server-only, like the others in script/rlsPosture.ts: row
+-- security on, no policies, nothing but the owner gets through.
+-- script/qa-rls.ts proves it by becoming `anon` and asking.
 
 -- masterclass_categories: admin full CRUD
 CREATE POLICY sakred_mc_categories_admin_insert ON masterclass_categories

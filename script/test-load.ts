@@ -27,6 +27,7 @@ import { readFileSync } from "node:fs";
 import {
   defaultLoadEntry,
   enteredLoadLabel,
+  estimateOneRepMax,
   externalLoadKg,
   loadEntryLabel,
   loadEntryKnown,
@@ -352,6 +353,51 @@ check("sets read their session's reading through one place",
 const training = code("server/training/routes.ts");
 check("no readback over sets joins the catalogue for it",
   !/loadEntry: exercises\.loadEntry/.test(training));
+
+// ── Strength is not volume, and must not learn to be ──────────────────────
+section("The normalised load stays out of the strength numbers");
+
+/*
+  The next change somebody will want to make, and the reason not to.
+
+  Volume now uses the total external load — 70 in each hand is 140kg moved.
+  Finishing the job by doubling dumbbells in the one-rep-max estimate looks
+  like consistency and is not: e1RM is a claim about capacity in the unit the
+  movement is performed in, and "78 per hand" is the number a member and a
+  coach both use. 156 is not a weight anybody has been near.
+
+  There is a shape problem too. `load_entry` is recorded per session and is
+  null for everything logged before it existed, so normalising a series would
+  put a step in every dumbbell graph on the date it shipped.
+
+  Read from the files with their prose stripped, because the paragraph above
+  would otherwise satisfy a grep for the rule it is explaining.
+*/
+const strength = code("server/training/strength.ts");
+check("the strength module does not consult how the weight was entered",
+  !/loadEntry|load_entry/.test(strength));
+check("nor normalises a load itself",
+  !/externalLoadKg|setVolumeKg|loadShape/.test(strength));
+
+/* And the reader that feeds it. `setRowsFor` is where a series is assembled;
+   a `loadEntry` appearing in it is the change this is here to notice. */
+const trainingRoutes = code("server/training/routes.ts");
+const setRows = trainingRoutes.slice(
+  trainingRoutes.indexOf("async function setRowsFor"),
+  trainingRoutes.indexOf("async function bodyweightLookup"),
+);
+check("and neither does the query that feeds it", !/loadEntry|setLoadEntry/.test(setRows),
+  setRows.length > 0 ? "" : "setRowsFor was not found — this check has stopped looking at anything");
+check("which is a real slice of the file, not an empty string", setRows.length > 200);
+
+/* The estimate itself takes the number as entered. Stated as arithmetic so the
+   intent survives somebody deleting the comment. */
+check("a single is exactly what was on the bar", estimateOneRepMax(70, 1) === 70);
+check("and eight reps at 70 estimates from 70, not from 140",
+  Math.abs((estimateOneRepMax(70, 8) ?? 0) - 70 * (1 + 8 / 30)) < 1e-9,
+  String(estimateOneRepMax(70, 8)));
+check("which is not the doubled figure",
+  (estimateOneRepMax(70, 8) ?? 0) < 100);
 
 if (failures.length) {
   console.error("\n✗ load semantics\n");

@@ -372,7 +372,12 @@ export function MovementPicker({
       )}
 
       {onClose && (
-        <Button variant="ghost" onClick={onClose} className="shrink-0 text-muted-foreground">
+        <Button
+          variant="ghost"
+          onClick={onClose}
+          className="shrink-0 text-muted-foreground"
+          data-testid="movement-picker-done"
+        >
           Done
         </Button>
       )}

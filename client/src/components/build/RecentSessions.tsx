@@ -52,7 +52,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { startSession } from "@/lib/startSession";
-import { seedOpenWorkout } from "@/hooks/use-open-workout";
+import { reconcileOpenWorkout, seedOpenWorkout } from "@/hooks/use-open-workout";
 import { useWorkoutSheet } from "./WorkoutSheet";
 import { cn } from "@/lib/utils";
 import { formatLocalDateString, addDaysToString } from "@shared/utils/dates";
@@ -386,6 +386,9 @@ function Again({ entry }: { entry: Entry }) {
         return;
       }
       await seedOpenWorkout(qc, result.started);
+      // Repeating always brings movements with it, so the composition is read
+      // back before the sheet is opened — see the note in MemberBuild.begin.
+      await reconcileOpenWorkout(qc);
       qc.invalidateQueries({ queryKey: ["/api/training/sessions"] });
       open();
     },
