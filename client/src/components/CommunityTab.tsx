@@ -9,7 +9,7 @@
  * feel like a footnote, and here the replies are usually the point.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   useChannels,
@@ -120,6 +120,25 @@ function Composer({
   const [photo, setPhoto] = useState<PhotoAttachment | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
 
+  /*
+    Whether Enter can send depends on whether Shift+Enter exists.
+
+    It sent unconditionally, with Shift+Enter reserved for a line break — and a
+    phone keyboard has no shift to hold. Its return key arrives as Enter with
+    `shiftKey` false, indistinguishable from the desktop send. So on a phone
+    the member could not type a second line at all: every attempt at a
+    paragraph break posted the half-written message instead.
+
+    `(pointer: fine)` is the question actually being asked — is there a mouse
+    and, with it, a hardware keyboard carrying the shift key this shortcut
+    needs. On anything else Enter does what the key says and the Post button
+    sends.
+  */
+  const enterSends = useMemo(
+    () => typeof window !== "undefined" && !!window.matchMedia?.("(pointer: fine)").matches,
+    [],
+  );
+
   useEffect(() => {
     if (autoFocus) ref.current?.focus();
   }, [autoFocus]);
@@ -177,9 +196,11 @@ function Composer({
         value={body}
         onChange={(e) => setBody(e.target.value)}
         onKeyDown={(e) => {
-          // Enter sends, Shift+Enter breaks the line. Escape backs out of a
-          // reply or an edit without losing the room underneath.
-          if (e.key === "Enter" && !e.shiftKey) {
+          // With a hardware keyboard, Enter sends and Shift+Enter breaks the
+          // line. Without one, Enter breaks the line and the button sends.
+          // Escape backs out of a reply or an edit without losing the room
+          // underneath.
+          if (enterSends && e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
             submit();
           }
@@ -359,6 +380,12 @@ function MessageBody({
   editPending: boolean;
 }) {
   const gone = !!message.deletedAt;
+  /*
+    Held here rather than lifted to the tab: only the photograph that was
+    tapped can be open, so the message that owns it owns the overlay, and
+    nothing has to be threaded down through ThreadNode's recursion.
+  */
+  const [full, setFull] = useState(false);
 
   return (
     <div className="flex gap-3 min-w-0">
@@ -415,13 +442,24 @@ function MessageBody({
                 about, the picture is how it looked. */}
             {message.workout && <SharedWorkoutCard workout={message.workout} />}
 
+            {/*
+              Whole, and openable.
+
+              It was neither: `object-cover` in a fixed 4:3 box, with no
+              onClick. A photograph taken on a phone is portrait, so the box
+              showed a band across its middle and there was no way to see the
+              rest of it. `contain` takes the shape from the picture, and a
+              tap opens it against the full screen.
+            */}
             {message.imageAssetId && (
               <MediaImage
                 assetId={message.imageAssetId}
                 variant="display"
                 alt={`Photo shared by ${displayName(message.author)}`}
                 aspect="4 / 3"
+                fit="contain"
                 className="max-w-sm"
+                onClick={() => setFull(true)}
               />
             )}
           </>
@@ -487,6 +525,36 @@ function MessageBody({
           </div>
         )}
       </div>
+
+      {/*
+        The photograph, full size, on tap.
+
+        A plain overlay rather than a dialog, matching the progress photos:
+        the only interaction is closing it. `contain` and the whole viewport,
+        because the point of opening it is to see the parts the feed could
+        not show.
+      */}
+      {full && message.imageAssetId && (
+        <div
+          className="fixed inset-0 z-[10002] grid place-items-center bg-background/95 p-4"
+          onClick={() => setFull(false)}
+          role="button"
+          tabIndex={-1}
+          aria-label="Close photo"
+          data-testid="overlay-room-photo"
+        >
+          <div className="w-full max-w-2xl">
+            <MediaImage
+              assetId={message.imageAssetId}
+              variant="display"
+              alt={`Photo shared by ${displayName(message.author)}`}
+              aspect="4 / 3"
+              fit="contain"
+              className="max-h-[88vh] bg-transparent"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -891,6 +959,38 @@ export function CommunityTab() {
       <div className="space-y-6">
         <Skeleton className="h-8 w-40" />
         <Skeleton className="h-32 w-full" />
+      </div>
+    );
+  }
+
+  /*
+    A failed request and an empty answer are different sentences.
+
+    These used to be one branch — `!channels.data` is true for both — so a
+    single failed load told the member "No rooms are open to you yet", which
+    is a statement about their access made out of a network error. With
+    `retry: false` and `staleTime: Infinity` nothing asked again either, so it
+    stayed on screen until the app was restarted. That is exactly what it
+    looked like from the outside: no access, then access after a reload.
+
+    The room list now retries a transient failure (see `useChannels`). This is
+    what is left when the retries are also gone.
+  */
+  if (channels.isError) {
+    return (
+      <div className="py-20 text-center space-y-3" data-testid="rooms-unavailable">
+        <Users className="h-10 w-10 mx-auto text-muted-foreground/40" />
+        <p className="text-sm text-muted-foreground">
+          {humanError(channels.error, "Sakred couldn't load your rooms just then.")}
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => channels.refetch()}
+          data-testid="button-retry-rooms"
+        >
+          Try again
+        </Button>
       </div>
     );
   }

@@ -125,24 +125,20 @@ CREATE INDEX IF NOT EXISTS idx_reactions_message ON message_reactions (message_i
 CREATE UNIQUE INDEX IF NOT EXISTS uq_reactions ON message_reactions (message_id, user_id, emoji);
 
 -- ─── 6. Reply counts ───────────────────────────────────────────────────────
--- Maintained by trigger rather than counted per read. A thread list showing
--- fifty messages would otherwise be fifty counts.
-
-CREATE OR REPLACE FUNCTION bump_reply_count() RETURNS trigger
-LANGUAGE plpgsql AS $$
-BEGIN
-  IF TG_OP = 'INSERT' AND NEW.parent_id IS NOT NULL THEN
-    UPDATE community_messages SET reply_count = reply_count + 1 WHERE id = NEW.parent_id;
-  ELSIF TG_OP = 'DELETE' AND OLD.parent_id IS NOT NULL THEN
-    UPDATE community_messages SET reply_count = GREATEST(0, reply_count - 1) WHERE id = OLD.parent_id;
-  END IF;
-  RETURN NULL;
-END $$;
-
-DROP TRIGGER IF EXISTS trg_reply_count ON community_messages;
-CREATE TRIGGER trg_reply_count
-  AFTER INSERT OR DELETE ON community_messages
-  FOR EACH ROW EXECUTE FUNCTION bump_reply_count();
+-- Maintained by the handler, not by a trigger, and deliberately so.
+--
+-- A trigger lived here and incremented the direct parent on INSERT. The post
+-- handler also walks the whole parent chain and increments every ancestor, so
+-- the direct parent was counted twice and the Room said "2 replies" under a
+-- message that had one. The trigger's other branch fired on DELETE, which this
+-- application never performs — a message is tombstoned with an UPDATE — so it
+-- never took a reply back off a count at all.
+--
+-- Both halves now live in server/community/routes.ts: the walk up on a reply,
+-- and `forgetReply` walking back down on a delete. If that changes, change it
+-- there; do not reintroduce a trigger alongside it.
+-- See supabase/2026-08-29-reply-count.sql, which removed it and recomputed
+-- every existing count from the rows.
 
 -- ─── Row level security ────────────────────────────────────────────────────
 -- The gate is tier rank. Expressed once here as a helper so the policies and

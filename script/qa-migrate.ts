@@ -36,7 +36,42 @@ if (!target.ok) {
 }
 
 const sql = readFileSync(file, "utf8");
+
+/*
+  Refuse a file that manages its own transaction.
+
+  A `COMMIT;` in the middle of a migration closes the transaction opened below
+  around the whole file, so everything after it — which is where the
+  verification block lives — runs committed. Demonstrated on QA: a file shaped
+  that way, whose verification raises, is reported here as "rolled back" while
+  the table it created is still there afterwards. That is the one failure mode
+  this runner exists to make impossible, so it is refused rather than
+  documented.
+*/
+if (/^\s*(BEGIN|COMMIT|ROLLBACK)\s*;/im.test(sql)) {
+  console.error(`
+✗ ${file} opens or closes its own transaction
+
+    A COMMIT inside the file ends the one this runner opens around it, and the
+    verification after it then cannot roll anything back. Remove the BEGIN and
+    COMMIT; the caller wraps the whole file.
+`);
+  process.exit(1);
+}
 const client = new pg.Client({ connectionString: target.url });
+
+/*
+  Show what the file says about itself.
+
+  Every migration here ends in a DO block that re-reads the database and
+  RAISEs on anything it does not like, and the interesting half of that is the
+  NOTICE at the end — how many rows it touched, how many were already right.
+  Those went to a channel nobody was listening on, so a migration that had
+  something to report reported it into the void.
+*/
+client.on("notice", (n) => {
+  if (n.message) console.log(`  ${n.message}`);
+});
 await client.connect();
 
 try {
@@ -69,10 +104,29 @@ const named = [
     ...Array.from(sql.matchAll(/ALTER TABLE (?:IF EXISTS )?(\w+)/gi)).map((m) => m[1]),
   ]),
 ];
+/*
+  A migration that changes no table's shape still has to be verified.
+
+  This exited 1 on any file that neither created nor altered a table — so
+  2026-08-29-reply-count.sql, which drops a trigger and repairs a column's
+  values, applied cleanly and was reported as a failure. An operator reading
+  that would reasonably stop and roll something back that was fine.
+
+  What such a file does have is its own DO block, which re-reads the database
+  and RAISEs. That ran inside the transaction above: if it had objected,
+  nothing would have been committed and we would not be here. So it counts,
+  and is said out loud rather than assumed.
+*/
+const selfVerifies = /DO \$\$[\s\S]*RAISE EXCEPTION/i.test(sql);
 if (named.length === 0) {
-  console.error("\n✗ nothing to verify — this file names no table to look at\n");
+  if (!selfVerifies) {
+    console.error("\n✗ nothing to verify — this file names no table to look at, and checks nothing itself\n");
+    await client.end();
+    process.exit(1);
+  }
+  console.log("\n  no table changed shape; the file's own checks ran inside the transaction and raised nothing\n");
   await client.end();
-  process.exit(1);
+  process.exit(0);
 }
 
 const { rows } = await client.query(

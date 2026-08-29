@@ -31,7 +31,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { zodMessage } from "../../shared/utils/zodMessage.js";
 import { db } from "../db.js";
-import { and, asc, desc, eq, inArray, isNull, lt, notInArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, lt, notInArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { isAuthenticated } from "../auth/index.js";
 import { storage } from "../storage.js";
@@ -113,6 +113,50 @@ function present(m: typeof communityMessages.$inferSelect) {
     };
   }
   return { ...rest, workout: readSharedWorkout(sharedWorkout) };
+}
+
+/**
+ * A deleted message is kept only when something hangs off it.
+ *
+ * The tombstone exists so replies underneath a deleted parent keep their
+ * parent and the conversation keeps its shape. Nothing hangs off a leaf, so
+ * there is nothing for its tombstone to hold up — and leaving one there is
+ * what a member reads as "I deleted it and it is still on my screen". They
+ * are right: deleting the only thing you posted should remove the post, not
+ * replace it with a line about the post.
+ *
+ * `reply_count` is every descendant, not just direct children (see the
+ * recursive UPDATE in the post handler), so zero means leaf, and removing a
+ * leaf can never orphan anything below it.
+ */
+const stillShown = or(isNull(communityMessages.deletedAt), gt(communityMessages.replyCount, 0));
+
+/**
+ * Take a reply back off every ancestor's count.
+ *
+ * The mirror of the walk in the post handler, and the reason a tombstone can
+ * disappear later: delete the last reply under an already-deleted parent and
+ * the parent's count reaches zero, so the next read drops both. Without this
+ * the parent is a permanent tombstone advertising "1 reply" to a thread that
+ * has none.
+ *
+ * `greatest(…, 0)` because a count that has drifted must not go negative and
+ * make a live message invisible.
+ */
+async function forgetReply(messageId: string) {
+  await db.execute(sql`
+    WITH RECURSIVE ancestors(id, parent_id) AS (
+      SELECT id, parent_id FROM community_messages
+       WHERE id = (SELECT parent_id FROM community_messages WHERE id = ${messageId})
+      UNION ALL
+      SELECT m.id, m.parent_id
+        FROM community_messages m
+        JOIN ancestors a ON m.id = a.parent_id
+    )
+    UPDATE community_messages
+       SET reply_count = greatest(reply_count - 1, 0)
+     WHERE id IN (SELECT id FROM ancestors)
+  `);
 }
 
 // ─── The gate ──────────────────────────────────────────────────────────────
@@ -292,6 +336,7 @@ export function registerCommunityRoutes(app: Express) {
           and(
             eq(communityMessages.channelId, channelId),
             isNull(communityMessages.parentId),
+            stillShown,
             ...(hidden.length ? [notInArray(communityMessages.userId, hidden)] : []),
             ...(before ? [lt(communityMessages.createdAt, new Date(before))] : []),
           ),
@@ -347,6 +392,7 @@ export function registerCommunityRoutes(app: Express) {
         .where(
           and(
             or(eq(communityMessages.rootId, rootId), eq(communityMessages.id, rootId)),
+            stillShown,
             ...(hidden.length ? [notInArray(communityMessages.userId, hidden)] : []),
           ),
         )
@@ -596,8 +642,16 @@ export function registerCommunityRoutes(app: Express) {
     try {
       const userId = req.session!.userId!;
 
-      // A tombstone, not a delete: replies underneath keep their parent and
-      // the conversation keeps its shape. The words go.
+      /*
+        A tombstone when something hangs off it, and gone when nothing does —
+        see `stillShown`. Either way the words go here; whether the row is
+        still rendered is decided on read, by whether it is holding up a
+        conversation.
+
+        `isNull(deletedAt)` so deleting twice is a 404 rather than a second
+        trip through `forgetReply`, which would take the same reply off its
+        ancestors' counts twice and hide a live message.
+      */
       const [updated] = await db
         .update(communityMessages)
         .set({ deletedAt: new Date(), body: "" })
@@ -605,11 +659,13 @@ export function registerCommunityRoutes(app: Express) {
           and(
             eq(communityMessages.id, param(req, "id")),
             eq(communityMessages.userId, userId),
+            isNull(communityMessages.deletedAt),
           ),
         )
         .returning({ id: communityMessages.id });
 
       if (!updated) return res.status(404).json({ message: "Not found" });
+      await forgetReply(updated.id);
       res.json({ id: updated.id, deleted: true });
     } catch (err) {
       fail(res, err);
@@ -860,9 +916,15 @@ export function registerCommunityRoutes(app: Express) {
       const [updated] = await db
         .update(communityMessages)
         .set({ deletedAt: new Date(), body: "" })
-        .where(eq(communityMessages.id, param(req, "id")))
+        .where(
+          and(
+            eq(communityMessages.id, param(req, "id")),
+            isNull(communityMessages.deletedAt),
+          ),
+        )
         .returning({ id: communityMessages.id });
       if (!updated) return res.status(404).json({ message: "Not found" });
+      await forgetReply(updated.id);
       res.json({ id: updated.id, deleted: true });
     } catch (err) {
       fail(res, err);

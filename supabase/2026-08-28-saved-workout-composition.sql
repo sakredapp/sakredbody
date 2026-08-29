@@ -17,7 +17,19 @@
 -- this column existed had no pairing recorded, and inventing one from movement
 -- adjacency would be guessing at somebody's programme.
 
-BEGIN;
+
+-- NOTE ON TRANSACTIONS
+--
+-- This file deliberately does not open one. It used to begin with BEGIN; and
+-- end the schema changes with COMMIT;, and that COMMIT closed the transaction
+-- the caller had opened around the whole file — so the verification block
+-- below ran outside it. Proved against QA rather than reasoned about: a file
+-- shaped that way, whose verification raises, reports "rolled back" while its
+-- table is still there afterwards.
+--
+-- The caller wraps the file. script/qa-migrate.ts does, and the Management API
+-- runs a file whole. Leave the transaction to whoever is applying this, so
+-- that a verification that objects takes the changes down with it.
 
 ALTER TABLE member_workout_exercises
   ADD COLUMN IF NOT EXISTS superset_group uuid;
@@ -41,7 +53,6 @@ ALTER TABLE member_workouts
 CREATE INDEX IF NOT EXISTS idx_member_workouts_source
   ON member_workouts (source_session_id);
 
-COMMIT;
 
 -- Verified from the table rather than from the success of the statement above.
 DO $$

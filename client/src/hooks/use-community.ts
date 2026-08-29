@@ -16,6 +16,7 @@ import type { Channel } from "@shared/schema";
 // Segments, not markup — see the module for why rendering the raw headline as
 // HTML would be a stored XSS.
 import type { HeadlineSegment } from "@shared/utils/highlight";
+import { worthRetrying } from "@shared/models/community";
 
 export interface Author {
   firstName: string | null;
@@ -102,8 +103,31 @@ export interface SearchHit {
 
 async function get<T>(url: string, label: string): Promise<T> {
   const res = await fetch(url, { credentials: "include" });
-  if (!res.ok) throw new Error(`Failed to load ${label}`);
+  if (!res.ok) {
+    /*
+      The status travels with the error, in the shape `humanError` reads.
+
+      Without it every failure was the same opaque string, and the Room had no
+      way to tell "you cannot see this" from "the server did not answer" — so
+      it said the first about both. A 503 from a cold server became a sentence
+      about the member's access.
+    */
+    const serverMessage = await res.text().catch(() => "");
+    throw Object.assign(new Error(`Failed to load ${label}`), {
+      status: res.status,
+      serverMessage,
+    });
+  }
   return res.json();
+}
+
+/** The rule itself lives in the shared model, where it is tested. */
+function transient(err: unknown): boolean {
+  const status =
+    err && typeof err === "object" && "status" in err && typeof err.status === "number"
+      ? err.status
+      : null;
+  return worthRetrying(status);
 }
 
 async function send<T>(method: string, url: string, body?: unknown): Promise<T> {
@@ -127,6 +151,21 @@ export function useChannels() {
   return useQuery<Channel[]>({
     queryKey: ["/api/community/channels"],
     queryFn: () => get("/api/community/channels", "the rooms"),
+    /*
+      This list is the gate to the whole tab, and the global defaults are
+      `retry: false` with `staleTime: Infinity`. One failed request therefore
+      left the Room saying "No rooms are open to you yet" — and never asked
+      again, so it stayed wrong until the app was restarted. A member who has
+      always had access reads that as having lost it.
+
+      The first request after a cold start is the one that fails: the server
+      answers 503 while it is still finding a database connection. So this
+      retries what is worth retrying, and refetches when the app comes back to
+      the foreground.
+    */
+    retry: (count, err) => count < 2 && transient(err),
+    retryDelay: (count) => 400 * 2 ** count,
+    refetchOnWindowFocus: true,
   });
 }
 

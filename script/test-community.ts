@@ -17,6 +17,9 @@ import {
 } from "../shared/utils/highlight.js";
 import { z as _z } from "zod";
 import { zodMessage } from "../shared/utils/zodMessage.js";
+import { worthRetrying } from "../shared/models/community.js";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 let passed = 0;
 let failed = 0;
@@ -324,6 +327,115 @@ check(
 check(
   "an empty error object still says something",
   zodMessage(new _z.ZodError([])) === "That request wasn't valid.",
+);
+
+// ─── Four defects a member found on a phone ────────────────────────────────
+
+/*
+  All four were reported from a device in one message, and none of them can be
+  reached from a test process: three are what a component renders and one is a
+  SQL predicate. So the behavioural rule that could be lifted out was lifted
+  out and is exercised directly; the rest are source assertions, in the manner
+  of script/test-release.ts — cheap, and each one fails if its fix is undone.
+*/
+
+const source = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
+
+section("A failed request is not an answer about access");
+
+/*
+  The Room said "No rooms are open to you yet" when `/api/community/channels`
+  failed, because `!channels.data` is true for a failure and for an empty
+  answer alike. Under `retry: false` and `staleTime: Infinity` it then never
+  asked again. That is the whole of the reported "it said I had no access, and
+  after I reloaded the app it worked".
+*/
+check("no answer at all is worth another try", worthRetrying(null));
+check("503 is worth another try", worthRetrying(503));
+check("500 is worth another try", worthRetrying(500));
+check("429 is worth another try", worthRetrying(429));
+check("401 is an answer, not a failure", !worthRetrying(401));
+check("403 is an answer, not a failure", !worthRetrying(403));
+check("404 is an answer, not a failure", !worthRetrying(404));
+check("400 is an answer, not a failure", !worthRetrying(400));
+
+const tab = source("client/src/components/CommunityTab.tsx");
+const hooks = source("client/src/hooks/use-community.ts");
+
+check(
+  "the tab has a branch for a failed load",
+  /if \(channels\.isError\)/.test(tab),
+);
+check(
+  "and it comes before the one that talks about access",
+  tab.indexOf("if (channels.isError)") < tab.indexOf("if (!channels.data ||"),
+  "the empty-state branch is reachable from an error again",
+);
+check(
+  "it offers a way to ask again rather than requiring a restart",
+  /button-retry-rooms/.test(tab) && /channels\.refetch\(\)/.test(tab),
+);
+check(
+  "the room list retries a transient failure",
+  /retry: \(count, err\) => count < 2 && transient\(err\)/.test(hooks),
+);
+check(
+  "the status reaches the error, so the rule has something to read",
+  /status: res\.status/.test(hooks),
+);
+
+section("Enter breaks the line where there is no shift to hold");
+
+/*
+  Enter sent and Shift+Enter broke the line. A phone keyboard's return key is
+  Enter with `shiftKey` false, so on a phone there was no way to type a second
+  line at all — the attempt posted the half-written message.
+*/
+check(
+  "Enter only sends where a hardware keyboard is",
+  /pointer: fine/.test(tab) && /enterSends && e\.key === "Enter"/.test(tab),
+);
+
+section("A photograph is shown whole, or can be opened");
+
+check("MediaImage can be told not to crop", /fit\?: "cover" \| "contain"/.test(source("client/src/components/MediaImage.tsx")));
+check(
+  "the room feed does not crop it",
+  /aspect="4 \/ 3"\s*\n\s*fit="contain"\s*\n\s*className="max-w-sm"/.test(tab),
+  "the feed image is the one that was cropping — the overlay matching is not enough",
+);
+check(
+  "and tapping it opens the whole thing",
+  /overlay-room-photo/.test(tab) && /setFull\(true\)/.test(tab),
+);
+
+section("Deleting the only thing you posted removes the post");
+
+/*
+  A tombstone exists so replies underneath a deleted parent keep their parent.
+  Nothing hangs off a leaf, so its tombstone holds nothing up — and leaving one
+  there is read, correctly, as "I deleted it and it is still on my screen".
+*/
+const routes = source("server/community/routes.ts");
+check(
+  "the rule is written once",
+  /const stillShown = or\(isNull\(communityMessages\.deletedAt\), gt\(communityMessages\.replyCount, 0\)\)/.test(routes),
+);
+check("the room list applies it", (routes.match(/\n\s+stillShown,/g) ?? []).length >= 2, "expected it on both the room and the thread query");
+check(
+  "a delete takes the reply off its ancestors' counts",
+  /await forgetReply\(updated\.id\)/.test(routes) &&
+    (routes.match(/await forgetReply\(updated\.id\)/g) ?? []).length === 2,
+  "both the member and the admin delete must do it",
+);
+check(
+  "and deleting twice cannot decrement twice",
+  (routes.match(/isNull\(communityMessages\.deletedAt\),/g) ?? []).length >= 3,
+  "the delete routes need the guard the edit route already had",
+);
+check(
+  "the count can never go negative and hide a live message",
+  /greatest\(reply_count - 1, 0\)/.test(routes),
 );
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed`);

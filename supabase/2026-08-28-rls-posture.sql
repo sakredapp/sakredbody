@@ -41,9 +41,21 @@
 -- Additive and reapply-safe. Enabling RLS on a table the owner reads changes
 -- nothing about the application; it changes what everybody else can reach.
 
-BEGIN;
 
 -- ── 1. The four with row security switched off ────────────────────────────
+
+-- NOTE ON TRANSACTIONS
+--
+-- This file deliberately does not open one. It used to begin with BEGIN; and
+-- end the schema changes with COMMIT;, and that COMMIT closed the transaction
+-- the caller had opened around the whole file — so the verification block
+-- below ran outside it. Proved against QA rather than reasoned about: a file
+-- shaped that way, whose verification raises, reports "rolled back" while its
+-- table is still there afterwards.
+--
+-- The caller wraps the file. script/qa-migrate.ts does, and the Management API
+-- runs a file whole. Leave the transaction to whoever is applying this, so
+-- that a verification that objects takes the changes down with it.
 
 ALTER TABLE coach_relationships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE health_connections  ENABLE ROW LEVEL SECURITY;
@@ -89,7 +101,6 @@ DROP POLICY IF EXISTS sakred_coaching_msgs_admin_select ON coaching_messages;
 DROP POLICY IF EXISTS sakred_coaching_msgs_admin_insert ON coaching_messages;
 DROP POLICY IF EXISTS sakred_coaching_msgs_admin_update ON coaching_messages;
 
-COMMIT;
 
 -- Verified by reading the catalogue, and then by actually being somebody else.
 -- A count of enabled tables is the claim; what `anon` can select is the fact.

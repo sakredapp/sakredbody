@@ -67,6 +67,17 @@ export function MediaImage({
   className,
   /** Reserve the space before the bytes land, so nothing jumps. */
   aspect = "4 / 5",
+  /**
+   * `cover` fills the box and crops what does not fit. `contain` shows the
+   * whole photograph and takes the box's shape from it once the bytes are in.
+   *
+   * A grid of thumbnails wants `cover` — equal tiles are the point, and every
+   * one of them opens. Anywhere a photograph is the thing being looked at and
+   * has nothing behind it to open wants `contain`: cropping it there means
+   * the member is shown a portion of their own picture with no way to see the
+   * rest, which is the complaint this exists to answer.
+   */
+  fit = "cover",
   onClick,
 }: {
   assetId: string;
@@ -74,10 +85,22 @@ export function MediaImage({
   alt: string;
   className?: string;
   aspect?: string;
+  fit?: "cover" | "contain";
   onClick?: () => void;
 }) {
   const [url, setUrl] = useState<string | null>(() => cache.get(`${assetId}/${variant}`) ?? null);
   const [failed, setFailed] = useState(false);
+  /*
+    The photograph's own shape, once it is known.
+
+    `contain` inside a box of a different ratio would letterbox — grey bars
+    around a picture, which looks like a bug rather than a decision. Taking
+    the ratio from the image means the rounded corners hug the photograph and
+    nothing is either cropped or padded. Clamped, because a panorama or a
+    screenshot of a whole phone screen would otherwise set the height of the
+    room feed.
+  */
+  const [shape, setShape] = useState<number | null>(null);
   const holder = useRef<HTMLDivElement | null>(null);
   const [near, setNear] = useState(() => cache.has(`${assetId}/${variant}`));
 
@@ -121,7 +144,7 @@ export function MediaImage({
     <div
       ref={holder}
       className={cn("relative overflow-hidden rounded-xl bg-muted/40", className)}
-      style={{ aspectRatio: aspect }}
+      style={{ aspectRatio: fit === "contain" && shape ? String(shape) : aspect }}
       data-testid="media-image"
     >
       {url ? (
@@ -129,7 +152,18 @@ export function MediaImage({
           src={url}
           alt={alt}
           onClick={onClick}
-          className={cn("h-full w-full object-cover", onClick && "cursor-zoom-in")}
+          onLoad={(e) => {
+            if (fit !== "contain") return;
+            const img = e.currentTarget;
+            if (!img.naturalWidth || !img.naturalHeight) return;
+            const ratio = img.naturalWidth / img.naturalHeight;
+            setShape(Math.min(Math.max(ratio, 0.6), 2));
+          }}
+          className={cn(
+            "h-full w-full",
+            fit === "contain" ? "object-contain" : "object-cover",
+            onClick && "cursor-zoom-in",
+          )}
         />
       ) : failed ? (
         /*

@@ -189,6 +189,9 @@ export function MovementAndProgress({ memberId }: { memberId: string }) {
               variant="display"
               alt={`Progress photo from ${open.onDate}`}
               aspect="3 / 4"
+              /* The same crop the Room had: a photo opened full size that
+                 still only showed the middle of itself. */
+              fit="contain"
             />
             <p className="text-xs text-muted-foreground">
               {open.onDate}

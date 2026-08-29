@@ -22,7 +22,10 @@
  * the trade being made deliberately.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { resolve } from "node:path";
+
+const ROOT = process.cwd();
 import { assembleBaseline, GENERATED_PART, PARTS } from "./baseline.js";
 
 let passed = 0;
@@ -130,6 +133,74 @@ check("no table is altered, indexed or secured before it is created", usedBefore
 
 check("the cutoff rule is in the file rather than in somebody's memory",
   /PRE-BASELINE HISTORY/.test(onDisk));
+
+// ─── No migration manages its own transaction ────────────────────────────
+
+/*
+  The caller wraps a migration file; the file must not wrap itself.
+
+  A `COMMIT;` in the middle closes the transaction opened around the whole
+  file, so everything after it — which is where the verification block lives —
+  runs already committed. Demonstrated against QA rather than argued: a file
+  shaped that way, whose verification raises, is reported as "rolled back"
+  while the table it created is still there afterwards. Four migrations were
+  written that way before anyone looked.
+
+  script/qa-migrate.ts refuses such a file, but production is applied through
+  the Management API and never sees that guard. This is the check that does.
+*/
+{
+  /*
+    Six module files predate the rule. They are already applied, and none of
+    them has a statement after its final COMMIT — so the hazard is latent
+    rather than live, and rewriting schema that is in production to close a
+    latent hazard is a worse trade than naming it. Named, so that the list
+    cannot grow quietly, and so a checked one growing a tail is caught.
+  */
+  const LEGACY_SELF_TRANSACTED = [
+    "coaching-attachments.sql",
+    "coaching-plans.sql",
+    "habit-identity.sql",
+    "offerings.sql",
+    "telemetry.sql",
+    "wins.sql",
+  ];
+
+  const files = readdirSync(resolve(ROOT, "supabase"))
+    .filter((f) => f.endsWith(".sql") && !f.startsWith("schema-baseline"));
+  const transacts = (body: string) => /^\s*(BEGIN|COMMIT|ROLLBACK)\s*;/im.test(body);
+
+  const offenders = files.filter(
+    (f) => !LEGACY_SELF_TRANSACTED.includes(f) &&
+      transacts(readFileSync(resolve(ROOT, "supabase", f), "utf8")),
+  );
+  check(
+    "no migration opens or closes its own transaction",
+    offenders.length === 0,
+    `${offenders.join(", ")} — a COMMIT here ends the caller's transaction, and a verification after it cannot roll anything back`,
+  );
+
+  /* And the exceptions are still exceptions. */
+  const healed = LEGACY_SELF_TRANSACTED.filter(
+    (f) => !transacts(readFileSync(resolve(ROOT, "supabase", f), "utf8")),
+  );
+  check(
+    "the legacy list names only files that still need naming",
+    healed.length === 0,
+    `${healed.join(", ")} no longer self-transacts — take it off the list`,
+  );
+
+  const grewATail = LEGACY_SELF_TRANSACTED.filter((f) => {
+    const body = readFileSync(resolve(ROOT, "supabase", f), "utf8");
+    const last = body.toUpperCase().lastIndexOf("\nCOMMIT;");
+    return last >= 0 && body.slice(last + 8).replace(/--.*$/gm, "").trim().length > 0;
+  });
+  check(
+    "and none of them has grown a statement after its last COMMIT",
+    grewATail.length === 0,
+    `${grewATail.join(", ")} — that statement is outside the transaction`,
+  );
+}
 
 if (failures.length) {
   console.error("\n✗ baseline\n");

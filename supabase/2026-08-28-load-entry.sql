@@ -29,9 +29,21 @@
 -- exactly the arithmetic the product used before this feature: one load, one
 -- performance. No past total moves because this migration ran.
 
-BEGIN;
 
 -- ── 1. The setting ─────────────────────────────────────────────────────────
+
+-- NOTE ON TRANSACTIONS
+--
+-- This file deliberately does not open one. It used to begin with BEGIN; and
+-- end the schema changes with COMMIT;, and that COMMIT closed the transaction
+-- the caller had opened around the whole file — so the verification block
+-- below ran outside it. Proved against QA rather than reasoned about: a file
+-- shaped that way, whose verification raises, reports "rolled back" while its
+-- table is still there afterwards.
+--
+-- The caller wraps the file. script/qa-migrate.ts does, and the Management API
+-- runs a file whole. Leave the transaction to whoever is applying this, so
+-- that a verification that objects takes the changes down with it.
 
 ALTER TABLE exercises
   ADD COLUMN IF NOT EXISTS load_entry text NOT NULL DEFAULT 'total';
@@ -87,7 +99,6 @@ UPDATE exercises
  WHERE equipment IN ('dumbbell', 'kettlebell')
    AND load_entry = 'total';
 
-COMMIT;
 
 -- Verified from the tables rather than from the success of the statements
 -- above. RLS-on-with-zero-policies is the failure that looks like success, and

@@ -505,3 +505,21 @@ export const messageReactions = pgTable(
 );
 
 export type MessageReaction = typeof messageReactions.$inferSelect;
+
+/**
+ * Whether a failed request is worth asking again, or is an answer.
+ *
+ * 401, 403 and 404 are the server saying something true about this member and
+ * this room; repeating the question does not change it. Everything else — no
+ * answer at all, a 5xx, a rate limit — is a fact about the moment.
+ *
+ * This exists because the Room had no way to tell those apart. `useChannels`
+ * runs under the global `retry: false` / `staleTime: Infinity`, so a single
+ * 503 from a server that had not yet found a database connection left the tab
+ * saying "No rooms are open to you yet" — an authorization sentence built out
+ * of a network failure — and nothing ever asked again. A member who had always
+ * had access read it as having lost it, and a restart was the only cure.
+ */
+export function worthRetrying(status: number | null): boolean {
+  return status === null || status === 429 || status >= 500;
+}
