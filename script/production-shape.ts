@@ -64,19 +64,42 @@
  * Compared against the leading date in a migration filename, so it is the same
  * ordering rule the cutoff already relies on.
  */
-export const SHAPE_READ_AT = "20260817";
+export const SHAPE_READ_AT = "20260829";
 
+/*
+  Re-read 29 Aug 2026, immediately after the six-file chain was applied:
+  recommendation-events, goals, load-entry, rls-posture,
+  saved-workout-composition, reply-count. Every figure below moved because of a
+  migration this repository contains, which is the first of the two cases the
+  note above describes — nothing here was changed to make a check pass.
+
+  Two of the movements are worth naming:
+
+    rlsEnabled 90 → 104, with rls-off now 0. Four tables carrying personal
+    data — coach_relationships, health_connections, health_days,
+    health_workouts — had row security disabled in production. Read as `anon`
+    beforehand they answered: 834 health days, 200 health workouts, 2
+    connections. They answer 0 now.
+
+    policies 155 → 152, and functions 6 → 5. Three permissive
+    `USING (true)` policies on coaching_messages were dropped — anon could
+    read, insert and update coaching messages, and did answer with 4 of them —
+    and `bump_reply_count()` went with its trigger, so the reply count has one
+    writer again.
+
+  These numbers are now identical to QA's, which is the point of the exercise.
+*/
 export const PRODUCTION_SHAPE = {
-  tables: 94,
-  policies: 155,
-  rlsEnabled: 90,
+  tables: 104,
+  policies: 152,
+  rlsEnabled: 104,
   /** Ours. The other 31 in `public` arrive with pg_trgm. */
-  functions: 6,
-  foreignKeys: 99,
-  checkConstraints: 116,
-  indexes: 325,
-  columns: 1008,
-  triggers: 2,
+  functions: 5,
+  foreignKeys: 109,
+  checkConstraints: 132,
+  indexes: 362,
+  columns: 1120,
+  triggers: 1,
 } as const;
 
 /** The queries that read each figure back out of a rebuilt database. */

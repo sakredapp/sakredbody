@@ -107,21 +107,53 @@ const policies = (sql.match(/CREATE POLICY/g) ?? []).length;
  * production does not have, which fails with a number that invites somebody
  * to edit the measurement.
  */
-const migrationSql = appliedMigrations().map((f) => readFileSync(f, "utf8")).join("\n");
 const countIn = (text: string, re: RegExp) => (text.match(re) ?? []).length;
-
-const POLICY = /create policy/gi;
 const ENABLE = /enable row level security/gi;
 
-const baselinePolicies = PRODUCTION_SHAPE.policies - countIn(migrationSql, POLICY);
-const baselineEnables = PRODUCTION_SHAPE.rlsEnabled - countIn(migrationSql, ENABLE);
+/**
+ * What the baseline itself must contain.
+ *
+ * This used to be derived — production's shape today, minus whatever the
+ * applied migrations add on top. That worked while every applied migration
+ * only ever added, and stopped working the day production caught up: the six
+ * applied on 29 Aug create ten tables and, in `2026-08-28-rls-posture.sql`,
+ * *drop* three policies with `DROP POLICY IF EXISTS`. A file cannot tell you
+ * how many of six conditional drops found something, so the subtraction has no
+ * right answer and the three checks failed with numbers that invite somebody
+ * to edit the measurement — the exact outcome `SHAPE_READ_AT` was written to
+ * prevent.
+ *
+ * So the reference point moves to the thing that genuinely cannot drift. The
+ * baseline is a snapshot taken at `BASELINE_CUTOFF` and is never regenerated;
+ * what it must produce is therefore a constant, not a function of a database
+ * that keeps changing. `PRODUCTION_SHAPE` stays what it is — the current
+ * reading, which is what the parity run at the bottom compares a rebuilt
+ * database against.
+ *
+ * If these three numbers ever need to change, the baseline was regenerated,
+ * and that is a decision somebody made rather than a drift to absorb.
+ */
+const BASELINE_SHAPE = { tables: 94, policies: 154, rlsEnabled: 89 } as const;
 
-check("it creates every table production has", tables === PRODUCTION_SHAPE.tables,
-  `${tables} of ${PRODUCTION_SHAPE.tables}`);
-check("and carries every policy the migrations do not add later",
-  policies === baselinePolicies, `${policies} of ${baselinePolicies}`);
-check("row-level security is enabled where production enables it",
-  countIn(sql, ENABLE) === baselineEnables, `${countIn(sql, ENABLE)} of ${baselineEnables}`);
+check("it creates every table the baseline is responsible for", tables === BASELINE_SHAPE.tables,
+  `${tables} of ${BASELINE_SHAPE.tables}`);
+check("and carries the policies it was snapshotted with",
+  policies === BASELINE_SHAPE.policies, `${policies} of ${BASELINE_SHAPE.policies}`);
+check("row-level security is enabled where the snapshot enabled it",
+  countIn(sql, ENABLE) === BASELINE_SHAPE.rlsEnabled, `${countIn(sql, ENABLE)} of ${BASELINE_SHAPE.rlsEnabled}`);
+
+/*
+  And the gap between the two is the migrations, which must still be there.
+  Without this the constants above could quietly describe a baseline that no
+  longer reaches production at all.
+*/
+const postCutoff = postBaselineMigrations();
+check("the migrations that carry the baseline up to production are present",
+  postCutoff.length > 0 && tables + countIn(
+    postCutoff.map((f) => readFileSync(f, "utf8")).join("\n"),
+    /create table\s+(?:if not exists\s+)?(?:public\.)?"?[a-z_]+"?/gi,
+  ) >= PRODUCTION_SHAPE.tables,
+  `${tables} in the baseline plus ${postCutoff.length} migration file(s) must reach ${PRODUCTION_SHAPE.tables}`);
 check("the helper functions the policies need are present",
   /FUNCTION public\.is_sakred_admin/.test(sql) && /FUNCTION public\.can_see_channel/.test(sql));
 check("the cutoff rule is written down, not remembered",
@@ -162,8 +194,12 @@ const NON_DRIZZLE_TABLES: readonly string[] = [];
   check("every baseline table is in the Drizzle schema", missing.length === 0, missing.join(", "));
   check("and the allowlist is still empty", NON_DRIZZLE_TABLES.length === 0,
     NON_DRIZZLE_TABLES.join(", "));
-  check(`Drizzle emits all ${PRODUCTION_SHAPE.tables}`, drizzleTables.size === PRODUCTION_SHAPE.tables,
-    `${drizzleTables.size}`);
+  /* The generated part is inside the frozen baseline, so it is measured
+     against the baseline's own count, not against a production that has moved
+     on since. Tables added after the cutoff are checked below instead — by
+     whether a migration creates them, which is the question that matters. */
+  check(`Drizzle emits all ${BASELINE_SHAPE.tables} the baseline creates`,
+    drizzleTables.size === BASELINE_SHAPE.tables, `${drizzleTables.size}`);
 }
 
 /**
