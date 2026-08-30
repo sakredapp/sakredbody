@@ -101,7 +101,7 @@ import { Input } from "@/components/ui/input";
 import { MovementPicker, type Movement } from "./MovementPicker";
 import { NewMovement } from "./NewMovement";
 import { ObservationForm, observationSummary, type Observation } from "./Observation";
-import { LOAD_ENTRIES, loadEntryLabel, supersetLabels } from "@shared/models/training";
+import { LOAD_ENTRIES, loadEntryLabel, numericDraft, supersetLabels } from "@shared/models/training";
 import { MovementMemory, MEMORY_KEY } from "./TrainingMemory";
 import { cn } from "@/lib/utils";
 
@@ -348,11 +348,11 @@ function SetRow({
         */
         <div className="relative flex-1">
           <Input
-            type="number"
+            type="text"
             inputMode="decimal"
             placeholder={unit}
             value={d.weight}
-            onChange={(e) => onChange({ weight: e.target.value })}
+            onChange={(e) => onChange({ weight: numericDraft(e.target.value) })}
             className="h-10 pr-14"
             aria-label={`Weight, set ${index}, in ${unit}${
               m.loadEntry === "per_limb" ? ` ${loadEntryLabel(m.loadEntry, m.unilateral)}` : ""
@@ -375,21 +375,21 @@ function SetRow({
 
       {duration ? (
         <Input
-          type="number"
+          type="text"
           inputMode="numeric"
           placeholder={asMinutes ? "mins" : "secs"}
           value={d.seconds}
-          onChange={(e) => onChange({ seconds: e.target.value })}
+          onChange={(e) => onChange({ seconds: numericDraft(e.target.value, { decimals: false }) })}
           className="h-10"
           aria-label={asMinutes ? "Minutes" : "Seconds"}
         />
       ) : (
         <Input
-          type="number"
+          type="text"
           inputMode="numeric"
           placeholder="reps"
           value={d.reps}
-          onChange={(e) => onChange({ reps: e.target.value })}
+          onChange={(e) => onChange({ reps: numericDraft(e.target.value, { decimals: false }) })}
           className="h-10"
           aria-label="Reps"
         />
@@ -533,10 +533,10 @@ function SetMeta({
           be one more control to find in that audit.
         */}
         <Input
-          type="number"
+          type="text"
           inputMode="numeric"
           value={d.rpe}
-          onChange={(e) => onChange({ rpe: e.target.value })}
+          onChange={(e) => onChange({ rpe: numericDraft(e.target.value, { decimals: false }) })}
           className="h-9 w-14 px-1.5 text-center"
           placeholder="—"
           aria-label="RPE, 1 to 10"
@@ -1060,7 +1060,18 @@ function Sheet() {
       }
       body.reps = reps;
     }
-    if (m.takesLoad) body.weight = d.weight ? Number(d.weight) : 0;
+    /* The box now hands over what was typed rather than what the browser was
+       willing to keep, so a half-finished number like "7." can reach here.
+       `Number` turns that into 7; only genuine nonsense becomes NaN, and that
+       must never be sent as a weight. */
+    if (m.takesLoad) {
+      const weight = d.weight ? Number(d.weight) : 0;
+      if (!Number.isFinite(weight)) {
+        toast({ title: "That weight isn't a number.", variant: "destructive" });
+        return null;
+      }
+      body.weight = weight;
+    }
     body.setStyle = d.style;
     body.toFailure = d.toFailure;
     body.rpe = d.rpe ? Number(d.rpe) : null;

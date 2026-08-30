@@ -41,7 +41,8 @@
     "qa:superset": "tsx script/qa-superset-builder.ts",
     "release:pair": "bash script/release-pair.sh",
     "release:parity": "node script/native-parity.mjs",
-    "qa:room-defects": "tsx script/qa-room-defects.ts"
+    "qa:room-defects": "tsx script/qa-room-defects.ts",
+    "qa:weight": "tsx script/qa-weight-entry.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.116.0",

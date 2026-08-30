@@ -2296,3 +2296,43 @@ export type HabitExercise = typeof habitExercises.$inferSelect;
 export type WorkoutSession = typeof workoutSessions.$inferSelect;
 export type WorkoutSet = typeof workoutSets.$inferSelect;
 export type BodyMeasurement = typeof bodyMeasurements.$inferSelect;
+
+/**
+ * What a member is allowed to have typed so far into a number box.
+ *
+ * ── Why these are not `<input type="number">` ─────────────────────────────
+ *
+ * Because that control sanitises its own value, and a controlled React input
+ * therefore cannot see what was typed — only what the browser was willing to
+ * keep. Anything it judges incomplete or invalid arrives at `onChange` as the
+ * empty string, so the state is set to "", so the box redraws empty. On a
+ * desktop keyboard that is nearly invisible. On a phone keypad it is the whole
+ * experience: a member on a locale whose decimal separator is a comma types
+ * the comma its keypad offers, the browser rejects the value, and from then on
+ * every digit lands in a field that keeps clearing itself. "I can't type any
+ * numbers."
+ *
+ * `type="text"` with `inputMode="decimal"` raises the same keypad on both
+ * platforms and hands over exactly what was pressed. Which means the rule about
+ * what a number looks like has to live here instead — where it can be tested,
+ * and where both the weight box and the reps box read it from one place.
+ *
+ * Deliberately permissive about *incomplete* input: "" and "7." and "." are all
+ * allowed through, because they are what a half-typed number looks like and a
+ * box that refuses them is the same bug in a smaller form. `measures()` is what
+ * decides whether a finished draft is a usable set.
+ */
+export function numericDraft(raw: string, opts: { decimals?: boolean } = {}): string {
+  const decimals = opts.decimals !== false;
+  /* A comma is a decimal point on most of the world's keypads. Accepting it
+     and storing a dot means the member types what their phone offers and the
+     server still receives a number. */
+  let out = raw.replace(/,/g, ".").replace(decimals ? /[^0-9.]/g : /[^0-9]/g, "");
+  if (decimals) {
+    const first = out.indexOf(".");
+    if (first !== -1) {
+      out = out.slice(0, first + 1) + out.slice(first + 1).replace(/\./g, "");
+    }
+  }
+  return out;
+}

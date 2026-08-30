@@ -24,7 +24,7 @@
  * the second. Half of what follows is about that one multiplication.
  */
 import { readFileSync } from "node:fs";
-import {
+import { numericDraft,
   defaultLoadEntry,
   enteredLoadLabel,
   estimateOneRepMax,
@@ -405,4 +405,41 @@ if (failures.length) {
   console.error("");
   process.exit(1);
 }
+// ─── The number boxes hand over what was typed ─────────────────────────────
+
+/*
+  From a phone, during a workout: "i cant type ny numbers".
+
+  `<input type="number">` sanitises its own value, so a controlled React input
+  never sees what was pressed — only what the browser kept. Anything it judges
+  invalid arrives as "", the state becomes "", and the box redraws empty. The
+  clearest way in is a keypad whose decimal separator is a comma: press it once
+  and the field starts clearing itself.
+
+  So the workout's boxes are `type="text"` with `inputMode="decimal"`, which
+  raises the same keypad and hands over the keystrokes, and the rule about what
+  a number looks like lives in `numericDraft` where it can be tested.
+*/
+section("A number box keeps what was typed");
+
+const eqd = (name: string, got: string, want: string) =>
+  check(name, got === want, `got ${JSON.stringify(got)}, wanted ${JSON.stringify(want)}`);
+
+eqd("plain digits pass through", numericDraft("70"), "70");
+eqd("a decimal point survives", numericDraft("70.5"), "70.5");
+eqd("a comma is the decimal point most keypads offer", numericDraft("70,5"), "70.5");
+eqd("letters cannot get in", numericDraft("7a0"), "70");
+eqd("and neither can a second point", numericDraft("70.5.2"), "70.52");
+
+/* Half-typed numbers are allowed through on purpose. A box that refuses "7."
+   is the same defect wearing a smaller hat — the member cannot get to "7.5". */
+eqd("an empty box stays empty", numericDraft(""), "");
+eqd("a lone point is a number being typed", numericDraft("."), ".");
+eqd("and so is a trailing point", numericDraft("7."), "7.");
+
+/* Reps and seconds are whole. */
+eqd("reps take no decimal point", numericDraft("12.5", { decimals: false }), "125");
+eqd("reps still take digits", numericDraft("12", { decimals: false }), "12");
+eqd("nonsense becomes nothing rather than NaN", numericDraft("abc"), "");
+
 console.log(`\n✓ ${passed} load assertions passed\n`);
